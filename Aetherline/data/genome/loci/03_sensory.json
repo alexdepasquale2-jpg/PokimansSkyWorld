@@ -1,0 +1,43 @@
+[
+  { "id": "sens_vision", "chromosome_id": "chr_sensory_far", "display_name": "Vision",
+    "description": "Acuity by day, and how much of it survives into the dark.",
+    "category": "SENSORY", "expression_mode": "ADDITIVE", "map_position_cm": 10.0,
+    "allele_ids": ["vision_keen", "vision_typical", "vision_nocturnal"],
+    "trait_keys": ["sight", "night_sight"], "trait_baselines": { "sight": 1.0, "night_sight": 0.0 },
+    "mutation_susceptibility": 1.4, "show_in_summary": true },
+
+  { "id": "sens_hearing", "chromosome_id": "chr_sensory_far", "display_name": "Hearing",
+    "description": "Auditory range. Cheap early warning, and the difference between an ambush and a fight.",
+    "category": "SENSORY", "expression_mode": "ADDITIVE", "map_position_cm": 42.0,
+    "allele_ids": ["hear_acute", "hear_typical", "hear_dull"],
+    "trait_keys": ["hearing"], "trait_baselines": { "hearing": 1.0 },
+    "mutation_susceptibility": 1.3, "show_in_summary": true },
+
+  { "id": "sens_focus", "chromosome_id": "chr_sensory_far", "display_name": "Sensory Focus",
+    "description": "Whether the animal takes in everything at once or fixes hard on one thing.",
+    "category": "SENSORY", "expression_mode": "DOMINANT", "map_position_cm": 68.0,
+    "allele_ids": ["focus_wide", "focus_narrow"],
+    "trait_keys": ["perception", "sight"], "trait_baselines": { "perception": 1.0, "sight": 0.0 },
+    "mutation_susceptibility": 1.2, "show_in_summary": true },
+
+  { "id": "sens_scent", "chromosome_id": "chr_sensory_near", "display_name": "Olfaction",
+    "description": "Scent and the ability to follow it. The foundation of every tracking lineage.",
+    "category": "SENSORY", "expression_mode": "ADDITIVE", "map_position_cm": 11.0,
+    "allele_ids": ["scent_bloodhound", "scent_typical", "scent_poor"],
+    "trait_keys": ["scent", "tracking"], "trait_baselines": { "scent": 1.0, "tracking": 0.0 },
+    "mutation_susceptibility": 1.4, "show_in_summary": true },
+
+  { "id": "sens_vibration", "chromosome_id": "chr_sensory_near", "display_name": "Tremor Sense",
+    "description": "Recessive gate. Reads movement through the ground — worthless above it, decisive below.",
+    "category": "SENSORY", "expression_mode": "RECESSIVE_GATE", "map_position_cm": 38.0,
+    "allele_ids": ["tremor_sensitive", "tremor_absent"],
+    "trait_keys": ["tremor_sense"], "trait_baselines": { "tremor_sense": 0.0 },
+    "mutation_susceptibility": 1.7, "show_in_summary": true },
+
+  { "id": "sens_exotic", "chromosome_id": "chr_sensory_near", "display_name": "Aether Sensitivity",
+    "description": "Recessive gate, rare allele. Whatever the sensitive lineages are perceiving, it is not light or sound. Hides in a bloodline for generations before it surfaces.",
+    "category": "SENSORY", "expression_mode": "RECESSIVE_GATE", "map_position_cm": 55.0,
+    "allele_ids": ["aether_attuned", "aether_deaf"],
+    "trait_keys": ["aether_sense"], "trait_baselines": { "aether_sense": 0.0 },
+    "mutation_susceptibility": 2.2, "show_in_summary": true }
+]

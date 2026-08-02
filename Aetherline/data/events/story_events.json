@@ -1,0 +1,113 @@
+[
+  {
+    "id": "story_guardian_stirring",
+    "kind": "archetype_stirring",
+    "severity": 0.35,
+    "cooldown_ticks": 400,
+    "once_per_creature": true,
+    "requires_archetype": "arch_guardian",
+    "requires_stage": "EMERGENT",
+    "conditions": [
+      { "metric": "protect_ally", "comparator": ">=", "threshold": 12.0 }
+    ],
+    "tags": ["archetype", "foreshadow"],
+    "text": "{name} has started positioning itself between the others and the treeline without being told to. It has done this {m.protect_ally} times now."
+  },
+
+  {
+    "id": "story_guardian_vigil",
+    "kind": "guardian_vigil",
+    "severity": 0.75,
+    "cooldown_ticks": 1200,
+    "once_per_creature": true,
+    "requires_archetype": "arch_guardian",
+    "requires_stage": "CRYSTALLIZED",
+    "conditions": [
+      { "metric": "damage_absorbed_for_ally", "comparator": ">=", "threshold": 150.0 }
+    ],
+    "tags": ["archetype", "protector"],
+    "text": "The others have stopped watching the dark. {name} is doing it for them. {history}"
+  },
+
+  {
+    "id": "story_bloodline_deepens",
+    "kind": "lineage_depth",
+    "severity": 0.6,
+    "cooldown_ticks": 2000,
+    "once_per_creature": true,
+    "conditions": [
+      { "metric": "generation", "comparator": ">=", "threshold": 6.0 }
+    ],
+    "tags": ["lineage"],
+    "text": "{name} is the sixth generation of {lineage}. Nothing of the founder's world remains in the pens except this."
+  },
+
+  {
+    "id": "story_survivor_improbable",
+    "kind": "improbable_survival",
+    "severity": 0.8,
+    "cooldown_ticks": 1500,
+    "once_per_creature": true,
+    "conditions": [
+      { "metric": "near_death_survived", "comparator": ">=", "threshold": 5.0 },
+      { "metric": "age_days", "comparator": ">=", "threshold": 40.0 }
+    ],
+    "tags": ["survival", "uncanny"],
+    "text": "By any reasonable accounting {name} should be dead. {history}"
+  },
+
+  {
+    "id": "story_broken_quiet",
+    "kind": "broken_quiet",
+    "severity": 0.85,
+    "cooldown_ticks": 1500,
+    "once_per_creature": true,
+    "requires_archetype": "arch_broken",
+    "requires_stage": "CRYSTALLIZED",
+    "conditions": [],
+    "tags": ["tragic"],
+    "text": "{name} has stopped responding to its name. It eats when food is put down and does nothing else. {history}"
+  },
+
+  {
+    "id": "story_inherited_burden",
+    "kind": "inherited_mark",
+    "severity": 0.7,
+    "cooldown_ticks": 1800,
+    "once_per_creature": true,
+    "requires_mark": "epi_maul_trauma",
+    "conditions": [
+      { "metric": "generation", "comparator": ">=", "threshold": 2.0 }
+    ],
+    "tags": ["epigenetics", "lineage"],
+    "text": "{name} flinches at the treeline, and has never once been near it. Whatever happened to its grandparents on {birth_planet} is still being handed down."
+  },
+
+  {
+    "id": "story_apex_ascendant",
+    "kind": "apex_ascendant",
+    "severity": 0.9,
+    "cooldown_ticks": 2400,
+    "once_per_creature": true,
+    "requires_archetype": "arch_apex",
+    "requires_stage": "CRYSTALLIZED",
+    "conditions": [],
+    "tags": ["predator", "legendary"],
+    "text": "The native fauna have redrawn their range around {name}. {history}"
+  },
+
+  {
+    "id": "story_oracle_stillness",
+    "kind": "oracle_stillness",
+    "severity": 0.95,
+    "cooldown_ticks": 3000,
+    "once_per_creature": true,
+    "requires_trait": "aether_sense",
+    "min_trait_value": 0.5,
+    "conditions": [
+      { "metric": "threat_foreseen", "comparator": ">=", "threshold": 6.0 }
+    ],
+    "tags": ["uncanny", "rare"],
+    "text": "{name} went still and faced an empty stretch of sky. Forty minutes later, something came over the ridge. This is the sixth time."
+  }
+]

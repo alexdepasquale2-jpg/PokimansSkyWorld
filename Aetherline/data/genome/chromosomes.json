@@ -1,0 +1,76 @@
+[
+  { "id": "chr_form", "display_name": "Form", "display_order": 0, "length_cm": 120.0,
+    "description": "Overall body plan. Long chromosome — its loci recombine freely, so size, build and posture mix independently.",
+    "locus_ids": ["morph_size", "morph_build", "morph_posture", "morph_tail"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_integument", "display_name": "Integument", "display_order": 1, "length_cm": 70.0,
+    "description": "Coat, hide and colouration. Short enough that a distinctive pelt tends to drag its hide and pigment along with it.",
+    "locus_ids": ["integ_pelage", "integ_hide", "integ_pigment"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_limbs", "display_name": "Locomotion", "display_order": 2, "length_cm": 95.0,
+    "description": "Limb architecture and gait.",
+    "locus_ids": ["limb_count", "limb_gait", "limb_extremity"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_metabolic", "display_name": "Metabolism", "display_order": 3, "length_cm": 88.0,
+    "description": "Diet and the efficiency with which it is turned into a living animal.",
+    "locus_ids": ["meta_diet", "meta_efficiency", "meta_water"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_thermal", "display_name": "Homeostasis", "display_order": 4, "length_cm": 62.0,
+    "description": "Temperature, atmosphere and toxin handling. Deliberately SHORT: this is the survival package, and a lineage that adapts to a hostile world should be able to pass that adaptation on as a unit.",
+    "locus_ids": ["therm_core", "therm_respiration", "therm_toxin"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_vitality", "display_name": "Vitality", "display_order": 5, "length_cm": 105.0,
+    "description": "Endurance, ageing and reproduction.",
+    "locus_ids": ["vital_stamina", "vital_senescence", "repro_fertility", "repro_gestation"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_sensory_far", "display_name": "Far Senses", "display_order": 6, "length_cm": 75.0,
+    "description": "Sight and hearing.",
+    "locus_ids": ["sens_vision", "sens_hearing", "sens_focus"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_sensory_near", "display_name": "Near Senses", "display_order": 7, "length_cm": 58.0,
+    "description": "Scent, vibration, and whatever the aether-sensitive lineages are actually doing.",
+    "locus_ids": ["sens_scent", "sens_vibration", "sens_exotic"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_offense", "display_name": "Offense", "display_order": 8, "length_cm": 85.0,
+    "description": "How the animal hurts things.",
+    "locus_ids": ["comb_power", "comb_weapon", "comb_venom", "comb_tempo"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_defense", "display_name": "Resilience", "display_order": 9, "length_cm": 80.0,
+    "description": "How the animal survives being hurt.",
+    "locus_ids": ["def_plating", "def_evasion", "def_constitution"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_labor", "display_name": "Aptitude", "display_order": 10, "length_cm": 90.0,
+    "description": "What the animal is actually useful for around a colony.",
+    "locus_ids": ["work_haul", "work_craft", "work_husbandry", "work_forage"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_temperament", "display_name": "Temperament", "display_order": 11, "length_cm": 98.0,
+    "description": "Disposition before life has had a vote. Long chromosome — temperament should not inherit as one indivisible block, or every animal in a bloodline would have the same personality.",
+    "locus_ids": ["behav_aggression", "behav_sociability", "behav_curiosity", "behav_stress"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_special", "display_name": "Latent", "display_order": 12, "length_cm": 45.0,
+    "description": "Rare ability slots. VERY short and mostly recessive: exotic traits should hide in a bloodline for generations and then surface together, which is the single best surprise this system can produce.",
+    "locus_ids": ["spec_slot_a", "spec_slot_b", "spec_potency"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_genomic", "display_name": "Genomic Architecture", "display_order": 13, "length_cm": 70.0,
+    "description": "The copying machinery itself, plus how readily this animal forms epigenetic marks. Genes about genes.",
+    "locus_ids": ["mut_rate", "mut_repair", "mut_plasticity"],
+    "uniparental": false, "uniparental_source": "GAMETE_B" },
+
+  { "id": "chr_cyto", "display_name": "Cytoplasmic", "display_order": 14, "length_cm": 18.0,
+    "description": "Mitochondrial analogue. Inherited whole from the gestating parent and never recombined, which gives the lineage UI a clean, unbroken maternal line to trace back through every planet the bloodline has crossed.",
+    "locus_ids": ["cyto_efficiency", "cyto_thermal"],
+    "uniparental": true, "uniparental_source": "GAMETE_B" }
+]

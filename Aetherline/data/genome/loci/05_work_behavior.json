@@ -1,0 +1,57 @@
+[
+  { "id": "work_haul", "chromosome_id": "chr_labor", "display_name": "Draught Aptitude",
+    "description": "Built to carry and pull.",
+    "category": "WORK", "expression_mode": "ADDITIVE", "map_position_cm": 11.0,
+    "allele_ids": ["haul_bearer", "haul_typical", "haul_poor"],
+    "trait_keys": ["haul"], "trait_baselines": { "haul": 1.0 },
+    "mutation_susceptibility": 1.0, "show_in_summary": true },
+
+  { "id": "work_craft", "chromosome_id": "chr_labor", "display_name": "Manipulation",
+    "description": "Fine work. Useless without the extremities to do it with.",
+    "category": "WORK", "expression_mode": "ADDITIVE", "map_position_cm": 38.0,
+    "allele_ids": ["craft_deft", "craft_typical", "craft_clumsy"],
+    "trait_keys": ["craft", "dexterity"], "trait_baselines": { "craft": 1.0, "dexterity": 1.0 },
+    "mutation_susceptibility": 1.0, "show_in_summary": true },
+
+  { "id": "work_husbandry", "chromosome_id": "chr_labor", "display_name": "Husbandry Instinct",
+    "description": "Reading and calming other creatures. The gene behind every good herd-minder and every emotional-support animal.",
+    "category": "WORK", "expression_mode": "ADDITIVE", "map_position_cm": 62.0,
+    "allele_ids": ["husb_attentive", "husb_typical", "husb_oblivious"],
+    "trait_keys": ["husbandry", "empathy"], "trait_baselines": { "husbandry": 1.0, "empathy": 1.0 },
+    "mutation_susceptibility": 1.1, "show_in_summary": true },
+
+  { "id": "work_forage", "chromosome_id": "chr_labor", "display_name": "Foraging",
+    "description": "Finding food that is not obviously there. Contributes scent alongside olfaction.",
+    "category": "WORK", "expression_mode": "ADDITIVE", "map_position_cm": 84.0,
+    "allele_ids": ["forage_gifted", "forage_typical", "forage_hopeless"],
+    "trait_keys": ["forage", "scent"], "trait_baselines": { "forage": 1.0, "scent": 0.0 },
+    "mutation_susceptibility": 1.1, "show_in_summary": true },
+
+  { "id": "behav_aggression", "chromosome_id": "chr_temperament", "display_name": "Aggression",
+    "description": "How readily it reaches for violence, and how little it minds the odds.",
+    "category": "BEHAVIOR", "expression_mode": "INCOMPLETE", "map_position_cm": 10.0,
+    "allele_ids": ["aggr_fierce", "aggr_even", "aggr_placid"],
+    "trait_keys": ["aggression", "boldness"], "trait_baselines": { "aggression": 0.5, "boldness": 0.5 },
+    "mutation_susceptibility": 1.3, "show_in_summary": true },
+
+  { "id": "behav_sociability", "chromosome_id": "chr_temperament", "display_name": "Sociability",
+    "description": "Herd animal or loner, and how hard it bonds once it does.",
+    "category": "BEHAVIOR", "expression_mode": "INCOMPLETE", "map_position_cm": 40.0,
+    "allele_ids": ["social_herd", "social_typical", "social_solitary"],
+    "trait_keys": ["sociability", "loyalty"], "trait_baselines": { "sociability": 0.5, "loyalty": 0.5 },
+    "mutation_susceptibility": 1.3, "show_in_summary": true },
+
+  { "id": "behav_curiosity", "chromosome_id": "chr_temperament", "display_name": "Curiosity",
+    "description": "Investigates the strange thing, or does not. Drives trainability — a dull animal is a safe animal and a useless one.",
+    "category": "BEHAVIOR", "expression_mode": "ADDITIVE", "map_position_cm": 66.0,
+    "allele_ids": ["curio_probing", "curio_typical", "curio_incurious"],
+    "trait_keys": ["curiosity", "trainability"], "trait_baselines": { "curiosity": 0.5, "trainability": 1.0 },
+    "mutation_susceptibility": 1.4, "show_in_summary": true },
+
+  { "id": "behav_stress", "chromosome_id": "chr_temperament", "display_name": "Stress Resilience",
+    "description": "How much the world can do to this animal before it changes it. Directly opposes the epigenetics system — a resilient animal resists being written on.",
+    "category": "BEHAVIOR", "expression_mode": "ADDITIVE", "map_position_cm": 88.0,
+    "allele_ids": ["stress_unshakeable", "stress_typical", "stress_brittle"],
+    "trait_keys": ["stress_resilience"], "trait_baselines": { "stress_resilience": 1.0 },
+    "mutation_susceptibility": 1.2, "show_in_summary": true }
+]

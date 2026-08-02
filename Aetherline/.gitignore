@@ -1,0 +1,14 @@
+# Godot 4
+.godot/
+/android/
+*.tmp
+*.bak
+
+# Exported builds
+/build/
+/export/
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store

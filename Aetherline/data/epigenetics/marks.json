@@ -1,0 +1,101 @@
+[
+  { "id": "epi_cold_hardening", "display_name": "Cold-Hardened",
+    "description": "Seasons of hard cold have retuned this creature's thermal response.",
+    "target_trait": "cold_tolerance", "effect": "ADD", "magnitude": 0.55,
+    "stability": 0.75, "heritability_chance": 0.0, "source": "ENVIRONMENT", "tags": ["cold", "environmental"] },
+
+  { "id": "epi_heat_hardening", "display_name": "Sun-Cured",
+    "description": "Long exposure to punishing heat.",
+    "target_trait": "heat_tolerance", "effect": "ADD", "magnitude": 0.55,
+    "stability": 0.75, "heritability_chance": 0.0, "source": "ENVIRONMENT", "tags": ["heat", "environmental"] },
+
+  { "id": "epi_dense_frame", "display_name": "Gravity-Dense",
+    "description": "Grown under heavy gravity; bone and muscle laid down denser than the genome intended.",
+    "target_trait": "mass", "effect": "MULTIPLY", "magnitude": 0.18,
+    "stability": 0.8, "heritability_chance": 0.0, "source": "ENVIRONMENT", "tags": ["gravity", "environmental"] },
+
+  { "id": "epi_thin_air", "display_name": "Thin-Air Lungs",
+    "description": "Raised where the atmosphere is barely worth breathing. The lungs adapted; nothing else did.",
+    "target_trait": "atmo_tolerance", "effect": "ADD", "magnitude": 0.4,
+    "stability": 0.7, "heritability_chance": 0.0, "source": "ENVIRONMENT", "tags": ["atmosphere", "environmental"] },
+
+  { "id": "epi_night_shifted", "display_name": "Night-Shifted",
+    "description": "A world with a long dark, and eyes that gave up waiting for the sun.",
+    "target_trait": "night_sight", "effect": "ADD", "magnitude": 0.35,
+    "stability": 0.6, "heritability_chance": 0.0, "source": "ENVIRONMENT", "tags": ["dark", "environmental"] },
+
+  { "id": "epi_lean_rations", "display_name": "Lean-Fed",
+    "description": "Chronic short rations. The body has learned to expect less.",
+    "target_trait": "stamina", "effect": "MULTIPLY", "magnitude": -0.22,
+    "stability": 0.3, "heritability_chance": 0.0, "source": "DIET", "tags": ["hunger", "diet"] },
+
+  { "id": "epi_rich_forage", "display_name": "Well-Fed",
+    "description": "Abundant forage through the formative seasons.",
+    "target_trait": "mass", "effect": "MULTIPLY", "magnitude": 0.12,
+    "stability": 0.25, "heritability_chance": 0.0, "source": "DIET", "tags": ["diet"] },
+
+  { "id": "epi_mineral_diet", "display_name": "Mineral-Fed",
+    "description": "Something in the forage here hardens the hide.",
+    "target_trait": "armor", "effect": "ADD", "magnitude": 0.2,
+    "stability": 0.45, "heritability_chance": 0.0, "source": "DIET", "tags": ["diet"] },
+
+  { "id": "epi_toil_callus", "display_name": "Work-Hardened",
+    "description": "Years under load. The frame has adapted to bearing weight.",
+    "target_trait": "haul", "effect": "ADD", "magnitude": 0.45,
+    "stability": 0.55, "heritability_chance": 0.0, "source": "WORK", "tags": ["work"] },
+
+  { "id": "epi_practised_hands", "display_name": "Practised",
+    "description": "Ten thousand repetitions of fine work.",
+    "target_trait": "craft", "effect": "ADD", "magnitude": 0.4,
+    "stability": 0.55, "heritability_chance": 0.0, "source": "WORK", "tags": ["work"] },
+
+  { "id": "epi_maul_trauma", "display_name": "Mauled",
+    "description": "Survived something that should have killed it, and has never entirely put it down.",
+    "target_trait": "aggression", "effect": "MULTIPLY", "magnitude": 0.4,
+    "stability": 0.95, "heritability_chance": 0.02, "source": "STRESS", "tags": ["trauma", "combat"] },
+
+  { "id": "epi_broken_spirit", "display_name": "Broken",
+    "description": "Whatever it was bred to be, it no longer reaches for it.",
+    "target_trait": "aggression", "effect": "SILENCE", "magnitude": 0.7,
+    "stability": 0.85, "heritability_chance": 0.0, "source": "STRESS", "tags": ["trauma"] },
+
+  { "id": "epi_chronic_vigilance", "display_name": "Never Still",
+    "description": "Too many bad nights. It does not stop watching.",
+    "target_trait": "perception", "effect": "ADD", "magnitude": 0.35,
+    "stability": 0.8, "heritability_chance": 0.01, "source": "STRESS", "tags": ["trauma", "vigilance"] },
+
+  { "id": "epi_battle_reflex", "display_name": "Blooded",
+    "description": "Enough fights survived that the body reacts before the animal decides to.",
+    "target_trait": "evasion", "effect": "ADD", "magnitude": 0.35,
+    "stability": 0.7, "heritability_chance": 0.0, "source": "COMBAT", "tags": ["combat"] },
+
+  { "id": "epi_killers_edge", "display_name": "Killer's Edge",
+    "description": "It has done this often enough to be efficient about it.",
+    "target_trait": "attack_power", "effect": "MULTIPLY", "magnitude": 0.25,
+    "stability": 0.75, "heritability_chance": 0.01, "source": "COMBAT", "tags": ["combat", "predator"] },
+
+  { "id": "epi_herd_bond", "display_name": "Herd-Bonded",
+    "description": "Raised close among others of its kind.",
+    "target_trait": "sociability", "effect": "ADD", "magnitude": 0.3,
+    "stability": 0.6, "heritability_chance": 0.0, "source": "SOCIAL", "tags": ["social"] },
+
+  { "id": "epi_isolation", "display_name": "Kept Apart",
+    "description": "Too long alone. Whatever it was for company, it is less of it now.",
+    "target_trait": "sociability", "effect": "MULTIPLY", "magnitude": -0.35,
+    "stability": 0.65, "heritability_chance": 0.0, "source": "SOCIAL", "tags": ["social", "isolation"] },
+
+  { "id": "epi_drilled_focus", "display_name": "Drilled",
+    "description": "Deliberate conditioning. Takes patience, and it holds.",
+    "target_trait": "agility", "effect": "ADD", "magnitude": 0.3,
+    "stability": 0.7, "heritability_chance": 0.05, "source": "TRAINING", "tags": ["training"] },
+
+  { "id": "epi_trained_recall", "display_name": "Trained to Hand",
+    "description": "Comes when called, and keeps coming when it matters.",
+    "target_trait": "trainability", "effect": "ADD", "magnitude": 0.45,
+    "stability": 0.75, "heritability_chance": 0.06, "source": "TRAINING", "tags": ["training", "bonded"] },
+
+  { "id": "epi_lab_fixed", "display_name": "Fixed in the Lab",
+    "description": "Deliberately induced and stabilised. Unlike anything life does on its own, this one was built to be passed on.",
+    "target_trait": "epigenetic_plasticity", "effect": "ENHANCE", "magnitude": 0.5,
+    "stability": 0.98, "heritability_chance": 0.35, "source": "RESEARCH", "tags": ["research", "engineered"] }
+]

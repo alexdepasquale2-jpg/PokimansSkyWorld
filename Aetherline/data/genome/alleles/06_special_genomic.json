@@ -1,0 +1,39 @@
+[
+  { "id": "spec_lumen", "locus_id": "spec_slot_a", "display_name": "Bioluminescent", "description": "Both copies required. The animal produces its own light.",
+    "dominance": 0.5, "contributions": { "lumen": 1.0, "display": 0.6 }, "tags": ["special", "lumen", "rare"], "natural_weight": 0.3, "mutation_weight": 1.4 },
+  { "id": "spec_null_a", "locus_id": "spec_slot_a", "display_name": "Slot I Silent", "description": "Nothing latent here.",
+    "dominance": 0.5, "contributions": { "lumen": 0.0, "display": 0.0 }, "tags": [], "natural_weight": 3.0, "mutation_weight": 1.0 },
+
+  { "id": "spec_mending", "locus_id": "spec_slot_b", "display_name": "Mending Flesh", "description": "Both copies required. Wounds close at a rate that unsettles observers.",
+    "dominance": 0.5, "contributions": { "regeneration": 0.9, "aether_sense": 0.3 }, "tags": ["special", "mending", "rare"], "natural_weight": 0.3, "mutation_weight": 1.4 },
+  { "id": "spec_null_b", "locus_id": "spec_slot_b", "display_name": "Slot II Silent", "description": "Nothing latent here.",
+    "dominance": 0.5, "contributions": { "regeneration": 0.0, "aether_sense": 0.0 }, "tags": [], "natural_weight": 3.0, "mutation_weight": 1.0 },
+
+  { "id": "potency_high", "locus_id": "spec_potency", "display_name": "High Potency", "description": "Amplifies whatever latent traits did surface. Worthless alone.",
+    "dominance": 0.5, "contributions": { "special_potency": 0.7 }, "tags": ["potent"], "natural_weight": 0.9, "mutation_weight": 1.0 },
+  { "id": "potency_typical", "locus_id": "spec_potency", "display_name": "Typical Potency", "description": "Ordinary expression strength.",
+    "dominance": 0.5, "contributions": { "special_potency": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "potency_low", "locus_id": "spec_potency", "display_name": "Low Potency", "description": "Even a surfaced gift comes through faint.",
+    "dominance": 0.5, "contributions": { "special_potency": -0.4 }, "tags": [], "natural_weight": 1.2, "mutation_weight": 1.0 },
+
+  { "id": "mut_conserved", "locus_id": "mut_rate", "display_name": "Conserved", "description": "Copies faithfully. Breeds true; adapts slowly.",
+    "dominance": 0.5, "contributions": { "mutation_rate": -0.55 }, "tags": ["stable"], "natural_weight": 1.0, "mutation_weight": 0.5 },
+  { "id": "mut_typical", "locus_id": "mut_rate", "display_name": "Typical Fidelity", "description": "Ordinary copying.",
+    "dominance": 0.5, "contributions": { "mutation_rate": 0.0 }, "tags": [], "natural_weight": 3.0, "mutation_weight": 1.0 },
+  { "id": "mut_volatile", "locus_id": "mut_rate", "display_name": "Volatile", "description": "Sloppy replication. Throws more monsters and more marvels.",
+    "dominance": 0.5, "contributions": { "mutation_rate": 1.6 }, "tags": ["volatile"], "natural_weight": 0.6, "mutation_weight": 1.4 },
+
+  { "id": "repair_diligent", "locus_id": "mut_repair", "display_name": "Diligent Repair", "description": "Catches most of what replication got wrong.",
+    "dominance": 0.5, "contributions": { "mutation_rate": -0.35, "genome_integrity": 0.5 }, "tags": ["stable"], "natural_weight": 1.2, "mutation_weight": 0.6 },
+  { "id": "repair_typical", "locus_id": "mut_repair", "display_name": "Typical Repair", "description": "Catches some of it.",
+    "dominance": 0.5, "contributions": { "mutation_rate": 0.0, "genome_integrity": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "repair_lax", "locus_id": "mut_repair", "display_name": "Lax Repair", "description": "Lets it through. Compounds badly with volatile replication.",
+    "dominance": 0.5, "contributions": { "mutation_rate": 0.7, "genome_integrity": -0.45 }, "tags": ["volatile"], "natural_weight": 0.9, "mutation_weight": 1.2 },
+
+  { "id": "plast_labile", "locus_id": "mut_plasticity", "display_name": "Labile", "description": "Rewritten fast by whatever happens to it. Learns its world quickly and is scarred by it just as quickly.",
+    "dominance": 0.5, "contributions": { "epigenetic_plasticity": 0.8 }, "tags": ["plastic"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "plast_typical", "locus_id": "mut_plasticity", "display_name": "Typical Plasticity", "description": "Marked at the ordinary rate.",
+    "dominance": 0.5, "contributions": { "epigenetic_plasticity": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "plast_fixed", "locus_id": "mut_plasticity", "display_name": "Fixed", "description": "What it was born is very nearly what it stays.",
+    "dominance": 0.5, "contributions": { "epigenetic_plasticity": -0.55 }, "tags": ["fixed"], "natural_weight": 1.0, "mutation_weight": 1.0 }
+]

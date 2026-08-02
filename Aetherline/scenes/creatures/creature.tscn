@@ -1,0 +1,38 @@
+[gd_scene load_steps=10 format=3 uid="uid://baethercreature"]
+
+[ext_resource type="Script" path="res://scenes/creatures/creature.gd" id="0_creature"]
+[ext_resource type="Script" path="res://scripts/components/stats_component.gd" id="1_stats"]
+[ext_resource type="Script" path="res://scripts/components/genetics_component.gd" id="2_genetics"]
+[ext_resource type="Script" path="res://scripts/components/epigenetics_component.gd" id="3_epigenetics"]
+[ext_resource type="Script" path="res://scripts/components/archetype_component.gd" id="4_archetype"]
+[ext_resource type="Script" path="res://scripts/components/experience_component.gd" id="4b_experience"]
+[ext_resource type="Script" path="res://scripts/components/needs_component.gd" id="5_needs"]
+[ext_resource type="Script" path="res://scripts/components/ai_controller.gd" id="6_ai"]
+[ext_resource type="Script" path="res://scripts/components/visual_controller.gd" id="7_visual"]
+
+[node name="Creature" type="Node2D"]
+script = ExtResource("0_creature")
+
+[node name="Stats" type="Node" parent="."]
+script = ExtResource("1_stats")
+
+[node name="Genetics" type="Node" parent="."]
+script = ExtResource("2_genetics")
+
+[node name="Epigenetics" type="Node" parent="."]
+script = ExtResource("3_epigenetics")
+
+[node name="Archetype" type="Node" parent="."]
+script = ExtResource("4_archetype")
+
+[node name="Experience" type="Node" parent="."]
+script = ExtResource("4b_experience")
+
+[node name="Needs" type="Node" parent="."]
+script = ExtResource("5_needs")
+
+[node name="AI" type="Node" parent="."]
+script = ExtResource("6_ai")
+
+[node name="Visual" type="Node" parent="."]
+script = ExtResource("7_visual")

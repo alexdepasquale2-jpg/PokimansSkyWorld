@@ -1,0 +1,50 @@
+[
+  { "id": "comb_power", "chromosome_id": "chr_offense", "display_name": "Musculature",
+    "description": "Raw striking power. Contributes mass as well — strength is not free.",
+    "category": "COMBAT", "expression_mode": "ADDITIVE", "map_position_cm": 12.0,
+    "allele_ids": ["power_massive", "power_typical", "power_wiry"],
+    "trait_keys": ["attack_power", "mass"], "trait_baselines": { "attack_power": 1.0, "mass": 0.0 },
+    "mutation_susceptibility": 0.9, "show_in_summary": true },
+
+  { "id": "comb_weapon", "chromosome_id": "chr_offense", "display_name": "Natural Weapon",
+    "description": "What the animal actually attacks with. Gates which innate moves it can use at all.",
+    "category": "COMBAT", "expression_mode": "DOMINANT", "map_position_cm": 40.0,
+    "allele_ids": ["weapon_fangs", "weapon_talons", "weapon_horns"],
+    "trait_keys": ["attack_power", "armor_pierce"], "trait_baselines": { "attack_power": 0.0, "armor_pierce": 0.0 },
+    "mutation_susceptibility": 1.0, "show_in_summary": true },
+
+  { "id": "comb_venom", "chromosome_id": "chr_offense", "display_name": "Venom",
+    "description": "Recessive gate. Two copies or nothing — venom is all-or-nothing chemistry.",
+    "category": "COMBAT", "expression_mode": "RECESSIVE_GATE", "map_position_cm": 66.0,
+    "allele_ids": ["venom_potent", "venom_absent"],
+    "trait_keys": ["venom"], "trait_baselines": { "venom": 0.0 },
+    "mutation_susceptibility": 1.9, "show_in_summary": true },
+
+  { "id": "comb_tempo", "chromosome_id": "chr_offense", "display_name": "Combat Tempo",
+    "description": "Fast flurries or heavy committed blows, and what each costs in wind.",
+    "category": "COMBAT", "expression_mode": "ADDITIVE", "map_position_cm": 80.0,
+    "allele_ids": ["tempo_rapid", "tempo_measured", "tempo_ponderous"],
+    "trait_keys": ["attack_speed", "stamina_cost"], "trait_baselines": { "attack_speed": 1.0, "stamina_cost": 1.0 },
+    "mutation_susceptibility": 1.1, "show_in_summary": true },
+
+  { "id": "def_plating", "chromosome_id": "chr_defense", "display_name": "Plating",
+    "description": "Hard defence. The third contributor to armour, after build and hide.",
+    "category": "COMBAT", "expression_mode": "ADDITIVE", "map_position_cm": 10.0,
+    "allele_ids": ["plate_heavy", "plate_partial", "plate_none"],
+    "trait_keys": ["armor", "mass"], "trait_baselines": { "armor": 0.0, "mass": 0.0 },
+    "mutation_susceptibility": 1.0, "show_in_summary": true },
+
+  { "id": "def_evasion", "chromosome_id": "chr_defense", "display_name": "Evasion",
+    "description": "Not being where the blow lands. The other way to survive a fight.",
+    "category": "COMBAT", "expression_mode": "ADDITIVE", "map_position_cm": 38.0,
+    "allele_ids": ["evade_darting", "evade_typical", "evade_stolid"],
+    "trait_keys": ["evasion", "agility"], "trait_baselines": { "evasion": 1.0, "agility": 0.0 },
+    "mutation_susceptibility": 1.2, "show_in_summary": true },
+
+  { "id": "def_constitution", "chromosome_id": "chr_defense", "display_name": "Constitution",
+    "description": "How much punishment the body absorbs, and how fast it repairs.",
+    "category": "COMBAT", "expression_mode": "ADDITIVE", "map_position_cm": 62.0,
+    "allele_ids": ["const_hardy", "const_typical", "const_frail"],
+    "trait_keys": ["vitality", "regeneration"], "trait_baselines": { "vitality": 1.0, "regeneration": 0.0 },
+    "mutation_susceptibility": 1.0, "show_in_summary": true }
+]

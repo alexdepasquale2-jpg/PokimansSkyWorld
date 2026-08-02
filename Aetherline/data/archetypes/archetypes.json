@@ -1,0 +1,230 @@
+[
+  {
+    "id": "arch_guardian",
+    "display_name": "Guardian",
+    "description": "It has spent its life getting between other creatures and whatever was coming for them. Not brave, exactly — it does not appear to consider the alternative.",
+    "crystallization_text": "{name} has become a Guardian. Whatever comes for the others now goes through it first.",
+    "conditions": [
+      { "metric": "protect_ally", "comparator": ">=", "threshold": 24.0, "weight": 3.0, "required": true },
+      { "metric": "damage_absorbed_for_ally", "comparator": ">=", "threshold": 120.0, "weight": 2.0 }
+    ],
+    "prerequisites": { "min_age_days": 40 },
+    "granted_abilities": ["ability_intercept", "ability_rally"],
+    "trait_modifiers": {
+      "armor": { "add": 0.25 },
+      "vitality": { "mul": 1.15 },
+      "loyalty": { "add": 0.3 }
+    },
+    "ai_bias": { "protect": 3.0, "flee": 0.3 },
+    "exclusivity_group": "core",
+    "conflicts_with": ["arch_wanderer"],
+    "narrative_tags": ["protector", "steadfast"],
+    "shatter_conditions": [
+      { "metric": "ally_died_under_protection", "comparator": ">=", "threshold": 4.0, "weight": 1.0 }
+    ],
+    "rarity": 0.4
+  },
+
+  {
+    "id": "arch_bulwark",
+    "display_name": "Bulwark",
+    "description": "Hit it. It is still there. That is the entire argument.",
+    "crystallization_text": "{name} has become a Bulwark. It has stopped noticing damage that would have killed it once.",
+    "conditions": [
+      { "metric": "damage_taken", "comparator": ">=", "threshold": 600.0, "weight": 3.0, "required": true },
+      { "metric": "near_death_survived", "comparator": ">=", "threshold": 4.0, "weight": 2.0, "required": true },
+      { "metric": "combat_win", "comparator": ">=", "threshold": 8.0, "weight": 1.0 }
+    ],
+    "prerequisites": { "min_age_days": 40 },
+    "granted_abilities": ["ability_brace", "ability_second_wind"],
+    "trait_modifiers": { "armor": { "add": 0.4 }, "vitality": { "mul": 1.3 }, "speed": { "mul": 0.9 } },
+    "ai_bias": { "fight": 1.8, "flee": 0.2 },
+    "exclusivity_group": "core",
+    "conflicts_with": [],
+    "narrative_tags": ["enduring", "scarred"],
+    "shatter_conditions": [],
+    "rarity": 0.45
+  },
+
+  {
+    "id": "arch_apex",
+    "display_name": "Apex",
+    "description": "Somewhere along the way it stopped being something that survives predators and became the reason other things do not.",
+    "crystallization_text": "{name} has become an Apex. The local fauna have started giving it distance.",
+    "conditions": [
+      { "metric": "kill", "comparator": ">=", "threshold": 30.0, "weight": 3.0, "required": true },
+      { "metric": "combat_win", "comparator": ">=", "threshold": 24.0, "weight": 2.0, "required": true },
+      { "metric": "combat_loss", "comparator": "<=", "threshold": 6.0, "weight": 1.0, "required": true }
+    ],
+    "prerequisites": { "min_age_days": 50, "requires_trait": "diet_meat", "min_trait_value": 0.7 },
+    "granted_abilities": ["ability_terrify", "ability_execute"],
+    "trait_modifiers": { "attack_power": { "mul": 1.3 }, "aggression": { "add": 0.2 }, "sociability": { "add": -0.2 } },
+    "ai_bias": { "fight": 3.0, "flee": 0.1 },
+    "exclusivity_group": "core",
+    "conflicts_with": ["arch_shepherd"],
+    "narrative_tags": ["predator", "feared", "legendary"],
+    "shatter_conditions": [
+      { "metric": "combat_loss", "comparator": ">=", "threshold": 15.0, "weight": 1.0 }
+    ],
+    "rarity": 0.2
+  },
+
+  {
+    "id": "arch_hunter",
+    "display_name": "Hunter",
+    "description": "Patient in a way that unsettles people. It will follow a scent across a valley and be waiting when the thing stops to rest.",
+    "crystallization_text": "{name} has become a Hunter. It brings things back now without being asked.",
+    "conditions": [
+      { "metric": "track_success", "comparator": ">=", "threshold": 30.0, "weight": 3.0, "required": true },
+      { "metric": "kill", "comparator": ">=", "threshold": 12.0, "weight": 1.5 },
+      { "metric": "forage_success", "comparator": ">=", "threshold": 20.0, "weight": 1.0 }
+    ],
+    "prerequisites": { "min_age_days": 25 },
+    "granted_abilities": ["ability_track", "ability_ambush"],
+    "trait_modifiers": { "scent": { "add": 0.4 }, "tracking": { "add": 0.5 }, "evasion": { "add": 0.2 } },
+    "ai_bias": { "seek_food": 2.0, "wander": 1.5 },
+    "exclusivity_group": "core",
+    "conflicts_with": [],
+    "narrative_tags": ["tracker", "patient"],
+    "shatter_conditions": [],
+    "rarity": 0.4
+  },
+
+  {
+    "id": "arch_wanderer",
+    "display_name": "Wanderer",
+    "description": "It has been on more worlds than most colonists. It does not settle, and it does not seem to want to.",
+    "crystallization_text": "{name} has become a Wanderer. It has stopped treating any particular sky as home.",
+    "conditions": [
+      { "metric": "planets_visited", "comparator": ">=", "threshold": 5.0, "weight": 3.0, "required": true },
+      { "metric": "distance_travelled", "comparator": ">=", "threshold": 40000.0, "weight": 2.0 },
+      { "metric": "biomes_entered", "comparator": ">=", "threshold": 12.0, "weight": 1.0 }
+    ],
+    "prerequisites": { "min_age_days": 60 },
+    "granted_abilities": ["ability_pathfind", "ability_acclimate"],
+    "trait_modifiers": {
+      "gait_endurance": { "add": 0.4 },
+      "atmo_tolerance": { "add": 0.3 },
+      "epigenetic_plasticity": { "mul": 1.2 }
+    },
+    "ai_bias": { "wander": 3.0, "idle": 0.4 },
+    "exclusivity_group": "core",
+    "conflicts_with": ["arch_guardian"],
+    "narrative_tags": ["traveller", "restless"],
+    "shatter_conditions": [],
+    "rarity": 0.35
+  },
+
+  {
+    "id": "arch_progenitor",
+    "display_name": "Progenitor",
+    "description": "Half the animals in the pens have its jaw. Whatever else it did with its life, this is what will outlast it.",
+    "crystallization_text": "{name} has become a Progenitor. The line is no longer in any danger of ending.",
+    "conditions": [
+      { "metric": "offspring_sired", "comparator": ">=", "threshold": 12.0, "weight": 3.0, "required": true },
+      { "metric": "offspring_survived", "comparator": ">=", "threshold": 8.0, "weight": 2.0, "required": true }
+    ],
+    "prerequisites": { "min_age_days": 80 },
+    "granted_abilities": ["ability_vigour", "ability_matriarch"],
+    "trait_modifiers": { "fertility": { "add": 0.4 }, "lifespan": { "mul": 1.1 }, "empathy": { "add": 0.25 } },
+    "ai_bias": { "idle": 1.5, "protect": 1.6 },
+    "exclusivity_group": "core",
+    "conflicts_with": [],
+    "narrative_tags": ["founder", "fecund", "legendary"],
+    "shatter_conditions": [],
+    "rarity": 0.3
+  },
+
+  {
+    "id": "arch_shepherd",
+    "display_name": "Shepherd",
+    "description": "It settles the others. Put it in a pen of frightened animals and within an hour they are eating again.",
+    "crystallization_text": "{name} has become a Shepherd. The herd is calmer when it is in the pen, and measurably worse when it is not.",
+    "conditions": [
+      { "metric": "creature_calmed", "comparator": ">=", "threshold": 30.0, "weight": 3.0, "required": true },
+      { "metric": "creature_tended", "comparator": ">=", "threshold": 40.0, "weight": 2.0 },
+      { "metric": "kill", "comparator": "<=", "threshold": 3.0, "weight": 1.0, "required": true }
+    ],
+    "prerequisites": { "min_age_days": 35 },
+    "granted_abilities": ["ability_soothe", "ability_herd"],
+    "trait_modifiers": { "husbandry": { "add": 0.5 }, "empathy": { "add": 0.5 }, "sociability": { "add": 0.3 } },
+    "ai_bias": { "idle": 2.0, "protect": 1.5, "fight": 0.3 },
+    "exclusivity_group": "core",
+    "conflicts_with": ["arch_apex"],
+    "narrative_tags": ["nurturing", "calm"],
+    "shatter_conditions": [],
+    "rarity": 0.35
+  },
+
+  {
+    "id": "arch_survivor",
+    "display_name": "Survivor",
+    "description": "It has been starved, frozen, and left for dead, and it is still eating out of your hand. There is something slightly unnerving about it.",
+    "crystallization_text": "{name} has become a Survivor. Three separate things should have killed it by now.",
+    "conditions": [
+      { "metric": "days_starving", "comparator": ">=", "threshold": 20.0, "weight": 2.0 },
+      { "metric": "near_death_survived", "comparator": ">=", "threshold": 5.0, "weight": 3.0, "required": true },
+      { "metric": "coldest_endured", "comparator": ">=", "threshold": 30.0, "weight": 1.5 },
+      { "metric": "hazards_endured", "comparator": ">=", "threshold": 10.0, "weight": 1.5 }
+    ],
+    "prerequisites": { "min_age_days": 45 },
+    "granted_abilities": ["ability_cling_to_life", "ability_scavenge"],
+    "trait_modifiers": {
+      "vitality": { "mul": 1.2 },
+      "food_efficiency": { "add": 0.35 },
+      "stress_resilience": { "add": 0.4 }
+    },
+    "ai_bias": { "seek_food": 1.8, "flee": 1.4 },
+    "exclusivity_group": "core",
+    "conflicts_with": [],
+    "narrative_tags": ["enduring", "unkillable"],
+    "shatter_conditions": [],
+    "rarity": 0.3
+  },
+
+  {
+    "id": "arch_oracle",
+    "display_name": "Oracle",
+    "description": "It goes still, and stares at a patch of empty air, and forty minutes later something comes over the ridge. Nobody has a good explanation.",
+    "crystallization_text": "{name} has become an Oracle. It knew about the ridge before anyone else did, and it has stopped bothering to explain how.",
+    "conditions": [
+      { "metric": "anomaly_investigated", "comparator": ">=", "threshold": 8.0, "weight": 3.0, "required": true },
+      { "metric": "threat_foreseen", "comparator": ">=", "threshold": 12.0, "weight": 3.0, "required": true }
+    ],
+    "prerequisites": { "min_age_days": 60, "requires_trait": "aether_sense", "min_trait_value": 0.5 },
+    "granted_abilities": ["ability_foresight", "ability_readsign"],
+    "trait_modifiers": { "perception": { "add": 0.5 }, "aether_sense": { "add": 0.5 }, "curiosity": { "add": 0.3 } },
+    "ai_bias": { "idle": 2.0, "wander": 1.3, "fight": 0.4 },
+    "exclusivity_group": "core",
+    "conflicts_with": [],
+    "narrative_tags": ["uncanny", "rare", "legendary"],
+    "shatter_conditions": [],
+    "rarity": 0.08
+  },
+
+  {
+    "id": "arch_broken",
+    "display_name": "Broken",
+    "description": "Whatever it was bred to be, it does not reach for it any more. It eats, it sleeps, and it flinches at nothing in particular.",
+    "crystallization_text": "{name} is Broken. It was going to be something, once.",
+    "conditions": [
+      { "metric": "trauma_events", "comparator": ">=", "threshold": 10.0, "weight": 3.0, "required": true },
+      { "metric": "combat_loss", "comparator": ">=", "threshold": 10.0, "weight": 1.5 },
+      { "metric": "isolation_days", "comparator": ">=", "threshold": 30.0, "weight": 1.5 }
+    ],
+    "prerequisites": {},
+    "granted_abilities": ["ability_dead_eyed"],
+    "trait_modifiers": {
+      "aggression": { "mul": 0.5 },
+      "trainability": { "mul": 0.5 },
+      "stress_resilience": { "mul": 0.6 },
+      "evasion": { "add": 0.2 }
+    },
+    "ai_bias": { "flee": 2.5, "idle": 1.5, "fight": 0.3 },
+    "exclusivity_group": "scar",
+    "conflicts_with": [],
+    "narrative_tags": ["tragic", "damaged"],
+    "shatter_conditions": [],
+    "rarity": 0.5
+  }
+]

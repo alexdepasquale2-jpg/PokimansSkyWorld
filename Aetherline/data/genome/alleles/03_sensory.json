@@ -1,0 +1,37 @@
+[
+  { "id": "vision_keen", "locus_id": "sens_vision", "display_name": "Keen-Eyed", "description": "Sees the thing on the ridge.",
+    "dominance": 0.5, "contributions": { "sight": 0.7, "night_sight": 0.0 }, "tags": ["keen"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "vision_typical", "locus_id": "sens_vision", "display_name": "Typical Vision", "description": "Adequate.",
+    "dominance": 0.5, "contributions": { "sight": 0.0, "night_sight": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "vision_nocturnal", "locus_id": "sens_vision", "display_name": "Nocturnal", "description": "Trades daylight acuity for the dark.",
+    "dominance": 0.5, "contributions": { "sight": -0.3, "night_sight": 0.9 }, "tags": ["nocturnal"], "natural_weight": 1.0, "mutation_weight": 1.1 },
+
+  { "id": "hear_acute", "locus_id": "sens_hearing", "display_name": "Acute Hearing", "description": "Hears it coming.",
+    "dominance": 0.5, "contributions": { "hearing": 0.7 }, "tags": ["keen"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "hear_typical", "locus_id": "sens_hearing", "display_name": "Typical Hearing", "description": "Ordinary ears.",
+    "dominance": 0.5, "contributions": { "hearing": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "hear_dull", "locus_id": "sens_hearing", "display_name": "Dull Hearing", "description": "Startles easily, for good reason.",
+    "dominance": 0.5, "contributions": { "hearing": -0.45 }, "tags": [], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "focus_wide", "locus_id": "sens_focus", "display_name": "Wide Focus", "description": "Dominant. Takes in everything, fixes on nothing.",
+    "dominance": 0.6, "contributions": { "perception": 0.5, "sight": -0.1 }, "tags": ["watchful"], "natural_weight": 1.5, "mutation_weight": 1.0 },
+  { "id": "focus_narrow", "locus_id": "sens_focus", "display_name": "Narrow Focus", "description": "Recessive. Locks on hard and misses the flank.",
+    "dominance": 0.4, "contributions": { "perception": -0.2, "sight": 0.4 }, "tags": ["fixated"], "natural_weight": 1.5, "mutation_weight": 1.0 },
+
+  { "id": "scent_bloodhound", "locus_id": "sens_scent", "display_name": "Bloodhound", "description": "Follows a two-day-old trail.",
+    "dominance": 0.5, "contributions": { "scent": 0.8, "tracking": 0.9 }, "tags": ["tracker"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "scent_typical", "locus_id": "sens_scent", "display_name": "Typical Olfaction", "description": "Smells what is in front of it.",
+    "dominance": 0.5, "contributions": { "scent": 0.0, "tracking": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "scent_poor", "locus_id": "sens_scent", "display_name": "Poor Olfaction", "description": "Barely there.",
+    "dominance": 0.5, "contributions": { "scent": -0.4, "tracking": -0.3 }, "tags": [], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "tremor_sensitive", "locus_id": "sens_vibration", "display_name": "Tremor-Sensitive", "description": "Both copies required. Reads movement through the ground.",
+    "dominance": 0.5, "contributions": { "tremor_sense": 0.9 }, "tags": ["tremor"], "natural_weight": 0.6, "mutation_weight": 1.2 },
+  { "id": "tremor_absent", "locus_id": "sens_vibration", "display_name": "Tremor-Blind", "description": "Feels nothing coming.",
+    "dominance": 0.5, "contributions": { "tremor_sense": 0.0 }, "tags": [], "natural_weight": 2.6, "mutation_weight": 1.0 },
+
+  { "id": "aether_attuned", "locus_id": "sens_exotic", "display_name": "Aether-Attuned", "description": "Rare, recessive. Perceives something that is not light or sound. Hides in a bloodline for generations.",
+    "dominance": 0.5, "contributions": { "aether_sense": 1.0 }, "tags": ["aether", "rare"], "natural_weight": 0.25, "mutation_weight": 1.3 },
+  { "id": "aether_deaf", "locus_id": "sens_exotic", "display_name": "Aether-Deaf", "description": "As nearly everything is.",
+    "dominance": 0.5, "contributions": { "aether_sense": 0.0 }, "tags": [], "natural_weight": 3.0, "mutation_weight": 1.0 }
+]

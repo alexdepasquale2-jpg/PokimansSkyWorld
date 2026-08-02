@@ -1,0 +1,77 @@
+[
+  { "id": "diet_carnivore", "locus_id": "meta_diet", "display_name": "Carnivorous", "description": "Meat, or nothing.",
+    "dominance": 0.6, "contributions": { "diet_meat": 0.5, "diet_plant": -0.5 }, "tags": ["predator"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "diet_herbivore", "locus_id": "meta_diet", "display_name": "Herbivorous", "description": "Forage, and plenty of it.",
+    "dominance": 0.6, "contributions": { "diet_meat": -0.5, "diet_plant": 0.5 }, "tags": ["grazer"], "natural_weight": 1.6, "mutation_weight": 1.0 },
+  { "id": "diet_omnivore", "locus_id": "meta_diet", "display_name": "Omnivorous", "description": "Recessive to both specialists, but survives what they cannot.",
+    "dominance": 0.4, "contributions": { "diet_meat": 0.1, "diet_plant": 0.1 }, "tags": ["adaptable"], "natural_weight": 1.0, "mutation_weight": 1.2 },
+
+  { "id": "metab_thrifty", "locus_id": "meta_efficiency", "display_name": "Thrifty", "description": "Wrings everything out of poor food. Runs lean.",
+    "dominance": 0.5, "contributions": { "food_efficiency": 0.55, "mass": -0.15 }, "tags": ["thrifty"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "metab_typical", "locus_id": "meta_efficiency", "display_name": "Typical Metabolism", "description": "Ordinary conversion.",
+    "dominance": 0.5, "contributions": { "food_efficiency": 0.0, "mass": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "metab_profligate", "locus_id": "meta_efficiency", "display_name": "Profligate", "description": "Grows big and costs a fortune to keep.",
+    "dominance": 0.5, "contributions": { "food_efficiency": -0.4, "mass": 0.3 }, "tags": ["hungry"], "natural_weight": 0.9, "mutation_weight": 1.0 },
+
+  { "id": "water_retentive", "locus_id": "meta_water", "display_name": "Water-Retentive", "description": "Can hold an arid world.",
+    "dominance": 0.5, "contributions": { "water_efficiency": 0.7 }, "tags": ["arid_adapted"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "water_typical", "locus_id": "meta_water", "display_name": "Typical Water Economy", "description": "Needs a drink like anything else.",
+    "dominance": 0.5, "contributions": { "water_efficiency": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "water_thirsty", "locus_id": "meta_water", "display_name": "Thirsty", "description": "Tied to standing water. A liability off the wetlands.",
+    "dominance": 0.5, "contributions": { "water_efficiency": -0.45 }, "tags": [], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "therm_cold", "locus_id": "therm_core", "display_name": "Cold-Adapted", "description": "Runs warm in the deep cold, suffers in heat.",
+    "dominance": 0.5, "contributions": { "cold_tolerance": 0.6, "heat_tolerance": -0.3 }, "tags": ["cold_adapted"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "therm_heat", "locus_id": "therm_core", "display_name": "Heat-Adapted", "description": "Sheds heat efficiently, freezes easily.",
+    "dominance": 0.5, "contributions": { "cold_tolerance": -0.3, "heat_tolerance": 0.6 }, "tags": ["heat_adapted"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "therm_temperate", "locus_id": "therm_core", "display_name": "Temperate", "description": "Comfortable in the middle, excellent nowhere.",
+    "dominance": 0.5, "contributions": { "cold_tolerance": 0.0, "heat_tolerance": 0.0 }, "tags": [], "natural_weight": 2.0, "mutation_weight": 1.0 },
+
+  { "id": "resp_broad", "locus_id": "therm_respiration", "display_name": "Broad-Spectrum Lungs", "description": "Breathes what would kill most things. Not efficient about it.",
+    "dominance": 0.5, "contributions": { "atmo_tolerance": 0.7, "stamina": -0.15 }, "tags": ["hardy"], "natural_weight": 0.9, "mutation_weight": 1.1 },
+  { "id": "resp_standard", "locus_id": "therm_respiration", "display_name": "Standard Respiration", "description": "Wants an ordinary atmosphere.",
+    "dominance": 0.5, "contributions": { "atmo_tolerance": 0.0, "stamina": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "resp_efficient", "locus_id": "therm_respiration", "display_name": "High-Efficiency Lungs", "description": "Superb oxygen uptake, narrow tolerance.",
+    "dominance": 0.5, "contributions": { "atmo_tolerance": -0.3, "stamina": 0.45 }, "tags": [], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "toxin_resistant", "locus_id": "therm_toxin", "display_name": "Toxin-Resistant", "description": "Both copies required. Worth breeding deliberately for.",
+    "dominance": 0.5, "contributions": { "toxin_resist": 0.9 }, "tags": ["toxin_resistant"], "natural_weight": 0.7, "mutation_weight": 1.2 },
+  { "id": "toxin_susceptible", "locus_id": "therm_toxin", "display_name": "Toxin-Susceptible", "description": "Like most things.",
+    "dominance": 0.5, "contributions": { "toxin_resist": 0.0 }, "tags": [], "natural_weight": 2.4, "mutation_weight": 1.0 },
+
+  { "id": "stam_furnace", "locus_id": "vital_stamina", "display_name": "Furnace-Blooded", "description": "Enormous endurance, shorter years.",
+    "dominance": 0.5, "contributions": { "stamina": 0.5, "lifespan": -0.1 }, "tags": ["tireless"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "stam_steady", "locus_id": "vital_stamina", "display_name": "Steady", "description": "Balanced burn.",
+    "dominance": 0.5, "contributions": { "stamina": 0.0, "lifespan": 0.0 }, "tags": [], "natural_weight": 2.0, "mutation_weight": 1.0 },
+  { "id": "stam_slow", "locus_id": "vital_stamina", "display_name": "Slow-Burning", "description": "Tires quickly, but lasts for years.",
+    "dominance": 0.5, "contributions": { "stamina": -0.4, "lifespan": 0.25 }, "tags": ["long_lived"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "senesc_slow", "locus_id": "vital_senescence", "display_name": "Slow-Ageing", "description": "Ages gently. Knits well.",
+    "dominance": 0.4, "contributions": { "lifespan": 0.45, "regeneration": 0.3 }, "tags": ["long_lived"], "natural_weight": 0.8, "mutation_weight": 1.0 },
+  { "id": "senesc_typical", "locus_id": "vital_senescence", "display_name": "Typical Ageing", "description": "The ordinary arc.",
+    "dominance": 0.5, "contributions": { "lifespan": 0.0, "regeneration": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "senesc_rapid", "locus_id": "vital_senescence", "display_name": "Rapid-Ageing", "description": "Burns out. Dominant, and a quiet curse in a bloodline.",
+    "dominance": 0.6, "contributions": { "lifespan": -0.35, "regeneration": -0.15 }, "tags": ["short_lived"], "natural_weight": 0.9, "mutation_weight": 1.1 },
+
+  { "id": "fert_prolific", "locus_id": "repro_fertility", "display_name": "Prolific", "description": "Fills a world fast, and inbreeds faster.",
+    "dominance": 0.5, "contributions": { "fertility": 0.5, "litter_size": 1.2 }, "tags": ["prolific"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "fert_typical", "locus_id": "repro_fertility", "display_name": "Typical Fertility", "description": "One at a time, usually.",
+    "dominance": 0.5, "contributions": { "fertility": 0.0, "litter_size": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "fert_sparse", "locus_id": "repro_fertility", "display_name": "Sparse", "description": "Rare young. Every birth matters.",
+    "dominance": 0.5, "contributions": { "fertility": -0.4, "litter_size": -0.3 }, "tags": [], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "gest_swift", "locus_id": "repro_gestation", "display_name": "Swift Gestation", "description": "Dominant. Young arrive quickly and small.",
+    "dominance": 0.6, "contributions": { "gestation_speed": 0.6 }, "tags": [], "natural_weight": 1.5, "mutation_weight": 1.0 },
+  { "id": "gest_long", "locus_id": "repro_gestation", "display_name": "Long Gestation", "description": "Recessive. Slow, and the young arrive ready.",
+    "dominance": 0.4, "contributions": { "gestation_speed": -0.3 }, "tags": [], "natural_weight": 1.5, "mutation_weight": 1.0 },
+
+  { "id": "cyto_rich", "locus_id": "cyto_efficiency", "display_name": "Rich Cytoplasm", "description": "Maternal line. Excellent energy yield.",
+    "dominance": 0.5, "contributions": { "food_efficiency": 0.3, "stamina": 0.2 }, "tags": ["maternal"], "natural_weight": 1.2, "mutation_weight": 1.0 },
+  { "id": "cyto_lean", "locus_id": "cyto_efficiency", "display_name": "Lean Cytoplasm", "description": "Maternal line. Unremarkable.",
+    "dominance": 0.5, "contributions": { "food_efficiency": 0.0, "stamina": 0.0 }, "tags": ["maternal"], "natural_weight": 2.0, "mutation_weight": 1.0 },
+
+  { "id": "cyto_warm", "locus_id": "cyto_thermal", "display_name": "Thermogenic Cytoplasm", "description": "Maternal line. A cold-hardy dam passes this to every one of her young.",
+    "dominance": 0.5, "contributions": { "cold_tolerance": 0.35 }, "tags": ["maternal", "cold_adapted"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "cyto_neutral", "locus_id": "cyto_thermal", "display_name": "Neutral Cytoplasm", "description": "Maternal line. No thermal contribution.",
+    "dominance": 0.5, "contributions": { "cold_tolerance": 0.0 }, "tags": ["maternal"], "natural_weight": 2.0, "mutation_weight": 1.0 }
+]

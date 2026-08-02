@@ -1,0 +1,43 @@
+[
+  { "id": "spec_slot_a", "chromosome_id": "chr_special", "display_name": "Latent Slot I",
+    "description": "Recessive gate on a very short chromosome. Carriers show nothing; two carriers can produce something remarkable.",
+    "category": "SPECIAL", "expression_mode": "RECESSIVE_GATE", "map_position_cm": 8.0,
+    "allele_ids": ["spec_lumen", "spec_null_a"],
+    "trait_keys": ["lumen", "display"], "trait_baselines": { "lumen": 0.0, "display": 0.0 },
+    "mutation_susceptibility": 2.4, "show_in_summary": true },
+
+  { "id": "spec_slot_b", "chromosome_id": "chr_special", "display_name": "Latent Slot II",
+    "description": "Recessive gate. Sits close to Slot I, so the two latent traits tend to travel together through a bloodline and surface in the same generation.",
+    "category": "SPECIAL", "expression_mode": "RECESSIVE_GATE", "map_position_cm": 26.0,
+    "allele_ids": ["spec_mending", "spec_null_b"],
+    "trait_keys": ["regeneration", "aether_sense"], "trait_baselines": { "regeneration": 0.0, "aether_sense": 0.0 },
+    "mutation_susceptibility": 2.4, "show_in_summary": true },
+
+  { "id": "spec_potency", "chromosome_id": "chr_special", "display_name": "Expression Potency",
+    "description": "Scales whatever latent traits did surface. Worthless on its own, which is what makes breeding for it a genuine gamble.",
+    "category": "SPECIAL", "expression_mode": "ADDITIVE", "map_position_cm": 42.0,
+    "allele_ids": ["potency_high", "potency_typical", "potency_low"],
+    "trait_keys": ["special_potency"], "trait_baselines": { "special_potency": 1.0 },
+    "mutation_susceptibility": 1.5, "show_in_summary": true },
+
+  { "id": "mut_rate", "chromosome_id": "chr_genomic", "display_name": "Replication Fidelity",
+    "description": "The creature's own mutation machinery. A volatile line throws more monsters and more marvels.",
+    "category": "MUTATION", "expression_mode": "ADDITIVE", "map_position_cm": 12.0,
+    "allele_ids": ["mut_conserved", "mut_typical", "mut_volatile"],
+    "trait_keys": ["mutation_rate"], "trait_baselines": { "mutation_rate": 1.0 },
+    "mutation_susceptibility": 0.6, "show_in_summary": true },
+
+  { "id": "mut_repair", "chromosome_id": "chr_genomic", "display_name": "Repair Enzymes",
+    "description": "Second contributor to mutation rate — polygenic, so a stable lineage needs both genes working, and one bad copy is survivable.",
+    "category": "MUTATION", "expression_mode": "ADDITIVE", "map_position_cm": 38.0,
+    "allele_ids": ["repair_diligent", "repair_typical", "repair_lax"],
+    "trait_keys": ["mutation_rate", "genome_integrity"], "trait_baselines": { "mutation_rate": 0.0, "genome_integrity": 1.0 },
+    "mutation_susceptibility": 0.7, "show_in_summary": true },
+
+  { "id": "mut_plasticity", "chromosome_id": "chr_genomic", "display_name": "Epigenetic Plasticity",
+    "description": "How readily this animal's expression is rewritten by what happens to it. High plasticity learns from its world fast and is scarred by it just as fast.",
+    "category": "MUTATION", "expression_mode": "ADDITIVE", "map_position_cm": 62.0,
+    "allele_ids": ["plast_labile", "plast_typical", "plast_fixed"],
+    "trait_keys": ["epigenetic_plasticity"], "trait_baselines": { "epigenetic_plasticity": 1.0 },
+    "mutation_susceptibility": 1.2, "show_in_summary": true }
+]

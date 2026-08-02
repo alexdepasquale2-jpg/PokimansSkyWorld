@@ -1,0 +1,48 @@
+[
+  { "id": "power_massive", "locus_id": "comb_power", "display_name": "Massive Musculature", "description": "Hits like falling masonry. Weighs like it too.",
+    "dominance": 0.5, "contributions": { "attack_power": 0.8, "mass": 0.4 }, "tags": ["powerful"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "power_typical", "locus_id": "comb_power", "display_name": "Typical Musculature", "description": "Ordinary strength.",
+    "dominance": 0.5, "contributions": { "attack_power": 0.0, "mass": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "power_wiry", "locus_id": "comb_power", "display_name": "Wiry", "description": "Weak blows from a body that costs almost nothing to move.",
+    "dominance": 0.5, "contributions": { "attack_power": -0.3, "mass": -0.25 }, "tags": ["light"], "natural_weight": 1.2, "mutation_weight": 1.0 },
+
+  { "id": "weapon_fangs", "locus_id": "comb_weapon", "display_name": "Fangs", "description": "Deep punctures. Poor against plate.",
+    "dominance": 0.5, "contributions": { "attack_power": 0.4, "armor_pierce": 0.3 }, "tags": ["fangs"], "natural_weight": 1.4, "mutation_weight": 1.0 },
+  { "id": "weapon_talons", "locus_id": "comb_weapon", "display_name": "Talons", "description": "Fast, shallow, relentless.",
+    "dominance": 0.5, "contributions": { "attack_power": 0.25, "armor_pierce": 0.15 }, "tags": ["talons"], "natural_weight": 1.4, "mutation_weight": 1.0 },
+  { "id": "weapon_horns", "locus_id": "comb_weapon", "display_name": "Horns", "description": "Dominant. One committed charge; excellent against armour.",
+    "dominance": 0.7, "contributions": { "attack_power": 0.55, "armor_pierce": 0.6 }, "tags": ["horns"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+
+  { "id": "venom_potent", "locus_id": "comb_venom", "display_name": "Venomous", "description": "Both copies or nothing. Venom is all-or-nothing chemistry.",
+    "dominance": 0.5, "contributions": { "venom": 1.0 }, "tags": ["venomous", "rare"], "natural_weight": 0.4, "mutation_weight": 1.3 },
+  { "id": "venom_absent", "locus_id": "comb_venom", "display_name": "Non-Venomous", "description": "No toxin glands.",
+    "dominance": 0.5, "contributions": { "venom": 0.0 }, "tags": [], "natural_weight": 3.0, "mutation_weight": 1.0 },
+
+  { "id": "tempo_rapid", "locus_id": "comb_tempo", "display_name": "Rapid", "description": "A flurry, and then nothing left.",
+    "dominance": 0.5, "contributions": { "attack_speed": 0.7, "stamina_cost": 0.5 }, "tags": ["fast"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "tempo_measured", "locus_id": "comb_tempo", "display_name": "Measured", "description": "Paced to last the fight.",
+    "dominance": 0.5, "contributions": { "attack_speed": 0.0, "stamina_cost": 0.0 }, "tags": [], "natural_weight": 2.0, "mutation_weight": 1.0 },
+  { "id": "tempo_ponderous", "locus_id": "comb_tempo", "display_name": "Ponderous", "description": "Slow, heavy, cheap to throw.",
+    "dominance": 0.5, "contributions": { "attack_speed": -0.4, "stamina_cost": -0.35 }, "tags": ["slow"], "natural_weight": 1.2, "mutation_weight": 1.0 },
+
+  { "id": "plate_heavy", "locus_id": "def_plating", "display_name": "Heavy Plating", "description": "Genuine armour, and the weight that comes with it.",
+    "dominance": 0.5, "contributions": { "armor": 0.7, "mass": 0.35 }, "tags": ["armored"], "natural_weight": 0.9, "mutation_weight": 1.0 },
+  { "id": "plate_partial", "locus_id": "def_plating", "display_name": "Partial Plating", "description": "Covers what matters most.",
+    "dominance": 0.5, "contributions": { "armor": 0.3, "mass": 0.12 }, "tags": [], "natural_weight": 1.6, "mutation_weight": 1.0 },
+  { "id": "plate_none", "locus_id": "def_plating", "display_name": "Unplated", "description": "Nothing between it and the world.",
+    "dominance": 0.5, "contributions": { "armor": 0.0, "mass": 0.0 }, "tags": [], "natural_weight": 2.0, "mutation_weight": 1.0 },
+
+  { "id": "evade_darting", "locus_id": "def_evasion", "display_name": "Darting", "description": "Simply not there when the blow lands.",
+    "dominance": 0.5, "contributions": { "evasion": 0.7, "agility": 0.25 }, "tags": ["evasive"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "evade_typical", "locus_id": "def_evasion", "display_name": "Typical Evasion", "description": "Dodges what it sees coming.",
+    "dominance": 0.5, "contributions": { "evasion": 0.0, "agility": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "evade_stolid", "locus_id": "def_evasion", "display_name": "Stolid", "description": "Stands there and takes it.",
+    "dominance": 0.5, "contributions": { "evasion": -0.4, "agility": -0.2 }, "tags": [], "natural_weight": 1.2, "mutation_weight": 1.0 },
+
+  { "id": "const_hardy", "locus_id": "def_constitution", "display_name": "Hardy", "description": "Absorbs a great deal and keeps going.",
+    "dominance": 0.5, "contributions": { "vitality": 0.6, "regeneration": 0.25 }, "tags": ["hardy"], "natural_weight": 1.0, "mutation_weight": 1.0 },
+  { "id": "const_typical", "locus_id": "def_constitution", "display_name": "Typical Constitution", "description": "Ordinary resilience.",
+    "dominance": 0.5, "contributions": { "vitality": 0.0, "regeneration": 0.0 }, "tags": [], "natural_weight": 2.5, "mutation_weight": 1.0 },
+  { "id": "const_frail", "locus_id": "def_constitution", "display_name": "Frail", "description": "Breaks. Heals badly.",
+    "dominance": 0.5, "contributions": { "vitality": -0.4, "regeneration": -0.2 }, "tags": ["frail"], "natural_weight": 1.0, "mutation_weight": 1.1 }
+]
