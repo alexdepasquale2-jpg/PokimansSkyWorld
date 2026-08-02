@@ -1,0 +1,41 @@
+[
+  { "id": "struct_lean_to", "display_name": "Lean-To", "description": "A roof and three walls. Enough.",
+    "category": "shelter", "footprint": [2, 2], "build_cost": {"timber": 20.0},
+    "effects": {"shelter": 0.3}, "tags": ["basic"] },
+
+  { "id": "struct_cabin", "display_name": "Cabin", "description": "Proper walls, a proper door.",
+    "category": "shelter", "footprint": [3, 3], "build_cost": {"timber": 60.0, "ore_ferrite": 10.0},
+    "effects": {"shelter": 0.7}, "tags": [] },
+
+  { "id": "struct_pen", "display_name": "Pen", "description": "Fenced ground for livestock.",
+    "category": "husbandry", "footprint": [3, 3], "build_cost": {"timber": 30.0},
+    "effects": {"work_bonus": {"husbandry": 0.25}, "capacity": 6.0}, "tags": ["livestock"] },
+
+  { "id": "struct_storage_rack", "display_name": "Storage Rack", "description": "Keeps supplies dry and off the ground.",
+    "category": "storage", "footprint": [2, 1], "build_cost": {"timber": 15.0},
+    "effects": {"storage_capacity": 200.0}, "tags": [] },
+
+  { "id": "struct_workbench", "display_name": "Workbench", "description": "Flat, sturdy, covered in tools.",
+    "category": "work", "footprint": [2, 1], "build_cost": {"timber": 20.0, "ore_ferrite": 8.0},
+    "effects": {"work_bonus": {"craft": 0.3}}, "tags": [] },
+
+  { "id": "struct_garden_plot", "display_name": "Garden Plot", "description": "Turned earth, ready to seed.",
+    "category": "husbandry", "footprint": [2, 2], "build_cost": {"timber": 8.0},
+    "effects": {"work_bonus": {"forage": 0.2}}, "tags": [] },
+
+  { "id": "struct_wall", "display_name": "Wall Section", "description": "One length of perimeter. Place as many as the shape needs.",
+    "category": "defense", "footprint": [1, 1], "build_cost": {"timber": 6.0},
+    "effects": {"shelter": 0.05}, "tags": ["modular"] },
+
+  { "id": "struct_watchpost", "display_name": "Watchpost", "description": "High enough to see trouble coming.",
+    "category": "defense", "footprint": [1, 1], "build_cost": {"timber": 25.0, "ore_ferrite": 5.0},
+    "effects": {"work_bonus": {"perception": 0.2}}, "tags": [] },
+
+  { "id": "struct_forge", "display_name": "Forge", "description": "Heat enough to work metal.",
+    "category": "work", "footprint": [2, 2], "build_cost": {"ore_ferrite": 40.0, "timber": 15.0},
+    "effects": {"work_bonus": {"craft": 0.5}, "unlocks_research": "tech_metallurgy"}, "tags": [] },
+
+  { "id": "struct_lab_bench", "display_name": "Lab Bench", "description": "Where the geneticists actually work.",
+    "category": "work", "footprint": [2, 2], "build_cost": {"ore_ferrite": 20.0, "silica": 15.0},
+    "effects": {"unlocks_research": "bio_selective_breeding"}, "tags": ["research"] }
+]

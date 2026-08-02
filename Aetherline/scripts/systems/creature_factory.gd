@@ -51,6 +51,15 @@ static func spawn_random(parent: Node, rng: RandomNumberGenerator,
 	# identity (survives into archived lineage records). They must never drift.
 	creature.genetics.genome.generation = creature.identity.generation
 	creature.stats.initialize_vitals()
+	# Wild-caught and gifted stock are grown animals, not newborns. This
+	# matters mechanically, not just narratively: infants count as fragile and
+	# can actually be killed, so spawning fauna at age zero would make every
+	# animal on a world one bad hit from death.
+	if opts.has("age_days"):
+		creature.stats.age_days = float(opts["age_days"])
+	elif String(opts.get("origin_kind", "founder")) != "born":
+		creature.stats.age_days = creature.stats.stat("max_age_days") \
+			* rng.randf_range(0.15, 0.55)
 	creature.visual.refresh()
 
 	_register_lineage(creature, opts)

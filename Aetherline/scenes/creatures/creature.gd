@@ -25,13 +25,22 @@ var genetics: GeneticsComponent
 var epigenetics: EpigeneticsComponent
 var archetype: ArchetypeComponent
 var experience: ExperienceComponent
+var work: WorkComponent
+var combat: CombatComponent
+var relationships: RelationshipComponent
 var needs: NeedsComponent
 var stats: StatsComponent
 var ai: AIController
 var visual: VisualController
+var audio: AudioController
 
 ## Every component, in setup order, for the generic serialize/load walk.
 var _components: Array[CreatureComponent] = []
+
+## Mounting — data only, no physics coupling yet (Phase 6 owns real bodies).
+var mount_target: Creature = null   ## What I'm riding.
+var rider: Creature = null          ## Who's riding me.
+var player_controlled: bool = false ## True while under direct player command.
 
 var _registered: bool = false
 
@@ -62,17 +71,22 @@ func _collect_components() -> void:
 	epigenetics = get_node_or_null("Epigenetics") as EpigeneticsComponent
 	archetype = get_node_or_null("Archetype") as ArchetypeComponent
 	experience = get_node_or_null("Experience") as ExperienceComponent
+	work = get_node_or_null("Work") as WorkComponent
+	combat = get_node_or_null("Combat") as CombatComponent
+	relationships = get_node_or_null("Relationships") as RelationshipComponent
 	needs = get_node_or_null("Needs") as NeedsComponent
 	stats = get_node_or_null("Stats") as StatsComponent
 	ai = get_node_or_null("AI") as AIController
 	visual = get_node_or_null("Visual") as VisualController
+	audio = get_node_or_null("Audio") as AudioController
 
 	# Order matters: Stats must be assigned before Genetics.setup runs, because
 	# setting a genome invalidates the Stats cache. Assignment above already
 	# guarantees that; this list only fixes *setup* order.
 	_components.clear()
 	# Experience is set up before Archetype because Archetype reads it.
-	for c in [stats, genetics, epigenetics, experience, archetype, needs, ai, visual]:
+	for c in [stats, genetics, epigenetics, experience, archetype, needs, work,
+			combat, relationships, ai, visual, audio]:
 		if c != null:
 			_components.append(c)
 	for c in _components:
@@ -116,12 +130,17 @@ func tick_days(days: float) -> void:
 		stats.age(days)
 	if epigenetics != null:
 		epigenetics.decay(days)
+	if relationships != null:
+		relationships.decay_all(days)
 	if needs != null:
 		needs.tick(days)
 	if archetype != null:
 		archetype.maybe_evaluate()
 	if ai != null:
-		ai.maybe_decide()
+		# decide() rather than maybe_decide(): a whole day passing IS the
+		# decision cadence here, and the tick-gate would otherwise skip the
+		# rest/eat decision entirely during batched day integration.
+		ai.decide()
 	_maybe_evaluate_story()
 
 
@@ -133,6 +152,29 @@ func _maybe_evaluate_story() -> void:
 		return
 	_next_story_tick = SimulationBudget.current_tick + STORY_EVALUATION_INTERVAL
 	StoryDirector.evaluate_creature(self)
+
+
+# --- Mounting -------------------------------------------------------------
+
+func mount(target: Creature) -> bool:
+	if target == null or target == self or mount_target != null or target.rider != null:
+		return false
+	mount_target = target
+	target.rider = self
+	return true
+
+
+func dismount() -> void:
+	if mount_target != null:
+		mount_target.rider = null
+		mount_target = null
+
+
+## Effective move speed accounting for a mount — the rider borrows the mount's
+## legs, not the other way round.
+func effective_move_speed() -> float:
+	return mount_target.stats.stat("move_speed") if mount_target != null \
+		else stats.stat("move_speed")
 
 
 func display_name() -> String:
@@ -191,7 +233,8 @@ func describe() -> Array[String]:
 
 	var sections := {
 		"GENOME": genetics, "EPIGENETICS": epigenetics, "PHENOTYPE": stats,
-		"EXPERIENCE": experience, "ARCHETYPE": archetype, "NEEDS": needs,
+		"EXPERIENCE": experience, "ARCHETYPE": archetype, "WORK": work,
+		"RELATIONSHIPS": relationships, "NEEDS": needs,
 		"BEHAVIOUR": ai, "APPEARANCE": visual,
 	}
 	for title in sections:

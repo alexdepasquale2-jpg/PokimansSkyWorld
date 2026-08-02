@@ -1,0 +1,40 @@
+[
+  { "id": "tech_basic_tools", "display_name": "Basic Tools", "branch": "technological", "cost": 50.0,
+    "description": "Sharper edges, sturdier handles.", "prerequisites": [],
+    "effects": {"unlock_structure": "struct_workbench"} },
+
+  { "id": "tech_metallurgy", "display_name": "Metallurgy", "branch": "technological", "cost": 180.0,
+    "description": "Ore into something useful.", "prerequisites": ["tech_basic_tools"],
+    "effects": {"unlock_structure": "struct_forge"} },
+
+  { "id": "tech_fortification", "display_name": "Fortification", "branch": "technological", "cost": 140.0,
+    "description": "Walls that mean it.", "prerequisites": ["tech_basic_tools"],
+    "effects": {"unlock_structure": "struct_watchpost"} },
+
+  { "id": "tech_stockpiling", "display_name": "Stockpiling", "branch": "technological", "cost": 60.0,
+    "description": "Keeping more than you can carry.", "prerequisites": [],
+    "effects": {"unlock_structure": "struct_storage_rack"} },
+
+  { "id": "bio_husbandry_basics", "display_name": "Husbandry Basics", "branch": "biological", "cost": 70.0,
+    "description": "Keeping animals content enough to breed.", "prerequisites": [],
+    "effects": {"unlock_structure": "struct_pen"} },
+
+  { "id": "bio_selective_breeding", "display_name": "Selective Breeding", "branch": "biological", "cost": 200.0,
+    "description": "Choosing pairings deliberately raises what a lineage can pass on.",
+    "prerequisites": ["bio_husbandry_basics"],
+    "effects": {"heritability_bonus": 0.12, "unlock_structure": "struct_lab_bench"} },
+
+  { "id": "bio_mutagenics", "display_name": "Mutagenics", "branch": "biological", "cost": 260.0,
+    "description": "Deliberately destabilising a genome, for those willing to gamble on it.",
+    "prerequisites": ["bio_selective_breeding"],
+    "effects": {"mutation_rate_modifier": 1.8} },
+
+  { "id": "bio_epigenetic_fixing", "display_name": "Epigenetic Fixing", "branch": "biological", "cost": 320.0,
+    "description": "Marks that would fade instead hold, and hold across generations.",
+    "prerequisites": ["bio_selective_breeding"],
+    "effects": {"heritability_bonus": 0.15} },
+
+  { "id": "tech_advanced_husbandry", "display_name": "Advanced Husbandry", "branch": "technological", "cost": 160.0,
+    "description": "Bigger pens, better care.", "prerequisites": ["bio_husbandry_basics", "tech_basic_tools"],
+    "effects": {"unlock_structure": "struct_garden_plot"} }
+]

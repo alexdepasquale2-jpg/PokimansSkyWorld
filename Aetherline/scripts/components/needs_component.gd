@@ -20,17 +20,22 @@ const BASE_DRAIN := {
 	"energy": 0.45,
 }
 
+## Energy regained per day while resting. Deliberately faster than the drain,
+## so a creature that stops to rest actually recovers within a day or two.
+const RECOVERY_RATE := 0.7
+
 @export var hunger: float = 1.0
 @export var energy: float = 1.0
 @export var health: float = 1.0
 @export var mood: float = 0.7
+@export var social: float = 0.5
 
 ## Needs already reported as critical, so the bus is not spammed every tick.
 var _critical_flags: Dictionary = {}
 
 
 func values() -> Dictionary:
-	return {"hunger": hunger, "energy": energy, "health": health, "mood": mood}
+	return {"hunger": hunger, "energy": energy, "health": health, "mood": mood, "social": social}
 
 
 func get_need(key: String) -> float:
@@ -39,6 +44,7 @@ func get_need(key: String) -> float:
 		"energy": return energy
 		"health": return health
 		"mood": return mood
+		"social": return social
 		_: return 1.0
 
 
@@ -55,7 +61,15 @@ func tick(days: float) -> void:
 	var stamina := maxf(0.1, float(traits.get("stamina", 1.0)))
 
 	hunger = clampf(hunger - BASE_DRAIN["hunger"] * mass * days, 0.0, 1.0)
-	energy = clampf(energy - BASE_DRAIN["energy"] / stamina * days, 0.0, 1.0)
+
+	# Energy RECOVERS while resting and drains otherwise. Without this a
+	# creature can never recoup exhaustion and dies of it however well fed —
+	# and it is what gives the AI's rest decision real consequence.
+	var resting: bool = creature.ai != null and creature.ai.state == AIController.State.REST
+	if resting:
+		energy = clampf(energy + RECOVERY_RATE * stamina * days, 0.0, 1.0)
+	else:
+		energy = clampf(energy - BASE_DRAIN["energy"] / stamina * days, 0.0, 1.0)
 
 	# Starvation and exhaustion convert into health loss rather than simply
 	# sitting at zero, so neglect has a real, recoverable cost.
@@ -64,8 +78,17 @@ func tick(days: float) -> void:
 	if energy <= 0.0:
 		health = clampf(health - 0.04 * days, 0.0, 1.0)
 
-	# Mood follows the worst unmet physical need, and drifts back up when fed.
-	var worst := minf(hunger, minf(energy, health))
+	# Social need tracks the strongest bond this creature has — an animal with
+	# nobody it trusts drifts lonely regardless of how well-fed it is.
+	if creature.relationships != null:
+		var best: String = creature.relationships.strongest_bond()
+		var target_social: float = 0.5 + creature.relationships.affinity(best) * 0.5 \
+			if not best.is_empty() else 0.3
+		social = clampf(lerpf(social, target_social, clampf(days * 0.2, 0.0, 1.0)), 0.0, 1.0)
+
+	# Mood follows the worst unmet need, physical or social, and drifts back
+	# up when things improve.
+	var worst := minf(minf(hunger, energy), minf(health, social))
 	mood = clampf(lerpf(mood, worst, clampf(days * 0.3, 0.0, 1.0)), 0.0, 1.0)
 
 	_check_critical()
@@ -73,14 +96,23 @@ func tick(days: float) -> void:
 
 func feed(amount: float) -> void:
 	hunger = clampf(hunger + amount, 0.0, 1.0)
+	# Food is what brings a collapsed animal back — the neglect it fell to is
+	# the same thing that revives it.
+	if creature != null and creature.stats.downed and hunger > 0.4:
+		health = maxf(health, 0.2)
+		creature.stats.revive(0.35)
 
 
 func rest(amount: float) -> void:
 	energy = clampf(energy + amount, 0.0, 1.0)
+	if creature != null and creature.stats.downed and energy > 0.5:
+		creature.stats.revive(0.35)
 
 
 func heal(amount: float) -> void:
 	health = clampf(health + amount, 0.0, 1.0)
+	if creature != null and health > 0.25:
+		creature.stats.revive(0.4)
 
 
 func _check_critical() -> void:
@@ -99,13 +131,13 @@ func _check_critical() -> void:
 
 
 func describe() -> Array[String]:
-	return ["  hunger %.0f%%   energy %.0f%%   health %.0f%%   mood %.0f%%" % [
-		hunger * 100.0, energy * 100.0, health * 100.0, mood * 100.0]]
+	return ["  hunger %.0f%%   energy %.0f%%   health %.0f%%   mood %.0f%%   social %.0f%%" % [
+		hunger * 100.0, energy * 100.0, health * 100.0, mood * 100.0, social * 100.0]]
 
 
 func to_dict() -> Dictionary:
 	return {
-		"hunger": hunger, "energy": energy, "health": health, "mood": mood,
+		"hunger": hunger, "energy": energy, "health": health, "mood": mood, "social": social,
 		"critical_flags": _critical_flags.duplicate(),
 	}
 
@@ -115,4 +147,5 @@ func from_dict(d: Dictionary) -> void:
 	energy = float(d.get("energy", 1.0))
 	health = float(d.get("health", 1.0))
 	mood = float(d.get("mood", 0.7))
+	social = float(d.get("social", 0.5))
 	_critical_flags = d.get("critical_flags", {}).duplicate()

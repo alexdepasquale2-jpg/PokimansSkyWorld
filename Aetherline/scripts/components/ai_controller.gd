@@ -83,6 +83,41 @@ func _state_from_key(key: String) -> int:
 		_: return -1
 
 
+# --- Combat decision -----------------------------------------------------------
+
+## Picks a target from `enemies` for this creature to attack this round, or
+## null to abstain (fled/defeated/nothing worth fighting). Reads phenotype and
+## archetype bias, never raw genome — a bred-placid animal that has been
+## traumatised into aggression fights like the traumatised animal it is.
+func choose_combat_target(enemies: Array, rng: RandomNumberGenerator) -> Creature:
+	if creature.stats.hp <= 0.0 or enemies.is_empty():
+		return null
+	var aggression: float = creature.stats.trait_value(&"aggression")
+	var bias: float = 1.0
+	if creature.archetype != null:
+		bias = float(creature.archetype.ai_bias().get("fight", 1.0))
+	var flee_bias: float = 1.0
+	if creature.archetype != null:
+		flee_bias = float(creature.archetype.ai_bias().get("flee", 1.0))
+
+	var will_to_fight: float = aggression * bias
+	var will_to_flee: float = (1.0 - aggression) * flee_bias * (1.0 - creature.stats.hp_fraction())
+	if will_to_flee > will_to_fight and rng.randf() < 0.5:
+		state = State.FLEE
+		return null
+
+	state = State.FIGHT
+	# Apex-biased hunters finish the weakest target; everything else picks at
+	# random among the living, which reads as scrappy rather than optimal.
+	var living: Array = enemies.filter(func(e): return e.stats.hp > 0.0)
+	if living.is_empty():
+		return null
+	if bias > 2.0:
+		living.sort_custom(func(a, b): return a.stats.hp_fraction() < b.stats.hp_fraction())
+		return living[0]
+	return living[rng.randi() % living.size()]
+
+
 func state_name() -> String:
 	return AetherTypes.enum_to_key(State, state)
 

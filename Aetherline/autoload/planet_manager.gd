@@ -74,10 +74,7 @@ func derive_planet(planet_id: String) -> PlanetSeedResource:
 	if planet == null:
 		push_error("PlanetManager.derive_planet: unknown planet '%s'" % planet_id)
 		return null
-	if planet.derived:
-		return planet
-	push_warning("PlanetManager.derive_planet: generator not implemented until Phase 3.")
-	return planet
+	return PlanetGenerator.derive(planet)
 
 
 func get_planet(planet_id: String) -> PlanetSeedResource:
@@ -129,16 +126,13 @@ func land(planet_id: String) -> Array:
 	summary.visited = true
 	summary.visit_count += 1
 
-	# Residents have been in cold storage since departure. Their needs, ageing
-	# and epigenetic decay are integrated over the gap in one step rather than
-	# simulated, which is what makes leaving a colony behind affordable.
-	# TODO(phase 3): run the catch-up integration over `elapsed_days` here.
 	var elapsed_days := summary.days_since_departure(
 		SimulationBudget.current_tick, SimulationBudget.TICKS_PER_DAY)
-	if elapsed_days > 0.0:
-		EventBus.trace("planet_catchup", {"planet": planet_id, "days": elapsed_days})
-
 	var residents := summary.take_residents()
+	if elapsed_days > 0.0:
+		residents = _catch_up(residents, planet_id, elapsed_days)
+		EventBus.trace("planet_catchup",
+			{"planet": planet_id, "days": elapsed_days, "residents": residents.size()})
 	EventBus.planet_landed.emit(planet_id)
 	return residents
 
@@ -171,6 +165,99 @@ func depart(carried_uids: Array, serializer: Callable = Callable()) -> void:
 	active_planet_id = ""
 	active_world_root = null
 	EventBus.planet_departed.emit(planet_id, left_behind)
+
+
+## Integrate `days` of absence over creatures left behind, WITHOUT inflating
+## them into scene nodes. Everything that happens to a dormant creature is
+## closed-form — ageing, epigenetic decay under continued planetary pressure,
+## needs draining, and death — so a decade away costs one pass over a list of
+## dictionaries rather than a decade of simulation.
+##
+## Returns the survivors. The dead are removed and mourned.
+func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
+	var planet: PlanetSeedResource = get_planet(planet_id)
+	var pressures: Dictionary = planet.epigenetic_pressures if planet != null else {}
+	var survivors: Array = []
+
+	for data in residents:
+		var components: Dictionary = data.get("components", {})
+		var stats: Dictionary = components.get("Stats", {})
+		var identity: Dictionary = data.get("identity", {})
+
+		# Ageing. A creature left behind can simply die of old age while away,
+		# which is one of the sharper consequences the jump system can carry.
+		var age := float(stats.get("age_days", 0.0)) + days
+		stats["age_days"] = age
+
+		var profile: Dictionary = components.get("Epigenetics", {}).get("profile", {})
+		var marks: Array = profile.get("marks", [])
+		var surviving_marks: Array = []
+		for mark in marks:
+			var stability := float(mark.get("stability", 0.5))
+			var strength := float(mark.get("strength", 0.0)) - 0.02 * (1.0 - stability) * days
+			# Continued exposure holds a mark up against its own decay — which
+			# is why a world's signature deepens in the lines that stay on it.
+			var pressure := float(pressures.get(String(mark.get("definition_id", "")), 0.0))
+			if pressure > 0.0:
+				strength = minf(1.0, strength + pressure * days * 0.01)
+				mark["exposure_count"] = int(mark.get("exposure_count", 0)) + int(days * pressure)
+			if strength > 0.001:
+				mark["strength"] = strength
+				surviving_marks.append(mark)
+		profile["marks"] = surviving_marks
+
+		# New marks the world pressed onto them while nobody was watching.
+		for definition_id in pressures:
+			if _has_mark(surviving_marks, String(definition_id)):
+				continue
+			var template := GenomeDB.instantiate_mark(definition_id)
+			if template == null:
+				continue
+			template.strength = clampf(float(pressures[definition_id]) * days * 0.01, 0.0, 1.0)
+			template.exposure_count = int(days * float(pressures[definition_id]))
+			template.origin_planet_id = planet_id
+			if template.strength > 0.02:
+				surviving_marks.append(template.to_dict())
+
+		var needs: Dictionary = components.get("Needs", {})
+		var health := float(needs.get("health", 1.0))
+		# Unattended creatures forage for themselves; how well depends on the
+		# world. A hostile planet quietly kills what you abandon on it —
+		# UNLESS it was boarded at a stable, which is what that service buys.
+		if bool(data.get("boarded", false)):
+			health = minf(1.0, health + days * 0.002)
+			needs["hunger"] = 1.0
+		else:
+			var attrition := clampf(
+				1.0 - (planet.habitability if planet != null else 0.5), 0.0, 1.0)
+			health -= attrition * days * 0.004
+		needs["health"] = clampf(health, 0.0, 1.0)
+
+		var max_age := 300.0 * maxf(0.1, float(stats.get("lifespan_hint", 1.0)))
+		if health <= 0.0 or age > max_age:
+			_mourn(identity, planet_id, "died while the colony was away"
+				if health <= 0.0 else "died of old age while the colony was away")
+			continue
+		survivors.append(data)
+
+	return survivors
+
+
+func _has_mark(marks: Array, definition_id: String) -> bool:
+	for mark in marks:
+		if String(mark.get("definition_id", "")) == definition_id:
+			return true
+	return false
+
+
+func _mourn(identity: Dictionary, planet_id: String, cause: String) -> void:
+	var uid := StringName(identity.get("uid", ""))
+	EventBus.creature_died.emit(uid, cause, SimulationBudget.current_tick)
+	var lineage := StoryDirector.get_lineage(StringName(identity.get("lineage_id", "")))
+	if lineage != null:
+		lineage.record_death(String(uid))
+		lineage.add_event(SimulationBudget.current_tick, planet_id, String(uid), "death",
+			"%s %s." % [identity.get("given_name", "Something"), cause], 0.8)
 
 
 func _build_summary_line(s: PlanetSummaryResource) -> String:

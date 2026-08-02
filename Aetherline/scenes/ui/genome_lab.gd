@@ -116,6 +116,8 @@ func _build_ui() -> void:
 	_add_button(toolbar, "Age 30d", func(): _age_selected(30.0))
 	toolbar.add_child(VSeparator.new())
 	_add_button(toolbar, "Clear Bench", _clear_bench)
+	_add_button(toolbar, "Main Menu", func():
+		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn"))
 
 	_parent_label = Label.new()
 	_parent_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL

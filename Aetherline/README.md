@@ -15,9 +15,9 @@ genetics, shaped by epigenetics, and elevated by emergent archetypes.
 | 0 | Project skeleton, autoloads, core data models | **complete** |
 | 1 | Genetics + epigenetics core | **complete — 239/239 self-tests pass** |
 | 2 | Archetypes + StoryDirector foundation | **complete — 312/312 self-tests pass** |
-| 3 | Planet generation + world streaming | not started |
-| 4 | AI, combat, utility | not started |
-| 5 | Colony management + emergent storytelling | not started |
+| 3 | Planet generation + world streaming | **complete — 358/358 self-tests pass, playable in Overworld** |
+| 4 | AI, combat, utility | **complete — 388/388 self-tests pass** |
+| 5 | Colony management + emergent storytelling | **complete — 425/425 self-tests pass** |
 | 6 | Progression, economy, save, polish | not started |
 
 ---

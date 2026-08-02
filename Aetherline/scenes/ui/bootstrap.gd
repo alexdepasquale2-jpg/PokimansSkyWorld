@@ -56,6 +56,30 @@ func _ready() -> void:
 		for line in archetype_tests.chronicle:
 			_out(line)
 
+	_section("World self-test  (generation · streaming · pressure · jumps)")
+	var world_tests := WorldSelfTest.new()
+	_report(world_tests.run(_creature_root))
+	if not world_tests.atlas.is_empty():
+		_out("")
+		_out("  sample worlds:")
+		for line in world_tests.atlas:
+			_out(line)
+
+	_section("Combat + utility self-test  (fight · protect · capture · mount · work · terrain)")
+	_report(CombatSelfTest.new().run(_creature_root))
+
+	_section("Colony self-test  (building · research · relationships · needs · colony story)")
+	_report(ColonySelfTest.new().run(_creature_root))
+
+	_section("Progression self-test  (economy · legacy · save · LOD · A/V hooks)")
+	_report(ProgressionSelfTest.new().run(_creature_root))
+
+	_section("Catching self-test  (odds · throw · party · full loop)")
+	_report(CatchingSelfTest.new().run(_creature_root))
+
+	_section("Gameplay loop self-test  (colony · harvest · survive · breed · jump · save)")
+	_report(GameplaySelfTest.new().run(_creature_root))
+
 	_section("Genome lab panel  (debug UI smoke test)")
 	var lab: GenomeLab = load("res://scenes/ui/genome_lab.tscn").instantiate()
 	lab.visible = false
@@ -79,14 +103,41 @@ func _ready() -> void:
 
 ## Hand-off into the interactive Phase 1 tool.
 func _add_lab_button() -> void:
-	var button := Button.new()
-	button.text = "Open Genome Lab  ->"
-	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	button.position = Vector2(-200, -4)
-	button.custom_minimum_size = Vector2(180, 0)
-	button.pressed.connect(func():
+	var lab := Button.new()
+	lab.text = "Open Genome Lab  ->"
+	lab.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	lab.position = Vector2(-200, -34)
+	lab.custom_minimum_size = Vector2(180, 0)
+	lab.pressed.connect(func():
 		get_tree().change_scene_to_file("res://scenes/ui/genome_lab.tscn"))
-	add_child(button)
+	add_child(lab)
+
+	var world := Button.new()
+	world.text = "Open World  ->"
+	world.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	world.position = Vector2(-200, 0)
+	world.custom_minimum_size = Vector2(180, 0)
+	world.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/world/overworld.tscn"))
+	add_child(world)
+
+	var menu := Button.new()
+	menu.text = "<-  Main Menu"
+	menu.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	menu.position = Vector2(-200, -68)
+	menu.custom_minimum_size = Vector2(180, 0)
+	menu.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn"))
+	add_child(menu)
+
+	var lineage := Button.new()
+	lineage.text = "Lineages  ->"
+	lineage.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	lineage.position = Vector2(-200, 34)
+	lineage.custom_minimum_size = Vector2(180, 0)
+	lineage.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/ui/lineage_panel.tscn"))
+	add_child(lineage)
 
 
 func _report(result: Dictionary) -> void:

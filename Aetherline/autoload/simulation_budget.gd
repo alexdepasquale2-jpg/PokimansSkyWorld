@@ -51,6 +51,65 @@ var stats: Dictionary = {
 
 var _paused: bool = false
 
+## Ticks between LOD reassignment passes.
+const LOD_REASSIGN_INTERVAL: int = 30
+
+## Where "near the player" is measured from. Set by the world scene each frame
+## it moves; creatures are banded by distance from this point.
+var focus_point: Vector2 = Vector2.ZERO
+
+
+func set_focus_point(point: Vector2) -> void:
+	focus_point = point
+
+
+## Bands every registered creature by distance from the focus, then enforces
+## the FULL-band ceiling by demoting the furthest, lowest-priority creatures.
+##
+## Two rules that matter:
+##  - a creature on another planet is DORMANT regardless of coordinates, since
+##    its position is meaningless relative to this world's focus
+##  - story-relevant creatures (priority > 0) are demoted last, so attachment
+##    is never evicted by a herd of anonymous grazers
+func reassign_lod() -> void:
+	var active := PlanetManager.active_planet_id
+	var candidates: Array = []
+
+	for uid in _registry:
+		var entry: Dictionary = _registry[uid]
+		if String(entry["planet_id"]) != active:
+			_assign(uid, AetherTypes.SimLOD.DORMANT)
+			continue
+		var node: Node = entry["node"]
+		if node == null or not is_instance_valid(node):
+			_assign(uid, AetherTypes.SimLOD.DORMANT)
+			continue
+		var distance: float = (node as Node2D).global_position.distance_to(focus_point)
+		if distance <= full_radius:
+			candidates.append({"uid": uid, "distance": distance,
+				"priority": float(entry["priority"])})
+		elif distance <= near_radius:
+			_assign(uid, AetherTypes.SimLOD.NEAR)
+		else:
+			_assign(uid, AetherTypes.SimLOD.ABSTRACT)
+
+	# Everything inside full_radius wants FULL; only max_full_creatures get it.
+	candidates.sort_custom(func(a, b):
+		if not is_equal_approx(a["priority"], b["priority"]):
+			return a["priority"] > b["priority"]
+		return a["distance"] < b["distance"])
+	for i in candidates.size():
+		_assign(candidates[i]["uid"],
+			AetherTypes.SimLOD.FULL if i < max_full_creatures else AetherTypes.SimLOD.NEAR)
+
+
+func _assign(uid: String, lod: AetherTypes.SimLOD) -> void:
+	var entry: Dictionary = _registry[uid]
+	if entry["lod"] == lod:
+		return
+	entry["lod"] = lod
+	EventBus.sim_lod_changed.emit(StringName(uid), int(lod))
+
 
 func _ready() -> void:
 	# Runs even when the game logic is paused so the debug overlay stays live.
@@ -174,11 +233,12 @@ func _physics_process(_delta: float) -> void:
 		current_day = day
 		EventBus.day_passed.emit(day)
 
+	# LOD reassignment is the single most important perf lever, but it is also
+	# pure overhead when nothing has moved — run it on a slow cadence rather
+	# than every physics tick.
+	if current_tick % LOD_REASSIGN_INTERVAL == 0:
+		reassign_lod()
 	_recount()
-	# TODO(phase 3): distance-based LOD reassignment against the active planet's
-	# focus point, plus demotion when max_full_creatures is exceeded.
-	# TODO(phase 4/6): drive the round-robin slices below into the AI and needs
-	# systems; the cursors and budgets are already sized for it here.
 
 
 ## Returns the slice of NEAR-band uids that should be updated this frame.

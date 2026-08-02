@@ -1,0 +1,29 @@
+[
+  { "id": "craft_planks", "display_name": "Planks", "station": "struct_workbench",
+    "inputs": {"timber": 10.0}, "outputs": {"planks": 6.0},
+    "work_hours": 2.0, "skill": "craft", "requires_research": "" },
+
+  { "id": "craft_rope", "display_name": "Rope", "station": "struct_workbench",
+    "inputs": {"reed": 8.0}, "outputs": {"rope": 4.0},
+    "work_hours": 1.5, "skill": "craft", "requires_research": "" },
+
+  { "id": "craft_ingot", "display_name": "Ferrite Ingot", "station": "struct_forge",
+    "inputs": {"ore_ferrite": 12.0}, "outputs": {"ingot_ferrite": 4.0},
+    "work_hours": 3.0, "skill": "craft", "requires_research": "tech_metallurgy" },
+
+  { "id": "craft_tools", "display_name": "Tool Set", "station": "struct_workbench",
+    "inputs": {"planks": 4.0, "ingot_ferrite": 2.0}, "outputs": {"tools": 1.0},
+    "work_hours": 4.0, "skill": "craft", "requires_research": "tech_basic_tools" },
+
+  { "id": "craft_glass", "display_name": "Glass", "station": "struct_forge",
+    "inputs": {"silica": 10.0}, "outputs": {"glass": 5.0},
+    "work_hours": 2.5, "skill": "craft", "requires_research": "tech_metallurgy" },
+
+  { "id": "craft_feed", "display_name": "Compound Feed", "station": "struct_pen",
+    "inputs": {"forage": 12.0, "grain": 6.0}, "outputs": {"feed": 10.0},
+    "work_hours": 1.0, "skill": "husbandry", "requires_research": "bio_husbandry_basics" },
+
+  { "id": "craft_reagents", "display_name": "Lab Reagents", "station": "struct_lab_bench",
+    "inputs": {"glass": 3.0, "sulfur": 4.0}, "outputs": {"reagents": 3.0},
+    "work_hours": 3.5, "skill": "craft", "requires_research": "bio_selective_breeding" }
+]

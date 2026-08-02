@@ -107,6 +107,8 @@ func evaluate_creature(creature: Node) -> Array:
 
 	for template_id in templates:
 		var template: Dictionary = templates[template_id]
+		if (template.get("tags", []) as Array).has("colony"):
+			continue  # colony-scope templates only fire via evaluate_colony
 		if bool(template.get("once_per_creature", true)) \
 				and _already_fired(uid, template_id):
 			continue
@@ -182,6 +184,36 @@ func _context_for(creature: Node, metrics: Dictionary = {}) -> Dictionary:
 		context["m." + String(key)] = int(value) if is_equal_approx(value, roundf(value)) \
 			else "%.1f" % value
 	return context
+
+
+## Colony-wide beats — population, mood, research, the planet itself — rather
+## than one creature's history. Reuses the same template files (anything
+## tagged "colony") and the same suppression machinery, keyed by a synthetic
+## per-planet id so a colony milestone fires once per world, not once per
+## creature living on it.
+func evaluate_colony(metrics: Dictionary, context: Dictionary = {}) -> Array:
+	if not enabled:
+		return []
+	var fired: Array = []
+	var colony_key := "colony:" + PlanetManager.active_planet_id
+	for template_id in templates:
+		var template: Dictionary = templates[template_id]
+		if not (template.get("tags", []) as Array).has("colony"):
+			continue
+		if _already_fired(colony_key, template_id):
+			continue
+		if not ConditionEval.all_met(template.get("conditions", []), metrics):
+			continue
+		var filled := context.duplicate()
+		for key in metrics:
+			var value := float(metrics[key])
+			filled["m." + String(key)] = int(value) if is_equal_approx(value, roundf(value)) \
+				else "%.1f" % value
+		var event := fire_event(template, filled)
+		if not event.is_empty():
+			_mark_fired(colony_key, template_id)
+			fired.append(event)
+	return fired
 
 
 # --- Narration ----------------------------------------------------------------
