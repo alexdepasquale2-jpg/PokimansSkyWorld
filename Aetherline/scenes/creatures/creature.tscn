@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://baethercreature"]
+[gd_scene load_steps=11 format=3 uid="uid://baethercreature"]
 
 [ext_resource type="Script" path="res://scenes/creatures/creature.gd" id="0_creature"]
 [ext_resource type="Script" path="res://scripts/components/stats_component.gd" id="1_stats"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/components/archetype_component.gd" id="4_archetype"]
 [ext_resource type="Script" path="res://scripts/components/experience_component.gd" id="4b_experience"]
 [ext_resource type="Script" path="res://scripts/components/needs_component.gd" id="5_needs"]
+[ext_resource type="Script" path="res://scripts/components/perception_component.gd" id="5b_perception"]
 [ext_resource type="Script" path="res://scripts/components/ai_controller.gd" id="6_ai"]
 [ext_resource type="Script" path="res://scripts/components/visual_controller.gd" id="7_visual"]
 
@@ -30,6 +31,9 @@ script = ExtResource("4b_experience")
 
 [node name="Needs" type="Node" parent="."]
 script = ExtResource("5_needs")
+
+[node name="Perception" type="Node" parent="."]
+script = ExtResource("5b_perception")
 
 [node name="AI" type="Node" parent="."]
 script = ExtResource("6_ai")

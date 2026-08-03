@@ -27,6 +27,7 @@ var archetype: ArchetypeComponent
 var experience: ExperienceComponent
 var needs: NeedsComponent
 var stats: StatsComponent
+var perception: PerceptionComponent
 var ai: AIController
 var visual: VisualController
 
@@ -64,6 +65,7 @@ func _collect_components() -> void:
 	experience = get_node_or_null("Experience") as ExperienceComponent
 	needs = get_node_or_null("Needs") as NeedsComponent
 	stats = get_node_or_null("Stats") as StatsComponent
+	perception = get_node_or_null("Perception") as PerceptionComponent
 	ai = get_node_or_null("AI") as AIController
 	visual = get_node_or_null("Visual") as VisualController
 
@@ -72,7 +74,9 @@ func _collect_components() -> void:
 	# guarantees that; this list only fixes *setup* order.
 	_components.clear()
 	# Experience is set up before Archetype because Archetype reads it.
-	for c in [stats, genetics, epigenetics, experience, archetype, needs, ai, visual]:
+	# Perception is set up before AI because arbitration senses through it.
+	for c in [stats, genetics, epigenetics, experience, archetype, needs,
+			perception, ai, visual]:
 		if c != null:
 			_components.append(c)
 	for c in _components:
@@ -192,7 +196,7 @@ func describe() -> Array[String]:
 	var sections := {
 		"GENOME": genetics, "EPIGENETICS": epigenetics, "PHENOTYPE": stats,
 		"EXPERIENCE": experience, "ARCHETYPE": archetype, "NEEDS": needs,
-		"BEHAVIOUR": ai, "APPEARANCE": visual,
+		"PERCEPTION": perception, "BEHAVIOUR": ai, "APPEARANCE": visual,
 	}
 	for title in sections:
 		var component: CreatureComponent = sections[title]

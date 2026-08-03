@@ -1,0 +1,49 @@
+[
+  { "id": "fear", "display_name": "Fear", "state": "FLEE",
+    "innate_trait": "boldness", "innate_polarity": -1.0,
+    "description": "How readily the clan gives ground. The first thing a culture learns and the last thing it unlearns." },
+
+  { "id": "aggression", "display_name": "Aggression", "state": "FIGHT",
+    "innate_trait": "aggression", "innate_polarity": 1.0,
+    "description": "Meeting a threat rather than leaving. Cheap when it works and catastrophic when it does not." },
+
+  { "id": "rest_urge", "display_name": "Rest", "state": "REST",
+    "innate_trait": "stamina", "innate_polarity": -1.0,
+    "description": "Stopping while there is still something worth doing. Harder to learn than it sounds." },
+
+  { "id": "foraging_priority", "display_name": "Hunger Drive", "state": "SEEK_FOOD",
+    "innate_trait": "forage", "innate_polarity": 1.0,
+    "description": "Eating. The one drive the authored floor will always override upward." },
+
+  { "id": "curiosity", "display_name": "Curiosity", "state": "WANDER",
+    "innate_trait": "curiosity", "innate_polarity": 1.0,
+    "description": "Going to look. Every discovery the clan ever makes is paid for out of this drive." },
+
+  { "id": "vigilance", "display_name": "Vigilance", "state": "IDLE",
+    "innate_trait": "perception", "innate_polarity": 1.0,
+    "description": "Holding still and watching. Reads as doing nothing and is frequently the correct answer." },
+
+  { "id": "protectiveness", "display_name": "Protectiveness", "state": "PROTECT",
+    "innate_trait": "empathy", "innate_polarity": 1.0,
+    "description": "Standing between the herd and the dark. What the Guardian archetype is made of." },
+
+  { "id": "social_bonding", "display_name": "Bonding", "state": "SOCIALIZE",
+    "innate_trait": "sociability", "innate_polarity": 1.0,
+    "description": "Seeking company for its own sake. The substrate every transmitted behaviour travels along." },
+
+  { "id": "industry", "display_name": "Industry", "state": "FORAGE",
+    "innate_trait": "haul", "innate_polarity": 1.0,
+    "description": "Gathering for the clan rather than the self. Distinct from eating, and a much later thing to learn." },
+
+  { "id": "migration_urge", "display_name": "Migration", "state": "MIGRATE",
+    "innate_trait": "gait_endurance", "innate_polarity": 1.0,
+    "description": "Leaving. Correct exactly often enough that a clan cannot afford to lose it." },
+
+  { "id": "play", "display_name": "Play", "state": "PLAY",
+    "innate_trait": "curiosity", "innate_polarity": 1.0,
+    "description": "Practising at no stake. Pure cost in the short run, which is why only a secure clan keeps it." },
+
+  { "id": "tool_confidence", "display_name": "Tool Confidence", "state": "USE_TOOL",
+    "innate_trait": "dexterity", "innate_polarity": 1.0,
+    "description": "Reaching for an object instead of a limb. The drive the whole design exists to watch spread." }
+]

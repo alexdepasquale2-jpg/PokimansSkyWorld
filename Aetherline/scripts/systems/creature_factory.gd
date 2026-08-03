@@ -115,6 +115,10 @@ static func _make_identity(rng: RandomNumberGenerator, opts: Dictionary) -> Crea
 	# A founder without an explicit lineage founds its own.
 	identity.lineage_id = StringName(opts.get("lineage_id",
 		"lin_" + String(identity.uid).substr(3)))
+	# An empty culture_id means "learn from the lineage's culture", so a founder
+	# founds its own people alongside its own bloodline and Phase 4 needs nothing
+	# authored per creature. CultureRegistry.culture_for does the fallback.
+	identity.culture_id = StringName(opts.get("culture_id", ""))
 	return identity
 
 
