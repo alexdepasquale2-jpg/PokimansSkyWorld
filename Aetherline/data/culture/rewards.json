@@ -1,0 +1,57 @@
+[
+  { "id": "forage_success", "reward": 0.7, "decay_ticks": 400, "max_per_day": 12,
+    "note": "Food found. Frequent and small, so it teaches steadily without dominating the ledger." },
+
+  { "id": "track_success", "reward": 0.6, "decay_ticks": 600, "max_per_day": 8,
+    "note": "Followed something to where it was. Rewarded because the following is the skill, not the finding." },
+
+  { "id": "combat_win", "reward": 1.0, "decay_ticks": 500, "max_per_day": 5,
+    "note": "Won. Capped hard: a clan that learns fighting always pays is a clan that stops eating." },
+
+  { "id": "kill", "reward": 0.8, "decay_ticks": 500, "max_per_day": 5, "note": "Killed something." },
+
+  { "id": "combat_loss", "reward": -1.2, "decay_ticks": 700, "max_per_day": 6,
+    "note": "Lost. Weighted heavier than a win, because the asymmetry is real." },
+
+  { "id": "damage_taken", "reward": -0.04, "decay_ticks": 300, "max_per_day": 40,
+    "note": "Per point. Small and uncapped-feeling by design — it is the background pressure, not an event." },
+
+  { "id": "near_death_survived", "reward": -1.6, "decay_ticks": 900, "max_per_day": 2,
+    "note": "Survived, but the culture should remember this as a failure of everything leading up to it." },
+
+  { "id": "trauma_events", "reward": -1.4, "decay_ticks": 900, "max_per_day": 3, "note": "Something broke." },
+
+  { "id": "protect_ally", "reward": 0.9, "decay_ticks": 600, "max_per_day": 6,
+    "note": "Taking the hit for someone. The behaviour the Guardian arc is built out of." },
+
+  { "id": "damage_absorbed_for_ally", "reward": 0.05, "decay_ticks": 600, "max_per_day": 40,
+    "note": "Per point absorbed on someone else's behalf." },
+
+  { "id": "ally_died_under_protection", "reward": -2.0, "decay_ticks": 1200, "max_per_day": 2,
+    "note": "The worst thing in the catalog that is not a death." },
+
+  { "id": "creature_tended", "reward": 0.5, "decay_ticks": 700, "max_per_day": 8, "note": "Care given." },
+  { "id": "creature_calmed", "reward": 0.5, "decay_ticks": 700, "max_per_day": 8, "note": "Panic stopped." },
+
+  { "id": "offspring_survived", "reward": 2.0, "decay_ticks": 2400, "max_per_day": 3,
+    "note": "The largest positive in the catalog. Everything else is instrumental to this." },
+
+  { "id": "offspring_sired", "reward": 0.8, "decay_ticks": 1200, "max_per_day": 3, "note": "Bred." },
+
+  { "id": "days_starving", "reward": -1.0, "decay_ticks": 1200, "max_per_day": 6,
+    "note": "Per day. The clan should feel this as a standing indictment of its foraging policy." },
+
+  { "id": "hazards_endured", "reward": -0.6, "decay_ticks": 900, "max_per_day": 6, "note": "The world bit." },
+  { "id": "isolation_days", "reward": -0.3, "decay_ticks": 1200, "max_per_day": 8,
+    "note": "Alone. Small per day and ruinous over a season, which is how isolation actually works." },
+
+  { "id": "anomaly_investigated", "reward": 0.6, "decay_ticks": 800, "max_per_day": 4,
+    "note": "Went to look at the strange thing and came back. Curiosity has to pay or it is bred out." },
+
+  { "id": "threat_foreseen", "reward": 0.9, "decay_ticks": 900, "max_per_day": 4,
+    "note": "Saw it coming. Rewards vigilance, which otherwise looks identical to doing nothing." },
+
+  { "id": "biomes_entered", "reward": 0.4, "decay_ticks": 1200, "max_per_day": 4, "note": "Somewhere new." },
+  { "id": "distance_travelled", "reward": 0.0002, "decay_ticks": 600, "max_per_day": 3000,
+    "note": "Per unit, deliberately near-zero. Present so migration is not invisible; too small to farm." }
+]

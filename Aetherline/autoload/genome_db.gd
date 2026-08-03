@@ -31,12 +31,36 @@ const FILE_ARCHETYPES := DATA_ROOT + "archetypes/archetypes.json"
 const DIR_LOCI := DATA_ROOT + "genome/loci/"
 const DIR_ALLELES := DATA_ROOT + "genome/alleles/"
 
+## Phase 4 culture catalogs. These live here rather than in a registry of their
+## own because assumption #3 is precise about what GenomeDB is: the single
+## registry for AUTHORED CONTENT. Drives, reward values and pretrained priors are
+## authored content and belong here. The learned weights they act on are runtime
+## state and emphatically do not — those live in CultureRegistry.
+const FILE_DRIVES := DATA_ROOT + "culture/drives.json"
+const FILE_REWARDS := DATA_ROOT + "culture/rewards.json"
+const FILE_CULTURE_PRIORS := DATA_ROOT + "culture/priors.json"
+
+## Largest magnitude any single reward entry may carry.
+const REWARD_LIMIT: float = 3.0
+
 ## id -> resource
 var chromosomes: Dictionary = {}
 var loci: Dictionary = {}
 var alleles: Dictionary = {}
 var epi_mark_templates: Dictionary = {}
 var archetypes: Dictionary = {}
+
+## Culture catalogs. Plain dictionaries rather than Resources: these are lookup
+## tables with no behaviour, and three Resource classes that only carry fields
+## would be ceremony without benefit.
+var drives: Dictionary = {}
+var rewards: Dictionary = {}
+var culture_priors: Dictionary = {}
+
+## Drive ids in catalog order. THE INDEX INTO THIS ARRAY IS THE NETWORK'S OUTPUT
+## INDEX, so it is kept explicitly rather than relying on dictionary ordering —
+## a reordering here silently remaps every weight a clan ever learned.
+var drive_order: Array[String] = []
 
 ## chromosome_id -> Array[locus_id], sorted by map_position_cm. Rebuilt on load.
 var _chromosome_loci: Dictionary = {}
@@ -68,6 +92,10 @@ func load_catalogs() -> void:
 	alleles.clear()
 	epi_mark_templates.clear()
 	archetypes.clear()
+	drives.clear()
+	rewards.clear()
+	culture_priors.clear()
+	drive_order.clear()
 	load_problems.clear()
 
 	_load_into(FILE_CHROMOSOMES, chromosomes,
@@ -85,6 +113,25 @@ func load_catalogs() -> void:
 	_load_into(FILE_ARCHETYPES, archetypes,
 		func(d): return ArchetypeDefinitionResource.from_dict(d))
 
+	_load_plain(FILE_DRIVES, drives)
+	_load_plain(FILE_REWARDS, rewards)
+	_load_plain(FILE_CULTURE_PRIORS, culture_priors)
+	for drive_id in drives:
+		drive_order.append(String(drive_id))
+
+	# Reward magnitudes are clamped at load rather than trusted. One mistyped
+	# zero in a tuning pass would otherwise hand a single event enough advantage
+	# to move every weight in a clan's brain at once, and the symptom — "the
+	# whole clan went strange after that hunt" — points nowhere near the cause.
+	for kind in rewards:
+		var entry: Dictionary = rewards[kind]
+		var value := float(entry.get("reward", 0.0))
+		var limited := clampf(value, -REWARD_LIMIT, REWARD_LIMIT)
+		if not is_equal_approx(value, limited):
+			load_problems.append("reward '%s' magnitude %.2f clamped to %.2f"
+				% [kind, value, limited])
+			entry["reward"] = limited
+
 	rebuild_indices()
 	loaded = true
 
@@ -92,7 +139,9 @@ func load_catalogs() -> void:
 	# A catalog can legitimately be split across a directory instead of a single
 	# file, so "file absent" is not news — "nothing loaded at all" is.
 	for entry in [["chromosomes", chromosomes], ["loci", loci], ["alleles", alleles],
-			["epigenetic marks", epi_mark_templates], ["archetypes", archetypes]]:
+			["epigenetic marks", epi_mark_templates], ["archetypes", archetypes],
+			["drives", drives], ["culture rewards", rewards],
+			["culture priors", culture_priors]]:
 		if (entry[1] as Dictionary).is_empty():
 			load_problems.append("%s catalog is empty" % entry[0])
 
@@ -123,6 +172,30 @@ func _load_into(path: String, target: Dictionary, factory: Callable) -> void:
 		if target.has(id):
 			load_problems.append("duplicate id '%s' in %s" % [id, path])
 		target[id] = res
+
+
+## Same contract as `_load_into`, but for catalogs whose entries are plain data
+## rather than Resources. Keeps the culture tables out of the Resource ceremony
+## without giving them a second, divergent loader.
+func _load_plain(path: String, target: Dictionary) -> void:
+	if not FileAccess.file_exists(path):
+		load_problems.append("catalog %s is missing" % path)
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(parsed) != TYPE_ARRAY:
+		load_problems.append("catalog %s is not a JSON array" % path)
+		return
+	for entry in parsed:
+		if typeof(entry) != TYPE_DICTIONARY:
+			load_problems.append("non-object entry in %s" % path)
+			continue
+		var id := String((entry as Dictionary).get("id", ""))
+		if id.is_empty():
+			load_problems.append("entry without id in %s" % path)
+			continue
+		if target.has(id):
+			load_problems.append("duplicate id '%s' in %s" % [id, path])
+		target[id] = (entry as Dictionary).duplicate(true)
 
 
 ## Loads every *.json in a directory, in sorted order so the merge result is
@@ -260,6 +333,34 @@ func all_trait_keys() -> Array:
 ## declares a baseline for it. SILENCE and ENHANCE epigenetic marks need this
 ## anchor: "silenced" means pulled back toward what the species normally is,
 ## not pulled to zero.
+## --- Culture catalog access --------------------------------------------------
+
+func get_drive(id) -> Dictionary:
+	return drives.get(String(id), {})
+
+
+## The network output index for a drive id, or -1. The one direction of this
+## mapping that gameplay code should ever compute.
+func drive_index(id) -> int:
+	return drive_order.find(String(id))
+
+
+func drive_id_at(index: int) -> String:
+	return drive_order[index] if index >= 0 and index < drive_order.size() else ""
+
+
+func drive_count() -> int:
+	return drive_order.size()
+
+
+func get_reward(kind) -> Dictionary:
+	return rewards.get(String(kind), {})
+
+
+func get_culture_prior(id) -> Dictionary:
+	return culture_priors.get(String(id), {})
+
+
 func trait_baseline(trait_key) -> float:
 	return float(_trait_baselines.get(String(trait_key), 0.0))
 
@@ -342,11 +443,46 @@ func validate_catalog() -> Array[String]:
 			if not archetypes.has(String(other)):
 				problems.append("archetype '%s' conflicts with unknown '%s'" % [arch_id, other])
 
+	# --- Culture catalogs -----------------------------------------------------
+	# A drive that names a state which does not exist is a network output nothing
+	# can ever act on: it would train, drift and be invisible. Cheap to catch.
+	var seen_states: Dictionary = {}
+	for drive_id in drives:
+		var drive: Dictionary = drives[drive_id]
+		var state_name := String(drive.get("state", ""))
+		if not AIController.State.has(state_name):
+			problems.append("drive '%s' names unknown state '%s'" % [drive_id, state_name])
+		elif seen_states.has(state_name):
+			problems.append("drives '%s' and '%s' both map to state '%s'"
+				% [seen_states[state_name], drive_id, state_name])
+		else:
+			seen_states[state_name] = String(drive_id)
+		var innate := String(drive.get("innate_trait", ""))
+		if not innate.is_empty() and not _trait_baselines.has(innate):
+			problems.append("drive '%s' seeds from unknown trait '%s'" % [drive_id, innate])
+
+	# Every reward must be something the experience log can actually record, or
+	# it is a tuning knob wired to nothing.
+	for kind in rewards:
+		var entry: Dictionary = rewards[kind]
+		if not entry.has("reward"):
+			problems.append("reward '%s' has no value" % kind)
+		if float(entry.get("decay_ticks", 0.0)) <= 0.0:
+			problems.append("reward '%s' has a non-positive decay window" % kind)
+
+	for prior_id in culture_priors:
+		var biases: Dictionary = (culture_priors[prior_id] as Dictionary).get("biases", {})
+		for drive_id in biases:
+			if not drives.has(String(drive_id)):
+				problems.append("prior '%s' biases unknown drive '%s'" % [prior_id, drive_id])
+
 	return problems
 
 
 func debug_summary() -> String:
-	return "GenomeDB: %d chromosomes, %d loci, %d alleles, %d epi templates, %d archetypes" % [
+	return ("GenomeDB: %d chromosomes, %d loci, %d alleles, %d epi templates, "
+		+ "%d archetypes, %d drives, %d rewards, %d priors") % [
 		chromosomes.size(), loci.size(), alleles.size(),
 		epi_mark_templates.size(), archetypes.size(),
+		drives.size(), rewards.size(), culture_priors.size(),
 	]

@@ -14,11 +14,21 @@ var _verbose_tests: bool = OS.get_cmdline_user_args().has("--verbose-tests")
 @onready var _creature_root: Node2D = $CreatureRoot
 
 var _lines: Array[String] = []
+var _ticker: CultureTicker = null
 
 
 func _ready() -> void:
 	_head("AETHERLINE — Phase 0")
 	_out("Godot %s" % Engine.get_version_info()["string"])
+
+	# CultureRegistry is a static class with no _ready of its own, and SaveSystem
+	# only calls providers that registered before a load runs. Installing it here
+	# is what makes the culture section loadable at all — see the hazard note in
+	# culture_registry.gd.
+	CultureRegistry.install(20260803)
+	_ticker = CultureTicker.new()
+	_ticker.enabled = false  # The suites drive decisions explicitly.
+	add_child(_ticker)
 
 	_section("Autoloads")
 	_out(GenomeDB.debug_summary())
@@ -56,6 +66,15 @@ func _ready() -> void:
 		for line in archetype_tests.chronicle:
 			_out(line)
 
+	_section("Culture self-test  (shared network · transmission · inheritance)")
+	var culture_tests := CultureSelfTest.new()
+	_report(culture_tests.run(_creature_root))
+	if not culture_tests.stats.is_empty():
+		_out("")
+		_out("  measured:")
+		for line in culture_tests.stats:
+			_out(line)
+
 	_section("Genome lab panel  (debug UI smoke test)")
 	var lab: GenomeLab = load("res://scenes/ui/genome_lab.tscn").instantiate()
 	lab.visible = false
@@ -67,6 +86,18 @@ func _ready() -> void:
 	for problem in lab_problems:
 		_out("  FAIL · " + problem)
 	lab.queue_free()
+
+	_section("Culture lab panel  (debug UI smoke test)")
+	var culture_lab: CultureLab = load("res://scenes/ui/culture_lab.tscn").instantiate()
+	culture_lab.visible = false
+	add_child(culture_lab)
+	var culture_lab_problems := culture_lab.run_smoke_test()
+	_out("%d passed, %d failed%s" % [
+		1 if culture_lab_problems.is_empty() else 0, culture_lab_problems.size(),
+		"" if culture_lab_problems.is_empty() else "   <<< ATTENTION"])
+	for problem in culture_lab_problems:
+		_out("  FAIL · " + problem)
+	culture_lab.queue_free()
 
 	if creature_tests.showcase != null:
 		_section("Reloaded creature — full readout")
@@ -82,11 +113,20 @@ func _add_lab_button() -> void:
 	var button := Button.new()
 	button.text = "Open Genome Lab  ->"
 	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	button.position = Vector2(-200, -4)
+	button.position = Vector2(-400, -4)
 	button.custom_minimum_size = Vector2(180, 0)
 	button.pressed.connect(func():
 		get_tree().change_scene_to_file("res://scenes/ui/genome_lab.tscn"))
 	add_child(button)
+
+	var culture_button := Button.new()
+	culture_button.text = "Open Culture Lab  ->"
+	culture_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	culture_button.position = Vector2(-200, -4)
+	culture_button.custom_minimum_size = Vector2(180, 0)
+	culture_button.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/ui/culture_lab.tscn"))
+	add_child(culture_button)
 
 
 func _report(result: Dictionary) -> void:

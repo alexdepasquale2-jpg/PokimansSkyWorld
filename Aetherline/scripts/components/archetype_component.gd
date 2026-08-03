@@ -227,7 +227,12 @@ func describe() -> Array[String]:
 				requirement["comparator"],
 				"  (required)" if requirement["required"] else ""])
 
-	return lines if not lines.is_empty() else ["  (nothing stirring yet)"]
+	# Built as a typed array rather than returned from a ternary: GDScript does
+	# not infer Array[String] for a literal in that position, and the resulting
+	# "expected Array[String]" error fires once per debug readout.
+	if lines.is_empty():
+		lines.append("  (nothing stirring yet)")
+	return lines
 
 
 ## The uncrystallized archetype this creature is furthest along toward.

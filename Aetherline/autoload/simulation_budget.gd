@@ -177,8 +177,13 @@ func _physics_process(_delta: float) -> void:
 	_recount()
 	# TODO(phase 3): distance-based LOD reassignment against the active planet's
 	# focus point, plus demotion when max_full_creatures is exceeded.
-	# TODO(phase 4/6): drive the round-robin slices below into the AI and needs
-	# systems; the cursors and budgets are already sized for it here.
+	#
+	# The Phase 4 half of this is done: CultureTicker consumes take_near_slice()
+	# and take_abstract_slice() to drive the AI at each tier's cadence. The driver
+	# lives there rather than here on purpose — this autoload's contract is
+	# accounting, and a governor that knows what it is governing is one the next
+	# system has to edit too. TODO(phase 6): the needs system wants the same
+	# slices for statistical catch-up.
 
 
 ## Returns the slice of NEAR-band uids that should be updated this frame.

@@ -1,0 +1,30 @@
+[
+  { "id": "prior_blank", "display_name": "No inheritance",
+    "note": "A clan with no opinions. Every drive equally likely until something teaches it otherwise. Useful for tests and for watching a culture form from nothing.",
+    "biases": {} },
+
+  { "id": "prior_timid", "display_name": "Timid",
+    "note": "Flees early, keeps close, does not experiment. Survives a dangerous world and discovers nothing in a safe one.",
+    "biases": { "fear": 0.9, "vigilance": 0.4, "social_bonding": 0.3,
+                "aggression": -0.8, "curiosity": -0.5, "play": -0.4 } },
+
+  { "id": "prior_predatory", "display_name": "Predatory",
+    "note": "Meets things. Eats well until it meets the wrong thing.",
+    "biases": { "aggression": 0.9, "foraging_priority": 0.4, "curiosity": 0.2,
+                "fear": -0.7, "rest_urge": -0.3, "protectiveness": -0.2 } },
+
+  { "id": "prior_gregarious", "display_name": "Gregarious",
+    "note": "Stays together and looks after its own. Transmits everything fast, including panic.",
+    "biases": { "social_bonding": 0.9, "protectiveness": 0.7, "play": 0.4,
+                "migration_urge": -0.4 } },
+
+  { "id": "prior_industrious", "display_name": "Industrious",
+    "note": "Gathers past sufficiency and handles objects. The closest thing in the catalog to a starting culture for tool use.",
+    "biases": { "industry": 0.9, "tool_confidence": 0.8, "foraging_priority": 0.3,
+                "play": -0.3, "aggression": -0.3 } },
+
+  { "id": "prior_nomadic", "display_name": "Nomadic",
+    "note": "Leaves before it has to. Finds more and holds less.",
+    "biases": { "migration_urge": 0.9, "curiosity": 0.5, "vigilance": 0.3,
+                "industry": -0.5, "rest_urge": -0.2 } }
+]
