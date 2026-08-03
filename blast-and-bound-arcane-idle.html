@@ -11,109 +11,156 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #161629 50%, #1a1040 100%);
             color: #e0e0e0;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            padding: 10px;
+            padding: 12px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .game-container {
-            max-width: 1000px;
+            max-width: 1100px;
             width: 100%;
-            background: rgba(15, 15, 35, 0.9);
-            border: 2px solid rgba(100, 200, 255, 0.3);
-            border-radius: 16px;
-            box-shadow: 0 0 40px rgba(100, 200, 255, 0.2), inset 0 0 40px rgba(100, 200, 255, 0.05);
+            height: 100vh;
+            max-height: 100vh;
+            background: linear-gradient(135deg, rgba(12, 15, 30, 0.95) 0%, rgba(20, 18, 40, 0.95) 100%);
+            border: 1px solid rgba(100, 200, 255, 0.15);
+            border-radius: 20px;
+            box-shadow:
+                0 25px 50px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 60px rgba(100, 150, 255, 0.1);
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            backdrop-filter: blur(10px);
         }
 
         .header {
-            background: linear-gradient(90deg, rgba(50, 100, 150, 0.3), rgba(100, 50, 200, 0.3));
-            border-bottom: 1px solid rgba(100, 200, 255, 0.2);
-            padding: 12px 20px;
+            background: linear-gradient(90deg, rgba(30, 60, 120, 0.2), rgba(80, 40, 150, 0.2));
+            border-bottom: 1px solid rgba(100, 200, 255, 0.1);
+            padding: 16px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            backdrop-filter: blur(8px);
+            flex-shrink: 0;
         }
 
         .header h1 {
-            font-size: 24px;
-            background: linear-gradient(90deg, #64c8ff, #ff64ff);
+            font-size: 26px;
+            background: linear-gradient(90deg, #60d5ff 0%, #8b5aff 50%, #ff6b9d 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            font-weight: bold;
-            letter-spacing: 1px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
         .header-stats {
             display: flex;
-            gap: 20px;
+            gap: 12px;
             align-items: center;
         }
 
         .stat-display {
-            background: rgba(100, 150, 200, 0.1);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            padding: 8px 16px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(60, 120, 180, 0.15), rgba(100, 80, 200, 0.15));
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            padding: 10px 16px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 14px;
+            font-size: 13px;
+            backdrop-filter: blur(8px);
+            transition: all 0.3s ease;
+        }
+
+        .stat-display:hover {
+            background: linear-gradient(135deg, rgba(80, 140, 200, 0.25), rgba(120, 100, 220, 0.25));
+            border-color: rgba(100, 200, 255, 0.4);
         }
 
         .stat-label {
-            color: #a0a0c0;
-            font-size: 12px;
+            color: #8899bb;
+            font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
+            font-weight: 600;
         }
 
         .stat-value {
             font-size: 18px;
-            font-weight: bold;
-            color: #64c8ff;
+            font-weight: 700;
+            color: #60d5ff;
         }
 
         .stage-display {
-            color: #ffa500;
-            font-weight: bold;
+            color: #ff9f2f;
+            font-weight: 700;
         }
 
         .content {
             display: flex;
             flex: 1;
-            gap: 20px;
+            gap: 16px;
             padding: 20px;
             overflow-y: auto;
-            max-height: 600px;
+            overflow-x: hidden;
+            max-height: calc(100vh - 76px);
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 200, 255, 0.3) transparent;
+        }
+
+        .content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .content::-webkit-scrollbar-thumb {
+            background: rgba(100, 200, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .content::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 200, 255, 0.5);
         }
 
         .battle-section {
-            flex: 0 0 250px;
+            flex: 0 0 280px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 14px;
         }
 
         .battle-arena {
-            background: linear-gradient(135deg, rgba(20, 40, 80, 0.5), rgba(60, 20, 100, 0.5));
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            border-radius: 12px;
-            padding: 15px;
+            background: linear-gradient(135deg, rgba(25, 50, 100, 0.3), rgba(80, 30, 120, 0.3));
+            border: 1px solid rgba(100, 150, 255, 0.15);
+            border-radius: 14px;
+            padding: 18px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
-            min-height: 280px;
+            gap: 12px;
+            min-height: 300px;
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .character-display {
@@ -121,227 +168,280 @@
         }
 
         .character-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #64c8ff;
-            margin-bottom: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #60d5ff;
+            margin-bottom: 12px;
+            letter-spacing: 0.3px;
         }
 
         .character-avatar {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, #ff5e8a, #ff9540);
             border-radius: 50%;
-            border: 2px solid #ffa500;
+            border: 2px solid rgba(255, 165, 0, 0.8);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
-            margin: 0 auto 8px;
-            box-shadow: 0 0 20px rgba(255, 165, 0, 0.6);
+            font-size: 45px;
+            margin: 0 auto 12px;
+            box-shadow:
+                0 0 30px rgba(255, 165, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 8px 24px rgba(255, 100, 0, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .character-avatar:hover {
+            transform: scale(1.05);
         }
 
         .character-hp {
             width: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 100, 100, 0.5);
-            height: 20px;
-            border-radius: 10px;
+            background: linear-gradient(90deg, rgba(40, 20, 40, 0.6), rgba(20, 10, 30, 0.6));
+            border: 1px solid rgba(255, 100, 100, 0.3);
+            height: 22px;
+            border-radius: 11px;
             overflow: hidden;
-            margin: 8px 0;
+            margin: 10px 0 6px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
         }
 
         .character-hp-bar {
             height: 100%;
-            background: linear-gradient(90deg, #ff6b6b, #ff8e53);
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, #ff6b6b 0%, #ff9540 100%);
+            transition: width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
             width: 100%;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .enemy-display {
             text-align: center;
-            margin-top: 10px;
+            margin-top: 12px;
         }
 
         .enemy-name {
             font-size: 14px;
             color: #ff8080;
-            margin-bottom: 6px;
+            margin-bottom: 10px;
+            font-weight: 700;
         }
 
         .enemy-avatar {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #8b4513, #a0522d);
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #cc5500, #dd6633);
             border-radius: 50%;
-            border: 2px solid #ff4444;
+            border: 2px solid rgba(255, 68, 68, 0.8);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
-            margin: 0 auto 6px;
-            box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
+            font-size: 35px;
+            margin: 0 auto 10px;
+            box-shadow:
+                0 0 25px rgba(255, 68, 68, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 6px 20px rgba(200, 50, 50, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .enemy-avatar:hover {
+            transform: scale(1.05);
         }
 
         .enemy-hp {
-            width: 80px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 100, 100, 0.5);
-            height: 16px;
-            border-radius: 8px;
+            width: 90px;
+            background: linear-gradient(90deg, rgba(40, 20, 20, 0.6), rgba(20, 10, 10, 0.6));
+            border: 1px solid rgba(255, 100, 100, 0.3);
+            height: 20px;
+            border-radius: 10px;
             overflow: hidden;
-            margin: 6px auto;
+            margin: 6px auto 0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
         }
 
         .enemy-hp-bar {
             height: 100%;
-            background: #ff4444;
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, #ff4444 0%, #ff6b6b 100%);
+            transition: width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
             width: 100%;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         .battle-info {
             font-size: 12px;
-            color: #a0a0c0;
+            color: #7080a8;
             text-align: center;
             margin-top: 8px;
+            font-weight: 500;
         }
 
         .energy-mana-section {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
         .bar-container {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            padding: 8px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(30, 40, 80, 0.2), rgba(50, 30, 100, 0.2));
+            border: 1px solid rgba(100, 150, 255, 0.15);
+            padding: 10px;
+            border-radius: 10px;
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .bar-label {
             font-size: 11px;
-            color: #a0a0c0;
-            margin-bottom: 4px;
+            color: #8899bb;
+            margin-bottom: 6px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
+            font-weight: 600;
         }
 
         .bar {
             width: 100%;
-            height: 24px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 6px;
+            height: 28px;
+            background: linear-gradient(90deg, rgba(20, 20, 50, 0.6), rgba(10, 10, 40, 0.6));
+            border-radius: 8px;
             overflow: hidden;
             display: flex;
             align-items: center;
             position: relative;
+            border: 1px solid rgba(100, 150, 255, 0.1);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
         }
 
         .bar-fill {
             height: 100%;
-            transition: width 0.3s ease;
+            transition: width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: 700;
             color: white;
-            text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+            text-shadow:
+                0 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 6px rgba(0, 0, 0, 0.5);
         }
 
         .energy-bar .bar-fill {
-            background: linear-gradient(90deg, #ff6b6b, #ffa500);
-            box-shadow: inset 0 0 10px rgba(255, 165, 0, 0.4);
+            background: linear-gradient(90deg, #ff5e5e 0%, #ffa540 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                inset 0 0 12px rgba(255, 100, 50, 0.3);
         }
 
         .mana-bar .bar-fill {
-            background: linear-gradient(90deg, #6b7bff, #b76bff);
-            box-shadow: inset 0 0 10px rgba(200, 100, 255, 0.4);
+            background: linear-gradient(90deg, #7b68ff 0%, #d060ff 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                inset 0 0 12px rgba(180, 100, 255, 0.3);
         }
 
         .spells-section {
-            background: rgba(20, 20, 50, 0.5);
-            border: 1px solid rgba(100, 150, 200, 0.2);
-            border-radius: 8px;
-            padding: 10px;
+            background: linear-gradient(135deg, rgba(40, 30, 100, 0.2), rgba(70, 20, 120, 0.2));
+            border: 1px solid rgba(150, 100, 255, 0.2);
+            border-radius: 10px;
+            padding: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .spells-label {
             font-size: 11px;
-            color: #a0a0c0;
-            margin-bottom: 8px;
+            color: #8899bb;
+            margin-bottom: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
+            font-weight: 600;
         }
 
         .spells-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: 8px;
         }
 
         .spell-slot {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(150, 100, 200, 0.3);
-            border-radius: 6px;
-            padding: 8px;
+            background: linear-gradient(135deg, rgba(60, 40, 120, 0.3), rgba(80, 30, 140, 0.3));
+            border: 1px solid rgba(150, 100, 220, 0.25);
+            border-radius: 8px;
+            padding: 10px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s ease;
-            min-height: 50px;
+            min-height: 60px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .spell-slot:hover {
-            border-color: rgba(150, 100, 200, 0.6);
-            background: rgba(50, 30, 80, 0.4);
+            border-color: rgba(150, 100, 255, 0.5);
+            background: linear-gradient(135deg, rgba(80, 60, 140, 0.4), rgba(100, 50, 160, 0.4));
+            transform: translateY(-2px);
         }
 
         .spell-icon {
-            font-size: 20px;
-            margin-bottom: 2px;
+            font-size: 24px;
+            margin-bottom: 4px;
+            transition: transform 0.2s ease;
+        }
+
+        .spell-slot:hover .spell-icon {
+            transform: scale(1.1);
         }
 
         .spell-name {
-            font-size: 10px;
-            color: #b0a0c8;
+            font-size: 11px;
+            color: #b8a0d0;
+            font-weight: 600;
         }
 
         .spell-cooldown {
-            font-size: 8px;
-            color: #ff8080;
-            margin-top: 2px;
+            font-size: 9px;
+            color: #ff9999;
+            margin-top: 3px;
+            font-weight: 500;
         }
 
         .puzzle-section {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
+            min-width: 320px;
         }
 
         .puzzle-board-container {
-            background: linear-gradient(135deg, rgba(20, 20, 60, 0.8), rgba(40, 20, 80, 0.8));
-            border: 2px solid rgba(100, 200, 255, 0.4);
-            border-radius: 12px;
-            padding: 10px;
+            background: linear-gradient(135deg, rgba(15, 20, 60, 0.6), rgba(35, 15, 80, 0.6));
+            border: 1px solid rgba(100, 150, 255, 0.15);
+            border-radius: 14px;
+            padding: 12px;
             flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 300px;
+            min-height: 340px;
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         canvas {
             display: block;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(10, 10, 30, 0.8), rgba(20, 10, 40, 0.8));
+            border-radius: 10px;
+            border: 1px solid rgba(100, 200, 255, 0.1);
             max-width: 100%;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .puzzle-info {
@@ -351,28 +451,51 @@
             font-size: 12px;
         }
 
+        .puzzle-score,
+        .puzzle-combo,
+        .puzzle-next {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            border: 1px solid;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
         .puzzle-score {
-            background: rgba(100, 150, 200, 0.1);
-            border: 1px solid rgba(100, 200, 255, 0.2);
-            padding: 8px 12px;
-            border-radius: 6px;
-            color: #64c8ff;
+            background: linear-gradient(135deg, rgba(60, 120, 180, 0.2), rgba(100, 150, 220, 0.2));
+            border-color: rgba(100, 200, 255, 0.2);
+            color: #60d5ff;
+        }
+
+        .puzzle-score:hover {
+            border-color: rgba(100, 200, 255, 0.4);
+            background: linear-gradient(135deg, rgba(80, 140, 200, 0.3), rgba(120, 170, 240, 0.3));
         }
 
         .puzzle-combo {
-            background: rgba(255, 165, 0, 0.1);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            padding: 8px 12px;
-            border-radius: 6px;
-            color: #ffa500;
+            background: linear-gradient(135deg, rgba(220, 100, 20, 0.2), rgba(255, 150, 40, 0.2));
+            border-color: rgba(255, 165, 0, 0.25);
+            color: #ffa540;
+        }
+
+        .puzzle-combo:hover {
+            border-color: rgba(255, 165, 0, 0.5);
+            background: linear-gradient(135deg, rgba(240, 120, 40, 0.3), rgba(255, 170, 60, 0.3));
         }
 
         .puzzle-next {
-            background: rgba(150, 100, 200, 0.1);
-            border: 1px solid rgba(150, 100, 200, 0.3);
-            padding: 8px 12px;
-            border-radius: 6px;
-            color: #d0a0ff;
+            background: linear-gradient(135deg, rgba(150, 80, 180, 0.2), rgba(180, 100, 220, 0.2));
+            border-color: rgba(180, 100, 220, 0.25);
+            color: #d8b0ff;
+        }
+
+        .puzzle-next:hover {
+            border-color: rgba(180, 100, 220, 0.5);
+            background: linear-gradient(135deg, rgba(170, 100, 200, 0.3), rgba(200, 120, 240, 0.3));
         }
 
         .modal-overlay {
@@ -382,127 +505,232 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
             z-index: 1000;
             justify-content: center;
             align-items: center;
+            animation: fadeIn 0.2s ease;
         }
 
         .modal-overlay.active {
             display: flex;
         }
 
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         .modal {
-            background: linear-gradient(135deg, rgba(20, 20, 60, 0.95), rgba(40, 20, 80, 0.95));
-            border: 2px solid rgba(100, 200, 255, 0.4);
-            border-radius: 16px;
-            padding: 30px;
-            max-width: 500px;
-            max-height: 80vh;
+            background: linear-gradient(135deg, rgba(15, 15, 35, 0.98), rgba(30, 15, 50, 0.98));
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            border-radius: 18px;
+            padding: 32px;
+            max-width: 520px;
+            max-height: 85vh;
             overflow-y: auto;
-            box-shadow: 0 0 60px rgba(100, 150, 200, 0.3);
+            box-shadow:
+                0 25px 50px rgba(0, 0, 0, 0.4),
+                0 0 60px rgba(100, 150, 255, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 200, 255, 0.2) transparent;
+            animation: slideUp 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        .modal::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .modal::-webkit-scrollbar-thumb {
+            background: rgba(100, 200, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .modal::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 200, 255, 0.4);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .modal h2 {
-            color: #64c8ff;
-            margin-bottom: 20px;
-            font-size: 24px;
+            color: #60d5ff;
+            margin-bottom: 24px;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
         }
 
         .upgrade-item {
-            background: rgba(50, 50, 100, 0.3);
-            border: 1px solid rgba(100, 150, 200, 0.2);
-            padding: 12px;
+            background: linear-gradient(135deg, rgba(50, 80, 150, 0.2), rgba(80, 50, 150, 0.2));
+            border: 1px solid rgba(100, 150, 220, 0.25);
+            padding: 14px;
             margin-bottom: 12px;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .upgrade-item:hover {
-            background: rgba(50, 80, 150, 0.4);
-            border-color: rgba(100, 200, 255, 0.5);
+            background: linear-gradient(135deg, rgba(70, 100, 180, 0.3), rgba(100, 70, 180, 0.3));
+            border-color: rgba(100, 200, 255, 0.4);
+            transform: translateX(4px);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 8px 16px rgba(100, 150, 255, 0.15);
+        }
+
+        .upgrade-item:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
 
         .upgrade-name {
-            font-weight: bold;
-            color: #a0d0ff;
+            font-weight: 700;
+            color: #7fd5ff;
             font-size: 14px;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            letter-spacing: 0.2px;
         }
 
         .upgrade-desc {
             font-size: 12px;
-            color: #a0a0c0;
-            margin-bottom: 6px;
+            color: #9099b8;
+            margin-bottom: 8px;
+            line-height: 1.4;
         }
 
         .upgrade-cost {
             font-size: 12px;
-            color: #ffa500;
-            font-weight: bold;
+            color: #ffb540;
+            font-weight: 700;
+            letter-spacing: 0.2px;
         }
 
         .button-row {
             display: flex;
-            gap: 10px;
-            margin-top: 20px;
+            gap: 12px;
+            margin-top: 24px;
             flex-wrap: wrap;
         }
 
         .btn {
             flex: 1;
-            padding: 12px 20px;
+            padding: 13px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            transition: all 0.2s ease;
+            font-size: 13px;
+            font-weight: 700;
+            transition: all 0.25s cubic-bezier(0.4, 0.0, 0.2, 1);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            min-width: 120px;
+            letter-spacing: 0.8px;
+            min-width: 130px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: left 0.3s ease;
+            z-index: -1;
+        }
+
+        .btn:hover::before {
+            left: 100%;
         }
 
         .btn-primary {
-            background: linear-gradient(90deg, #64c8ff, #6b8bff);
+            background: linear-gradient(135deg, #5ac8ff 0%, #7070ff 100%);
             color: white;
-            border: 1px solid rgba(100, 200, 255, 0.6);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 8px 24px rgba(90, 200, 255, 0.25);
         }
 
         .btn-primary:hover {
-            background: linear-gradient(90deg, #7dd8ff, #7b9bff);
-            box-shadow: 0 0 20px rgba(100, 200, 255, 0.4);
+            background: linear-gradient(135deg, #70d5ff 0%, #8080ff 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 12px 32px rgba(100, 200, 255, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+            box-shadow:
+                inset 0 2px 6px rgba(0, 0, 0, 0.2),
+                0 2px 8px rgba(100, 200, 255, 0.2);
         }
 
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
 
         .btn-secondary {
-            background: rgba(100, 100, 150, 0.3);
-            color: #a0a0c0;
-            border: 1px solid rgba(100, 150, 200, 0.3);
+            background: linear-gradient(135deg, rgba(100, 120, 180, 0.3), rgba(120, 100, 180, 0.3));
+            color: #a0c8ff;
+            border: 1px solid rgba(100, 150, 220, 0.3);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 4px 16px rgba(50, 100, 150, 0.1);
         }
 
         .btn-secondary:hover {
-            background: rgba(100, 120, 180, 0.4);
-            border-color: rgba(100, 200, 255, 0.5);
+            background: linear-gradient(135deg, rgba(120, 140, 200, 0.4), rgba(140, 120, 200, 0.4));
+            border-color: rgba(100, 200, 255, 0.4);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.15),
+                0 8px 20px rgba(100, 150, 200, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary:active {
+            transform: translateY(0);
         }
 
         .tutorial-box {
-            background: rgba(50, 100, 150, 0.3);
-            border-left: 4px solid #64c8ff;
-            padding: 12px;
-            margin-bottom: 15px;
-            border-radius: 4px;
+            background: linear-gradient(135deg, rgba(50, 100, 150, 0.25), rgba(50, 80, 150, 0.25));
+            border-left: 4px solid #60d5ff;
+            padding: 14px;
+            margin-bottom: 20px;
+            border-radius: 8px;
             font-size: 13px;
-            line-height: 1.5;
+            line-height: 1.6;
+            border: 1px solid rgba(100, 180, 255, 0.15);
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .tutorial-box strong {
-            color: #64c8ff;
+            color: #60d5ff;
+            font-weight: 700;
         }
 
         @media (max-width: 768px) {
@@ -516,32 +744,42 @@
             }
 
             .header h1 {
-                font-size: 18px;
+                font-size: 20px;
             }
 
             .header-stats {
-                gap: 10px;
-                font-size: 12px;
+                gap: 8px;
+                font-size: 11px;
             }
 
             .stat-display {
-                padding: 6px 12px;
+                padding: 8px 12px;
             }
 
             .stat-value {
-                font-size: 16px;
+                font-size: 14px;
+            }
+
+            .puzzle-section {
+                min-width: auto;
+            }
+
+            .modal {
+                padding: 24px;
+                max-width: 90vw;
             }
         }
 
         .particle {
             position: fixed;
             pointer-events: none;
-            font-weight: bold;
+            font-weight: 700;
             z-index: 500;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
         }
 
         .float-up {
-            animation: floatUp 1s ease-out forwards;
+            animation: floatUp 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
 
         @keyframes floatUp {
@@ -549,21 +787,30 @@
                 transform: translateY(0) scale(1);
                 opacity: 1;
             }
+            60% {
+                opacity: 1;
+            }
             100% {
-                transform: translateY(-60px) scale(0.5);
+                transform: translateY(-80px) scale(0.4);
                 opacity: 0;
             }
         }
 
         .screen-shake {
-            animation: screenShake 0.3s ease;
+            animation: screenShake 0.35s cubic-bezier(0.36, 0, 0.66, 1);
         }
 
         @keyframes screenShake {
             0%, 100% { transform: translate(0, 0); }
-            25% { transform: translate(-3px, -3px); }
-            50% { transform: translate(3px, 3px); }
-            75% { transform: translate(-3px, 3px); }
+            10% { transform: translate(-2px, -2px); }
+            20% { transform: translate(2px, 2px); }
+            30% { transform: translate(-2px, 2px); }
+            40% { transform: translate(2px, -2px); }
+            50% { transform: translate(-1px, -1px); }
+            60% { transform: translate(1px, 1px); }
+            70% { transform: translate(-1px, 1px); }
+            80% { transform: translate(1px, -1px); }
+            90% { transform: translate(0, 0); }
         }
     </style>
 </head>
@@ -831,6 +1078,7 @@
         // =====================================================
 
         function init() {
+            lockScroll();
             loadProgress();
             gameState.character = CHARACTERS[gameState.selectedCharacterIdx];
             gameState.grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
@@ -839,6 +1087,14 @@
             initializeEnemy();
             setupEventListeners();
             update();
+        }
+
+        function lockScroll() {
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            document.body.style.height = '100%';
         }
 
         function loadProgress() {
