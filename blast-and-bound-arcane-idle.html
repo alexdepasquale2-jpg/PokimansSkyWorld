@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blast & Bound: Arcane Idle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 100%);
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .game-container {
+            max-width: 1000px;
+            width: 100%;
+            background: rgba(15, 15, 35, 0.9);
+            border: 2px solid rgba(100, 200, 255, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(100, 200, 255, 0.2), inset 0 0 40px rgba(100, 200, 255, 0.05);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(90deg, rgba(50, 100, 150, 0.3), rgba(100, 50, 200, 0.3));
+            border-bottom: 1px solid rgba(100, 200, 255, 0.2);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #64c8ff, #ff64ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .stat-display {
+            background: rgba(100, 150, 200, 0.1);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #a0a0c0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #64c8ff;
+        }
+
+        .stage-display {
+            color: #ffa500;
+            font-weight: bold;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .battle-section {
+            flex: 0 0 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .battle-arena {
+            background: linear-gradient(135deg, rgba(20, 40, 80, 0.5), rgba(60, 20, 100, 0.5));
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            min-height: 280px;
+        }
+
+        .character-display {
+            text-align: center;
+        }
+
+        .character-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #64c8ff;
+            margin-bottom: 8px;
+        }
+
+        .character-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+            border-radius: 50%;
+            border: 2px solid #ffa500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 8px;
+            box-shadow: 0 0 20px rgba(255, 165, 0, 0.6);
+        }
+
+        .character-hp {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 100, 100, 0.5);
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .character-hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+            transition: width 0.3s ease;
+            width: 100%;
+        }
+
+        .enemy-display {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .enemy-name {
+            font-size: 14px;
+            color: #ff8080;
+            margin-bottom: 6px;
+        }
+
+        .enemy-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #8b4513, #a0522d);
+            border-radius: 50%;
+            border: 2px solid #ff4444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            margin: 0 auto 6px;
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
+        }
+
+        .enemy-hp {
+            width: 80px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 100, 100, 0.5);
+            height: 16px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 6px auto;
+        }
+
+        .enemy-hp-bar {
+            height: 100%;
+            background: #ff4444;
+            transition: width 0.3s ease;
+            width: 100%;
+        }
+
+        .battle-info {
+            font-size: 12px;
+            color: #a0a0c0;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .energy-mana-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .bar-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .bar-label {
+            font-size: 11px;
+            color: #a0a0c0;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bar {
+            width: 100%;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .energy-bar .bar-fill {
+            background: linear-gradient(90deg, #ff6b6b, #ffa500);
+            box-shadow: inset 0 0 10px rgba(255, 165, 0, 0.4);
+        }
+
+        .mana-bar .bar-fill {
+            background: linear-gradient(90deg, #6b7bff, #b76bff);
+            box-shadow: inset 0 0 10px rgba(200, 100, 255, 0.4);
+        }
+
+        .spells-section {
+            background: rgba(20, 20, 50, 0.5);
+            border: 1px solid rgba(100, 150, 200, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .spells-label {
+            font-size: 11px;
+            color: #a0a0c0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .spells-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .spell-slot {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(150, 100, 200, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spell-slot:hover {
+            border-color: rgba(150, 100, 200, 0.6);
+            background: rgba(50, 30, 80, 0.4);
+        }
+
+        .spell-icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+
+        .spell-name {
+            font-size: 10px;
+            color: #b0a0c8;
+        }
+
+        .spell-cooldown {
+            font-size: 8px;
+            color: #ff8080;
+            margin-top: 2px;
+        }
+
+        .puzzle-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .puzzle-board-container {
+            background: linear-gradient(135deg, rgba(20, 20, 60, 0.8), rgba(40, 20, 80, 0.8));
+            border: 2px solid rgba(100, 200, 255, 0.4);
+            border-radius: 12px;
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+
+        canvas {
+            display: block;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            max-width: 100%;
+        }
+
+        .puzzle-info {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .puzzle-score {
+            background: rgba(100, 150, 200, 0.1);
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: #64c8ff;
+        }
+
+        .puzzle-combo {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: #ffa500;
+        }
+
+        .puzzle-next {
+            background: rgba(150, 100, 200, 0.1);
+            border: 1px solid rgba(150, 100, 200, 0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: #d0a0ff;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, rgba(20, 20, 60, 0.95), rgba(40, 20, 80, 0.95));
+            border: 2px solid rgba(100, 200, 255, 0.4);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 60px rgba(100, 150, 200, 0.3);
+        }
+
+        .modal h2 {
+            color: #64c8ff;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .upgrade-item {
+            background: rgba(50, 50, 100, 0.3);
+            border: 1px solid rgba(100, 150, 200, 0.2);
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .upgrade-item:hover {
+            background: rgba(50, 80, 150, 0.4);
+            border-color: rgba(100, 200, 255, 0.5);
+        }
+
+        .upgrade-name {
+            font-weight: bold;
+            color: #a0d0ff;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .upgrade-desc {
+            font-size: 12px;
+            color: #a0a0c0;
+            margin-bottom: 6px;
+        }
+
+        .upgrade-cost {
+            font-size: 12px;
+            color: #ffa500;
+            font-weight: bold;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #64c8ff, #6b8bff);
+            color: white;
+            border: 1px solid rgba(100, 200, 255, 0.6);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(90deg, #7dd8ff, #7b9bff);
+            box-shadow: 0 0 20px rgba(100, 200, 255, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: rgba(100, 100, 150, 0.3);
+            color: #a0a0c0;
+            border: 1px solid rgba(100, 150, 200, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(100, 120, 180, 0.4);
+            border-color: rgba(100, 200, 255, 0.5);
+        }
+
+        .tutorial-box {
+            background: rgba(50, 100, 150, 0.3);
+            border-left: 4px solid #64c8ff;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .tutorial-box strong {
+            color: #64c8ff;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+                max-height: none;
+            }
+
+            .battle-section {
+                flex: 0 1 auto;
+            }
+
+            .header h1 {
+                font-size: 18px;
+            }
+
+            .header-stats {
+                gap: 10px;
+                font-size: 12px;
+            }
+
+            .stat-display {
+                padding: 6px 12px;
+            }
+
+            .stat-value {
+                font-size: 16px;
+            }
+        }
+
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            font-weight: bold;
+            z-index: 500;
+        }
+
+        .float-up {
+            animation: floatUp 1s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-60px) scale(0.5);
+                opacity: 0;
+            }
+        }
+
+        .screen-shake {
+            animation: screenShake 0.3s ease;
+        }
+
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-3px, -3px); }
+            50% { transform: translate(3px, 3px); }
+            75% { transform: translate(-3px, 3px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>⚡ Blast & Bound: Arcane Idle ⚡</h1>
+            <div class="header-stats">
+                <div class="stat-display">
+                    <span class="stat-label">Stage</span>
+                    <span class="stat-value stage-display" id="stageDisplay">1</span>
+                </div>
+                <div class="stat-display">
+                    <span class="stat-label">Score</span>
+                    <span class="stat-value" id="scoreDisplay">0</span>
+                </div>
+                <div class="stat-display">
+                    <span class="stat-label">Best</span>
+                    <span class="stat-value" id="bestDisplay">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="battle-section">
+                <div class="battle-arena">
+                    <div class="character-display">
+                        <div class="character-name" id="characterName">Fighter</div>
+                        <div class="character-avatar" id="characterAvatar">⚔️</div>
+                        <div class="character-hp">
+                            <div class="character-hp-bar" id="characterHpBar" style="width: 100%"></div>
+                        </div>
+                        <div style="font-size: 11px; color: #a0a0c0;">
+                            <span id="characterHp">100</span> / <span id="characterMaxHp">100</span> HP
+                        </div>
+                    </div>
+
+                    <div style="color: #8080c0; font-size: 12px; margin: 8px 0;">vs.</div>
+
+                    <div class="enemy-display">
+                        <div class="enemy-name" id="enemyName">Enemy</div>
+                        <div class="enemy-avatar" id="enemyAvatar">👹</div>
+                        <div class="enemy-hp">
+                            <div class="enemy-hp-bar" id="enemyHpBar" style="width: 100%"></div>
+                        </div>
+                        <div style="font-size: 11px; color: #c0a0a0;">
+                            <span id="enemyHp">50</span> / <span id="enemyMaxHp">50</span> HP
+                        </div>
+                    </div>
+
+                    <div class="battle-info" id="battleInfo">Ready for battle!</div>
+                </div>
+
+                <div class="energy-mana-section">
+                    <div class="bar-container">
+                        <div class="bar-label">Energy ⚡</div>
+                        <div class="bar">
+                            <div class="bar-fill energy-bar" id="energyBar" style="width: 50%">
+                                <span id="energyValue">50</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bar-container">
+                        <div class="bar-label">Mana 🔮</div>
+                        <div class="bar">
+                            <div class="bar-fill mana-bar" id="manaBar" style="width: 30%">
+                                <span id="manaValue">30</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="spells-section">
+                    <div class="spells-label">Active Spells</div>
+                    <div class="spells-grid" id="spellsGrid">
+                        <div class="spell-slot" id="spell0">
+                            <div class="spell-icon">-</div>
+                            <div class="spell-name">Empty</div>
+                        </div>
+                        <div class="spell-slot" id="spell1">
+                            <div class="spell-icon">-</div>
+                            <div class="spell-name">Empty</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="upgradesBtn" style="width: 100%;">⬆️ Upgrades</button>
+            </div>
+
+            <div class="puzzle-section">
+                <div class="puzzle-board-container">
+                    <canvas id="gameCanvas" width="320" height="320"></canvas>
+                </div>
+                <div class="puzzle-info">
+                    <div class="puzzle-score">Score: <span id="puzzleScore">0</span></div>
+                    <div class="puzzle-combo">Combo x<span id="comboDisplay">0</span></div>
+                    <div class="puzzle-next">Clears: <span id="clearsDisplay">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upgrades Modal -->
+    <div class="modal-overlay" id="upgradesModal">
+        <div class="modal">
+            <h2>⬆️ Upgrades</h2>
+            <div class="tutorial-box" id="tutorialBox" style="display: none;">
+                <strong>💡 Tip:</strong> <span id="tutorialText"></span>
+            </div>
+            <div id="upgradesContainer"></div>
+            <div class="button-row">
+                <button class="btn btn-secondary" id="closeUpgradesBtn">Close</button>
+                <button class="btn btn-primary" id="changeCharacterBtn">🔄 Character</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // GAME STATE & CONSTANTS
+        // =====================================================
+
+        const GRID_SIZE = 8;
+        const CELL_SIZE = 40;
+        const TOTAL_WIDTH = GRID_SIZE * CELL_SIZE;
+
+        const CHARACTERS = [
+            {
+                id: 'warrior',
+                name: '⚔️ Warrior',
+                avatar: '⚔️',
+                baseAttack: 8,
+                baseDefense: 5,
+                baseHp: 100,
+                color: '#ff8e53'
+            },
+            {
+                id: 'mage',
+                name: '🧙 Mage',
+                avatar: '🧙',
+                baseAttack: 12,
+                baseDefense: 2,
+                baseHp: 60,
+                color: '#b76bff'
+            },
+            {
+                id: 'paladin',
+                name: '✨ Paladin',
+                avatar: '✨',
+                baseAttack: 6,
+                baseDefense: 8,
+                baseHp: 120,
+                color: '#64c8ff'
+            }
+        ];
+
+        const SPELLS = [
+            {
+                id: 'fireball',
+                name: 'Fireball',
+                icon: '🔥',
+                manaCost: 30,
+                damage: 20,
+                description: 'Massive fire damage',
+                element: 'fire'
+            },
+            {
+                id: 'frostbolt',
+                name: 'Frostbolt',
+                icon: '❄️',
+                manaCost: 25,
+                damage: 15,
+                description: 'Freeze and damage',
+                element: 'ice'
+            },
+            {
+                id: 'lightning',
+                name: 'Lightning',
+                icon: '⚡',
+                manaCost: 35,
+                damage: 25,
+                description: 'Chain damage',
+                element: 'lightning'
+            },
+            {
+                id: 'arcane',
+                name: 'Arcane Blast',
+                icon: '🌀',
+                manaCost: 40,
+                damage: 30,
+                description: 'Pure magic damage',
+                element: 'arcane'
+            }
+        ];
+
+        const POLYOMINOES = [
+            [[1]],
+            [[1, 1]],
+            [[1], [1]],
+            [[1, 1], [1, 1]],
+            [[1, 1, 1]],
+            [[1, 0], [1, 1]],
+            [[0, 1], [1, 1]]
+        ];
+
+        let gameState = {
+            stage: 1,
+            score: 0,
+            bestScore: 0,
+            character: null,
+            selectedCharacterIdx: 0,
+            grid: [],
+            nextPieces: [],
+            currentPieceIdx: 0,
+            draggingPiece: null,
+            dragOffset: { x: 0, y: 0 },
+            energy: 50,
+            maxEnergy: 100,
+            mana: 30,
+            maxMana: 100,
+            equippedSpells: [null, null],
+            combo: 0,
+            clearedLines: 0,
+            characterHp: 0,
+            characterMaxHp: 0,
+            enemyHp: 0,
+            enemyMaxHp: 0,
+            isGameOver: false,
+            tutorial: {
+                clearShown: false,
+                energyShown: false,
+                manaShown: false
+            },
+            upgrades: {
+                attackLevel: 0,
+                defenseLevel: 0,
+                hpLevel: 0,
+                energyCapacity: 0,
+                manaCapacity: 0,
+                autoLoot: 0
+            }
+        };
+
+        let enemies = [
+            { name: 'Goblin', hp: 30, maxHp: 30, attack: 3, icon: '👹' },
+            { name: 'Orc', hp: 50, maxHp: 50, attack: 5, icon: '🗡️' },
+            { name: 'Dragon', hp: 80, maxHp: 80, attack: 8, icon: '🐉' },
+            { name: 'Lich', hp: 100, maxHp: 100, attack: 10, icon: '💀' }
+        ];
+
+        let currentEnemy = { ...enemies[0] };
+        let currentBattle = {
+            characterAttackCooldown: 0,
+            characterAttackSpeed: 0.5,
+            enemyAttackCooldown: 0,
+            enemyAttackSpeed: 0.7
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // =====================================================
+        // INITIALIZATION
+        // =====================================================
+
+        function init() {
+            loadProgress();
+            gameState.character = CHARACTERS[gameState.selectedCharacterIdx];
+            gameState.grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
+            gameState.nextPieces = generateNextPieces();
+            initializeCharacter();
+            initializeEnemy();
+            setupEventListeners();
+            update();
+        }
+
+        function loadProgress() {
+            const saved = localStorage.getItem('blastnboundProgress');
+            if (saved) {
+                const data = JSON.parse(saved);
+                gameState.bestScore = data.bestScore || 0;
+                gameState.upgrades = data.upgrades || gameState.upgrades;
+                gameState.selectedCharacterIdx = data.selectedCharacterIdx || 0;
+                document.getElementById('bestDisplay').textContent = gameState.bestScore;
+            }
+        }
+
+        function saveProgress() {
+            localStorage.setItem('blastnboundProgress', JSON.stringify({
+                bestScore: gameState.bestScore,
+                upgrades: gameState.upgrades,
+                selectedCharacterIdx: gameState.selectedCharacterIdx
+            }));
+        }
+
+        function initializeCharacter() {
+            const char = gameState.character;
+            const atkBonus = gameState.upgrades.attackLevel * 3;
+            const defBonus = gameState.upgrades.defenseLevel * 2;
+            const hpBonus = gameState.upgrades.hpLevel * 20;
+
+            gameState.characterMaxHp = char.baseHp + hpBonus;
+            gameState.characterHp = gameState.characterMaxHp;
+            gameState.maxEnergy = 100 + gameState.upgrades.energyCapacity * 20;
+            gameState.energy = Math.min(gameState.energy, gameState.maxEnergy);
+            gameState.maxMana = 100 + gameState.upgrades.manaCapacity * 20;
+
+            document.getElementById('characterName').textContent = char.name;
+            document.getElementById('characterAvatar').textContent = char.avatar;
+            document.getElementById('characterMaxHp').textContent = gameState.characterMaxHp;
+        }
+
+        function initializeEnemy() {
+            const enemyList = enemies.slice(0, Math.min(Math.floor(gameState.stage / 2) + 1, enemies.length));
+            currentEnemy = { ...enemyList[Math.floor(Math.random() * enemyList.length)] };
+            currentEnemy.hp = currentEnemy.maxHp;
+            gameState.enemyHp = currentEnemy.hp;
+            gameState.enemyMaxHp = currentEnemy.maxHp;
+
+            document.getElementById('enemyName').textContent = currentEnemy.name;
+            document.getElementById('enemyAvatar').textContent = currentEnemy.icon;
+            document.getElementById('enemyMaxHp').textContent = currentEnemy.maxHp;
+        }
+
+        function generateNextPieces() {
+            const pieces = [];
+            for (let i = 0; i < 3; i++) {
+                pieces.push(POLYOMINOES[Math.floor(Math.random() * POLYOMINOES.length)]);
+            }
+            return pieces;
+        }
+
+        // =====================================================
+        // PUZZLE LOGIC
+        // =====================================================
+
+        function canPlacePiece(piece, gridX, gridY) {
+            for (let y = 0; y < piece.length; y++) {
+                for (let x = 0; x < piece[y].length; x++) {
+                    if (piece[y][x]) {
+                        const gx = gridX + x;
+                        const gy = gridY + y;
+                        if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return false;
+                        if (gameState.grid[gy][gx]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placePiece(piece, gridX, gridY) {
+            for (let y = 0; y < piece.length; y++) {
+                for (let x = 0; x < piece[y].length; x++) {
+                    if (piece[y][x]) {
+                        gameState.grid[gridY + y][gridX + x] = 1;
+                    }
+                }
+            }
+        }
+
+        function findClearedLines() {
+            const cleared = { rows: [], cols: [] };
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                if (gameState.grid[y].every(cell => cell === 1)) {
+                    cleared.rows.push(y);
+                }
+            }
+
+            for (let x = 0; x < GRID_SIZE; x++) {
+                if (gameState.grid.every(row => row[x] === 1)) {
+                    cleared.cols.push(x);
+                }
+            }
+
+            return cleared;
+        }
+
+        function clearLines(cleared) {
+            const totalClears = cleared.rows.length + cleared.cols.length;
+            if (totalClears === 0) return 0;
+
+            cleared.rows.forEach(y => {
+                gameState.grid[y] = Array(GRID_SIZE).fill(0);
+            });
+
+            cleared.cols.forEach(x => {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    gameState.grid[y][x] = 0;
+                }
+            });
+
+            gameState.clearedLines += totalClears;
+            gameState.combo++;
+
+            const energyGain = totalClears * 10 + (totalClears > 1 ? totalClears * 5 : 0) + gameState.combo * 5;
+            const manaGain = totalClears > 1 ? totalClears * 5 : 0;
+
+            addEnergy(energyGain);
+            addMana(manaGain);
+
+            floatNumber(TOTAL_WIDTH / 2, TOTAL_WIDTH / 2, `+${energyGain} ⚡`, '#ffa500');
+
+            if (totalClears > 1) {
+                floatNumber(TOTAL_WIDTH / 2, TOTAL_WIDTH / 2 + 30, `+${manaGain} 🔮`, '#b76bff');
+                screenShake();
+            }
+
+            return totalClears;
+        }
+
+        function checkGameOver() {
+            const piece = gameState.nextPieces[gameState.currentPieceIdx];
+            const canPlace = canPlacePiece(piece, 0, 0) || canPlacePiece(piece, 1, 0) || canPlacePiece(piece, 2, 0);
+            return !canPlace;
+        }
+
+        // =====================================================
+        // ENERGY & MANA
+        // =====================================================
+
+        function addEnergy(amount) {
+            gameState.energy = Math.min(gameState.energy + amount, gameState.maxEnergy);
+            updateEnergyBar();
+        }
+
+        function consumeEnergy(amount) {
+            gameState.energy = Math.max(0, gameState.energy - amount);
+            updateEnergyBar();
+        }
+
+        function addMana(amount) {
+            gameState.mana = Math.min(gameState.mana + amount, gameState.maxMana);
+            updateManaBar();
+        }
+
+        function consumeMana(amount) {
+            gameState.mana = Math.max(0, gameState.mana - amount);
+            updateManaBar();
+        }
+
+        function updateEnergyBar() {
+            const pct = (gameState.energy / gameState.maxEnergy) * 100;
+            document.getElementById('energyBar').style.width = pct + '%';
+            document.getElementById('energyValue').textContent = Math.floor(gameState.energy);
+        }
+
+        function updateManaBar() {
+            const pct = (gameState.mana / gameState.maxMana) * 100;
+            document.getElementById('manaBar').style.width = pct + '%';
+            document.getElementById('manaValue').textContent = Math.floor(gameState.mana);
+        }
+
+        // =====================================================
+        // BATTLE SYSTEM
+        // =====================================================
+
+        function updateBattle(deltaTime) {
+            if (gameState.isGameOver) return;
+
+            const energyFactor = gameState.energy / gameState.maxEnergy;
+            currentBattle.characterAttackCooldown -= deltaTime;
+
+            if (currentBattle.characterAttackCooldown <= 0 && energyFactor > 0.1) {
+                const char = gameState.character;
+                const atkBonus = gameState.upgrades.attackLevel * 3;
+                const baseDmg = char.baseAttack + atkBonus;
+                const damage = Math.floor(baseDmg * (0.7 + energyFactor * 0.5));
+
+                currentEnemy.hp -= damage;
+                gameState.enemyHp = Math.max(0, currentEnemy.hp);
+                updateEnemyHpBar();
+
+                floatNumber(canvas.width / 2 + 80, canvas.height / 2, `-${damage}`, '#ff6b6b');
+
+                currentBattle.characterAttackCooldown = 1 / (0.5 + energyFactor);
+                consumeEnergy(2);
+
+                if (currentEnemy.hp <= 0) {
+                    winBattle();
+                }
+            }
+
+            currentBattle.enemyAttackCooldown -= deltaTime;
+            if (currentBattle.enemyAttackCooldown <= 0) {
+                const char = gameState.character;
+                const defBonus = gameState.upgrades.defenseLevel * 2;
+                const baseDef = char.baseDefense + defBonus;
+                const damage = Math.max(1, Math.floor(currentEnemy.attack - baseDef * 0.5));
+
+                gameState.characterHp -= damage;
+                updateCharacterHpBar();
+
+                floatNumber(canvas.width / 2 - 80, canvas.height / 2, `-${damage}`, '#ff6b6b');
+
+                currentBattle.enemyAttackCooldown = 1.5;
+
+                if (gameState.characterHp <= 0) {
+                    loseBattle();
+                }
+            }
+        }
+
+        function winBattle() {
+            gameState.stage++;
+            gameState.score += 100 + gameState.upgrades.autoLoot * 20;
+            gameState.clearedLines = 0;
+            gameState.combo = 0;
+            gameState.bestScore = Math.max(gameState.bestScore, gameState.score);
+            saveProgress();
+            initializeCharacter();
+            initializeEnemy();
+            document.getElementById('stageDisplay').textContent = gameState.stage;
+            document.getElementById('scoreDisplay').textContent = gameState.score;
+            floatNumber(canvas.width / 2, canvas.height / 2 - 60, 'VICTORY! ✨', '#ffa500');
+        }
+
+        function loseBattle() {
+            gameState.isGameOver = true;
+            gameState.bestScore = Math.max(gameState.bestScore, gameState.score);
+            saveProgress();
+            setTimeout(() => {
+                if (confirm(`Game Over! Score: ${gameState.score}\n\nPlay again?`)) {
+                    location.reload();
+                }
+            }, 500);
+        }
+
+        function updateCharacterHpBar() {
+            const pct = (gameState.characterHp / gameState.characterMaxHp) * 100;
+            document.getElementById('characterHpBar').style.width = pct + '%';
+            document.getElementById('characterHp').textContent = Math.max(0, gameState.characterHp);
+        }
+
+        function updateEnemyHpBar() {
+            const pct = (gameState.enemyHp / gameState.enemyMaxHp) * 100;
+            document.getElementById('enemyHpBar').style.width = pct + '%';
+            document.getElementById('enemyHp').textContent = Math.max(0, gameState.enemyHp);
+        }
+
+        // =====================================================
+        // SPELL SYSTEM
+        // =====================================================
+
+        function equipSpell(spellIdx) {
+            const spell = SPELLS[spellIdx];
+            const slotIdx = gameState.equippedSpells.findIndex(s => s === null);
+            if (slotIdx >= 0) {
+                gameState.equippedSpells[slotIdx] = spell;
+                renderSpells();
+                saveProgress();
+            }
+        }
+
+        function castSpell(spell) {
+            if (gameState.mana >= spell.manaCost) {
+                consumeMana(spell.manaCost);
+                const damage = spell.damage;
+                currentEnemy.hp -= damage;
+                gameState.enemyHp = Math.max(0, currentEnemy.hp);
+                updateEnemyHpBar();
+                floatNumber(canvas.width / 2 + 80, canvas.height / 2 - 30, `${spell.icon} -${damage}`, '#b76bff');
+
+                if (currentEnemy.hp <= 0) {
+                    winBattle();
+                }
+            }
+        }
+
+        function renderSpells() {
+            const grid = document.getElementById('spellsGrid');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < gameState.equippedSpells.length; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'spell-slot';
+                slot.id = `spell${i}`;
+
+                const spell = gameState.equippedSpells[i];
+                if (spell) {
+                    slot.innerHTML = `
+                        <div class="spell-icon">${spell.icon}</div>
+                        <div class="spell-name">${spell.name}</div>
+                        <div class="spell-cooldown">${spell.manaCost} Mana</div>
+                    `;
+                    slot.style.cursor = 'pointer';
+                    slot.onclick = () => castSpell(spell);
+                } else {
+                    slot.innerHTML = `
+                        <div class="spell-icon">-</div>
+                        <div class="spell-name">Empty</div>
+                    `;
+                }
+                grid.appendChild(slot);
+            }
+        }
+
+        function autocastSpells() {
+            for (let spell of gameState.equippedSpells) {
+                if (spell && gameState.mana >= spell.manaCost && Math.random() < 0.3) {
+                    castSpell(spell);
+                    break;
+                }
+            }
+        }
+
+        // =====================================================
+        // UPGRADES
+        // =====================================================
+
+        function showUpgrades() {
+            const upgradesList = [
+                {
+                    key: 'attackLevel',
+                    name: '⚔️ Attack Power',
+                    desc: `Damage +${gameState.upgrades.attackLevel * 3} (Current: ${gameState.character.baseAttack + gameState.upgrades.attackLevel * 3})`,
+                    cost: 100 + gameState.upgrades.attackLevel * 50,
+                    effect: 'Increases character attack damage'
+                },
+                {
+                    key: 'defenseLevel',
+                    name: '🛡️ Defense',
+                    desc: `Defense +${gameState.upgrades.defenseLevel * 2} (Current: ${gameState.character.baseDefense + gameState.upgrades.defenseLevel * 2})`,
+                    cost: 80 + gameState.upgrades.defenseLevel * 40,
+                    effect: 'Reduces enemy damage taken'
+                },
+                {
+                    key: 'hpLevel',
+                    name: '❤️ Max HP',
+                    desc: `HP +${gameState.upgrades.hpLevel * 20} (Current: ${gameState.characterMaxHp})`,
+                    cost: 120 + gameState.upgrades.hpLevel * 60,
+                    effect: 'Increases max health'
+                },
+                {
+                    key: 'energyCapacity',
+                    name: '⚡ Energy Capacity',
+                    desc: `Capacity +${gameState.upgrades.energyCapacity * 20} (Current: ${gameState.maxEnergy})`,
+                    cost: 150 + gameState.upgrades.energyCapacity * 75,
+                    effect: 'Increases maximum energy reserves'
+                },
+                {
+                    key: 'manaCapacity',
+                    name: '🔮 Mana Capacity',
+                    desc: `Capacity +${gameState.upgrades.manaCapacity * 20} (Current: ${gameState.maxMana})`,
+                    cost: 150 + gameState.upgrades.manaCapacity * 75,
+                    effect: 'Increases maximum mana reserves'
+                }
+            ];
+
+            const container = document.getElementById('upgradesContainer');
+            container.innerHTML = '';
+
+            upgradesList.forEach(upg => {
+                const div = document.createElement('div');
+                const canAfford = gameState.score >= upg.cost;
+                div.className = 'upgrade-item';
+                if (!canAfford) div.style.opacity = '0.5';
+                div.innerHTML = `
+                    <div class="upgrade-name">${upg.name}</div>
+                    <div class="upgrade-desc">${upg.desc}</div>
+                    <div class="upgrade-desc">${upg.effect}</div>
+                    <div class="upgrade-cost">Cost: ${upg.cost} points</div>
+                `;
+                div.onclick = () => {
+                    if (canAfford) {
+                        gameState.score -= upg.cost;
+                        gameState.upgrades[upg.key]++;
+                        if (upg.key === 'attackLevel' || upg.key === 'defenseLevel' || upg.key === 'hpLevel') {
+                            initializeCharacter();
+                        } else if (upg.key === 'energyCapacity') {
+                            gameState.maxEnergy += 20;
+                        } else if (upg.key === 'manaCapacity') {
+                            gameState.maxMana += 20;
+                        }
+                        document.getElementById('scoreDisplay').textContent = gameState.score;
+                        saveProgress();
+                        showUpgrades();
+                    }
+                };
+                container.appendChild(div);
+            });
+
+            // Show tutorial tips
+            const tutorialBox = document.getElementById('tutorialBox');
+            const tutorialText = document.getElementById('tutorialText');
+            if (!gameState.tutorial.clearShown && gameState.clearedLines < 5) {
+                tutorialBox.style.display = 'block';
+                tutorialText.textContent = 'Clear lines on the puzzle to generate Energy, which powers your fighter!';
+                gameState.tutorial.clearShown = true;
+            } else if (!gameState.tutorial.manaShown && gameState.clearedLines > 10) {
+                tutorialBox.style.display = 'block';
+                tutorialText.textContent = 'Clear multiple lines at once to generate Mana and cast powerful spells!';
+                gameState.tutorial.manaShown = true;
+            } else {
+                tutorialBox.style.display = 'none';
+            }
+
+            document.getElementById('upgradesModal').classList.add('active');
+        }
+
+        function changeCharacter() {
+            gameState.selectedCharacterIdx = (gameState.selectedCharacterIdx + 1) % CHARACTERS.length;
+            gameState.character = CHARACTERS[gameState.selectedCharacterIdx];
+            initializeCharacter();
+            saveProgress();
+            showUpgrades();
+        }
+
+        // =====================================================
+        // RENDERING
+        // =====================================================
+
+        function drawGrid() {
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.1)';
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    ctx.strokeStyle = 'rgba(100, 200, 255, 0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+            }
+        }
+
+        function drawCells() {
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    if (gameState.grid[y][x]) {
+                        ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+                        ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                        ctx.strokeStyle = 'rgba(150, 230, 255, 1)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x * CELL_SIZE + 2, y * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                    }
+                }
+            }
+        }
+
+        function drawPiece(piece, x, y, alpha = 1) {
+            ctx.globalAlpha = alpha;
+            for (let py = 0; py < piece.length; py++) {
+                for (let px = 0; px < piece[py].length; px++) {
+                    if (piece[py][px]) {
+                        const gx = x + px;
+                        const gy = y + py;
+                        if (gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE) {
+                            ctx.fillStyle = 'rgba(255, 200, 100, 0.9)';
+                            ctx.fillRect(gx * CELL_SIZE + 2, gy * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                            ctx.strokeStyle = 'rgba(255, 220, 150, 1)';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(gx * CELL_SIZE + 2, gy * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                        }
+                    }
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'rgba(10, 20, 50, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawGrid();
+            drawCells();
+
+            if (gameState.draggingPiece) {
+                const piece = gameState.nextPieces[gameState.currentPieceIdx];
+                const canvasRect = canvas.getBoundingClientRect();
+                const mouseX = (gameState.draggingPiece.x - canvasRect.left) / (canvasRect.width / TOTAL_WIDTH);
+                const mouseY = (gameState.draggingPiece.y - canvasRect.top) / (canvasRect.height / TOTAL_WIDTH);
+                const gridX = Math.floor(mouseX / CELL_SIZE);
+                const gridY = Math.floor(mouseY / CELL_SIZE);
+
+                if (canPlacePiece(piece, gridX, gridY)) {
+                    drawPiece(piece, gridX, gridY, 1);
+                } else {
+                    drawPiece(piece, gridX, gridY, 0.5);
+                }
+            }
+        }
+
+        function floatNumber(x, y, text, color) {
+            const particle = document.createElement('div');
+            particle.className = 'particle float-up';
+            particle.textContent = text;
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            particle.style.color = color;
+            particle.style.textShadow = `0 0 4px ${color}`;
+            document.body.appendChild(particle);
+            setTimeout(() => particle.remove(), 1000);
+        }
+
+        function screenShake() {
+            const container = document.querySelector('.game-container');
+            container.classList.add('screen-shake');
+            setTimeout(() => container.classList.remove('screen-shake'), 300);
+        }
+
+        // =====================================================
+        // EVENT LISTENERS
+        // =====================================================
+
+        function setupEventListeners() {
+            canvas.addEventListener('mousedown', onCanvasMouseDown);
+            canvas.addEventListener('mousemove', onCanvasMouseMove);
+            canvas.addEventListener('mouseup', onCanvasMouseUp);
+            canvas.addEventListener('touchstart', onCanvasTouchStart, false);
+            canvas.addEventListener('touchmove', onCanvasTouchMove, false);
+            canvas.addEventListener('touchend', onCanvasTouchEnd, false);
+
+            document.getElementById('upgradesBtn').addEventListener('click', showUpgrades);
+            document.getElementById('closeUpgradesBtn').addEventListener('click', () => {
+                document.getElementById('upgradesModal').classList.remove('active');
+            });
+            document.getElementById('changeCharacterBtn').addEventListener('click', changeCharacter);
+        }
+
+        function onCanvasMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            gameState.draggingPiece = { x: e.clientX, y: e.clientY };
+            gameState.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function onCanvasMouseMove(e) {
+            if (gameState.draggingPiece) {
+                gameState.draggingPiece = { x: e.clientX, y: e.clientY };
+            }
+        }
+
+        function onCanvasMouseUp(e) {
+            if (gameState.draggingPiece) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const gridX = Math.floor(x / (rect.width / GRID_SIZE));
+                const gridY = Math.floor(y / (rect.height / GRID_SIZE));
+                tryPlacePiece(gridX, gridY);
+                gameState.draggingPiece = null;
+            }
+        }
+
+        function onCanvasTouchStart(e) {
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            gameState.draggingPiece = { x: touch.clientX, y: touch.clientY };
+            gameState.dragOffset = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+        }
+
+        function onCanvasTouchMove(e) {
+            if (gameState.draggingPiece && e.touches.length > 0) {
+                const touch = e.touches[0];
+                gameState.draggingPiece = { x: touch.clientX, y: touch.clientY };
+            }
+        }
+
+        function onCanvasTouchEnd(e) {
+            if (gameState.draggingPiece) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.changedTouches[0];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                const gridX = Math.floor(x / (rect.width / GRID_SIZE));
+                const gridY = Math.floor(y / (rect.height / GRID_SIZE));
+                tryPlacePiece(gridX, gridY);
+                gameState.draggingPiece = null;
+            }
+        }
+
+        function tryPlacePiece(gridX, gridY) {
+            const piece = gameState.nextPieces[gameState.currentPieceIdx];
+            if (canPlacePiece(piece, gridX, gridY)) {
+                placePiece(piece, gridX, gridY);
+                gameState.score += 10;
+
+                const cleared = findClearedLines();
+                if (cleared.rows.length > 0 || cleared.cols.length > 0) {
+                    clearLines(cleared);
+                    showTutorialIfNeeded();
+                }
+
+                gameState.currentPieceIdx++;
+                if (gameState.currentPieceIdx >= gameState.nextPieces.length) {
+                    gameState.nextPieces = generateNextPieces();
+                    gameState.currentPieceIdx = 0;
+                }
+
+                if (checkGameOver()) {
+                    gameState.isGameOver = true;
+                    gameState.bestScore = Math.max(gameState.bestScore, gameState.score);
+                    saveProgress();
+                    setTimeout(() => {
+                        if (confirm(`No more moves! Score: ${gameState.score}\n\nPlay again?`)) {
+                            location.reload();
+                        }
+                    }, 200);
+                }
+            }
+        }
+
+        function showTutorialIfNeeded() {
+            if (!gameState.tutorial.energyShown) {
+                gameState.tutorial.energyShown = true;
+            }
+        }
+
+        // =====================================================
+        // GAME LOOP
+        // =====================================================
+
+        let lastTime = Date.now();
+
+        function update() {
+            const now = Date.now();
+            const deltaTime = Math.min((now - lastTime) / 1000, 0.016);
+            lastTime = now;
+
+            if (!gameState.isGameOver) {
+                updateBattle(deltaTime);
+                autocastSpells();
+            }
+
+            draw();
+            updateEnergyBar();
+            updateManaBar();
+            updateCharacterHpBar();
+            updateEnemyHpBar();
+            document.getElementById('scoreDisplay').textContent = gameState.score;
+            document.getElementById('comboDisplay').textContent = gameState.combo;
+            document.getElementById('clearsDisplay').textContent = gameState.clearedLines;
+            document.getElementById('battleInfo').textContent = gameState.isGameOver ? '⚰️ DEFEATED' : 'Battle ongoing...';
+
+            requestAnimationFrame(update);
+        }
+
+        // =====================================================
+        // START GAME
+        // =====================================================
+
+        init();
+        renderSpells();
+        // Auto-equip first two spells for new players
+        if (gameState.equippedSpells[0] === null) {
+            gameState.equippedSpells[0] = SPELLS[0];
+            gameState.equippedSpells[1] = SPELLS[1];
+            renderSpells();
+        }
+    </script>
+</body>
+</html>
