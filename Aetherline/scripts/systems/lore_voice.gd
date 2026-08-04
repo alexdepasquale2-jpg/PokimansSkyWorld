@@ -351,6 +351,15 @@ static func mark_sentence(name: String, definition_id: String) -> String:
 	return "This place is marking %s: %s." % [name, what]
 
 
+## A mark has faded. The counterweight to `mark_sentence`, and the reason it
+## exists: what a place did to an animal is not permanent, and an animal whose
+## traits drift back with nothing said about it looks like a bug.
+static func mark_faded_sentence(name: String, definition_id: String) -> String:
+	var template: EpigeneticMarkResource = GenomeDB.get_epi_template(definition_id)
+	var what := template.display_name.to_lower() if template != null else "what it carried"
+	return "%s is losing %s. Whatever put it there is behind them now." % [name, what]
+
+
 static func generation_sentence(culture: CultureResource, retained: float) -> String:
 	var kept := "most of what they knew"
 	if retained < 0.5:

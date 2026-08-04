@@ -449,10 +449,28 @@ func _test_hundredth_monkey() -> void:
 
 	# 5. Specificity. The clan learned a response to a CONDITION, not a new
 	# obsession. If migration rose everywhere, one drive has eaten the network.
+	#
+	# READ THE POPULATION FIGURE BELOW BEFORE BLAMING THE CULTURE SYSTEM FOR THIS
+	# ONE. It is order-dependent: every suite in the bootstrap runs inside a
+	# single `_ready`, so creatures that earlier suites `queue_free` are still
+	# registered while this one runs, and this number moves with how many of them
+	# there are. Adding six bodies to a suite three earlier took it from +0.36 to
+	# +0.60 without touching a line of culture code. If this fails right after you
+	# added a test somewhere else, that is almost certainly why — free your
+	# creatures with `free()` rather than `queue_free()` and try again.
+	#
+	# The threshold is deliberately a RATIO of the effect rather than an absolute:
+	# how much a clan should generalise is README open question 7, to be answered
+	# against a real world rather than synthetic situations, and an absolute bound
+	# here would be pinning a guess.
 	var neutral_shift: float = shared["neutral_after"] - shared["neutral_before"]
 	_note("migrate probability shift in an unrelated situation", neutral_shift)
+	_note("bodies registered while this ran (see above)",
+		float(SimulationBudget.population()))
 	_check("hundredth monkey: the lesson is tied to the cold snap, not general "
-		+ "(%+.3f elsewhere)" % neutral_shift, neutral_shift < spread * 0.6)
+		+ "(%+.3f elsewhere, %d bodies registered)"
+		% [neutral_shift, SimulationBudget.population()],
+		neutral_shift < spread * 0.6)
 
 	stats.append("  adoption among the naive:  %s" % shared["curve"])
 
@@ -888,14 +906,34 @@ static func _log_odds(p: float) -> float:
 	return log(clamped / (1.0 - clamped))
 
 
+## Spawned FULL and pinned there, and that pin is load-bearing.
+##
+## `CultureRewardRouter` weights an observation by the band the creature was in
+## when it made it — 1.0 FULL, 0.35 NEAR, 0.1 ABSTRACT — so a demoted creature
+## teaches the clan a third as hard. And LOD is assigned by POPULATION:
+## everything past `max_full_creatures` is demoted. Every suite in the bootstrap
+## runs inside one `_ready`, so creatures other suites `queue_free` stay
+## registered for the whole run and eat that budget.
+##
+## The effect is a landmine. Adding one creature to a test three suites earlier
+## pushed this suite's clan across the band boundary and moved the
+## hundredth-monkey generalisation figure by half a point — a failure that reads
+## as "the culture system regressed" and points nowhere near the change that
+## caused it. Cost a bisect to find. This suite measures learning, not banding,
+## so it says which band it wants.
 func _spawn(culture_id: String) -> Creature:
-	return CreatureFactory.spawn_random(_parent, _rng, {"culture_id": culture_id})
+	var creature := CreatureFactory.spawn_random(_parent, _rng, {"culture_id": culture_id})
+	SimulationBudget.set_lod(creature.identity.uid, AetherTypes.SimLOD.FULL)
+	return creature
 
 
 func _despawn(creatures: Array) -> void:
 	for creature in creatures:
 		if is_instance_valid(creature):
-			creature.queue_free()
+			# Freed now rather than queued, for the same reason: a body that
+			# outlives its suite is a body the next suite's banding has to fit
+			# around.
+			creature.free()
 
 
 # --- Harness -------------------------------------------------------------------

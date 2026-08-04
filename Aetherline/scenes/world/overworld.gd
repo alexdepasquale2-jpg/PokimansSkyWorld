@@ -130,6 +130,7 @@ func _ready() -> void:
 	# its mind. The systems were working and silent, which is the same as absent.
 	EventBus.mutation_occurred.connect(_on_mutation)
 	EventBus.epigenetic_mark_gained.connect(_on_mark_gained)
+	EventBus.epigenetic_mark_lost.connect(_on_mark_lost)
 	EventBus.culture_shifted.connect(_on_culture_shifted)
 	EventBus.culture_generation_advanced.connect(_on_generation_advanced)
 	EventBus.culture_forked.connect(_on_culture_forked)
@@ -161,6 +162,7 @@ func _exit_tree() -> void:
 	_unbind(EventBus.archetype_crystallized, _on_crystallized)
 	_unbind(EventBus.mutation_occurred, _on_mutation)
 	_unbind(EventBus.epigenetic_mark_gained, _on_mark_gained)
+	_unbind(EventBus.epigenetic_mark_lost, _on_mark_lost)
 	_unbind(EventBus.culture_shifted, _on_culture_shifted)
 	_unbind(EventBus.culture_generation_advanced, _on_generation_advanced)
 	_unbind(EventBus.culture_forked, _on_culture_forked)
@@ -224,6 +226,15 @@ func _on_mark_gained(uid: StringName, definition_id: StringName, _source: int) -
 	if c == null:
 		return
 	_log(LoreVoice.mark_sentence(c.display_name(), String(definition_id)))
+
+
+## And a mark has faded. Said as plainly as gaining one, because the trait moves
+## either way and only one direction used to be explained.
+func _on_mark_lost(uid: StringName, definition_id: StringName) -> void:
+	var c := _is_mine(uid)
+	if c == null:
+		return
+	_log(LoreVoice.mark_faded_sentence(c.display_name(), String(definition_id)))
 
 
 ## The clan changed its mind about something. Already throttled at the emitter
