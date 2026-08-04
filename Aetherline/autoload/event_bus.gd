@@ -100,6 +100,18 @@ signal neurons_lost(clan_id: String, neuron_ids: Array)
 signal evolution_leap(clan_id: String, leap: int, locked_neurons: int)
 
 
+# --- The run itself ------------------------------------------------------------
+#
+# A campaign can now be won and lost, which it could not before. Both are
+# once-per-run and both are the loudest thing the bus ever carries.
+
+## The clan is down to its last few. Fired once, while there is still time.
+signal lineage_imperilled(clan_id: String, living: int)
+## The run is over. `outcome` is a CampaignArc.Outcome; `chronicle` is what this
+## lineage did, for the ending to read back.
+signal campaign_ended(clan_id: String, outcome: int, chronicle: Dictionary)
+
+
 # --- World & travel -----------------------------------------------------------
 
 signal planet_generated(planet_id: String, seed: int)

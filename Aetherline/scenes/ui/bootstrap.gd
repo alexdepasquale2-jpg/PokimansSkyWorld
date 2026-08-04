@@ -87,6 +87,15 @@ func _ready() -> void:
 	_section("Progression self-test  (economy · legacy · upgrades · A/V hooks)")
 	_report(ProgressionSelfTest.new().run(_creature_root))
 
+	_section("Stakes self-test  (death · decline · extinction · triumph)")
+	var stakes_tests := StakesSelfTest.new()
+	_report(stakes_tests.run(_creature_root))
+	if not stakes_tests.stats.is_empty():
+		_out("")
+		_out("  measured:")
+		for line in stakes_tests.stats:
+			_out(line)
+
 	_section("Neuronal self-test  (discover · reinforce · lock or lose · leap)")
 	var neuron_tests := NeuronalSelfTest.new()
 	_report(neuron_tests.run(_creature_root))

@@ -98,6 +98,18 @@ func _test_catalog() -> void:
 	_check("catalog: a clan with nothing has somewhere to start (%d roots)" % roots,
 		roots >= 3)
 
+	# THE AMBITION MUST BE REACHABLE. Leaps require a cumulative count of locked
+	# neurons, so a catalog smaller than the final threshold makes the win
+	# condition impossible — which is exactly what shipped until StakesSelfTest
+	# tried to win and could not. Asserted here, against the catalog, so tuning
+	# either side fails loudly instead of silently making the game unwinnable.
+	var needed := NeuronalTree.LEAP_THRESHOLD * CampaignArc.EVOLUTION_LEAPS_TO_WIN
+	_check("catalog: the campaign's ambition is actually reachable (%d neurons "
+		% NeuronalTree.ids().size() + "for %d needed)" % needed,
+		NeuronalTree.ids().size() >= needed)
+	_check("catalog: and with room to choose rather than buy everything",
+		NeuronalTree.ids().size() >= needed + 4)
+
 
 # --- Earning --------------------------------------------------------------------------
 
@@ -257,6 +269,7 @@ func _test_leap() -> void:
 			tree.reinforce(id)
 			break
 	var carried := tree.locked_count()
+	var before_leap := tree.understandings_since_leap()
 	var mid_flight := tree.pending.size()
 	_check("leap: crossing succeeds", tree.take_leap())
 	_check("leap: everything understood is carried across",
@@ -264,8 +277,16 @@ func _test_leap() -> void:
 	_check("leap: everything merely being tried is not (%d abandoned)" % mid_flight,
 		tree.pending.is_empty())
 	_check("leap: the clan arrives with nothing banked", is_zero_approx(tree.energy))
-	_check("leap: and the next crossing is further off than the last",
-		tree.neurons_until_leap() > 0 and not tree.leap_ready())
+	# A crossing consumes exactly its threshold and no more. Surplus understanding
+	# carries forward, so a clan that prepared thoroughly may be ready again at
+	# once — that is earned, not a bug. What must never happen is a leap
+	# swallowing understanding it did not charge for; resetting the baseline to
+	# the current count did exactly that, and with a finite catalog it made the
+	# later leaps unreachable.
+	_check("leap: a crossing consumes exactly what it charges for",
+		tree.understandings_since_leap() == before_leap - NeuronalTree.LEAP_THRESHOLD)
+	_check("leap: and surplus understanding is carried, not discarded",
+		tree.locked_at_last_leap == NeuronalTree.LEAP_THRESHOLD * tree.leaps)
 
 	_note("neurons locked before the first leap", float(carried))
 

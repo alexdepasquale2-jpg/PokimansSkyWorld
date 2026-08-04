@@ -73,6 +73,11 @@ var locked: Dictionary = {}
 var forgotten: Dictionary = {}
 
 var leaps: int = 0
+## Locked count as of the last crossing. A leap demands understanding acquired
+## SINCE the last one, not a cumulative total — otherwise a clan that banked the
+## whole tree could cross three times in an afternoon and the long haul the
+## fantasy is built on collapses into a shopping trip.
+var locked_at_last_leap: int = 0
 ## Discovery kinds this clan has already been paid for, so the same first time
 ## cannot be sold twice.
 var known_firsts: Dictionary = {}
@@ -320,12 +325,17 @@ func locked_count() -> int:
 	return locked.size()
 
 
+## Understandings locked since the last crossing.
+func understandings_since_leap() -> int:
+	return maxi(0, locked_count() - locked_at_last_leap)
+
+
 func leap_ready() -> bool:
-	return locked_count() >= LEAP_THRESHOLD * (leaps + 1)
+	return understandings_since_leap() >= LEAP_THRESHOLD
 
 
 func neurons_until_leap() -> int:
-	return maxi(0, LEAP_THRESHOLD * (leaps + 1) - locked_count())
+	return maxi(0, LEAP_THRESHOLD - understandings_since_leap())
 
 
 ## Cross the gap. Everything locked is carried; everything pending is not, because
@@ -335,6 +345,11 @@ func take_leap() -> bool:
 	if not leap_ready():
 		return false
 	leaps += 1
+	# Consume exactly the threshold, not everything on hand. Resetting to the
+	# current count discarded any surplus, so a clan that prepared thoroughly
+	# before crossing was punished for it — and with a finite catalog it made the
+	# later leaps unreachable outright. Surplus understanding carries forward.
+	locked_at_last_leap += LEAP_THRESHOLD
 	for id in pending:
 		forgotten[String(id)] = true
 	pending.clear()
@@ -426,6 +441,7 @@ func to_dict() -> Dictionary:
 		"locked": locked.keys(),
 		"forgotten": forgotten.keys(),
 		"leaps": leaps,
+		"locked_at_last_leap": locked_at_last_leap,
 		"known_firsts": known_firsts.keys(),
 	}
 
@@ -435,6 +451,7 @@ static func from_dict(d: Dictionary) -> NeuronalTree:
 	tree.energy = float(d.get("energy", 0.0))
 	tree.lifetime_energy = float(d.get("lifetime_energy", 0.0))
 	tree.leaps = int(d.get("leaps", 0))
+	tree.locked_at_last_leap = int(d.get("locked_at_last_leap", 0))
 	for id in d.get("pending", []):
 		tree.pending[String(id)] = true
 	for id in d.get("locked", []):

@@ -42,6 +42,10 @@ var roster: Array[String] = []
 ## whose body is currently in cold storage on another world.
 var roster_names: Dictionary = {}
 
+## What this run is for, and how it ends. Before this the session counted days
+## and jumps and nothing consumed either.
+var arc := CampaignArc.new("culture_colony")
+
 var days_elapsed: int = 0
 var jumps_made: int = 0
 var campaign_started: bool = false
@@ -173,6 +177,7 @@ func complete_jump() -> void:
 
 func to_dict() -> Dictionary:
 	return {
+		"arc": arc.to_dict(),
 		"stock": stock.to_dict(),
 		"research": research.to_dict(),
 		"ship": ship.to_dict(),
@@ -200,5 +205,7 @@ func from_dict(d: Dictionary) -> void:
 	days_elapsed = int(d.get("days_elapsed", 0))
 	jumps_made = int(d.get("jumps_made", 0))
 	campaign_started = bool(d.get("campaign_started", false))
+	if d.has("arc"):
+		arc = CampaignArc.from_dict(d["arc"])
 	roster_changed.emit()
 	resources_changed.emit()

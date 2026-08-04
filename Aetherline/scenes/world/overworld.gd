@@ -115,6 +115,10 @@ func _ready() -> void:
 	EventBus.neurons_locked.connect(_on_neurons_locked)
 	EventBus.neurons_lost.connect(_on_neurons_lost)
 	EventBus.evolution_leap.connect(_on_evolution_leap)
+	# Stakes. A run can now be lost and won, and both need somebody watching.
+	EventBus.creature_died.connect(_on_creature_died)
+	EventBus.lineage_imperilled.connect(_on_lineage_imperilled)
+	EventBus.campaign_ended.connect(_on_campaign_ended)
 
 	_build_ui()
 	if bool(Engine.get_meta("aetherline_new_campaign", true)):
@@ -136,6 +140,9 @@ func _exit_tree() -> void:
 	_unbind(EventBus.neurons_locked, _on_neurons_locked)
 	_unbind(EventBus.neurons_lost, _on_neurons_lost)
 	_unbind(EventBus.evolution_leap, _on_evolution_leap)
+	_unbind(EventBus.creature_died, _on_creature_died)
+	_unbind(EventBus.lineage_imperilled, _on_lineage_imperilled)
+	_unbind(EventBus.campaign_ended, _on_campaign_ended)
 
 
 func _unbind(source: Signal, handler: Callable) -> void:
@@ -240,6 +247,59 @@ func _on_evolution_leap(clan_id: String, leap: int, locked_neurons: int) -> void
 	_log("[b]%s[/b]" % LoreVoice.leap_sentence(leap, locked_neurons))
 	if player != null:
 		ImpactEffect.spawn(self, player.global_position, Color(1.0, 0.9, 0.5), 320.0)
+	# A leap is the only thing that can win the run, so the arc is asked here
+	# rather than waiting for the next death to prompt it.
+	_evaluate_arc()
+
+
+## Somebody died. If they were yours, it matters, and it may have ended the run.
+func _on_creature_died(uid: StringName, cause: String, _tick: int) -> void:
+	if session == null:
+		return
+	var name := String(session.roster_names.get(String(uid), ""))
+	var mine := name != "" or _is_mine(uid) != null
+	if mine:
+		session.arc.note_death()
+		_log("[b]%s[/b]" % LoreVoice.death_sentence(
+			name if name != "" else "One of yours", cause))
+	_evaluate_arc()
+
+
+## The count that decides whether the lineage still exists.
+##
+## Read from the live party and colony rather than a tally kept somewhere: a
+## number maintained by hand is a number that eventually disagrees with the
+## bodies, and this one decides whether the player has lost.
+func _living_clan() -> int:
+	if session == null or session.party == null:
+		return 0
+	var living := 0
+	for entry in session.party.active:
+		var c: Creature = entry
+		if is_instance_valid(c) and c.needs != null and not c.needs.is_dead():
+			living += 1
+	if settlement_runtime != null:
+		for c in settlement_runtime.settlers:
+			if is_instance_valid(c) and c.needs != null and not c.needs.is_dead():
+				living += 1
+	return living
+
+
+func _evaluate_arc() -> void:
+	if session == null or session.arc.is_resolved():
+		return
+	var culture := CultureRegistry.get_culture("culture_colony")
+	session.arc.evaluate(_living_clan(), culture.generation if culture != null else 0)
+
+
+func _on_lineage_imperilled(_clan_id: String, living: int) -> void:
+	_log("[b]%s[/b]" % LoreVoice.imperilled_sentence(living))
+
+
+func _on_campaign_ended(_clan_id: String, outcome: int, chronicle: Dictionary) -> void:
+	for line in LoreVoice.ending_lines(outcome, chronicle):
+		_log(line)
+	SimulationBudget.set_paused(true)
 
 
 ## Any culture the player's own creatures belong to.
@@ -1586,10 +1646,20 @@ func _update_info() -> void:
 	var dex := session.discovery.totals()
 	var mass := session.stock.carried_mass()
 	var cap := session.stock.carry_capacity
-	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s" % [
+	# The ambition, always on screen. A player who cannot see what they are aiming
+	# at is not playing toward anything, and this run has a destination now.
+	var arc: CampaignArc = session.arc
+	var living := _living_clan()
+	var arc_line := ""
+	if arc != null:
+		arc_line = "\nbloodline: %d/%d crossings · %d alive%s" % [
+			arc.leaps_taken(), CampaignArc.EVOLUTION_LEAPS_TO_WIN, living,
+			"  <<< YOUR PEOPLE ARE DYING" if living <= CampaignArc.DIRE_MEMBERS else ""]
+
+	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s%s" % [
 		world.planet.display_name, biome_name, pos.x, pos.y,
 		leader_text,
 		session.party.size(), session.party.party_limit(session.ship),
 		session.party.total_caught(),
 		dex["species"], session.ship.salvage, mass, cap, session.jumps_made,
-		culture_line, village_line]
+		culture_line, village_line, arc_line]

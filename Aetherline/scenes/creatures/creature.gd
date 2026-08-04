@@ -125,6 +125,10 @@ func _on_day_passed(_day: int) -> void:
 func tick_days(days: float) -> void:
 	if days <= 0.0:
 		return
+	# The dead do not forage. Checked here rather than in each component so there
+	# is one place where "this creature has stopped participating" is true.
+	if needs != null and needs.is_dead():
+		return
 	if stats != null:
 		stats.age(days)
 	if epigenetics != null:

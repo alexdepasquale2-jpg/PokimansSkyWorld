@@ -191,6 +191,20 @@ func refresh() -> void:
 		lines.append("  [i]Once knew, and lost: %s[/i]" % ", ".join(lost))
 	lines.append("  %s" % LoreVoice.leap_readiness(tree))
 
+	# What the run is for. Stated plainly and near the top, because a player who
+	# does not know what they are aiming at is playing a screensaver.
+	if _session != null and _session.arc != null:
+		var arc: CampaignArc = _session.arc
+		lines.append("")
+		lines.append("[b]The bloodline[/b]")
+		if arc.is_resolved():
+			lines.append("  This run is over: %s." % arc.outcome_name().to_lower())
+		else:
+			lines.append("  %d of %d crossings behind them." % [
+				arc.leaps_taken(), CampaignArc.EVOLUTION_LEAPS_TO_WIN])
+			lines.append("  Carry them through %d more and the bloodline is somewhere "
+				% arc.leaps_remaining() + "it could not have reached.")
+
 	lines.append("")
 	lines.append("[b]The clan[/b]")
 	var counted := 0

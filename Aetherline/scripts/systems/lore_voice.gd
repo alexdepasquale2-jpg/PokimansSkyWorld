@@ -446,6 +446,59 @@ static func _ordinal(n: int) -> String:
 		_: return "%dth" % n
 
 
+# --- Stakes ------------------------------------------------------------------------
+
+## Someone is gone. Named plainly, because a euphemism here reads as the game
+## not taking its own loss seriously.
+static func death_sentence(name: String, cause: String) -> String:
+	match cause:
+		"starvation":
+			return "%s has starved." % name
+		"exhaustion":
+			return "%s lay down and did not get up again." % name
+		"injury":
+			return "%s died of their wounds." % name
+		_:
+			return "%s is dead." % name
+
+
+static func imperilled_sentence(living: int) -> String:
+	if living <= 1:
+		return "There is one of you left. Everything your people understood is "\
+			+ "one death from being nobody's."
+	return "There are %d of you left. A clan this thin cannot hold what it knows." % living
+
+
+## The ending. Not a score — what these people became.
+static func ending_lines(outcome: int, chronicle: Dictionary) -> Array[String]:
+	var lines: Array[String] = []
+	var understood: Array = chronicle.get("understood", [])
+	var lost: Array = chronicle.get("lost", [])
+	var generations := int(chronicle.get("generations", 0))
+	var deaths := int(chronicle.get("deaths", 0))
+
+	if outcome == CampaignArc.Outcome.TRIUMPH:
+		lines.append("[b]THE BLOODLINE CARRIES.[/b]")
+		lines.append("Across %d leaps and %d generations, they became something that "
+			% [int(chronicle.get("leaps", 0)), generations]
+			+ "did not exist when you started.")
+	else:
+		lines.append("[b]THE LINEAGE ENDS.[/b]")
+		lines.append("The last of them is gone after %d generations. " % generations
+			+ "Whatever they had worked out goes with them.")
+
+	if not understood.is_empty():
+		lines.append("They understood: %s." % ", ".join(PackedStringArray(understood)))
+	else:
+		lines.append("They never worked anything out that outlived them.")
+	if not lost.is_empty():
+		lines.append("They once knew, and could not keep: %s."
+			% ", ".join(PackedStringArray(lost)))
+	lines.append("%d of them died along the way. At their strongest there were %d."
+		% [deaths, int(chronicle.get("peak_members", 0))])
+	return lines
+
+
 # --- Advanced view ------------------------------------------------------------------
 
 ## The numbers, for the menu that asks for them.
