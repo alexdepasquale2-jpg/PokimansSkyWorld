@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**975 assertions pass** across nineteen suites plus a whole-project compile
+**991 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -527,7 +527,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (975 assertions)
+# the full suite (991 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 
@@ -606,7 +606,12 @@ its environment, saved and reloaded:
   assertions, all of them things that must hold whatever the tuning is — chiefly
   that a competent clan can actually finish. Everything else is measured and
   printed rather than asserted, because a test that pinned those numbers would
-  be freezing a guess into a requirement. See [Pacing](#pacing).
+  be freezing a guess into a requirement. See [Pacing](#pacing). It then saves
+  that finished campaign to a real file, reloads it, and asserts it came back
+  identical — the only place a campaign with a history is round-tripped rather
+  than a clean object built seconds earlier — and opens both player-facing
+  panels on it, which is the only place they meet a clan that has forgotten
+  something.
 - `GameplaySelfTest` — 35 assertions over the loop end to end: colony, harvest,
   jump, save.
 - `WorldSelfTest` — 79 assertions over planet derivation and chunk streaming.

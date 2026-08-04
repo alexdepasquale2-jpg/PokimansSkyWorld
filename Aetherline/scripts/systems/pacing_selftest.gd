@@ -78,6 +78,8 @@ func run(parent: Node) -> Dictionary:
 	var restore_tick := SimulationBudget.current_tick
 	_play(parent)
 	_report()
+	_test_the_campaign_survives_a_reload()
+	_test_the_panels_can_read_it(parent)
 	SimulationBudget.current_tick = restore_tick
 
 	_teardown()
@@ -261,6 +263,129 @@ func _report() -> void:
 			stats.append(line)
 		if _timeline.size() > shown.size():
 			stats.append("    … and %d more" % (_timeline.size() - shown.size()))
+
+
+# --- And then it was put down and picked up again ---------------------------------
+
+## Everything above, through a real file and back.
+##
+## The individual sections are round-tripped by their own suites, against state
+## those suites built a moment earlier. Nothing has ever saved a CAMPAIGN — six
+## generations of drift, eighteen locked understandings, a handful the clan lost,
+## an arc two crossings in — and the interesting failures live in the difference.
+## A clan that reloads one generation younger, or a tree that comes back with its
+## forgotten neurons merely absent rather than remembered, are both invisible to
+## a test that saves a clean object.
+func _test_the_campaign_survives_a_reload() -> void:
+	var before := {
+		"generation": _culture.generation,
+		"applies": _culture.live.applies,
+		"watermark": _culture.applies_at_last_generation,
+		"locked": _tree.locked.size(),
+		"forgotten": _tree.forgotten.size(),
+		"leaps": _tree.leaps,
+		"since_leap": _tree.understandings_since_leap(),
+		"energy": _tree.energy,
+		"weights": _culture.live.to_blob(),
+	}
+
+	var document := {
+		"cultures": CultureRegistry.save_section(),
+		"neurons": NeuronalTree.save_section(),
+		"arc": _arc.to_dict(),
+	}
+	var path := "user://pacing_roundtrip.json"
+	_check("reload: the campaign writes to a real file",
+		SaveSystem.serialize_to_file(path, document))
+
+	var restored: Dictionary = SaveSystem.deserialize_from_file(path)
+	_check("reload: and reads back", not restored.is_empty())
+
+	CultureRegistry.reset()
+	NeuronalTree.reset()
+	CultureRegistry.load_section(restored.get("cultures", {}))
+	NeuronalTree.load_section(restored.get("neurons", {}))
+	var culture := CultureRegistry.get_culture("clan_pacing")
+	var tree := NeuronalTree.for_clan("clan_pacing")
+	var arc := CampaignArc.from_dict(restored.get("arc", {}))
+
+	_check("reload: the clan is the same age it was",
+		culture != null and culture.generation == before["generation"])
+	# The watermark is what stops the boundary re-firing on load. Without it a
+	# reloaded clan sits on a multiple of the cadence and turns a generation
+	# immediately, losing everything still provisional.
+	_check("reload: and does not turn a generation just for being reloaded",
+		culture.applies_at_last_generation == before["watermark"]
+			and not CultureRegistry.press_generation("clan_pacing"))
+	_check("reload: what it learned came back bit-for-bit",
+		culture.live.to_blob() == before["weights"])
+	_check("reload: and how much of it there was",
+		culture.live.applies == before["applies"])
+
+	_check("reload: every locked understanding survived (%d)" % before["locked"],
+		tree.locked.size() == before["locked"])
+	_check("reload: so did the memory of the ones it lost (%d)" % before["forgotten"],
+		tree.forgotten.size() == before["forgotten"])
+	_check("reload: the crossings it made stand",
+		tree.leaps == before["leaps"]
+			and tree.understandings_since_leap() == before["since_leap"])
+	_check("reload: and it cannot bank its way back to a leap it already took",
+		not tree.leap_ready() or before["since_leap"] >= NeuronalTree.LEAP_THRESHOLD)
+	_check("reload: banked energy is not created or destroyed",
+		is_equal_approx(tree.energy, before["energy"]))
+	_check("reload: the run is still won",
+		arc.leaps_taken() == _arc.leaps_taken() and arc.is_resolved() == _arc.is_resolved())
+
+	# Restore the live objects so the panels below read the campaign, not a
+	# half-loaded copy of it.
+	_culture = culture
+	_tree = tree
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+## The two screens, against a campaign rather than a fresh object.
+##
+## Every panel smoke test in the project opens on state built seconds earlier: no
+## generations, nothing forgotten, no arc in flight. The assertions those tests
+## make — no ids in the plain view, the stakes line warns when it should — have
+## never met a clan with a history. This is the only place they do.
+func _test_the_panels_can_read_it(parent: Node) -> void:
+	var session := GameSession.new()
+	parent.add_child(session)
+	session.arc = _arc
+	for c in _clan:
+		if is_instance_valid(c) and not c.needs.is_dead():
+			session.enroll(c)
+			session.party.accept(c, session.ship)
+
+	var people := PeoplePanel.new()
+	parent.add_child(people)
+	var people_problems := people.run_smoke_test(session)
+	_check("panels: Your People reads a campaign (%s)"
+		% ("clean" if people_problems.is_empty() else "; ".join(people_problems)),
+		people_problems.is_empty())
+
+	# The one thing a fresh clan cannot exercise: a lineage that has LOST things
+	# has to be able to say so, and say so without naming an id.
+	people.open(session)
+	var prose: String = people._prose.text
+	_check("panels: and says what the lineage came to understand",
+		prose.contains("What they have understood"))
+	if not _tree.forgotten.is_empty():
+		_check("panels: including what it could not keep",
+			prose.contains("lost:") or prose.contains("Once knew"))
+	people.close_panel()
+	people.queue_free()
+
+	var neurons := NeuronPanel.new()
+	parent.add_child(neurons)
+	var neuron_problems := neurons.run_smoke_test(session)
+	_check("panels: Understandings reads a campaign (%s)"
+		% ("clean" if neuron_problems.is_empty() else "; ".join(neuron_problems)),
+		neuron_problems.is_empty())
+	neurons.queue_free()
+
+	session.queue_free()
 
 
 func _teardown() -> void:
