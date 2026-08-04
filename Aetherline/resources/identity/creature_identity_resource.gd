@@ -24,6 +24,15 @@ const SCHEMA_VERSION: int = 1
 ## Bloodline this creature belongs to (LineageRecordResource.lineage_id).
 @export var lineage_id: StringName = &""
 
+## Which clan's shared culture this creature learns from and contributes to.
+##
+## Empty means "fall through to lineage_id", so every bloodline founds its own
+## culture and Phase 4 needs no new content authored. Stage 3 sets it explicitly
+## once clans merge and split — declaring the field now means that costs no
+## schema migration then, which is why SCHEMA_VERSION does not move for it
+## (from_dict already defaults every missing key).
+@export var culture_id: StringName = &""
+
 ## Species/schema key. Must match the genome's species_id.
 @export var species_id: StringName = &"aether_base"
 
@@ -93,6 +102,7 @@ func to_dict() -> Dictionary:
 		"given_name": given_name,
 		"epithets": epithets.duplicate(),
 		"lineage_id": String(lineage_id),
+		"culture_id": String(culture_id),
 		"species_id": String(species_id),
 		"is_human": is_human,
 		"birth_planet_id": birth_planet_id,
@@ -114,6 +124,7 @@ static func from_dict(d: Dictionary) -> CreatureIdentityResource:
 	i.uid = StringName(d.get("uid", ""))
 	i.given_name = String(d.get("given_name", ""))
 	i.lineage_id = StringName(d.get("lineage_id", ""))
+	i.culture_id = StringName(d.get("culture_id", ""))
 	i.species_id = StringName(d.get("species_id", "aether_base"))
 	i.is_human = bool(d.get("is_human", false))
 	i.birth_planet_id = String(d.get("birth_planet_id", ""))

@@ -114,12 +114,6 @@ func crystallize(definition: ArchetypeDefinitionResource) -> bool:
 	var tick := SimulationBudget.current_tick
 	state.crystallize(definition.id, group, tick, definition.granted_abilities)
 	creature.stats.mark_dirty()
-	if creature.visual != null:
-		creature.visual.set_crystallized_glow(true)
-		creature.visual.refresh()
-	if creature.audio != null:
-		creature.audio.refresh()
-		creature.audio.vocalize("crystallize")
 
 	# A crystallized archetype is permanently story-relevant, so it must stop
 	# competing with anonymous wildlife for simulation budget.
@@ -157,8 +151,6 @@ func _shatter(definition: ArchetypeDefinitionResource) -> void:
 	var uid: StringName = creature.identity.uid
 	state.shatter(definition.id, definition.exclusivity_group, definition.granted_abilities)
 	creature.stats.mark_dirty()
-	if creature.visual != null and state.active_archetypes().is_empty():
-		creature.visual.set_crystallized_glow(false)
 	EventBus.archetype_shattered.emit(uid, definition.id, SimulationBudget.current_tick)
 
 
@@ -235,7 +227,12 @@ func describe() -> Array[String]:
 				requirement["comparator"],
 				"  (required)" if requirement["required"] else ""])
 
-	return lines if not lines.is_empty() else ["  (nothing stirring yet)"]
+	# Built as a typed array rather than returned from a ternary: GDScript does
+	# not infer Array[String] for a literal in that position, and the resulting
+	# "expected Array[String]" error fires once per debug readout.
+	if lines.is_empty():
+		lines.append("  (nothing stirring yet)")
+	return lines
 
 
 ## The uncrystallized archetype this creature is furthest along toward.

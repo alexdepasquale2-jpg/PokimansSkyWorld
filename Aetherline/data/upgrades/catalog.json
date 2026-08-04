@@ -1,0 +1,50 @@
+[
+  {
+    "id": "upg_probe",
+    "display_name": "Probe Array",
+    "category": "Navigation",
+    "description": "Sharpens every scan and opens the next tier of survey data.",
+    "max_level": 6,
+    "base_cost": 24.0,
+    "cost_growth": 1.45,
+    "effects": {"scan_depth": 1.0, "candidates": 0.5},
+    "tags": ["scan", "navigation"],
+    "action": "scan"
+  },
+  {
+    "id": "upg_hull",
+    "display_name": "Hull Reinforcement",
+    "category": "Survival",
+    "description": "Makes the ship sturdier and improves the safety margin for stranded crew.",
+    "max_level": 5,
+    "base_cost": 28.0,
+    "cost_growth": 1.5,
+    "effects": {"abandonment_protection": 0.1, "carry_capacity": 40.0},
+    "tags": ["survival", "logistics"],
+    "action": "rest"
+  },
+  {
+    "id": "upg_bio",
+    "display_name": "Bio-Archive",
+    "category": "Biology",
+    "description": "Reveals more about the creatures you carry and what they are becoming.",
+    "max_level": 4,
+    "base_cost": 32.0,
+    "cost_growth": 1.55,
+    "effects": {"reveal_depth": 1.0},
+    "tags": ["biology", "reveal"],
+    "action": "catch"
+  },
+  {
+    "id": "upg_hold",
+    "display_name": "Expanded Hold",
+    "category": "Logistics",
+    "description": "Adds cargo space so the ship can preserve more than a single haul.",
+    "max_level": 7,
+    "base_cost": 20.0,
+    "cost_growth": 1.35,
+    "effects": {"carry_capacity": 60.0},
+    "tags": ["logistics", "cargo"],
+    "action": "harvest"
+  }
+]

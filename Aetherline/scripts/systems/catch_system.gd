@@ -3,9 +3,9 @@ class_name CatchSystem
 
 ## Throwing for a wild creature.
 ##
-## Odds are readable on purpose — the player should be able to look at a target
+## Odds are readable on purpose ΓÇö the player should be able to look at a target
 ## and know roughly whether it is worth a throw. Three inputs, all visible:
-##   how hurt it is   (the main lever — this is what combat is FOR)
+##   how hurt it is   (the main lever ΓÇö this is what combat is FOR)
 ##   how wild it is   (aggression resists, trainability accepts)
 ##   how rare it is   (a creature with rare genes fights the catch harder)
 ##
@@ -18,7 +18,7 @@ const MAX_CHANCE := 0.95
 
 
 ## 0..1 odds of this throw landing. Exposed so the HUD can show it BEFORE the
-## player commits — hidden catch rates just make people spam the button.
+## player commits ΓÇö hidden catch rates just make people spam the button.
 static func chance_for(target: Creature, ship: ShipSystem) -> float:
 	var hurt := 1.0 - target.stats.hp_fraction()
 	# Weakening is worth far more than anything else, so fighting first is
@@ -29,7 +29,7 @@ static func chance_for(target: Creature, ship: ShipSystem) -> float:
 	chance += target.stats.trait_value(&"trainability") * 0.14
 	chance += target.stats.trait_value(&"sociability") * 0.06
 
-	# A downed creature is nearly a guaranteed catch — the payoff for winning.
+	# A downed creature is nearly a guaranteed catch ΓÇö the payoff for winning.
 	if target.stats.downed:
 		chance += 0.35
 

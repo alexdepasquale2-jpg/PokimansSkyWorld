@@ -6,7 +6,7 @@ class_name GameSession
 ## project holds to six), and registered with SaveSystem via the provider seam
 ## that has existed since Phase 0 for exactly this.
 ##
-## Everything the player accumulates lives here. Creature BODIES do not — those
+## Everything the player accumulates lives here. Creature BODIES do not ΓÇö those
 ## are spawned by the world scene and serialized through PlanetManager on
 ## departure; this holds the roster of who belongs to the colony.
 
@@ -30,7 +30,7 @@ var discovery := DiscoverySystem.new()
 ## Your team, and everything you've caught.
 var party := PartySystem.new()
 
-## Party data read from a save, waiting for the world scene to inflate it —
+## Party data read from a save, waiting for the world scene to inflate it ΓÇö
 ## creatures need a parent node, which does not exist at load time.
 var pending_party: Dictionary = {}
 
@@ -65,6 +65,7 @@ func start_new_campaign(seed_value: int = 0) -> void:
 		stock.add_local(res_id, float(STARTING_RESOURCES[res_id]))
 	research = ResearchSystem.new()
 	ship = ShipSystem.new()
+	ship.salvage = 35.0  # enough for a first Survey Array or Hold plate
 	discovery = DiscoverySystem.new()
 	party = PartySystem.new()
 	pending_party = {}
@@ -78,7 +79,11 @@ func start_new_campaign(seed_value: int = 0) -> void:
 	PlanetManager.known_planets.clear()
 	PlanetManager.summaries.clear()
 	PlanetManager.active_planet_id = ""
-	PlanetManager.set_universe_seed(seed_value if seed_value != 0 else randi() | (randi() << 32))
+	var seed_final: int = seed_value if seed_value != 0 else randi() | (randi() << 32)
+	PlanetManager.set_universe_seed(seed_final)
+	# Fresh campaign = fresh clan brains (Odyssey: cultures are per-campaign).
+	CultureRegistry.reset(seed_final)
+	CultureRegistry.install(seed_final)
 	StoryDirector.lineages.clear()
 	StoryDirector.long_term.clear()
 	CreatureFactory.reset_counter()
@@ -121,7 +126,7 @@ func spend(costs: Dictionary) -> bool:
 	return ok
 
 
-## Total edible material on hand — what feeding actually draws from.
+## Total edible material on hand ΓÇö what feeding actually draws from.
 func food_available() -> float:
 	return stock.amount("forage") + stock.amount("grain") + stock.amount("feed")
 
@@ -133,7 +138,7 @@ func consume_meal(amount: float = 8.0) -> float:
 		if stock.amount(res_id) >= amount:
 			stock.spend({res_id: amount})
 			resources_changed.emit()
-			# Compound feed is worth more than raw forage — the whole point of
+			# Compound feed is worth more than raw forage ΓÇö the whole point of
 			# researching it.
 			return {"feed": 1.0, "grain": 0.7, "forage": 0.5}[res_id]
 	return 0.0
@@ -161,7 +166,7 @@ func complete_jump() -> void:
 	jumps_made += 1
 	resources_changed.emit()
 	if not left.is_empty():
-		notice.emit("Left %d resource type(s) behind — the hold was full." % left.size())
+		notice.emit("Left %d resource type(s) behind ΓÇö the hold was full." % left.size())
 
 
 # --- Serialization ---------------------------------------------------------------

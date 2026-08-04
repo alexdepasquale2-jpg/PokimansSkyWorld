@@ -1,7 +1,7 @@
 extends RefCounted
 class_name DiscoverySystem
 
-## The Aetherdex — the catalog that fills.
+## The Aetherdex ΓÇö the catalog that fills.
 ##
 ## This is the loop's connective tissue. Every creature, resource and site you
 ## scan becomes a permanent entry with YOUR name on it, pays salvage, and
@@ -10,7 +10,7 @@ class_name DiscoverySystem
 ##
 ## Species identity is derived from the GENOME, not from a species table: two
 ## animals count as the same species when their defining alleles match. That
-## means a mutated line eventually reads as something new — discovery and
+## means a mutated line eventually reads as something new ΓÇö discovery and
 ## genetics are the same system seen from different ends.
 
 ## Loci that define a "species" for catalog purposes. Deliberately the visible,
@@ -61,7 +61,8 @@ static func describe_species(genome: GenomeResource) -> String:
 	var diet := "Predator" if float(traits.get("diet_meat", 0.5)) > 0.7 \
 		else ("Grazer" if float(traits.get("diet_plant", 0.5)) > 0.7 else "Forager")
 	var limbs := int(round(float(traits.get("limbs", 4.0))))
-	var limb_word := {2: "Biped", 4: "Quadruped", 6: "Hexapod"}.get(limbs, "Anomaly")
+	var limb_map := {2: "Biped", 4: "Quadruped", 6: "Hexapod"}
+	var limb_word: String = String(limb_map.get(limbs, "Anomaly"))
 	return "%s %s %s %s" % [size_word, coat, limb_word, diet]
 
 
@@ -85,7 +86,7 @@ func scan_creature(creature: Creature, planet: PlanetSeedResource, ship: ShipSys
 	var entry: Dictionary = species[key]
 	entry["sightings"] = int(entry["sightings"]) + 1
 
-	# A better bio-sensor records more about what it sees — the same animal
+	# A better bio-sensor records more about what it sees ΓÇö the same animal
 	# yields a richer entry later, which is a real reason to re-scan.
 	var depth := ship.reveal_depth()
 	var traits: Dictionary = entry["traits"]

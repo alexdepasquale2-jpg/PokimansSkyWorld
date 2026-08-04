@@ -195,15 +195,20 @@ func _test_colony_story(parent: Node) -> void:
 	# colony_events.json is retired. The evaluator still has to behave (fire
 	# nothing, suppress repeats) so the machinery stays sound if a future mode
 	# reinstates the templates.
-	var fired := StoryDirector.evaluate_colony(metrics, {"planet": "Test-1"})
+	var fired: Array = StoryDirector.evaluate_colony(metrics, {"planet": "Test-1"})
 	_check("colony story: no colony beats fire while the templates are retired",
 		fired.is_empty())
 
 	# A creature-scope evaluation must never accidentally fire a colony beat.
 	var lone := CreatureFactory.spawn_random(parent, _rng, {"name": "Solitary"})
-	var creature_fired := StoryDirector.evaluate_creature(lone)
+	var creature_fired: Array = StoryDirector.evaluate_creature(lone)
+	var no_colony_tag := true
+	for e in creature_fired:
+		if String(e.get("kind", "")).begins_with("colony_"):
+			no_colony_tag = false
+			break
 	_check("colony story: colony-tagged templates never fire from evaluate_creature",
-		creature_fired.all(func(e): return not String(e.get("kind", "")).begins_with("colony_")))
+		no_colony_tag)
 
 	for c in creatures:
 		c.free()

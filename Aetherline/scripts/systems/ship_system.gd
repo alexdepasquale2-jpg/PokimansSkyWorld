@@ -1,7 +1,7 @@
 extends RefCounted
 class_name ShipSystem
 
-## The incremental layer — and the reason to come back to orbit.
+## The incremental layer ΓÇö and the reason to come back to orbit.
 ##
 ## Everything you do planetside earns salvage; salvage buys modules; modules
 ## widen what the planet layer is allowed to contain. Crucially the modules do
@@ -21,8 +21,16 @@ static var achievements: Dictionary = {}
 
 var salvage: float = 0.0
 var levels: Dictionary = {}            ## module_id -> int
+var invested: Dictionary = {}          ## module_id -> total salvage spent (for sell refunds)
 var unlocked_achievements: Array[String] = []
 var lifetime: Dictionary = {}          ## metric -> float, never decreases
+
+## Default action tags when modules.json omits `action` (used by ActionEffects).
+const MODULE_ACTIONS := {
+	"mod_drive": "upgrade", "mod_scanner": "scan", "mod_hold": "harvest",
+	"mod_habitat": "rest", "mod_stasis": "rest", "mod_lab": "upgrade",
+	"mod_sensor": "catch", "mod_beacon": "upgrade",
+}
 
 
 static func load_catalogs() -> void:
@@ -41,6 +49,17 @@ func _init() -> void:
 
 
 # --- Modules ---------------------------------------------------------------------
+
+func module_definition(module_id) -> Dictionary:
+	load_catalogs()
+	var key := String(module_id)
+	var definition: Dictionary = modules.get(key, {}).duplicate(true)
+	if definition.is_empty():
+		return {}
+	if not definition.has("action"):
+		definition["action"] = MODULE_ACTIONS.get(key, "upgrade")
+	return definition
+
 
 func level_of(module_id) -> int:
 	return int(levels.get(String(module_id), 0))
@@ -61,14 +80,42 @@ func cost_of(module_id) -> float:
 
 
 func can_upgrade(module_id) -> bool:
-	return salvage >= cost_of(module_id)
+	var cost := cost_of(module_id)
+	return cost < INF and salvage >= cost
 
 
 func upgrade(module_id) -> bool:
 	if not can_upgrade(module_id):
 		return false
-	salvage -= cost_of(module_id)
-	levels[String(module_id)] = level_of(module_id) + 1
+	var key := String(module_id)
+	var cost := cost_of(key)
+	salvage -= cost
+	invested[key] = float(invested.get(key, 0.0)) + cost
+	levels[key] = level_of(key) + 1
+	return true
+
+
+## Total salvage spent on this module across all levels (for sell pricing UI).
+func paid_cost(module_id) -> float:
+	return float(invested.get(String(module_id), 0.0))
+
+
+## Sell one level of a module back for 60% of the average invested cost.
+func sell(module_id) -> bool:
+	var key := String(module_id)
+	var level := level_of(key)
+	if level <= 0:
+		return false
+	var total_paid := float(invested.get(key, 0.0))
+	var slice := total_paid / float(level) if level > 0 else 0.0
+	var refund := slice * 0.6
+	levels[key] = level - 1
+	if levels[key] <= 0:
+		levels.erase(key)
+		invested.erase(key)
+	else:
+		invested[key] = maxf(0.0, total_paid - slice)
+	salvage += refund
 	return true
 
 
@@ -114,7 +161,7 @@ func jump_candidates() -> int:
 	return 3 + int(stat("candidates"))
 
 
-## Exotic worlds — the extremes of the generator — only become reachable once
+## Exotic worlds ΓÇö the extremes of the generator ΓÇö only become reachable once
 ## the drive can get there.
 func exotic_chance() -> float:
 	return clampf(stat("exotic_chance"), 0.0, 0.8)
@@ -194,13 +241,31 @@ func achievement_progress() -> Array:
 # --- Serialization ---------------------------------------------------------------------
 
 func to_dict() -> Dictionary:
-	return {"salvage": salvage, "levels": levels.duplicate(),
-		"unlocked": unlocked_achievements.duplicate(), "lifetime": lifetime.duplicate()}
+	return {
+		"salvage": salvage,
+		"levels": levels.duplicate(),
+		"invested": invested.duplicate(),
+		"unlocked": unlocked_achievements.duplicate(),
+		"lifetime": lifetime.duplicate(),
+	}
 
 
 func from_dict(d: Dictionary) -> void:
 	salvage = float(d.get("salvage", 0.0))
 	levels = d.get("levels", {}).duplicate()
+	invested = d.get("invested", {}).duplicate()
+	# Backfill invested for older saves so sell still refunds something.
+	if invested.is_empty() and not levels.is_empty():
+		for module_id in levels:
+			var paid := 0.0
+			var definition: Dictionary = modules.get(String(module_id), {})
+			if definition.is_empty():
+				continue
+			var base := float(definition.get("base_cost", 30.0))
+			var growth := float(definition.get("cost_growth", 1.5))
+			for lv in int(levels[module_id]):
+				paid += base * pow(growth, lv)
+			invested[String(module_id)] = paid
 	lifetime = d.get("lifetime", {}).duplicate()
 	unlocked_achievements.clear()
 	for id in d.get("unlocked", []):

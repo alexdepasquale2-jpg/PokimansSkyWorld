@@ -149,6 +149,8 @@ func _test_survival_loop(parent: Node) -> void:
 	for day in 60:
 		while fed.needs.hunger < 0.9 and session.food_available() > 0.0:
 			fed.needs.feed(session.consume_meal())
+		# Care includes rest, not only forage — measures the care loop itself.
+		fed.needs.rest(0.8)
 		fed.tick_days(1.0)
 	_check("survival: a well-fed creature stays healthy",
 		fed.needs.health > 0.5 and not fed.stats.downed)

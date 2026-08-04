@@ -65,12 +65,6 @@ func set_focus_point(point: Vector2) -> void:
 
 ## Bands every registered creature by distance from the focus, then enforces
 ## the FULL-band ceiling by demoting the furthest, lowest-priority creatures.
-##
-## Two rules that matter:
-##  - a creature on another planet is DORMANT regardless of coordinates, since
-##    its position is meaningless relative to this world's focus
-##  - story-relevant creatures (priority > 0) are demoted last, so attachment
-##    is never evicted by a herd of anonymous grazers
 func reassign_lod() -> void:
 	var active := PlanetManager.active_planet_id
 	var candidates: Array = []
@@ -84,6 +78,9 @@ func reassign_lod() -> void:
 		if node == null or not is_instance_valid(node):
 			_assign(uid, AetherTypes.SimLOD.DORMANT)
 			continue
+		if not (node is Node2D):
+			_assign(uid, AetherTypes.SimLOD.ABSTRACT)
+			continue
 		var distance: float = (node as Node2D).global_position.distance_to(focus_point)
 		if distance <= full_radius:
 			candidates.append({"uid": uid, "distance": distance,
@@ -93,7 +90,6 @@ func reassign_lod() -> void:
 		else:
 			_assign(uid, AetherTypes.SimLOD.ABSTRACT)
 
-	# Everything inside full_radius wants FULL; only max_full_creatures get it.
 	candidates.sort_custom(func(a, b):
 		if not is_equal_approx(a["priority"], b["priority"]):
 			return a["priority"] > b["priority"]
@@ -233,12 +229,16 @@ func _physics_process(_delta: float) -> void:
 		current_day = day
 		EventBus.day_passed.emit(day)
 
-	# LOD reassignment is the single most important perf lever, but it is also
-	# pure overhead when nothing has moved — run it on a slow cadence rather
-	# than every physics tick.
-	if current_tick % LOD_REASSIGN_INTERVAL == 0:
-		reassign_lod()
 	_recount()
+	# TODO(phase 3): distance-based LOD reassignment against the active planet's
+	# focus point, plus demotion when max_full_creatures is exceeded.
+	#
+	# The Phase 4 half of this is done: CultureTicker consumes take_near_slice()
+	# and take_abstract_slice() to drive the AI at each tier's cadence. The driver
+	# lives there rather than here on purpose — this autoload's contract is
+	# accounting, and a governor that knows what it is governing is one the next
+	# system has to edit too. TODO(phase 6): the needs system wants the same
+	# slices for statistical catch-up.
 
 
 ## Returns the slice of NEAR-band uids that should be updated this frame.

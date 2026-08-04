@@ -51,15 +51,6 @@ static func spawn_random(parent: Node, rng: RandomNumberGenerator,
 	# identity (survives into archived lineage records). They must never drift.
 	creature.genetics.genome.generation = creature.identity.generation
 	creature.stats.initialize_vitals()
-	# Wild-caught and gifted stock are grown animals, not newborns. This
-	# matters mechanically, not just narratively: infants count as fragile and
-	# can actually be killed, so spawning fauna at age zero would make every
-	# animal on a world one bad hit from death.
-	if opts.has("age_days"):
-		creature.stats.age_days = float(opts["age_days"])
-	elif String(opts.get("origin_kind", "founder")) != "born":
-		creature.stats.age_days = creature.stats.stat("max_age_days") \
-			* rng.randf_range(0.15, 0.55)
 	creature.visual.refresh()
 
 	_register_lineage(creature, opts)
@@ -124,6 +115,10 @@ static func _make_identity(rng: RandomNumberGenerator, opts: Dictionary) -> Crea
 	# A founder without an explicit lineage founds its own.
 	identity.lineage_id = StringName(opts.get("lineage_id",
 		"lin_" + String(identity.uid).substr(3)))
+	# An empty culture_id means "learn from the lineage's culture", so a founder
+	# founds its own people alongside its own bloodline and Phase 4 needs nothing
+	# authored per creature. CultureRegistry.culture_for does the fallback.
+	identity.culture_id = StringName(opts.get("culture_id", ""))
 	return identity
 
 

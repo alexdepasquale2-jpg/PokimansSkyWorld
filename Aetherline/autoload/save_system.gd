@@ -24,11 +24,7 @@ const EXT := ".aether.json"
 ## via `register_provider`.
 const CORE_SECTIONS := ["meta", "budget", "planets", "story"]
 
-## Compaction ceilings. A campaign is meant to run for hundreds of hours across
-## an unbounded number of worlds, so the save must have a size ASYMPTOTE rather
-## than growing linearly with playtime. Everything dropped at these limits is
-## either regenerable from a seed or explicitly low-significance — the story
-## layer's own weighting decides what survives.
+## Compaction ceilings — a campaign must have a save-size asymptote.
 const MAX_LONG_TERM_SAVED: int = 1500
 const MAX_LINEAGES_SAVED: int = 400
 const MAX_PLANETS_SAVED: int = 600
@@ -114,78 +110,12 @@ func save_game(slot: String) -> bool:
 
 	_compact(doc)
 	doc["integrity"] = _section_checksums(doc["sections"])
-
-	# Pretty-printing a campaign with hundreds of worlds triples the file size
-	# for no benefit; keep it readable only while the save is still small.
 	var compact_json := JSON.stringify(doc)
 	var text := JSON.stringify(doc, "  ") if compact_json.length() < 512000 else compact_json
 
 	var ok := _write_atomic(slot_path(slot), text)
 	EventBus.save_completed.emit(slot, ok, last_error)
 	return ok
-
-
-## Bounds the parts of a save that grow without limit over a long campaign.
-## Everything trimmed here is either reconstructible or deliberately
-## low-value; the counters and summaries that replace it are not.
-func _compact(doc: Dictionary) -> void:
-	var story: Dictionary = doc["sections"].get("story", {})
-
-	# Long-term story memory: keep the most significant, drop routine noise.
-	var long_term: Array = story.get("long_term", [])
-	if long_term.size() > MAX_LONG_TERM_SAVED:
-		long_term.sort_custom(func(a, b): return float(a["weight"]) > float(b["weight"]))
-		story["long_term"] = long_term.slice(0, MAX_LONG_TERM_SAVED)
-
-	# Extinct lineages with nothing notable in them are pure weight. A line
-	# that produced an archetype or an entrenched mark is kept forever.
-	var lineages: Dictionary = story.get("lineages", {})
-	if lineages.size() > MAX_LINEAGES_SAVED:
-		var disposable: Array = []
-		for id in lineages:
-			var record: Dictionary = lineages[id]
-			var notable: bool = not (record.get("archetype_history", {}) as Dictionary).is_empty() \
-				or not (record.get("entrenched_marks", {}) as Dictionary).is_empty() \
-				or (record.get("living_uids", []) as Array).size() > 0
-			if not notable:
-				disposable.append(id)
-		var score_of := func(id): return float(lineages[id].get("legacy_score", 0.0))
-		disposable.sort_custom(func(a, b): return score_of.call(a) < score_of.call(b))
-		var to_drop: int = mini(disposable.size(), lineages.size() - MAX_LINEAGES_SAVED)
-		for i in to_drop:
-			lineages.erase(disposable[i])
-
-	# Unvisited planets are pure seed — regenerable, so only the seed is kept.
-	# (PlanetSeedResource already serializes that way; this just caps how many
-	# merely-scanned worlds we bother remembering at all.)
-	var planets: Dictionary = doc["sections"].get("planets", {}).get("known_planets", {})
-	var summaries: Dictionary = doc["sections"].get("planets", {}).get("summaries", {})
-	if planets.size() > MAX_PLANETS_SAVED:
-		var unvisited: Array = planets.keys().filter(func(id): return not summaries.has(id))
-		var excess: int = mini(unvisited.size(), planets.size() - MAX_PLANETS_SAVED)
-		for i in excess:
-			planets.erase(unvisited[i])
-
-
-## Per-section checksums, so a corrupt section can be identified and skipped
-## instead of taking the whole campaign down with it.
-##
-## CRITICAL: the hash must be taken over the section's POST-JSON form. Writing
-## and reading JSON is lossy for types — an int becomes a float, so
-## `{"tick":0}` comes back as `{"tick":0.0}` and re-stringifies differently.
-## Hashing the pre-serialization dictionary would therefore make every section
-## fail its own checksum on load. Normalizing through a parse round-trip first
-## makes both sides agree.
-func _section_checksums(sections: Dictionary) -> Dictionary:
-	var sums := {}
-	for key in sections:
-		sums[key] = _normalized_hash(sections[key])
-	return sums
-
-
-func _normalized_hash(section: Variant) -> int:
-	var normalized: Variant = JSON.parse_string(JSON.stringify(section))
-	return str(JSON.stringify(normalized)).hash()
 
 
 ## Write via temp file, then rotate the previous save to .bak, then commit.
@@ -236,6 +166,50 @@ func _write_atomic(path: String, text: String) -> bool:
 	return true
 
 
+func _compact(doc: Dictionary) -> void:
+	var story: Dictionary = doc["sections"].get("story", {})
+	var long_term: Array = story.get("long_term", [])
+	if long_term.size() > MAX_LONG_TERM_SAVED:
+		long_term.sort_custom(func(a, b): return float(a["weight"]) > float(b["weight"]))
+		story["long_term"] = long_term.slice(0, MAX_LONG_TERM_SAVED)
+
+	var lineages: Dictionary = story.get("lineages", {})
+	if lineages.size() > MAX_LINEAGES_SAVED:
+		var disposable: Array = []
+		for id in lineages:
+			var record: Dictionary = lineages[id]
+			var notable: bool = not (record.get("archetype_history", {}) as Dictionary).is_empty() \
+				or not (record.get("entrenched_marks", {}) as Dictionary).is_empty() \
+				or (record.get("living_uids", []) as Array).size() > 0
+			if not notable:
+				disposable.append(id)
+		var score_of := func(id): return float(lineages[id].get("legacy_score", 0.0))
+		disposable.sort_custom(func(a, b): return score_of.call(a) < score_of.call(b))
+		var to_drop: int = mini(disposable.size(), lineages.size() - MAX_LINEAGES_SAVED)
+		for i in to_drop:
+			lineages.erase(disposable[i])
+
+	var planets: Dictionary = doc["sections"].get("planets", {}).get("known_planets", {})
+	var summaries: Dictionary = doc["sections"].get("planets", {}).get("summaries", {})
+	if planets.size() > MAX_PLANETS_SAVED:
+		var unvisited: Array = planets.keys().filter(func(id): return not summaries.has(id))
+		var excess: int = mini(unvisited.size(), planets.size() - MAX_PLANETS_SAVED)
+		for i in excess:
+			planets.erase(unvisited[i])
+
+
+func _section_checksums(sections: Dictionary) -> Dictionary:
+	var sums := {}
+	for key in sections:
+		sums[key] = _normalized_hash(sections[key])
+	return sums
+
+
+func _normalized_hash(section: Variant) -> int:
+	var normalized: Variant = JSON.parse_string(JSON.stringify(section))
+	return str(JSON.stringify(normalized)).hash()
+
+
 # --- Load ---------------------------------------------------------------------
 
 func load_game(slot: String) -> bool:
@@ -261,10 +235,6 @@ func load_game(slot: String) -> bool:
 	var sections: Dictionary = doc.get("sections", {})
 	var failures: Array[String] = []
 
-	# Verify each section against its stored checksum BEFORE applying it. A
-	# section that fails is skipped entirely and left at defaults rather than
-	# half-applied, which is the difference between "lost my research" and
-	# "lost my campaign".
 	var integrity: Dictionary = doc.get("integrity", {})
 	for key in integrity.keys():
 		if not sections.has(key):
@@ -293,7 +263,6 @@ func load_game(slot: String) -> bool:
 	var note := "" if failures.is_empty() else "sections with problems: " + ", ".join(failures)
 	EventBus.load_completed.emit(slot, true, note)
 	return true
-
 
 func _read_document(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):

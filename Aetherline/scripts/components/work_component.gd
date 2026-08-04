@@ -28,6 +28,7 @@ func perform(role: String, hours: float, target: Creature = null) -> float:
 
 	creature.needs.energy = clampf(creature.needs.energy - energy_cost_per_hour * hours, 0.0, 1.0)
 	creature.experience.log_event(String(ROLE_EXPERIENCE.get(role, "work_completed")), output)
+	creature.stats.mark_dirty()
 	EventBus.work_completed.emit(creature.identity.uid, role, output)
 
 	if ROLE_MARK.has(role):

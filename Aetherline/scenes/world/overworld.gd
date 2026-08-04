@@ -1,37 +1,50 @@
 extends Node2D
 class_name Overworld
 
-## The game: walk a strange world, find something alive, weaken it, catch it,
-## and go somewhere stranger.
-##
-## Deliberately only five verbs — move, scan, fight, catch, interact. There is
-## no feeding, no building, no work rosters, no research screen. The deep
-## genetics simulation underneath is what makes each catch DIFFERENT; it is
-## never something the player is asked to manage.
+## Five-verb game surface: walk, scan, fight, catch, interact, jump.
+## Keeps Task 4 culture stack (CultureRegistry + CultureTicker + perception
+## LOD) and ports phase3on verb handlers onto GameSession / Catch / Combat.
 
+const SAVE_SLOT := "campaign"
+const FAUNA_COUNT := 8
 const FAUNA_SPAWN_RADIUS := 900.0
+const ALLY_RADIUS := 400.0
+const PREDATOR_AGGRO := 0.65
 const FOLLOW_DISTANCE := 62.0
 const HARVEST_RANGE := 56.0
-const SAVE_SLOT := "campaign"
+const TARGET_RANGE := 260.0
+const LOD_REFRESH_INTERVAL := 0.5
+const SENSE_REFRESH_INTERVAL := 0.25
+const ATMOS_REFRESH_INTERVAL := 0.4
+const CAMERA_ZOOM := Vector2(1.65, 1.65)
 
 var session: GameSession
 var world: PlanetWorld
 var player: PlayerAvatar
-var wild: Array = []
-var resource_nodes: Array = []
-
 var chunk_layer: Node2D
 var node_layer: Node2D
-var chunk_views: Dictionary = {}
+var chunk_views: Dictionary = {}  # "x,y" -> ChunkView
+var wild: Array = []  # Creature
+var resource_nodes: Array = []
 var settlement: SettlementView
+var settlement_runtime: SettlementRuntime
+var ticker: CultureTicker
+var camera: Camera2D
+var atmos: CanvasModulate
+var backdrop: Node2D
+var haze: CanvasLayer
+var _haze_rect: ColorRect
+var _haze_mat: ShaderMaterial
 
 var _rng := RandomNumberGenerator.new()
 var _nearest_wild: Creature = null
 var _nearest_node: ResourceNode = null
 var _nearest_building: Dictionary = {}
-var _ship_view: ShipView
-var _service_menu: ServiceMenu
 var _party_panel: PartyPanel
+var _star_map
+var _ship_view: ShipView
+var _inventory_panel: InventoryPanel
+var _service_menu: ServiceMenu
 
 var _info: Label
 var _prompt: Label
@@ -39,30 +52,56 @@ var _target_bar: Label
 var _log_label: RichTextLabel
 var _log_lines: Array[String] = []
 var _hud_panel: FxPanel
+var _target_panel: FxPanel
+
+var _lod_timer: float = 0.0
+var _sense_timer: float = 0.0
+var _atmos_timer: float = 0.0
+var _atmos_color: Color = Color(0.92, 0.94, 0.98)
+var _atmos_target: Color = Color(0.92, 0.94, 0.98)
+var _haze_color: Color = Color(0.55, 0.72, 0.95)
+var _haze_density: float = 0.18
+var _pending_chunks: Array = []
 
 
 func _ready() -> void:
 	_rng.randomize()
+	CultureRegistry.install(int(PlanetManager.universe_seed))
+	ticker = CultureTicker.new()
+	ticker.name = "CultureTicker"
+	ticker.enabled = true
+	add_child(ticker)
+	# Odyssey reward path: experience_logged -> clan gradients (one router for all).
+	var rewards := CultureRewardRouter.new()
+	rewards.name = "CultureRewardRouter"
+	add_child(rewards)
 
 	session = GameSession.new()
 	session.name = "GameSession"
 	add_child(session)
 	session.notice.connect(_log)
 
+	# Deep backdrop so unloaded void never reads as pure black flat.
+	backdrop = Node2D.new()
+	backdrop.name = "Backdrop"
+	backdrop.z_index = -100
+	backdrop.draw.connect(_draw_backdrop)
+	add_child(backdrop)
+
 	chunk_layer = Node2D.new()
+	chunk_layer.name = "ChunkLayer"
+	chunk_layer.z_index = 0
 	add_child(chunk_layer)
 	node_layer = Node2D.new()
+	node_layer.name = "NodeLayer"
+	node_layer.z_index = 1
 	add_child(node_layer)
 
 	EventBus.planet_chunk_loaded.connect(_on_chunk_loaded)
 	EventBus.planet_chunk_unloaded.connect(_on_chunk_unloaded)
-	# The ONLY narrative event still surfaced in the world. Crystallizing is
-	# this game's evolution moment and deserves a callout; everything else the
-	# story layer produces belongs on the party screen, not in the player's face.
 	EventBus.archetype_crystallized.connect(_on_crystallized)
 
 	_build_ui()
-
 	if bool(Engine.get_meta("aetherline_new_campaign", true)):
 		_begin_new_campaign()
 	else:
@@ -75,6 +114,11 @@ func _exit_tree() -> void:
 	_unbind(EventBus.archetype_crystallized, _on_crystallized)
 
 
+func _unbind(source: Signal, handler: Callable) -> void:
+	if source.is_connected(handler):
+		source.disconnect(handler)
+
+
 func _on_crystallized(uid: StringName, archetype_id: StringName, _tick: int) -> void:
 	for entry in session.party.active:
 		var c: Creature = entry
@@ -82,120 +126,482 @@ func _on_crystallized(uid: StringName, archetype_id: StringName, _tick: int) -> 
 			continue
 		var definition: ArchetypeDefinitionResource = GenomeDB.get_archetype(archetype_id)
 		_log("[b]%s became %s.[/b]" % [c.display_name(),
-			definition.display_name if definition != null else archetype_id])
+			definition.display_name if definition != null else String(archetype_id)])
 		ImpactEffect.spawn(self, c.global_position, Color(1.0, 0.85, 0.4), 160.0)
-		if _hud_panel != null:
-			_hud_panel.set_rim_color(Color(1.0, 0.85, 0.35))
-			_hud_panel.flash(2.0)
 		return
 
 
-func _unbind(source: Signal, handler: Callable) -> void:
-	if source.is_connected(handler):
-		source.disconnect(handler)
+# --- Campaign --------------------------------------------------------------------
 
+func _menu_open() -> bool:
+	return (_party_panel != null and _party_panel.visible) \
+		or (_star_map != null and _star_map.visible) \
+		or (_ship_view != null and _ship_view.visible) \
+		or (_inventory_panel != null and _inventory_panel.visible) \
+		or (_service_menu != null and _service_menu.visible)
 
-# --- Start -------------------------------------------------------------------------
 
 func _begin_new_campaign() -> void:
 	session.start_new_campaign()
+	_ensure_player()
 	var planet := PlanetManager.create_planet()
 	_land_on(planet.planet_id)
 
-	player = PlayerAvatar.new()
-	player.position = Vector2.ZERO
-	add_child(player)
-
-	# You start with one creature. Everything else you have to go and find.
+	# Human companion: same stack as fauna, explicit colony culture (Odyssey clan brain).
 	var starter := CreatureFactory.spawn_random(self, _rng, {
-		"origin_kind": "gifted", "planet_id": planet.planet_id,
-		"planet_name": ShipSystem.HOME_PLANET})
-	starter.position = Vector2(40, 20)
+		"origin_kind": "gifted",
+		"is_human": true,
+		"species_id": "aether_base",
+		"culture_id": "culture_colony",
+		"lineage_id": "lin_colony",
+		"planet_id": planet.planet_id,
+		"planet_name": ShipSystem.HOME_PLANET,
+		"name": "Vess",
+	})
+	starter.position = player.position + Vector2(40, 20)
 	session.party.active.append(starter)
+	session.enroll(starter)
+	_bind_culture_member(starter)
 	session.discovery.scan_creature(starter, world.planet, session.ship)
 
-	_spawn_fauna(world.planet)
-	_log("%s is gone. You got out with one creature and a failing ship." % ShipSystem.HOME_PLANET)
-	_log("%s is with you." % starter.display_name())
-	_log("Q scans. Space attacks. C throws. Weaken something before you throw.")
+	world.set_focus(player.global_position)
+	_drain_stream_budget()
+	_spawn_fauna(planet)
+	_refresh_lod()
+	_refresh_world_senses()
+	_refresh_atmosphere()
+	if backdrop != null:
+		backdrop.queue_redraw()
+
+	var colony := CultureRegistry.ensure("culture_colony", "Survivors")
+	_log("%s is gone. You got out with one human and a failing ship." % ShipSystem.HOME_PLANET)
+	_log("%s walks with you — clan \"%s\"." % [starter.display_name(), colony.display_name])
+	_log("Cultures learn from what they live. Villages keep their own fire.")
+	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
+		_log("Smoke on the wind: %s." % settlement_runtime.describe())
+	_log("Q scan · Space fight · C throw · E village/ship · J jump · U ship bay")
 
 
 func _resume_campaign() -> void:
 	if not SaveSystem.load_game(SAVE_SLOT) or PlanetManager.active_planet_id.is_empty():
 		_begin_new_campaign()
 		return
+	_ensure_player()
 	_land_on(PlanetManager.active_planet_id)
-	player = PlayerAvatar.new()
-	add_child(player)
-	session.party.from_dict(session.pending_party, self)
+	if not session.pending_party.is_empty():
+		session.party.from_dict(session.pending_party, self)
+		session.pending_party = {}
+	for entry in session.party.active:
+		var c: Creature = entry
+		if not is_instance_valid(c):
+			continue
+		c.home_planet_id = PlanetManager.active_planet_id
+		c.position = player.position + Vector2(40, 20)
+		SimulationBudget.register_creature(c.identity.uid, c, PlanetManager.active_planet_id)
 	_spawn_fauna(world.planet)
+	_refresh_lod()
+	_refresh_world_senses()
+	_refresh_atmosphere()
+	if backdrop != null:
+		backdrop.queue_redraw()
 	_log("Back on %s." % world.planet.display_name)
+
+
+func _ensure_player() -> void:
+	if player != null:
+		return
+	player = PlayerAvatar.new()
+	player.name = "Player"
+	player.position = Vector2.ZERO
+	add_child(player)
+
+	camera = Camera2D.new()
+	camera.name = "Camera2D"
+	camera.enabled = true
+	camera.zoom = CAMERA_ZOOM
+	camera.position_smoothing_enabled = true
+	camera.position_smoothing_speed = 8.0
+	player.add_child(camera)
+
+	if atmos == null:
+		atmos = CanvasModulate.new()
+		atmos.name = "Atmosphere"
+		atmos.color = _atmos_color
+		add_child(atmos)
+	if haze == null:
+		haze = CanvasLayer.new()
+		haze.name = "WorldHaze"
+		haze.layer = 2
+		add_child(haze)
+		_haze_rect = ColorRect.new()
+		_haze_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_haze_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_haze_rect.color = Color(1, 1, 1, 1)
+		var haze_path := "res://shaders/world_haze.gdshader"
+		if ResourceLoader.exists(haze_path):
+			_haze_mat = ShaderMaterial.new()
+			_haze_mat.shader = load(haze_path)
+			_haze_mat.set_shader_parameter("density", _haze_density)
+			_haze_mat.set_shader_parameter("haze_color", Vector3(_haze_color.r, _haze_color.g, _haze_color.b))
+			_haze_rect.material = _haze_mat
+		haze.add_child(_haze_rect)
 
 
 func _land_on(planet_id: String) -> void:
 	PlanetManager.land(planet_id)
+	if world != null:
+		world.queue_free()
+		world = null
 	world = PlanetWorld.new()
+	world.name = "PlanetWorld"
 	add_child(world)
 	world.setup(PlanetManager.active_planet(), PlanetManager.active_summary())
 
-	if settlement != null:
-		settlement.queue_free()
-	settlement = SettlementView.new()
-	chunk_layer.add_child(settlement)
-	settlement.setup(SettlementGenerator.generate(world.planet))
+	_teardown_settlement()
+	if SettlementGenerator.has_settlement(world.planet):
+		_build_settlement(world.planet)
 
 	var first_visit := session.discovery.register_planet(world.planet)
 	if first_visit:
 		session.ship.add_salvage(DiscoverySystem.SALVAGE_PLANET)
-	LandfallCard.show_for(self, world.planet, session.discovery, first_visit)
+	(load("res://scenes/ui/landfall_card.gd") as GDScript).call("show_for",
+		self, world.planet, session.discovery, first_visit)
+	if player != null:
+		world.set_focus(player.global_position)
 
 
-# --- Loop ---------------------------------------------------------------------------
+func _clear_surface() -> void:
+	for key in chunk_views.keys():
+		var view: Node = chunk_views[key]
+		if is_instance_valid(view):
+			view.queue_free()
+	chunk_views.clear()
+	for n in resource_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	resource_nodes.clear()
+	for c in wild:
+		if is_instance_valid(c):
+			c.queue_free()
+	wild.clear()
+	_teardown_settlement()
+	if world != null:
+		world.queue_free()
+		world = null
+	_nearest_wild = null
+	_nearest_node = null
+	_nearest_building = {}
 
-func _menu_open() -> bool:
-	return (_ship_view != null and _ship_view.visible) \
-		or (_service_menu != null and _service_menu.visible) \
-		or (_party_panel != null and _party_panel.visible)
 
+## Depart -> land new planet -> environmental pressure -> autosave campaign.
+func _jump_to(planet_id: String = "") -> void:
+	if session == null or player == null:
+		return
+	var carried: Array = []
+	for entry in session.party.active:
+		var c: Creature = entry
+		if is_instance_valid(c) and c.identity != null:
+			carried.append(String(c.identity.uid))
+	var serializer := func(uid: StringName) -> Dictionary:
+		var node := SimulationBudget.node_for(uid)
+		if node != null and node.has_method("to_dict"):
+			return node.to_dict()
+		return {}
+	PlanetManager.depart(carried, serializer)
+	_clear_surface()
+	session.prepare_hold()
+	session.complete_jump()
+
+	var next_id := planet_id
+	if next_id.is_empty():
+		var next := PlanetManager.create_planet()
+		next_id = next.planet_id
+	_land_on(next_id)
+
+	# _land_on places the player near a village when one exists; otherwise origin.
+	if settlement_runtime == null or settlement_runtime.layout.is_empty():
+		player.position = Vector2.ZERO
+	for entry in session.party.active:
+		var c: Creature = entry
+		if not is_instance_valid(c):
+			continue
+		c.home_planet_id = next_id
+		c.position = player.position + Vector2(_rng.randf_range(-40, 40), _rng.randf_range(-30, 30))
+		SimulationBudget.register_creature(c.identity.uid, c, next_id)
+	_apply_travel_pressure()
+	_spawn_fauna(world.planet)
+	# Party culture remembers the jump.
+	for entry in session.party.active:
+		var c: Creature = entry
+		if is_instance_valid(c) and c.experience != null:
+			c.experience.log_event("biomes_entered", 1.0)
+			c.experience.log_event("distance_travelled", 800.0)
+	world.set_focus(player.global_position)
+	_refresh_lod()
+	_refresh_world_senses()
+	_refresh_atmosphere()
+	if backdrop != null:
+		backdrop.queue_redraw()
+	SaveSystem.save_game(SAVE_SLOT)
+	var folk := ""
+	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
+		folk = "  " + settlement_runtime.describe()
+	_log("Jumped to %s. Local herds and folk bring their own cultures.%s" % [
+		world.planet.display_name, folk])
+
+
+func _jump_to_new_world() -> void:
+	_jump_to("")
+
+
+func _apply_travel_pressure() -> void:
+	if world == null or world.planet == null or session == null:
+		return
+	var pressures: Dictionary = world.planet.epigenetic_pressures
+	for entry in session.party.active:
+		var c: Creature = entry
+		if not is_instance_valid(c) or c.epigenetics == null:
+			continue
+		for definition_id in pressures:
+			if _rng.randf() < float(pressures[definition_id]) * 0.6:
+				c.epigenetics.apply_mark(definition_id, 0.22)
+	PlanetManager.apply_environmental_pressure(1.0)
+
+
+func _open_star_map() -> void:
+	if session == null:
+		return
+	# Close overlapping menus so only the map is interactive.
+	if _ship_view != null:
+		_ship_view.visible = false
+	if _inventory_panel != null:
+		_inventory_panel.visible = false
+	if _star_map == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 7
+		layer.name = "StarMapLayer"
+		add_child(layer)
+		_star_map = (load("res://scenes/ui/star_map.gd") as GDScript).new()
+		layer.add_child(_star_map)
+		_star_map.destination_chosen.connect(_jump_to)
+	_star_map.max_candidates = session.ship.jump_candidates()
+	_star_map.scan_depth = session.ship.scan_depth()
+	_star_map.open(session.discovery.planets.keys())
+
+
+func _toggle_ship() -> void:
+	if session == null:
+		return
+	if _ship_view != null and _ship_view.visible:
+		_ship_view.visible = false
+		return
+	if _ship_view == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 7
+		layer.name = "ShipLayer"
+		add_child(layer)
+		_ship_view = (load("res://scenes/ui/ship_view.gd") as GDScript).new() as ShipView
+		layer.add_child(_ship_view)
+		_ship_view.returned_to_surface.connect(func(): _ship_view.visible = false)
+		_ship_view.open_star_map_requested.connect(_open_star_map)
+		_ship_view.open_inventory_requested.connect(_open_inventory)
+		_ship_view.jump_requested.connect(_jump_to)
+	_ship_view.open(session)
+
+
+func _open_inventory() -> void:
+	if session == null:
+		return
+	if _inventory_panel != null and _inventory_panel.visible:
+		_inventory_panel.close()
+		return
+	if _inventory_panel == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 7
+		layer.name = "InventoryLayer"
+		add_child(layer)
+		_inventory_panel = InventoryPanel.new()
+		layer.add_child(_inventory_panel)
+		_inventory_panel.changed.connect(func():
+			if _info != null:
+				_update_info())
+	if _ship_view != null:
+		_ship_view.visible = false
+	_inventory_panel.open(session)
+
+
+func _open_service(entry: Dictionary) -> void:
+	if session == null or entry.is_empty():
+		return
+	if _service_menu == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 7
+		layer.name = "ServiceLayer"
+		add_child(layer)
+		_service_menu = ServiceMenu.new()
+		layer.add_child(_service_menu)
+		_service_menu.closed.connect(func(): pass)
+	_service_menu.settlement_runtime = settlement_runtime
+	_service_menu.open(entry, session, session.party.active)
+
+
+func _build_settlement(planet: PlanetSeedResource) -> void:
+	var layout := SettlementGenerator.generate(planet)
+	if layout.is_empty():
+		return
+	settlement = SettlementView.new()
+	settlement.name = "Settlement"
+	chunk_layer.add_child(settlement)
+	settlement_runtime = SettlementRuntime.new()
+	settlement_runtime.name = "SettlementRuntime"
+	add_child(settlement_runtime)
+	settlement_runtime.setup(layout, self, settlement)
+	settlement_runtime.culture_taught.connect(func(text: String):
+		if not text.is_empty():
+			_log(text))
+	settlement_runtime.settler_recruited.connect(_on_settler_recruited)
+	# Settlers are living culture hosts — include them in wild-adjacent systems.
+	for c in settlement_runtime.settlers:
+		if is_instance_valid(c) and not wild.has(c):
+			wild.append(c)
+	# Land within walking distance of the fire — Odyssey: people, not empty dirt.
+	if player != null:
+		var plaza := settlement_runtime.center()
+		if player.position.distance_to(plaza) > 220.0:
+			var ang := _rng.randf() * TAU
+			player.position = plaza + Vector2(cos(ang), sin(ang)) * _rng.randf_range(90.0, 160.0)
+	_log("Arrived near %s." % settlement_runtime.describe())
+
+
+func _teardown_settlement() -> void:
+	if settlement_runtime != null:
+		for c in settlement_runtime.settlers:
+			if is_instance_valid(c):
+				wild.erase(c)
+		settlement_runtime.clear()
+		settlement_runtime.queue_free()
+		settlement_runtime = null
+	if settlement != null:
+		settlement.queue_free()
+		settlement = null
+
+
+func _on_settler_recruited(creature: Creature) -> void:
+	if creature == null or not is_instance_valid(creature) or session == null:
+		return
+	wild.erase(creature)
+	if creature.identity != null:
+		creature.identity.culture_id = &"culture_colony"
+	_bind_culture_member(creature)
+	session.enroll(creature)
+	var where := session.party.accept(creature, session.ship)
+	if where == "party":
+		_log("%s joins your party — and the Survivors' fire." % creature.display_name())
+	else:
+		_log("%s boards the ship (party full)." % creature.display_name())
+	ImpactEffect.spawn(self, creature.global_position, Color(0.55, 0.9, 0.65), 90.0)
+
+
+func _to_menu() -> void:
+	SaveSystem.save_game(SAVE_SLOT)
+	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
+
+
+# --- Loop ------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
-	if player == null or _menu_open():
+	if player == null or world == null:
 		return
-	_move_player(delta)
+	if _menu_open():
+		return
+
+	_drain_stream_budget()
+	PlayerWalker.move(player, world, delta)
+	world.set_focus(player.global_position)
 	_follow(delta)
+	_tick_culture_bodies(delta)
+	if settlement_runtime != null:
+		settlement_runtime.tick(delta, player, world)
 	_update_targets()
-	_tick_wild(delta)
+	_tick_combat(delta)
+
+	_lod_timer += delta
+	if _lod_timer >= LOD_REFRESH_INTERVAL:
+		_lod_timer = 0.0
+		_refresh_lod()
+
+	_sense_timer += delta
+	if _sense_timer >= SENSE_REFRESH_INTERVAL:
+		_sense_timer = 0.0
+		_refresh_world_senses()
+
+	_atmos_timer += delta
+	if _atmos_timer >= ATMOS_REFRESH_INTERVAL:
+		_atmos_timer = 0.0
+		_refresh_atmosphere()
+	if atmos != null:
+		_atmos_color = _atmos_color.lerp(_atmos_target, clampf(delta * 1.8, 0.0, 1.0))
+		atmos.color = _atmos_color
+	# skip continuous backdrop redraw (FPS)
+
 	_update_info()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not (event is InputEventKey) or not event.pressed or _menu_open():
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	if _star_map != null and _star_map.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_J:
+			_star_map.visible = false
+		return
+	if _ship_view != null and _ship_view.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_U or event.keycode == KEY_O:
+			_ship_view.visible = false
+		elif event.keycode == KEY_J:
+			_ship_view.visible = false
+			_open_star_map()
+		elif event.keycode == KEY_I:
+			_ship_view.visible = false
+			_open_inventory()
+		return
+	if _inventory_panel != null and _inventory_panel.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_I:
+			_inventory_panel.close()
+		return
+	if _service_menu != null and _service_menu.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_E:
+			_service_menu.visible = false
+		return
+	if _party_panel != null and _party_panel.visible:
+		if event.keycode == KEY_P or event.keycode == KEY_ESCAPE:
+			_party_panel.close()
 		return
 	match event.keycode:
-		KEY_Q: _scan()
-		KEY_E: _interact()
-		KEY_SPACE: _attack()
-		KEY_C: _throw()
-		KEY_TAB: _cycle_leader()
-		KEY_P: _open_party()
-		KEY_J: _open_ship()
-		KEY_ESCAPE: _to_menu()
+		KEY_Q:
+			_scan()
+		KEY_E:
+			_interact()
+		KEY_SPACE:
+			_attack()
+		KEY_C:
+			_throw()
+		KEY_TAB:
+			_cycle_leader()
+		KEY_P:
+			_open_party()
+		KEY_J:
+			_open_star_map()
+		KEY_U, KEY_O:
+			_toggle_ship()
+		KEY_I:
+			_open_inventory()
+		KEY_M:
+			_to_menu()
 
 
-func _move_player(delta: float) -> void:
-	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	if dir == Vector2.ZERO:
-		return
-	var cost := float(PlanetGenerator.get_biome(
-		world.biome_at(player.position)).get("move_cost", 1.0))
-	player.position += dir.normalized() * (240.0 / maxf(0.5, cost)) * delta
-	world.set_focus(player.position)
-	SimulationBudget.set_focus_point(player.position)
-
-
-## Party members trail you loosely, staggered so a team reads as a group of
-## animals rather than a formation.
 func _follow(delta: float) -> void:
+	if session == null:
+		return
 	for i in session.party.active.size():
 		var c: Creature = session.party.active[i]
 		if not is_instance_valid(c):
@@ -203,16 +609,18 @@ func _follow(delta: float) -> void:
 		var slot := Vector2(cos(i * 2.4), sin(i * 2.4)) * FOLLOW_DISTANCE
 		var goal := player.position + slot
 		if c.position.distance_to(goal) > 12.0:
-			c.position = c.position.move_toward(goal,
-				c.stats.stat("move_speed") * 1.5 * delta)
+			var speed := 80.0
+			if c.stats != null:
+				speed = maxf(40.0, c.stats.stat("move_speed") * 1.5)
+			c.position = c.position.move_toward(goal, speed * delta)
 
 
 func _update_targets() -> void:
 	_nearest_wild = null
-	var best := 260.0
+	var best := TARGET_RANGE
 	for entry in wild:
 		var c: Creature = entry
-		if not is_instance_valid(c) or c.stats.hp <= 0.0:
+		if not is_instance_valid(c) or c.stats == null or c.stats.hp <= 0.0:
 			continue
 		var d := c.position.distance_to(player.position)
 		if d < best:
@@ -230,40 +638,55 @@ func _update_targets() -> void:
 			node_best = d
 			_nearest_node = n
 
-	_nearest_building = settlement.building_at(player.position) if settlement != null else {}
+	if settlement_runtime != null:
+		_nearest_building = settlement_runtime.building_at(player.position)
+	elif settlement != null:
+		_nearest_building = settlement.building_at(player.position)
+	else:
+		_nearest_building = {}
 	_update_prompt()
 
 
 func _update_prompt() -> void:
+	if _prompt == null:
+		return
 	var parts: Array[String] = []
 	if not _nearest_building.is_empty():
 		var definition := SettlementGenerator.get_building(_nearest_building["building_id"])
-		parts.append("[E] %s" % definition["display_name"])
+		parts.append("[E] enter %s" % definition.get("display_name", "building"))
+	elif player != null and player.position.length() < 56.0 and _nearest_node == null:
+		parts.append("[E] ship bay  ·  [U] upgrades  ·  [I] inventory  ·  [J] jump")
 	elif _nearest_node != null:
 		parts.append("[E] gather %s" % _nearest_node.resource_id)
 
-	if _nearest_wild != null:
+	if _nearest_wild != null and session != null:
 		var chance := CatchSystem.chance_for(_nearest_wild, session.ship)
 		parts.append("[Space] fight    [C] throw — %s (%d%%)" % [
 			CatchSystem.describe_chance(chance), int(chance * 100.0)])
 	_prompt.text = "        ".join(parts)
 
-	# The target's condition, front and centre — this is the number the player
-	# is actually managing when they decide whether to throw.
+	if _target_bar == null:
+		return
 	if _nearest_wild != null:
 		var hp := _nearest_wild.stats.hp_fraction()
-		var bars := int(round(hp * 20.0))
-		_target_bar.text = "%s   [%s%s]  %d%%%s" % [
+		var bars := int(round(hp * 16.0))
+		_target_bar.text = "TARGET  %s\n[%s%s]  %d%%%s" % [
 			_nearest_wild.display_name(),
-			"|".repeat(bars), ".".repeat(20 - bars), int(hp * 100.0),
+			"█".repeat(bars), "░".repeat(16 - bars), int(hp * 100.0),
 			"   DOWNED" if _nearest_wild.stats.downed else ""]
+		if _target_panel != null:
+			_target_panel.visible = true
 	else:
 		_target_bar.text = ""
+		if _target_panel != null:
+			_target_panel.visible = false
 
 
-# --- Verbs ----------------------------------------------------------------------------
+# --- Verbs -----------------------------------------------------------------------
 
 func _scan() -> void:
+	if player == null or session == null or world == null:
+		return
 	var radius := 260.0 + session.ship.stat("scan_depth") * 60.0
 	ScanEffect.sweep(self, player.global_position, radius)
 
@@ -278,6 +701,10 @@ func _scan() -> void:
 		if bool(result["new"]):
 			discovered += 1
 			_log("Catalogued: %s" % result["name"])
+		_log_phenotype_summary(c, String(result["name"]))
+		_log_culture_summary(c)
+		if c.experience != null and bool(result["new"]):
+			c.experience.log_event("anomaly_investigated", 1.0)
 		ScanEffect.tag(self, c.global_position, String(result["name"]), bool(result["new"]))
 
 	for entry in resource_nodes:
@@ -295,113 +722,200 @@ func _scan() -> void:
 		var totals := session.discovery.totals()
 		_log("%d new. Aetherdex: %d species across %d worlds.  +%.0f salvage"
 			% [discovered, totals["species"], totals["planets"], salvage])
-		_sync_ship_metrics()
+
+
+func _log_culture_summary(c: Creature) -> void:
+	if c == null or c.identity == null:
+		return
+	var culture := CultureRegistry.culture_for(c)
+	culture.ensure_nets()
+	var drives: Array = culture.drive_report()
+	var top := ""
+	if not drives.is_empty() and drives[0] is Dictionary:
+		var first: Dictionary = drives[0]
+		top = "%s %.0f%%" % [String(first.get("drive", "?")), float(first.get("p", 0.0)) * 100.0]
+	var kind := "human" if c.identity.is_human else "creature"
+	var gen := culture.generation
+	var applies := culture.live.applies if culture.live != null else 0
+	_log("  clan %s · %s · gen %d · %d lessons%s" % [
+		culture.display_name if not culture.display_name.is_empty() else culture.culture_id,
+		kind, gen, applies,
+		(" · lean " + top) if not top.is_empty() else ""])
+	if c.ai != null:
+		_log("  doing: %s" % c.ai.state_name().to_lower())
+
+
+func _log_phenotype_summary(c: Creature, species_name: String) -> void:
+	if c.stats == null:
+		return
+	var ph := c.stats.phenotype()
+	var stage := ""
+	if c.archetype != null and c.archetype.state != null:
+		var best_id := ""
+		var best_p := 0.0
+		for archetype_id in c.archetype.state.progress:
+			if c.archetype.state.is_crystallized(archetype_id):
+				var d: ArchetypeDefinitionResource = GenomeDB.get_archetype(archetype_id)
+				stage = " · %s" % (d.display_name if d != null else String(archetype_id))
+				best_id = ""
+				break
+			var p := c.archetype.state.get_progress(archetype_id)
+			if p > best_p:
+				best_p = p
+				best_id = String(archetype_id)
+		if stage.is_empty() and not best_id.is_empty() and best_p > 0.15:
+			var def: ArchetypeDefinitionResource = GenomeDB.get_archetype(best_id)
+			var label := def.display_name if def != null else best_id
+			stage = " · becoming %s (%d%%)" % [label, int(best_p * 100.0)]
+	_log("%s [%s]: size %.1f · atk %.1f · armor %.1f%s" % [
+		c.display_name(), species_name,
+		float(ph.get("size", 1.0)),
+		float(ph.get("attack_power", 0.0)),
+		float(ph.get("armor", 0.0)),
+		stage])
 
 
 func _attack() -> void:
-	if _nearest_wild == null:
+	if _nearest_wild == null or session == null:
 		return
 	var leader := session.party.leader()
 	if leader == null:
 		_log("Nothing in your party can fight. Rest at a settlement.")
 		return
-	if not leader.combat.ready_to_attack():
-		return
-	# Your creature closes the distance itself — you point, it fights.
-	leader.position = leader.position.move_toward(_nearest_wild.position, 40.0)
-	if leader.position.distance_to(_nearest_wild.position) > leader.combat.attack_range():
+	if leader.combat != null and not leader.combat.ready_to_attack():
 		return
 
-	leader.combat.reset_cooldown()
-	leader.combat.engaged = true
-	_nearest_wild.combat.engaged = true
-	_resolve_hit(leader, _nearest_wild)
+	# Close enough to trade blows.
+	leader.position = leader.position.move_toward(_nearest_wild.position, 40.0)
+	if leader.combat != null and leader.position.distance_to(_nearest_wild.position) > leader.combat.attack_range():
+		return
+
+	if leader.combat != null:
+		leader.combat.reset_cooldown()
+		leader.combat.engaged = true
+	if _nearest_wild.combat != null:
+		_nearest_wild.combat.engaged = true
+
+	var target := _nearest_wild
+	var log_hits: Array = CombatSystem.fight_round(leader, target, _rng)
+	for result in log_hits:
+		var r: Dictionary = result
+		if not bool(r.get("hit", false)):
+			DamagePopup.spawn(self, target.global_position, 0.0, "miss")
+			continue
+		var dmg := float(r.get("damage", 0.0))
+		ImpactEffect.spawn(self, target.global_position, Color(1.0, 0.75, 0.3), 40.0 + dmg * 1.2)
+		DamagePopup.spawn(self, target.global_position, dmg)
+	if is_instance_valid(target) and target.stats.downed:
+		_log("%s is down — good time to throw." % target.display_name())
+	elif is_instance_valid(target) and target.stats.hp <= 0.0:
+		_log("%s died." % target.display_name())
+		wild.erase(target)
+		session.ship.add_salvage(3.0)
+		target.queue_free()
+		_nearest_wild = null
 
 
 func _throw() -> void:
-	if _nearest_wild == null:
+	if _nearest_wild == null or session == null or player == null:
 		return
 	if player.position.distance_to(_nearest_wild.position) > 220.0:
 		_log("Too far. Get closer.")
 		return
 
 	var target := _nearest_wild
+	var chance := CatchSystem.chance_for(target, session.ship)
 	var result := CatchSystem.attempt(target, session.ship, _rng)
 	ScanEffect.sweep(self, target.global_position, 70.0, Color(1.0, 0.85, 0.4))
 
 	if not bool(result["caught"]):
 		DamagePopup.spawn(self, target.global_position, 0.0, "miss")
-		_log("%s broke free." % target.display_name())
+		_log("%s broke free. (%d%%)" % [target.display_name(), int(chance * 100.0)])
 		return
 
 	wild.erase(target)
-	# Catching catalogues it. Otherwise a player who throws without scanning
-	# first ends up with a creature in hand and no dex entry for it.
 	var entry := session.discovery.scan_creature(target, world.planet, session.ship)
 	if bool(entry["new"]):
 		_log("Catalogued: %s" % entry["name"])
-	var where := session.party.accept(target, session.ship)
+	# Fold the catch into the colony culture (Odyssey: recruitment is learning).
+	if target.experience != null:
+		target.experience.log_event("creature_calmed", 1.0)
+	# Enroll before accept — storage path frees the live node.
+	session.enroll(target)
+	# Join the player clan's brain going forward.
+	if target.identity != null:
+		target.identity.culture_id = &"culture_colony"
+	_bind_culture_member(target)
 	session.discovery.mark_tamed(target.genetics.genome)
+	var where := session.party.accept(target, session.ship)
 	session.ship.add_salvage(10.0)
 	session.ship.record("tamed", 1.0, true)
 	ImpactEffect.spawn(self, player.global_position, Color(0.6, 0.9, 1.0), 110.0)
 
 	if where == "party":
-		_log("Caught %s! It joins your party." % target.display_name())
+		_log("Caught %s! It joins your party — and the Survivors' culture." % target.display_name())
 	else:
 		_log("Caught %s! Party is full — sent to the ship." % target.display_name())
-	_sync_ship_metrics()
+	_nearest_wild = null
 
 
 func _cycle_leader() -> void:
+	if session == null:
+		return
 	var next := session.party.cycle()
 	if next != null:
 		_log("%s steps forward." % next.display_name())
 
 
 func _interact() -> void:
+	if session == null:
+		return
+	# Settlement doors open the full service menu (trade, breed, craft…).
 	if not _nearest_building.is_empty():
-		_enter_building(_nearest_building)
+		_open_service(_nearest_building)
+		return
+	# Near origin = lander / ship bay.
+	if player != null and player.position.length() < 56.0 and _nearest_node == null:
+		_toggle_ship()
+		_log("Ship bay. Upgrade modules, pack the hold, open the star map.")
+		ImpactEffect.spawn(self, player.global_position, Color(0.45, 0.7, 1.0), 90.0)
 		return
 	if _nearest_node == null:
 		return
 	var yielded := _nearest_node.harvest(session.party.leader())
 	if yielded <= 0.0:
 		return
-	# Materials exist only as salvage now — there is no inventory to manage.
 	session.ship.add_salvage(yielded * 0.35)
+	session.gain(_nearest_node.resource_id, yielded)
 	DamagePopup.spawn(self, _nearest_node.global_position, yielded, "heal")
+	ActionEffects.apply(self, "harvest", {"name": _nearest_node.resource_id})
 	var summary := PlanetManager.active_summary()
 	if summary != null:
 		summary.resource_depletion[_nearest_node.node_key] = _nearest_node.remaining / 40.0
 	if _nearest_node.depleted():
 		resource_nodes.erase(_nearest_node)
 		_nearest_node.queue_free()
+		_nearest_node = null
 
 
-# --- Combat ----------------------------------------------------------------------------
-
-func _resolve_hit(attacker: Creature, target: Creature) -> void:
-	var result := CombatSystem.resolve_attack(attacker, target, _rng)
-	if not bool(result["hit"]):
-		DamagePopup.spawn(self, target.global_position, 0.0, "miss")
+func _open_party() -> void:
+	if session == null:
 		return
-	target.visual.flash_hit(Color(1.0, 0.4, 0.35))
-	ImpactEffect.spawn(self, target.global_position, Color(1.0, 0.75, 0.3),
-		40.0 + float(result["damage"]) * 1.2)
-	DamagePopup.spawn(self, target.global_position, float(result["damage"]))
-
-	if bool(result["downed"]):
-		_log("%s is down — good time to throw." % target.display_name())
-	elif bool(result["killed"]):
-		_log("%s died." % target.display_name())
-		wild.erase(target)
-		session.ship.add_salvage(3.0)
-		target.queue_free()
+	if _party_panel == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 6
+		layer.name = "PartyLayer"
+		add_child(layer)
+		_party_panel = PartyPanel.new()
+		layer.add_child(_party_panel)
+	_party_panel.open(session, self)
 
 
-## Wild creatures approach and swing back if provoked or naturally aggressive.
-func _tick_wild(delta: float) -> void:
+# --- Combat tick (engaged wild retaliate) ----------------------------------------
+
+func _tick_combat(delta: float) -> void:
+	if session == null:
+		return
 	var leader := session.party.leader()
 	for entry in session.party.active + wild:
 		var c: Creature = entry
@@ -412,7 +926,11 @@ func _tick_wild(delta: float) -> void:
 
 	for entry in wild.duplicate():
 		var beast: Creature = entry
-		if not is_instance_valid(beast) or beast.stats.hp <= 0.0 or beast.stats.downed:
+		if not is_instance_valid(beast) or beast.stats == null:
+			continue
+		if beast.stats.hp <= 0.0 or beast.stats.downed:
+			continue
+		if beast.combat == null:
 			continue
 		var d := beast.position.distance_to(leader.position)
 		if d > beast.combat.aggro_range() and not beast.combat.engaged:
@@ -425,165 +943,371 @@ func _tick_wild(delta: float) -> void:
 				* beast.stats.stat("move_speed") * 0.5 * delta
 		elif beast.combat.ready_to_attack():
 			beast.combat.reset_cooldown()
-			_resolve_hit(beast, leader)
+			var result := CombatSystem.resolve_attack(beast, leader, _rng)
+			if bool(result.get("hit", false)):
+				ImpactEffect.spawn(self, leader.global_position, Color(1.0, 0.45, 0.35),
+					36.0 + float(result.get("damage", 0.0)))
+				DamagePopup.spawn(self, leader.global_position, float(result.get("damage", 0.0)))
+				if bool(result.get("downed", false)):
+					_log("%s is down!" % leader.display_name())
+				elif bool(result.get("killed", false)):
+					_log("%s fell." % leader.display_name())
 
 
-# --- Screens -----------------------------------------------------------------------------
+# --- World systems (LOD / senses / fauna / stream) -------------------------------
 
-func _enter_building(entry: Dictionary) -> void:
-	if _service_menu == null:
-		var layer := CanvasLayer.new()
-		layer.layer = 6
-		add_child(layer)
-		_service_menu = ServiceMenu.new()
-		layer.add_child(_service_menu)
-	_service_menu.open(entry, session, session.party.active)
-
-
-func _open_party() -> void:
-	if _party_panel == null:
-		var layer := CanvasLayer.new()
-		layer.layer = 6
-		add_child(layer)
-		_party_panel = PartyPanel.new()
-		layer.add_child(_party_panel)
-	_party_panel.open(session, self)
-
-
-func _open_ship() -> void:
-	if _ship_view == null:
-		var layer := CanvasLayer.new()
-		layer.layer = 7
-		add_child(layer)
-		_ship_view = ShipView.new()
-		layer.add_child(_ship_view)
-		_ship_view.jump_requested.connect(_jump_to)
-	_sync_ship_metrics()
-	_ship_view.open(session)
-
-
-func _sync_ship_metrics() -> void:
-	var ship := session.ship
-	var earned: Array = []
-	earned += ship.record("planets_visited", float(session.discovery.planets.size()))
-	earned += ship.record("colony_size", float(session.party.total_caught()))
-	earned += ship.record("species", float(session.discovery.totals()["species"]))
-	var deepest := 0.0
-	var archetypes := 0.0
-	for id in StoryDirector.lineages:
-		var record: LineageRecordResource = StoryDirector.lineages[id]
-		deepest = maxf(deepest, float(record.max_generation))
-		for a in record.archetype_history:
-			archetypes += float(record.archetype_history[a])
-	earned += ship.record("max_generation", deepest)
-	earned += ship.record("archetypes", archetypes)
-	for achievement in earned:
-		_log("[ACHIEVEMENT] %s — %s  (%s)" % [achievement["display_name"],
-			achievement["description"], achievement.get("reward_text", "")])
-	if not earned.is_empty() and _hud_panel != null:
-		_hud_panel.set_rim_color(Color(1.0, 0.85, 0.35))
-		_hud_panel.flash(1.6)
+func _draw_backdrop() -> void:
+	var centre := player.global_position if player != null else Vector2.ZERO
+	var extent := 2400.0
+	var rect := Rect2(centre.x - extent, centre.y - extent, extent * 2.0, extent * 2.0)
+	# Planet-tinted void so unloaded chunks never read as flat black.
+	var deep := Color(0.05, 0.06, 0.09)
+	var mid := Color(0.09, 0.11, 0.15)
+	if world != null and world.planet != null:
+		var p := world.planet
+		if p.mean_temperature_c < -10.0:
+			deep = Color(0.04, 0.06, 0.11)
+			mid = Color(0.08, 0.12, 0.18)
+		elif p.mean_temperature_c > 32.0:
+			deep = Color(0.09, 0.05, 0.04)
+			mid = Color(0.14, 0.09, 0.06)
+		elif p.hydrosphere_fraction > 0.55:
+			deep = Color(0.04, 0.07, 0.11)
+			mid = Color(0.07, 0.12, 0.16)
+	backdrop.draw_rect(rect, deep, true)
+	for i in 7:
+		var t := float(i) / 7.0
+		var r := 220.0 + t * 1050.0
+		var c := mid.lerp(deep, t)
+		c.a = 0.38 - t * 0.04
+		backdrop.draw_circle(centre, r, c)
+	# Sparse distant "hills" silhouettes for depth.
+	if world != null and world.planet != null:
+		var seed_v := int(world.planet.seed)
+		for i in 12:
+			var a := float((seed_v + i * 37) % 360) * TAU / 360.0
+			var dist := 900.0 + float((seed_v + i * 91) % 700)
+			var pos := centre + Vector2(cos(a), sin(a)) * dist
+			var h := 40.0 + float((seed_v + i * 13) % 80)
+			backdrop.draw_circle(pos, h, Color(mid.r, mid.g, mid.b, 0.22))
 
 
-## Called by ServiceMenu / PartyPanel when the party changes.
-func adopt_offspring(child: Creature) -> void:
-	child.position = player.position + Vector2(_rng.randf_range(-40, 40), _rng.randf_range(-40, 40))
-	session.party.accept(child, session.ship)
-	_log("%s was born." % child.display_name())
-
-
-func recruit_colonist(_npc_name: String) -> void:
-	_log("Nobody here is looking to leave.")
-
-
-# --- Travel --------------------------------------------------------------------------------
-
-func _jump_to(planet_id: String) -> void:
-	# Your party comes with you. Nothing is ever left behind — the whole point
-	# of a team is that it is YOUR team.
-	for key in chunk_views:
-		chunk_views[key].queue_free()
-	chunk_views.clear()
-	for n in resource_nodes:
-		if is_instance_valid(n):
-			n.queue_free()
-	resource_nodes.clear()
-	for c in wild:
-		if is_instance_valid(c):
-			c.queue_free()
-	wild.clear()
-	if world != null:
-		world.queue_free()
-
-	session.jumps_made += 1
-	_land_on(planet_id)
-	player.position = Vector2.ZERO
-	for c in session.party.active:
-		if is_instance_valid(c):
-			c.home_planet_id = planet_id
-			c.position = Vector2(_rng.randf_range(-50, 50), _rng.randf_range(-50, 50))
-	_spawn_fauna(world.planet)
-	world.set_focus(player.position)
-	_apply_travel_pressure()
-	SaveSystem.save_game(SAVE_SLOT)
-
-
-## Living through a world marks the creatures that saw it — but SILENTLY.
-## Applied once per jump rather than nagged daily, so a team that has crossed
-## six worlds quietly accumulates a history you can read on the party screen
-## and nowhere else.
-func _apply_travel_pressure() -> void:
-	var pressures: Dictionary = world.planet.epigenetic_pressures
-	if pressures.is_empty():
+func _refresh_atmosphere() -> void:
+	if world == null or player == null:
 		return
-	for entry in session.party.active:
-		var c: Creature = entry
-		if not is_instance_valid(c):
-			continue
-		for definition_id in pressures:
-			if _rng.randf() < float(pressures[definition_id]) * 0.6:
-				c.epigenetics.apply_mark(definition_id, 0.22)
+	var biome_id := world.biome_at(player.global_position)
+	var density := 0.16
+	var wind := 0.3
+	var haze_col := Color(0.55, 0.72, 0.95)
+	if biome_id.is_empty():
+		_atmos_target = Color(0.92, 0.94, 0.98)
+	else:
+		match biome_id:
+			"biome_ice_waste", "biome_tundra":
+				_atmos_target = Color(0.86, 0.92, 1.0)
+				haze_col = Color(0.70, 0.82, 0.98)
+				density = 0.22
+				wind = 0.55
+			"biome_desert", "biome_savanna":
+				_atmos_target = Color(1.0, 0.95, 0.86)
+				haze_col = Color(0.92, 0.78, 0.48)
+				density = 0.28
+				wind = 0.7
+			"biome_jungle", "biome_forest", "biome_taiga":
+				_atmos_target = Color(0.88, 0.97, 0.88)
+				haze_col = Color(0.45, 0.72, 0.48)
+				density = 0.20
+				wind = 0.25
+			"biome_ashland":
+				_atmos_target = Color(1.0, 0.88, 0.84)
+				haze_col = Color(0.55, 0.35, 0.30)
+				density = 0.38
+				wind = 0.5
+			"biome_shallows", "biome_wetland":
+				_atmos_target = Color(0.86, 0.94, 1.0)
+				haze_col = Color(0.40, 0.68, 0.85)
+				density = 0.26
+				wind = 0.35
+			_:
+				_atmos_target = Color(0.93, 0.94, 0.96)
+				haze_col = Color(0.55, 0.68, 0.82)
+				density = 0.16
+	# Hostile worlds thicken the air — survival pressure you can see.
+	if world.planet != null:
+		var hazard := 0.0
+		for key in world.planet.hazard_profile:
+			hazard += float(world.planet.hazard_profile[key])
+		density = clampf(density + hazard * 0.04, 0.08, 0.5)
+		if float(world.planet.hazard_profile.get("radiation", 0.0)) > 0.3:
+			haze_col = haze_col.lerp(Color(0.55, 0.95, 0.45), 0.35)
+	_haze_color = _haze_color.lerp(haze_col, 0.35)
+	_haze_density = lerpf(_haze_density, density, 0.35)
+	if _haze_mat != null:
+		_haze_mat.set_shader_parameter("haze_color",
+			Vector3(_haze_color.r, _haze_color.g, _haze_color.b))
+		_haze_mat.set_shader_parameter("density", _haze_density)
+		_haze_mat.set_shader_parameter("wind", wind)
 
 
 func _spawn_fauna(planet: PlanetSeedResource) -> void:
-	var depth := session.ship.fauna_depth()
-	var count := clampi(int(round(float(planet.fauna_species_count) * depth)), 2, 14)
-	for i in count:
-		var angle := _rng.randf() * TAU
-		var c := CreatureFactory.spawn_random(self, _rng, {
-			"name": CreatureFactory.generate_name(_rng),
-			"planet_id": planet.planet_id, "planet_name": planet.display_name,
-			"divergence": planet.fauna_divergence})
-		c.position = Vector2(cos(angle), sin(angle)) * _rng.randf_range(220.0, FAUNA_SPAWN_RADIUS)
+	if planet == null or player == null:
+		return
+	# Need streamed chunks so ecology_at is meaningful for placement.
+	if world != null:
+		world.set_focus(player.global_position)
+		for _i in 25:
+			if world.pending_count() == 0:
+				break
+			world.process_stream_budget(1)
+
+	var depth := 1.0
+	if session != null:
+		depth = session.ship.fauna_depth()
+	var planet_scale := clampf(
+		(0.35 + 0.65 * planet.habitability) * depth
+		* (float(planet.fauna_species_count) / 8.0),
+		0.25, 1.75)
+
+	var local_life := 0.0
+	if world != null:
+		local_life = float(world.ecology_at(player.global_position).get("life", 0.0))
+	# Soft floor only on mid-habitable worlds so the loop still has targets;
+	# true barren land stays empty (no hard FAUNA_COUNT floor).
+	var target := Ecology.expected_fauna(local_life, planet_scale)
+	if target == 0 and planet.habitability >= 0.35:
+		target = 2
+	target = clampi(target, 0, Ecology.MAX_FAUNA)
+
+	var pack_count := clampi(int(ceil(float(maxi(target, 1)) / 4.0)), 1, 4)
+	var placed := 0
+	var attempts := 0
+	var max_attempts := 48
+	while placed < target and attempts < max_attempts:
+		attempts += 1
+		var ang := _rng.randf() * TAU
+		var dist := _rng.randf_range(120.0, FAUNA_SPAWN_RADIUS)
+		var pos: Vector2 = player.position + Vector2(cos(ang), sin(ang)) * dist
+		var life := local_life
+		if world != null:
+			life = float(world.ecology_at(pos).get("life", 0.0))
+		if life < Ecology.LIFE_SPAWN_FLOOR:
+			# Scout pack on habitable worlds may still land near the player.
+			if not (target <= 2 and planet.habitability >= 0.35 and placed < target):
+				continue
+		elif _rng.randf() > clampf(life, 0.0, 1.0):
+			continue
+
+		var pack := placed % pack_count
+		var culture_id := "culture_%s_pack%d" % [planet.planet_id, pack]
+		var lineage_id := "lin_%s_pack%d" % [planet.planet_id, pack]
+		CultureRegistry.ensure(culture_id, "%s herd %d" % [planet.display_name, pack + 1])
+		var c: Creature = CreatureFactory.spawn_random(self, _rng, {
+			"origin_kind": "wild",
+			"planet_id": planet.planet_id,
+			"planet_name": planet.display_name,
+			"divergence": planet.fauna_divergence,
+			"culture_id": culture_id,
+			"lineage_id": lineage_id,
+		})
+		c.position = pos
+		_bind_culture_member(c)
 		wild.append(c)
+		placed += 1
+	_refresh_lod()
 
 
-func _to_menu() -> void:
-	SaveSystem.save_game(SAVE_SLOT)
-	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
-
-
-# --- Streaming ------------------------------------------------------------------------------
-
-func _on_chunk_loaded(_planet_id: String, coord: Vector2i) -> void:
-	if world == null:
+func _bind_culture_member(c: Creature) -> void:
+	if c == null or c.identity == null:
 		return
-	var key := "%d,%d" % [coord.x, coord.y]
-	if not world.loaded_chunks.has(key) or chunk_views.has(key):
+	var culture := CultureRegistry.culture_for(c)
+	culture.member_count = maxi(culture.member_count, 1)
+	# Mint nets so the first decision is not a cold allocate mid-frame.
+	culture.ensure_nets()
+
+
+func _refresh_lod() -> void:
+	if player == null:
 		return
-	var chunk: Dictionary = world.loaded_chunks[key]
-	var view := ChunkView.new()
-	view.set_chunk(chunk)
-	chunk_layer.add_child(view)
-	chunk_views[key] = view
-	resource_nodes.append_array(ResourceNode.spawn_for_chunk(
-		node_layer, world.planet, chunk, PlanetManager.active_summary()))
+	var all: Array = wild.duplicate()
+	if session != null:
+		all.append_array(session.party.active)
+	for c in all:
+		if not is_instance_valid(c) or c.identity == null:
+			continue
+		var d: float = c.global_position.distance_to(player.global_position)
+		var lod: AetherTypes.SimLOD = AetherTypes.SimLOD.ABSTRACT
+		if d < SimulationBudget.full_radius:
+			lod = AetherTypes.SimLOD.FULL
+		elif d < SimulationBudget.near_radius:
+			lod = AetherTypes.SimLOD.NEAR
+		SimulationBudget.set_lod(c.identity.uid, lod)
 
 
-func _on_chunk_unloaded(_planet_id: String, coord: Vector2i) -> void:
+func _refresh_world_senses() -> void:
+	# Odyssey Stage-2: every FULL/NEAR creature gets spatial slots 27–30.
+	var all: Array = wild.duplicate()
+	if session != null:
+		all.append_array(session.party.active)
+	for c in all:
+		if not is_instance_valid(c) or c.perception == null:
+			continue
+		c.perception.world_senses = _compute_senses(c)
+
+
+## Execute culture-chosen AI states as motion (embodiment). FULL band every frame;
+## NEAR gets a cheap step so herds still look alive without the full brain cost.
+func _tick_culture_bodies(delta: float) -> void:
+	if player == null:
+		return
+	var party_nodes: Array = []
+	if session != null:
+		for p in session.party.active:
+			if is_instance_valid(p):
+				party_nodes.append(p)
+	var threats_for_wild: Array = party_nodes.duplicate()
+	if player != null:
+		threats_for_wild.append(player)
+	for c in wild:
+		if not is_instance_valid(c) or c.ai == null or c.identity == null:
+			continue
+		# SettlementRuntime owns village routines.
+		if bool(c.get_meta("is_settler", false)):
+			continue
+		var lod := SimulationBudget.lod_of(c.identity.uid)
+		if lod == AetherTypes.SimLOD.ABSTRACT:
+			continue
+		var food := BehaviorExecutor.food_point_for(c, world)
+		BehaviorExecutor.step(c, delta, {
+			"player": player,
+			"world": world,
+			"threats": threats_for_wild,
+			"allies": wild,
+			"food_point": food,
+		})
+	# Party members: soft AI when not player-led (they still follow via _follow).
+	for p in party_nodes:
+		var pc: Creature = p
+		if pc.ai == null or pc.identity == null:
+			continue
+		if SimulationBudget.lod_of(pc.identity.uid) == AetherTypes.SimLOD.FULL:
+			# Light wander offset is enough; follow() owns formation.
+			pass
+
+
+func _compute_senses(c: Creature) -> Dictionary:
+	var predator_dist := 9999.0
+	var ally_count := 0
+	var peers: Array = wild.duplicate()
+	if session != null:
+		peers.append_array(session.party.active)
+	for other in peers:
+		if other == c or not is_instance_valid(other):
+			continue
+		if not (other is Node2D):
+			continue
+		var d: float = c.global_position.distance_to((other as Node2D).global_position)
+		var aggro := 0.0
+		if other.stats != null:
+			aggro = float(other.stats.phenotype().get("aggression", 0.5))
+		# Player presence is a predator signal for wild non-allied animals.
+		if aggro >= PREDATOR_AGGRO and d < predator_dist:
+			predator_dist = d
+		var same_culture := false
+		if c.identity != null and other.identity != null:
+			var ca := String(c.identity.culture_id)
+			var cb := String(other.identity.culture_id)
+			if ca.is_empty():
+				ca = String(c.identity.lineage_id)
+			if cb.is_empty():
+				cb = String(other.identity.lineage_id)
+			same_culture = ca == cb and not ca.is_empty()
+		if d <= ALLY_RADIUS and (same_culture or aggro < PREDATOR_AGGRO):
+			ally_count += 1
+	if player != null and c.identity != null and not bool(c.identity.is_human):
+		var pd: float = c.global_position.distance_to(player.global_position)
+		if pd < predator_dist:
+			predator_dist = pd
+
+	var food_dist := 9999.0
+	var hazard := 0.0
+	if world != null:
+		var biome_hazard := 0.0
+		var biome_id := world.biome_at(c.global_position)
+		if not biome_id.is_empty():
+			var biome: Dictionary = PlanetGenerator.get_biome(biome_id)
+			var hazards: Dictionary = biome.get("hazards", {})
+			for key in hazards:
+				biome_hazard = maxf(biome_hazard, float(hazards[key]))
+
+		var eco := Ecology.empty()
+		if world.has_method("ecology_at"):
+			eco = world.ecology_at(c.global_position)
+		var food_sig := Ecology.food_signal(eco)
+		if food_sig > 0.02:
+			food_dist = 500.0 * (1.0 - food_sig)
+
+		var planet_load := 0.0
+		if world.planet != null and not world.planet.hazard_profile.is_empty():
+			var n := 0
+			for key in world.planet.hazard_profile:
+				planet_load += float(world.planet.hazard_profile[key])
+				n += 1
+			if n > 0:
+				planet_load /= float(n)
+		hazard = Ecology.hazard_blend(
+			biome_hazard,
+			float(eco.get("order", 0.5)),
+			planet_load,
+			0.7)
+
+	return {
+		"predator_dist": predator_dist,
+		"food_dist": food_dist,
+		"ally_count": ally_count,
+		"hazard": hazard,
+	}
+
+
+func _on_chunk_loaded(planet_id: String, coord: Vector2i) -> void:
+	if world == null or world.planet == null or planet_id != world.planet.planet_id:
+		return
 	var key := "%d,%d" % [coord.x, coord.y]
 	if chunk_views.has(key):
-		chunk_views[key].queue_free()
+		return
+	if not world.loaded_chunks.has(key):
+		return
+	_pending_chunks.append({"key": key, "data": world.loaded_chunks[key]})
+
+
+func _drain_stream_budget() -> void:
+	# At most one heavy job per frame: gen OR bake (not both) — holds 120fps.
+	if world != null and world.has_method("pending_count") and world.pending_count() > 0:
+		if world.process_stream_budget(1) > 0:
+			return
+	if _pending_chunks.is_empty():
+		return
+	var item: Dictionary = _pending_chunks.pop_front()
+	var key: String = item["key"]
+	if chunk_views.has(key) or world == null or not world.loaded_chunks.has(key):
+		return
+	var view := ChunkView.new()
+	chunk_layer.add_child(view)
+	view.set_chunk(item["data"])
+	chunk_views[key] = view
+	if node_layer != null:
+		resource_nodes.append_array(ResourceNode.spawn_for_chunk(
+			node_layer, world.planet, item["data"], PlanetManager.active_summary()))
+
+
+func _on_chunk_unloaded(planet_id: String, coord: Vector2i) -> void:
+	if world == null or world.planet == null or planet_id != world.planet.planet_id:
+		return
+	var key := "%d,%d" % [coord.x, coord.y]
+	for i in range(_pending_chunks.size() - 1, -1, -1):
+		if _pending_chunks[i]["key"] == key:
+			_pending_chunks.remove_at(i)
+	if chunk_views.has(key):
+		(chunk_views[key] as Node).queue_free()
 		chunk_views.erase(key)
 	var prefix := "%d,%d:" % [coord.x, coord.y]
 	for n in resource_nodes.duplicate():
@@ -592,71 +1316,90 @@ func _on_chunk_unloaded(_planet_id: String, coord: Vector2i) -> void:
 			n.queue_free()
 
 
-# --- UI ---------------------------------------------------------------------------------------
+# --- HUD -------------------------------------------------------------------------
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
+	layer.name = "HUD"
+	layer.layer = 5
 	add_child(layer)
 
-	var camera := Camera2D.new()
-	camera.zoom = Vector2(1.3, 1.3)
-	add_child(camera)
-	set_meta("camera", camera)
-
-	_hud_panel = FxPanel.new(Color(0.4, 0.75, 1.0))
-	_hud_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_hud_panel = FxPanel.new(Color(0.40, 0.78, 1.0), 0.72)
 	_hud_panel.position = Vector2(12, 12)
+	_hud_panel.custom_minimum_size = Vector2(460, 0)
 	layer.add_child(_hud_panel)
 	var hud_margin := MarginContainer.new()
 	for side in ["left", "top", "right", "bottom"]:
-		hud_margin.add_theme_constant_override("margin_" + side, 8)
+		hud_margin.add_theme_constant_override("margin_" + side, 12)
 	_hud_panel.add_child(hud_margin)
-	var box := VBoxContainer.new()
-	hud_margin.add_child(box)
+	var hud_box := VBoxContainer.new()
+	hud_box.add_theme_constant_override("separation", 4)
+	hud_margin.add_child(hud_box)
 
 	_info = Label.new()
-	box.add_child(_info)
+	_info.add_theme_color_override("font_color", Color(0.90, 0.93, 0.98))
+	_info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_info.add_theme_constant_override("outline_size", 3)
+	_info.add_theme_font_size_override("font_size", 14)
+	hud_box.add_child(_info)
 
 	var hint := Label.new()
-	hint.text = "WASD move · Q scan · Space fight · C throw · Tab swap · E interact · P party · J ship · Esc menu"
-	hint.add_theme_color_override("font_color", Color(0.62, 0.64, 0.7))
-	box.add_child(hint)
+	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · M menu"
+	hint.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
+	hint.add_theme_font_size_override("font_size", 11)
+	hud_box.add_child(hint)
 
+	_target_panel = FxPanel.new(Color(1.0, 0.55, 0.45), 0.65)
+	_target_panel.position = Vector2(12, 118)
+	_target_panel.custom_minimum_size = Vector2(360, 0)
+	_target_panel.visible = false
+	layer.add_child(_target_panel)
+	var t_margin := MarginContainer.new()
+	for side in ["left", "top", "right", "bottom"]:
+		t_margin.add_theme_constant_override("margin_" + side, 10)
+	_target_panel.add_child(t_margin)
 	_target_bar = Label.new()
-	_target_bar.add_theme_font_size_override("font_size", 18)
-	_target_bar.add_theme_color_override("font_color", Color(1.0, 0.75, 0.7))
+	_target_bar.add_theme_font_size_override("font_size", 16)
+	_target_bar.add_theme_color_override("font_color", Color(1.0, 0.78, 0.72))
 	_target_bar.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	_target_bar.add_theme_constant_override("outline_size", 5)
-	_target_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_target_bar.position = Vector2(-180, 24)
-	layer.add_child(_target_bar)
+	_target_bar.add_theme_constant_override("outline_size", 3)
+	t_margin.add_child(_target_bar)
 
 	_prompt = Label.new()
-	_prompt.add_theme_font_size_override("font_size", 16)
-	_prompt.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
-	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_prompt.add_theme_font_size_override("font_size", 17)
+	_prompt.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
+	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.92))
 	_prompt.add_theme_constant_override("outline_size", 5)
 	_prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_prompt.position = Vector2(-240, -70)
+	_prompt.offset_left = -320
+	_prompt.offset_right = 320
+	_prompt.offset_top = -78
+	_prompt.offset_bottom = -42
+	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layer.add_child(_prompt)
 
-	var log_panel := FxPanel.new(Color(0.5, 0.55, 0.7))
+	var log_panel := FxPanel.new(Color(0.35, 0.55, 0.75), 0.78)
 	log_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	log_panel.position = Vector2(12, -150)
-	log_panel.custom_minimum_size = Vector2(520, 130)
+	log_panel.offset_left = 12
+	log_panel.offset_top = -168
+	log_panel.offset_right = 540
+	log_panel.offset_bottom = -12
 	layer.add_child(log_panel)
 	var log_margin := MarginContainer.new()
 	for side in ["left", "top", "right", "bottom"]:
-		log_margin.add_theme_constant_override("margin_" + side, 8)
+		log_margin.add_theme_constant_override("margin_" + side, 10)
 	log_panel.add_child(log_margin)
 	_log_label = RichTextLabel.new()
 	_log_label.bbcode_enabled = true
 	_log_label.scroll_following = true
+	_log_label.fit_content = false
+	_log_label.custom_minimum_size = Vector2(500, 120)
+	_log_label.add_theme_color_override("default_color", Color(0.82, 0.88, 0.94))
 	log_margin.add_child(_log_label)
 
 
 func _log(text: String) -> void:
-	if text.is_empty():
+	if text.is_empty() or _log_label == null:
 		return
 	_log_lines.append(text)
 	if _log_lines.size() > 40:
@@ -665,21 +1408,41 @@ func _log(text: String) -> void:
 
 
 func _update_info() -> void:
-	if world == null or player == null:
+	if world == null or player == null or session == null or _info == null:
 		return
-	var dex := session.discovery.totals()
+	var biome_name := "?"
+	var biome_id := world.biome_at(player.position)
+	if not biome_id.is_empty():
+		biome_name = String(PlanetGenerator.get_biome(biome_id).get("display_name", biome_id))
 	var leader := session.party.leader()
 	var leader_text := "no one able"
+	var culture_line := ""
+	var colony := CultureRegistry.get_culture("culture_colony")
+	if colony != null:
+		colony.ensure_nets()
+		var report: Array = colony.drive_report()
+		var lean := ""
+		if not report.is_empty() and report[0] is Dictionary:
+			lean = String(report[0].get("drive", ""))
+		culture_line = "\nclan %s · gen %d · %d lessons%s" % [
+			colony.display_name, colony.generation, colony.live.applies if colony.live != null else 0,
+			(" · " + lean) if not lean.is_empty() else ""]
+	var village_line := ""
+	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
+		var d_plaza := player.position.distance_to(settlement_runtime.center())
+		if d_plaza < 520.0:
+			village_line = "\n%s" % settlement_runtime.describe()
 	if leader != null:
 		leader_text = "%s   %d/%d hp" % [leader.display_name(),
 			int(leader.stats.hp), int(leader.stats.max_hp())]
-
-	_info.text = "%s   ·   %s\nleading: %s\nparty %d/%d · caught %d · dex %d species / %d worlds · salvage %.0f" % [
-		world.planet.display_name,
-		PlanetGenerator.get_biome(world.biome_at(player.position)).get("display_name", "?"),
+	var pos := player.position
+	var dex := session.discovery.totals()
+	var mass := session.stock.carried_mass()
+	var cap := session.stock.carry_capacity
+	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s" % [
+		world.planet.display_name, biome_name, pos.x, pos.y,
 		leader_text,
 		session.party.size(), session.party.party_limit(session.ship),
 		session.party.total_caught(),
-		dex["species"], dex["planets"], session.ship.salvage]
-
-	(get_meta("camera") as Camera2D).global_position = player.global_position
+		dex["species"], session.ship.salvage, mass, cap, session.jumps_made,
+		culture_line, village_line]

@@ -9,9 +9,10 @@ class_name Creature
 ## components they carry and what their genome says — never by subclassing
 ## Creature.
 ##
-## The named accessors below exist so components can reach each other readably
-## (`creature.stats.phenotype()`), which is worth far more than the purity of
-## forcing every lookup through a type query.
+## Unified stack (Pokimans culture + Godot colony):
+##   Perception + culture AI  (Odyssey)
+##   Combat / Work / Relationships / Audio  (colony + embodiment)
+## Components remain droppable by node name.
 
 ## Narrative identity. The one part of a creature that outlives its body.
 @export var identity: CreatureIdentityResource
@@ -25,11 +26,12 @@ var genetics: GeneticsComponent
 var epigenetics: EpigeneticsComponent
 var archetype: ArchetypeComponent
 var experience: ExperienceComponent
+var needs: NeedsComponent
+var stats: StatsComponent
+var perception: PerceptionComponent
 var work: WorkComponent
 var combat: CombatComponent
 var relationships: RelationshipComponent
-var needs: NeedsComponent
-var stats: StatsComponent
 var ai: AIController
 var visual: VisualController
 var audio: AudioController
@@ -37,10 +39,10 @@ var audio: AudioController
 ## Every component, in setup order, for the generic serialize/load walk.
 var _components: Array[CreatureComponent] = []
 
-## Mounting — data only, no physics coupling yet (Phase 6 owns real bodies).
-var mount_target: Creature = null   ## What I'm riding.
-var rider: Creature = null          ## Who's riding me.
-var player_controlled: bool = false ## True while under direct player command.
+## Mounting — data only (from Godot colony build).
+var mount_target: Creature = null
+var rider: Creature = null
+var player_controlled: bool = false
 
 var _registered: bool = false
 
@@ -71,22 +73,21 @@ func _collect_components() -> void:
 	epigenetics = get_node_or_null("Epigenetics") as EpigeneticsComponent
 	archetype = get_node_or_null("Archetype") as ArchetypeComponent
 	experience = get_node_or_null("Experience") as ExperienceComponent
+	needs = get_node_or_null("Needs") as NeedsComponent
+	stats = get_node_or_null("Stats") as StatsComponent
+	perception = get_node_or_null("Perception") as PerceptionComponent
 	work = get_node_or_null("Work") as WorkComponent
 	combat = get_node_or_null("Combat") as CombatComponent
 	relationships = get_node_or_null("Relationships") as RelationshipComponent
-	needs = get_node_or_null("Needs") as NeedsComponent
-	stats = get_node_or_null("Stats") as StatsComponent
 	ai = get_node_or_null("AI") as AIController
 	visual = get_node_or_null("Visual") as VisualController
 	audio = get_node_or_null("Audio") as AudioController
 
-	# Order matters: Stats must be assigned before Genetics.setup runs, because
-	# setting a genome invalidates the Stats cache. Assignment above already
-	# guarantees that; this list only fixes *setup* order.
+	# Order matters: Stats before Genetics.setup; Experience before Archetype;
+	# Perception before AI (culture arbitration senses through it).
 	_components.clear()
-	# Experience is set up before Archetype because Archetype reads it.
-	for c in [stats, genetics, epigenetics, experience, archetype, needs, work,
-			combat, relationships, ai, visual, audio]:
+	for c in [stats, genetics, epigenetics, experience, archetype, needs,
+			perception, work, combat, relationships, ai, visual, audio]:
 		if c != null:
 			_components.append(c)
 	for c in _components:
@@ -114,8 +115,6 @@ func _unregister(reason: String = "despawn") -> void:
 # --- Simulation ---------------------------------------------------------------
 
 func _on_day_passed(_day: int) -> void:
-	# Only fully-simulated creatures tick here. Everything coarser is driven by
-	# SimulationBudget's round-robin slices (Phase 4) or integrated on landing.
 	if SimulationBudget.lod_of(identity.uid) != AetherTypes.SimLOD.FULL:
 		return
 	tick_days(1.0)
@@ -137,16 +136,12 @@ func tick_days(days: float) -> void:
 	if archetype != null:
 		archetype.maybe_evaluate()
 	if ai != null:
-		# decide() rather than maybe_decide(): a whole day passing IS the
-		# decision cadence here, and the tick-gate would otherwise skip the
-		# rest/eat decision entirely during batched day integration.
-		ai.decide()
+		# Culture AI uses tick-gated maybe_decide for live frames; day
+		# integration still calls maybe_decide so the gate can fire once.
+		ai.maybe_decide()
 	_maybe_evaluate_story()
 
 
-## The story layer reads creature state on its own slow cadence rather than
-## being pushed to. Kept much slower than archetype evaluation: an archetype
-## changing is cheap, a narrative beat firing costs the player's attention.
 func _maybe_evaluate_story() -> void:
 	if experience == null or SimulationBudget.current_tick < _next_story_tick:
 		return
@@ -154,7 +149,7 @@ func _maybe_evaluate_story() -> void:
 	StoryDirector.evaluate_creature(self)
 
 
-# --- Mounting -------------------------------------------------------------
+# --- Mounting -----------------------------------------------------------------
 
 func mount(target: Creature) -> bool:
 	if target == null or target == self or mount_target != null or target.rider != null:
@@ -170,11 +165,12 @@ func dismount() -> void:
 		mount_target = null
 
 
-## Effective move speed accounting for a mount — the rider borrows the mount's
-## legs, not the other way round.
 func effective_move_speed() -> float:
-	return mount_target.stats.stat("move_speed") if mount_target != null \
-		else stats.stat("move_speed")
+	if mount_target != null and mount_target.stats != null:
+		return mount_target.stats.stat("move_speed")
+	if stats != null:
+		return stats.stat("move_speed")
+	return 1.0
 
 
 func display_name() -> String:
@@ -183,9 +179,6 @@ func display_name() -> String:
 
 # --- Serialization ------------------------------------------------------------
 
-## Complete, lossless snapshot: identity + every component's state.
-## This is what goes into a save, into a PlanetSummaryResource when the
-## creature is left behind, and across a jump.
 func to_dict() -> Dictionary:
 	var components := {}
 	for c in _components:
@@ -198,10 +191,6 @@ func to_dict() -> Dictionary:
 	}
 
 
-## Restore from a snapshot. Two-phase by contract: every component loads its own
-## data first, then every component gets post_load, at which point it is safe to
-## read the others (Stats resolving a phenotype needs Genetics and Epigenetics
-## to already be populated).
 func apply_dict(d: Dictionary) -> void:
 	identity = CreatureIdentityResource.from_dict(d.get("identity", {}))
 	home_planet_id = String(d.get("home_planet_id", ""))
@@ -218,8 +207,6 @@ func apply_dict(d: Dictionary) -> void:
 
 # --- Debug readout ------------------------------------------------------------
 
-## Full human-readable dump. This is the Phase 0 "inspect the data" surface and
-## the seed of the Phase 1 debug panel.
 func describe() -> Array[String]:
 	var lines: Array[String] = []
 	lines.append("=== %s ===" % display_name())
@@ -233,9 +220,9 @@ func describe() -> Array[String]:
 
 	var sections := {
 		"GENOME": genetics, "EPIGENETICS": epigenetics, "PHENOTYPE": stats,
-		"EXPERIENCE": experience, "ARCHETYPE": archetype, "WORK": work,
-		"RELATIONSHIPS": relationships, "NEEDS": needs,
-		"BEHAVIOUR": ai, "APPEARANCE": visual,
+		"EXPERIENCE": experience, "ARCHETYPE": archetype, "NEEDS": needs,
+		"PERCEPTION": perception, "WORK": work, "COMBAT": combat,
+		"RELATIONSHIPS": relationships, "BEHAVIOUR": ai, "APPEARANCE": visual,
 	}
 	for title in sections:
 		var component: CreatureComponent = sections[title]

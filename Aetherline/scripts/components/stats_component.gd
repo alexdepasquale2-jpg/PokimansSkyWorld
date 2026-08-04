@@ -21,6 +21,8 @@ class_name StatsComponent
 ## newborns silently spawn on 1 hp.
 @export var hp: float = 0.0
 @export var age_days: float = 0.0
+## Set while collapsed. Cleared by healing, resting or a stable's care.
+@export var downed: bool = false
 
 var _phenotype: Dictionary = {}
 var _derived: Dictionary = {}
@@ -163,10 +165,6 @@ func resolve_mortal_blow() -> bool:
 	return false
 
 
-## Set while collapsed. Cleared by healing, resting or a stable's care.
-@export var downed: bool = false
-
-
 func revive(fraction: float = 0.4) -> void:
 	downed = false
 	hp = maxf(hp, max_hp() * fraction)
@@ -193,8 +191,9 @@ func describe() -> Array[String]:
 
 	lines.append("")
 	var d := derived()
-	lines.append("  hp %.0f/%.0f · speed %.0f · atk %.1f · def %.1f · carry %.0f" % [
-		hp, d["max_hp"], d["move_speed"], d["attack_power"], d["defense"], d["carry_capacity"]])
+	lines.append("  hp %.0f/%.0f · speed %.0f · atk %.1f · def %.1f · carry %.0f%s" % [
+		hp, d["max_hp"], d["move_speed"], d["attack_power"], d["defense"], d["carry_capacity"],
+		" · DOWNED" if downed else ""])
 	lines.append("  age %.0f/%.0f days · comfort %.0f°C to %.0f°C" % [
 		age_days, d["max_age_days"], d["cold_floor_c"], d["heat_ceiling_c"]])
 	return lines

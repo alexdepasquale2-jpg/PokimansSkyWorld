@@ -5,7 +5,8 @@ class_name CombatSystem
 ## so a creature fights as what its genes+life+archetype made it, never as raw
 ## genome. All randomness goes through the caller's RNG for reproducibility.
 
-## Single attack. Returns {hit, damage, killed}.
+
+## Single attack. Returns {hit, damage, killed, downed?}.
 static func resolve_attack(attacker: Creature, defender: Creature,
 		rng: RandomNumberGenerator) -> Dictionary:
 	if defender.stats.hp <= 0.0:
@@ -40,10 +41,10 @@ static func resolve_attack(attacker: Creature, defender: Creature,
 
 ## Whichever creature is faster (attack_speed trait) strikes first; if that
 ## kills the other, no retaliation. Logs experience and fires bus signals so
-## the archetype/story layers see combat the same way anything else does.
+## the archetype/story/culture layers see combat the same way anything else does.
 static func fight_round(a: Creature, b: Creature, rng: RandomNumberGenerator) -> Array:
 	var order := [a, b] if a.stats.trait_value(&"attack_speed") \
-		>= b.stats.trait_value(&"attack_speed") else [b, a]
+			>= b.stats.trait_value(&"attack_speed") else [b, a]
 	var log: Array = []
 	for i in 2:
 		var attacker: Creature = order[i]
@@ -78,6 +79,7 @@ static func fight_round(a: Creature, b: Creature, rng: RandomNumberGenerator) ->
 ## Attack `primary_target`, but let a Guardian-biased ally intercept. This is
 ## the mechanism that feeds protect_ally/damage_absorbed_for_ally — combat is
 ## where the Guardian archetype actually earns itself.
+## Relationships component is optional; main may not carry it.
 static func attack_with_protection(attacker: Creature, primary_target: Creature,
 		allies: Array, rng: RandomNumberGenerator) -> Dictionary:
 	var actual := primary_target
@@ -109,8 +111,7 @@ static func attack_with_protection(attacker: Creature, primary_target: Creature,
 			actual.experience.log_event("combat_loss", 1.0)
 			EventBus.creature_died.emit(actual.identity.uid, "combat", SimulationBudget.current_tick)
 			if actual != primary_target:
-				# The protector died doing its job — the sharpest possible
-				# Guardian shatter trigger, and the sharpest possible tragedy.
+				# The protector died doing its job — Guardian shatter / tragedy hook.
 				var lineage := StoryDirector.get_lineage(actual.identity.lineage_id)
 				if lineage != null:
 					lineage.add_event(SimulationBudget.current_tick, PlanetManager.active_planet_id,

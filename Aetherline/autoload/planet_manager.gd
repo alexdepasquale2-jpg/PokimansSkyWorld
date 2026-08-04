@@ -67,13 +67,14 @@ func create_planet(seed_value: int = 0) -> PlanetSeedResource:
 
 ## Runs the deterministic derivation pass (orbit -> climate -> biomes ->
 ## resources -> hazards -> ruins -> fauna) and caches the results on the seed.
-## TODO(phase 3): implement in scripts/generators/planet_generator.gd and call
-## it from here. Idempotent by contract: calling twice must change nothing.
+## Idempotent by contract: calling twice must change nothing.
 func derive_planet(planet_id: String) -> PlanetSeedResource:
 	var planet: PlanetSeedResource = known_planets.get(planet_id)
 	if planet == null:
 		push_error("PlanetManager.derive_planet: unknown planet '%s'" % planet_id)
 		return null
+	if planet.derived:
+		return planet
 	return PlanetGenerator.derive(planet)
 
 
@@ -167,13 +168,8 @@ func depart(carried_uids: Array, serializer: Callable = Callable()) -> void:
 	EventBus.planet_departed.emit(planet_id, left_behind)
 
 
-## Integrate `days` of absence over creatures left behind, WITHOUT inflating
-## them into scene nodes. Everything that happens to a dormant creature is
-## closed-form — ageing, epigenetic decay under continued planetary pressure,
-## needs draining, and death — so a decade away costs one pass over a list of
-## dictionaries rather than a decade of simulation.
-##
-## Returns the survivors. The dead are removed and mourned.
+## Integrate `days` of absence over creatures left behind without inflating
+## scene nodes. Closed-form ageing, pressure, and attrition.
 func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
 	var planet: PlanetSeedResource = get_planet(planet_id)
 	var pressures: Dictionary = planet.epigenetic_pressures if planet != null else {}
@@ -184,8 +180,6 @@ func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
 		var stats: Dictionary = components.get("Stats", {})
 		var identity: Dictionary = data.get("identity", {})
 
-		# Ageing. A creature left behind can simply die of old age while away,
-		# which is one of the sharper consequences the jump system can carry.
 		var age := float(stats.get("age_days", 0.0)) + days
 		stats["age_days"] = age
 
@@ -195,8 +189,6 @@ func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
 		for mark in marks:
 			var stability := float(mark.get("stability", 0.5))
 			var strength := float(mark.get("strength", 0.0)) - 0.02 * (1.0 - stability) * days
-			# Continued exposure holds a mark up against its own decay — which
-			# is why a world's signature deepens in the lines that stay on it.
 			var pressure := float(pressures.get(String(mark.get("definition_id", "")), 0.0))
 			if pressure > 0.0:
 				strength = minf(1.0, strength + pressure * days * 0.01)
@@ -206,7 +198,6 @@ func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
 				surviving_marks.append(mark)
 		profile["marks"] = surviving_marks
 
-		# New marks the world pressed onto them while nobody was watching.
 		for definition_id in pressures:
 			if _has_mark(surviving_marks, String(definition_id)):
 				continue
@@ -221,9 +212,6 @@ func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
 
 		var needs: Dictionary = components.get("Needs", {})
 		var health := float(needs.get("health", 1.0))
-		# Unattended creatures forage for themselves; how well depends on the
-		# world. A hostile planet quietly kills what you abandon on it —
-		# UNLESS it was boarded at a stable, which is what that service buys.
 		if bool(data.get("boarded", false)):
 			health = minf(1.0, health + days * 0.002)
 			needs["hunger"] = 1.0

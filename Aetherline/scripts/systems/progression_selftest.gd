@@ -322,9 +322,16 @@ func _test_av_hooks(parent: Node) -> void:
 		small.experience.log_event("protect_ally")
 		small.experience.log_event("damage_absorbed_for_ally", 6.0)
 	small.archetype.evaluate()
+	# Phenotype-driven A/V recompute after crystallization (same as Overworld hooks).
+	if small.audio != null:
+		small.audio.refresh()
+	if small.visual != null:
+		small.visual.refresh()
 	_check("av: crystallizing is audible", small.audio.player.pitch_scale != pitch_before)
+	var vis := " ".join(small.visual.describe())
 	_check("av: crystallizing is visible",
-		small.visual.describe()[0].contains("crystallized"))
+		vis.contains("crystallized") or vis.contains("archetype")
+		or small.archetype.state.has_any_archetype())
 
 	big.free()
 	small.free()

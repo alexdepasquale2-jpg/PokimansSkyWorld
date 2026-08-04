@@ -2,8 +2,8 @@ extends CreatureComponent
 class_name CombatComponent
 
 ## Live, in-world combat state — cooldowns and range, not resolution logic.
-## Resolution still goes through CombatSystem (Phase 4); this is what lets that
-## same resolver run continuously while creatures walk around instead of in
+## Resolution still goes through CombatSystem; this is what lets that same
+## resolver run continuously while creatures walk around instead of in
 ## discrete resolved-instantly rounds.
 
 @export var attack_cooldown_max: float = 1.1  ## Seconds between attacks.

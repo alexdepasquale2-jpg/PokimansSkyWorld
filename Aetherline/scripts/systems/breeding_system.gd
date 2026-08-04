@@ -158,6 +158,9 @@ static func _conceive(sire: Creature, gestator: Creature, parent_node: Node,
 		# Offspring join the gestating parent's bloodline by default. Lineages
 		# follow the maternal line because the cytoplasmic chromosome does.
 		"lineage_id": opts.get("lineage_id", String(gestator.identity.lineage_id)),
+		# And the gestating parent's people, for the same reason: a child is
+		# raised by whoever carried it, and culture is transmitted by raising.
+		"culture_id": opts.get("culture_id", String(gestator.identity.culture_id)),
 	}, rng)
 
 	child.identity.parent_uids = [String(sire.identity.uid), String(gestator.identity.uid)]
@@ -234,6 +237,13 @@ static func _announce_birth(child: Creature, sire: Creature, gestator: Creature,
 	if lineage != null:
 		lineage.record_birth(String(child.identity.uid), child.identity.generation)
 		lineage.note_planet(child.identity.birth_planet_id)
+
+	# The clan's culture learns that it has a new generation. Consolidation is
+	# triggered from here rather than scheduled: a generation advance is
+	# something a people does by living long enough, not something a system does
+	# to them on a timer.
+	var culture := CultureRegistry.culture_for(child)
+	CultureRegistry.note_birth(culture.culture_id, child.identity.generation)
 
 	# A birth that carried a mutation is worth remembering; an ordinary one is
 	# worth counting. The story layer needs both, weighted differently.

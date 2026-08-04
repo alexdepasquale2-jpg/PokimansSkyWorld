@@ -14,11 +14,21 @@ var _verbose_tests: bool = OS.get_cmdline_user_args().has("--verbose-tests")
 @onready var _creature_root: Node2D = $CreatureRoot
 
 var _lines: Array[String] = []
+var _ticker: CultureTicker = null
 
 
 func _ready() -> void:
 	_head("AETHERLINE — Phase 0")
 	_out("Godot %s" % Engine.get_version_info()["string"])
+
+	# CultureRegistry is a static class with no _ready of its own, and SaveSystem
+	# only calls providers that registered before a load runs. Installing it here
+	# is what makes the culture section loadable at all — see the hazard note in
+	# culture_registry.gd.
+	CultureRegistry.install(20260803)
+	_ticker = CultureTicker.new()
+	_ticker.enabled = false  # The suites drive decisions explicitly.
+	add_child(_ticker)
 
 	_section("Autoloads")
 	_out(GenomeDB.debug_summary())
@@ -56,28 +66,28 @@ func _ready() -> void:
 		for line in archetype_tests.chronicle:
 			_out(line)
 
-	_section("World self-test  (generation · streaming · pressure · jumps)")
-	var world_tests := WorldSelfTest.new()
-	_report(world_tests.run(_creature_root))
-	if not world_tests.atlas.is_empty():
+	_section("Culture self-test  (shared network · transmission · inheritance)")
+	var culture_tests := CultureSelfTest.new()
+	_report(culture_tests.run(_creature_root))
+	if not culture_tests.stats.is_empty():
 		_out("")
-		_out("  sample worlds:")
-		for line in world_tests.atlas:
+		_out("  measured:")
+		for line in culture_tests.stats:
 			_out(line)
 
-	_section("Combat + utility self-test  (fight · protect · capture · mount · work · terrain)")
+	_section("Combat self-test")
 	_report(CombatSelfTest.new().run(_creature_root))
 
-	_section("Colony self-test  (building · research · relationships · needs · colony story)")
-	_report(ColonySelfTest.new().run(_creature_root))
-
-	_section("Progression self-test  (economy · legacy · save · LOD · A/V hooks)")
-	_report(ProgressionSelfTest.new().run(_creature_root))
-
-	_section("Catching self-test  (odds · throw · party · full loop)")
+	_section("Catching self-test  (party · ship · discovery · catch · session)")
 	_report(CatchingSelfTest.new().run(_creature_root))
 
-	_section("Gameplay loop self-test  (colony · harvest · survive · breed · jump · save)")
+	_section("Colony self-test  (building · research · relationships · work)")
+	_report(ColonySelfTest.new().run(_creature_root))
+
+	_section("Progression self-test  (economy · legacy · upgrades · A/V hooks)")
+	_report(ProgressionSelfTest.new().run(_creature_root))
+
+	_section("Gameplay loop self-test  (colony · harvest · jump · save)")
 	_report(GameplaySelfTest.new().run(_creature_root))
 
 	_section("Genome lab panel  (debug UI smoke test)")
@@ -92,6 +102,27 @@ func _ready() -> void:
 		_out("  FAIL · " + problem)
 	lab.queue_free()
 
+	_section("Culture lab panel  (debug UI smoke test)")
+	var culture_lab: CultureLab = load("res://scenes/ui/culture_lab.tscn").instantiate()
+	culture_lab.visible = false
+	add_child(culture_lab)
+	var culture_lab_problems := culture_lab.run_smoke_test()
+	_out("%d passed, %d failed%s" % [
+		1 if culture_lab_problems.is_empty() else 0, culture_lab_problems.size(),
+		"" if culture_lab_problems.is_empty() else "   <<< ATTENTION"])
+	for problem in culture_lab_problems:
+		_out("  FAIL · " + problem)
+	culture_lab.queue_free()
+
+	_section("World self-test  (planet derive · chunk streaming)")
+	var world_tests := WorldSelfTest.new()
+	_report(world_tests.run(_creature_root))
+	if not world_tests.atlas.is_empty():
+		_out("")
+		_out("  sample atlas:")
+		for line in world_tests.atlas:
+			_out(line)
+
 	if creature_tests.showcase != null:
 		_section("Reloaded creature — full readout")
 		for line in creature_tests.showcase.describe():
@@ -103,41 +134,23 @@ func _ready() -> void:
 
 ## Hand-off into the interactive Phase 1 tool.
 func _add_lab_button() -> void:
-	var lab := Button.new()
-	lab.text = "Open Genome Lab  ->"
-	lab.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	lab.position = Vector2(-200, -34)
-	lab.custom_minimum_size = Vector2(180, 0)
-	lab.pressed.connect(func():
+	var button := Button.new()
+	button.text = "Open Genome Lab  ->"
+	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	button.position = Vector2(-400, -4)
+	button.custom_minimum_size = Vector2(180, 0)
+	button.pressed.connect(func():
 		get_tree().change_scene_to_file("res://scenes/ui/genome_lab.tscn"))
-	add_child(lab)
+	add_child(button)
 
-	var world := Button.new()
-	world.text = "Open World  ->"
-	world.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	world.position = Vector2(-200, 0)
-	world.custom_minimum_size = Vector2(180, 0)
-	world.pressed.connect(func():
-		get_tree().change_scene_to_file("res://scenes/world/overworld.tscn"))
-	add_child(world)
-
-	var menu := Button.new()
-	menu.text = "<-  Main Menu"
-	menu.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	menu.position = Vector2(-200, -68)
-	menu.custom_minimum_size = Vector2(180, 0)
-	menu.pressed.connect(func():
-		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn"))
-	add_child(menu)
-
-	var lineage := Button.new()
-	lineage.text = "Lineages  ->"
-	lineage.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	lineage.position = Vector2(-200, 34)
-	lineage.custom_minimum_size = Vector2(180, 0)
-	lineage.pressed.connect(func():
-		get_tree().change_scene_to_file("res://scenes/ui/lineage_panel.tscn"))
-	add_child(lineage)
+	var culture_button := Button.new()
+	culture_button.text = "Open Culture Lab  ->"
+	culture_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	culture_button.position = Vector2(-200, -4)
+	culture_button.custom_minimum_size = Vector2(180, 0)
+	culture_button.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/ui/culture_lab.tscn"))
+	add_child(culture_button)
 
 
 func _report(result: Dictionary) -> void:

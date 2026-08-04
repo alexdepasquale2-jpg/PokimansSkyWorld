@@ -31,7 +31,7 @@ func add_local(res_id, qty: float) -> void:
 
 
 ## Spends from local first, then the hold. Returns false and changes nothing
-## if the total is insufficient — partial spends would corrupt recipe atomicity.
+## if the total is insufficient ΓÇö partial spends would corrupt recipe atomicity.
 func spend(costs: Dictionary) -> bool:
 	for res_id in costs:
 		if amount(res_id) < float(costs[res_id]):
@@ -64,8 +64,23 @@ func load_for_travel(res_id, qty: float) -> float:
 	if moved <= 0.0:
 		return 0.0
 	local[key] = float(local[key]) - moved
+	if local[key] <= 0.001:
+		local.erase(key)
 	carried[key] = float(carried.get(key, 0.0)) + moved
 	return moved
+
+
+## Move goods out of the hold onto the active planet (manual cargo manage).
+func unload_from_hold(res_id, qty: float) -> float:
+	var key := String(res_id)
+	var available := minf(qty, float(carried.get(key, 0.0)))
+	if available <= 0.0:
+		return 0.0
+	carried[key] = float(carried[key]) - available
+	if carried[key] <= 0.001:
+		carried.erase(key)
+	add_local(key, available)
+	return available
 
 
 ## On landing, the hold spills onto the new world's local pile.
@@ -73,6 +88,26 @@ func unload_on_arrival() -> void:
 	for res_id in carried:
 		add_local(res_id, float(carried[res_id]))
 	carried.clear()
+
+
+## All non-zero lines for UI lists: [{id, local, carried, total}, ...]
+func lines(include_empty: bool = false) -> Array:
+	var keys: Dictionary = {}
+	for k in local:
+		keys[String(k)] = true
+	for k in carried:
+		keys[String(k)] = true
+	var out: Array = []
+	var sorted: Array = keys.keys()
+	sorted.sort()
+	for key in sorted:
+		var loc := float(local.get(key, 0.0))
+		var car := float(carried.get(key, 0.0))
+		if not include_empty and loc + car <= 0.001:
+			continue
+		out.append({"id": key, "local": loc, "carried": car, "total": loc + car})
+	return out
+
 
 
 ## Anything still local when the player jumps stays behind, on that planet.

@@ -66,6 +66,24 @@ signal story_event_fired(event: Dictionary)
 signal notification_raised(text: String, severity: float, uid: StringName)
 
 
+# --- Culture -------------------------------------------------------------------
+#
+# All three are event-shaped and rate-limited at the emitter. RULE 3 above is the
+# reason the learning update itself emits NOTHING: gradients are applied several
+# times a second at population scale, and a bus carrying that would be a bus
+# nobody could read. What crosses here is only "the clan changed its mind",
+# which is a thing worth narrating.
+
+## A drive's clan-wide strength moved materially. Throttled: at most once per
+## CultureRewardRouter.SHIFT_INTERVAL applies, and only past a real threshold.
+signal culture_shifted(culture_id: String, drive_id: String, delta: float)
+## A generation consolidated. `retained` is the measured correlation between the
+## clan's policy before and after — how much of the old people survived.
+signal culture_generation_advanced(culture_id: String, generation: int, retained: float)
+## A clan split off from another and took a copy of its culture with it.
+signal culture_forked(parent_culture_id: String, child_culture_id: String, reason: String)
+
+
 # --- World & travel -----------------------------------------------------------
 
 signal planet_generated(planet_id: String, seed: int)

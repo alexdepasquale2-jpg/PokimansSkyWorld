@@ -8,7 +8,7 @@ class_name PlanetGenerator
 ## never shift which biomes or fauna a previously-visited world had. That is the
 ## only reason a save can store a bare seed and trust it.
 ##
-## Stages run in causal order — a planet's climate follows from its star and
+## Stages run in causal order â€” a planet's climate follows from its star and
 ## orbit, its biomes from its climate, its hazards from its geology, and the
 ## epigenetic pressure it exerts from all of it.
 
@@ -141,7 +141,7 @@ static func _resources(p: PlanetSeedResource) -> void:
 	var rng := p.rng_for("resources")
 	var abundance := {}
 	# Resource availability is the union of what the present biomes offer,
-	# scaled by geology — a tectonically dead world is metal-poor.
+	# scaled by geology â€” a tectonically dead world is metal-poor.
 	for id in p.biome_weights:
 		for key in (get_biome(id).get("resources", {}) as Dictionary):
 			abundance[key] = maxf(float(abundance.get(key, 0.0)),
@@ -189,7 +189,7 @@ static func _fauna(p: PlanetSeedResource) -> void:
 	p.fauna_species_count = maxi(0, int(round(liveable * rng.randf_range(4.0, 14.0))))
 	p.fauna_divergence = clampf((1.0 - liveable) * 0.8 + rng.randf_range(0.0, 0.25), 0.0, 1.0)
 	# Radiation and stellar hardness raise the mutation rate for anything
-	# conceived here — the reason a geneticist might deliberately settle a
+	# conceived here â€” the reason a geneticist might deliberately settle a
 	# world nobody sane would.
 	p.mutation_rate_modifier = clampf(
 		0.6 + float(p.hazard_profile.get("radiation", 0.0)) * 3.0
@@ -226,6 +226,10 @@ static func _habitability(p: PlanetSeedResource) -> void:
 	p.habitability = clampf(_liveability(p) - hazard_load * 0.08, 0.0, 1.0)
 
 
+static func liveability(p: PlanetSeedResource) -> float:
+	return _liveability(p)
+
+
 static func _liveability(p: PlanetSeedResource) -> float:
 	var temperature := _band_fit(p.mean_temperature_c, -25.0, 40.0, 30.0)
 	var air := _band_fit(p.atmosphere_density, 0.4, 2.5, 0.4)
@@ -237,10 +241,21 @@ static func _liveability(p: PlanetSeedResource) -> float:
 
 # --- Naming -------------------------------------------------------------------
 
-const _SYLLABLES := ["Kel", "Ard", "Vos", "Thal", "Mire", "Sethe", "Orun", "Bask",
-	"Cind", "Ryn", "Hollow", "Vale", "Aster", "Grym", "Nix", "Peleth"]
+const _SYLLABLES_A := ["Kel", "Ard", "Vos", "Thal", "Mire", "Sethe", "Orun", "Bask",
+	"Cind", "Ryn", "Nix", "Peleth", "Iri", "Sael", "Tor", "Venn"]
+const _SYLLABLES_B := ["hollow", "vale", "reach", "spire", "mere", "fall", "wound",
+	"cradle", "march", "rift", "wake", "shoal", "crown", "ash", "bloom", "dusk"]
 
 static func name_for(seed_value: int) -> String:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value ^ hash("name")
-	return "%s-%d" % [_SYLLABLES[rng.randi() % _SYLLABLES.size()], rng.randi_range(2, 99)]
+	# Odyssey-style place names: spoken, not serial numbers.
+	if rng.randf() < 0.55:
+		return "%s%s" % [
+			_SYLLABLES_A[rng.randi() % _SYLLABLES_A.size()],
+			_SYLLABLES_B[rng.randi() % _SYLLABLES_B.size()],
+		]
+	return "%s-%s" % [
+		_SYLLABLES_A[rng.randi() % _SYLLABLES_A.size()],
+		_SYLLABLES_A[rng.randi() % _SYLLABLES_A.size()].to_lower(),
+	]

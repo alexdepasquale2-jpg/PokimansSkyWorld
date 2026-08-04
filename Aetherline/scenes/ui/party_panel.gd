@@ -1,224 +1,155 @@
 extends Control
 class_name PartyPanel
 
-## Your team and everything on the ship.
-##
-## Also the ONLY place the genetics simulation surfaces. A player who never
-## opens this screen still has a complete game; a player who does finds the
-## whole depth — traits, what an animal is hiding, what it's turning into.
-## That is the deal: complexity is available, never mandatory.
+## Party roster with instrument-plate chrome. Full genetics stay in Genome Lab;
+## this is the in-field glance that keeps the Odyssey loop moving.
+
+const ACCENT := Color(0.55, 0.85, 0.95)
 
 var session: GameSession
-var _owner_scene: Node
-var _party_list: ItemList
-var _stored_list: ItemList
-var _detail: RichTextLabel
-var _frame: FxPanel
+var _list: ItemList
+var _detail: Label
+var _title: Label
+var _panel: FxPanel
 
 
 func _ready() -> void:
-	_build_ui()
+	_build()
 	visible = false
 
 
-func open(game_session: GameSession, owner_scene: Node) -> void:
+func open(game_session: GameSession, _owner_scene: Node = null) -> void:
 	session = game_session
-	_owner_scene = owner_scene
 	visible = true
 	_refresh()
+	if _panel != null:
+		_panel.flash(0.45)
+	modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_property(self, "modulate:a", 1.0, 0.18)
 
 
-func _build_ui() -> void:
+func close() -> void:
+	visible = false
+
+
+func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.03, 0.05, 0.62)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed:
+			close())
+	add_child(dim)
+
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	_frame = FxPanel.new(Color(0.45, 0.8, 0.95))
-	_frame.custom_minimum_size = Vector2(880, 520)
-	center.add_child(_frame)
+	_panel = FxPanel.new(ACCENT, 0.9)
+	_panel.custom_minimum_size = Vector2(460, 400)
+	center.add_child(_panel)
+
 	var margin := MarginContainer.new()
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 16)
-	_frame.add_child(margin)
+	_panel.add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", 10)
 	margin.add_child(root)
 
-	var title := Label.new()
-	title.text = "PARTY"
-	title.add_theme_font_size_override("font_size", 24)
-	root.add_child(title)
+	_title = Label.new()
+	_title.text = "BLOODLINE  ·  PARTY"
+	_title.add_theme_font_size_override("font_size", 22)
+	_title.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
+	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	_title.add_theme_constant_override("outline_size", 3)
+	root.add_child(_title)
 
-	var split := HSplitContainer.new()
-	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(split)
+	var sub := Label.new()
+	sub.text = "Those who walk with you shape the culture. The rest wait on the ship."
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.add_theme_font_size_override("font_size", 12)
+	sub.add_theme_color_override("font_color", Color(0.65, 0.72, 0.82))
+	root.add_child(sub)
 
-	var lists := VBoxContainer.new()
-	lists.custom_minimum_size.x = 320
-	split.add_child(lists)
+	_list = ItemList.new()
+	_list.custom_minimum_size = Vector2(0, 210)
+	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_list.add_theme_color_override("font_color", Color(0.88, 0.9, 0.95))
+	_list.add_theme_color_override("font_selected_color", Color(0.45, 0.95, 1.0))
+	_list.item_selected.connect(_on_selected)
+	root.add_child(_list)
 
-	lists.add_child(_titled("With you"))
-	_party_list = ItemList.new()
-	_party_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_party_list.item_selected.connect(func(i): _show_party(i))
-	lists.add_child(_party_list)
+	_detail = Label.new()
+	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail.add_theme_color_override("font_color", Color(0.75, 0.82, 0.90))
+	_detail.add_theme_font_size_override("font_size", 13)
+	root.add_child(_detail)
 
-	lists.add_child(_titled("On the ship"))
-	_stored_list = ItemList.new()
-	_stored_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_stored_list.item_selected.connect(func(i): _show_stored(i))
-	lists.add_child(_stored_list)
+	var close_btn := FxButton.new(Color(0.7, 0.5, 0.5))
+	close_btn.text = "Close  (P / Esc)"
+	close_btn.custom_minimum_size = Vector2(0, 40)
+	close_btn.pressed.connect(close)
+	root.add_child(close_btn)
 
-	var scroll := ScrollContainer.new()
-	split.add_child(scroll)
-	_detail = RichTextLabel.new()
-	_detail.bbcode_enabled = true
-	_detail.fit_content = true
-	_detail.scroll_active = false
-	_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_detail)
-
-	var buttons := HBoxContainer.new()
-	root.add_child(buttons)
-	_add_button(buttons, "Send to ship", Color(0.6, 0.6, 0.7), _deposit_selected)
-	_add_button(buttons, "Bring out", Color(0.4, 0.85, 0.55), _withdraw_selected)
-	_add_button(buttons, "Close", Color(0.6, 0.6, 0.68), func(): visible = false)
-
-
-func _titled(text: String) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_color_override("font_color", Color(0.6, 0.78, 0.9))
-	return label
-
-
-func _add_button(parent: Node, text: String, accent: Color, handler: Callable) -> void:
-	var b := FxButton.new(accent)
-	b.text = text
-	b.custom_minimum_size = Vector2(150, 34)
-	b.pressed.connect(handler)
-	parent.add_child(b)
-
-
-# --- Contents ------------------------------------------------------------------------
 
 func _refresh() -> void:
-	_party_list.clear()
+	if session == null or _list == null:
+		return
+	_list.clear()
 	for entry in session.party.active:
 		var c: Creature = entry
 		if not is_instance_valid(c):
 			continue
-		_party_list.add_item("%s   %d/%d hp%s" % [c.display_name(),
-			int(c.stats.hp), int(c.stats.max_hp()),
-			"   DOWNED" if c.stats.downed else ""])
-
-	_stored_list.clear()
-	for data in session.party.stored:
-		var identity: Dictionary = data.get("identity", {})
-		_stored_list.add_item(String(identity.get("given_name", "?")))
-
+		var hp_frac := c.stats.hp_fraction() if c.stats != null else 0.0
+		var bars := int(round(hp_frac * 10.0))
+		var bar := "█".repeat(bars) + "░".repeat(10 - bars)
+		var down := "  · DOWNED" if c.stats != null and c.stats.downed else ""
+		var human := " · human" if c.identity != null and c.identity.is_human else ""
+		_list.add_item("%s   [%s]  %d/%d%s%s" % [
+			c.display_name(), bar,
+			int(c.stats.hp) if c.stats else 0,
+			int(c.stats.max_hp()) if c.stats else 0,
+			down, human])
+		var idx := _list.item_count - 1
+		if c.stats != null and c.stats.downed:
+			_list.set_item_custom_fg_color(idx, Color(1.0, 0.45, 0.4))
+		elif hp_frac < 0.35:
+			_list.set_item_custom_fg_color(idx, Color(1.0, 0.75, 0.4))
+		else:
+			_list.set_item_custom_fg_color(idx, Color(0.7, 0.95, 0.8))
 	if not session.party.active.is_empty():
-		_party_list.select(0)
-		_show_party(0)
+		_list.select(0)
+		_on_selected(0)
+	else:
+		_detail.text = "No party members. Catch, gift, or breed a companion."
+	var stored_n := session.party.stored.size()
+	if stored_n > 0:
+		_detail.text = (_detail.text + "\n%d resting on the ship." % stored_n).strip_edges()
 
 
-func _show_party(index: int) -> void:
-	if index < 0 or index >= session.party.active.size():
+func _on_selected(index: int) -> void:
+	if session == null or index < 0 or index >= session.party.active.size():
 		return
 	var c: Creature = session.party.active[index]
 	if not is_instance_valid(c):
 		return
-
-	var lines: Array[String] = []
-	lines.append("[b]%s[/b]" % c.display_name())
-	lines.append("[color=#9a9aa5]%s · generation %d · born on %s[/color]" % [
-		DiscoverySystem.describe_species(c.genetics.genome),
-		c.identity.generation,
-		c.identity.birth_planet_name if not c.identity.birth_planet_name.is_empty()
-			else "somewhere"])
-	lines.append("")
-
-	var d := c.stats.derived()
-	lines.append("  hp        %d / %d" % [int(c.stats.hp), int(d["max_hp"])])
-	lines.append("  attack    %.1f" % d["attack_power"])
-	lines.append("  defense   %.1f" % d["defense"])
-	lines.append("  speed     %.0f" % d["move_speed"])
-
-	# Archetype — the closest thing this game has to an evolution.
-	var becoming := ""
-	var best := 0.0
-	for archetype_id in c.archetype.state.progress:
-		if c.archetype.state.is_crystallized(archetype_id):
-			var crystal: ArchetypeDefinitionResource = GenomeDB.get_archetype(archetype_id)
-			lines.append("")
-			lines.append("[color=#ffd98a]** %s **[/color]" % crystal.display_name)
-			lines.append("[color=#9a9aa5]%s[/color]" % crystal.description)
-			becoming = ""
-			break
-		var p := c.archetype.state.get_progress(archetype_id)
-		if p > best:
-			best = p
-			var definition: ArchetypeDefinitionResource = GenomeDB.get_archetype(archetype_id)
-			becoming = definition.display_name if definition != null else String(archetype_id)
-	if not becoming.is_empty() and best > 0.15:
-		lines.append("")
-		lines.append("[color=#c9a7ff]becoming %s — %d%%[/color]" % [becoming, int(best * 100.0)])
-
-	# The hidden half. Gated on the ship's bio-sensor, so upgrading it visibly
-	# opens up the breeding game.
-	lines.append("")
-	if session.ship.reveal_depth() >= 2:
-		var hidden := PhenotypeResolver.hidden_carriers(c.genetics.genome)
-		lines.append("[b]CARRIES[/b]")
-		if hidden.is_empty():
-			lines.append("  nothing hidden")
-		for h in hidden.slice(0, 6):
-			lines.append("  %s (%s)" % [h["name"], h["reason"]])
-	else:
-		lines.append("[color=#8a8a95]Upgrade the Bio-Sensor to read what it carries.[/color]")
-
-	# Epigenetic marks are flavour here and nowhere else — never narrated at
-	# the player in the world log.
-	if not c.epigenetics.profile.marks.is_empty():
-		lines.append("")
-		lines.append("[b]SHAPED BY[/b]")
-		for mark in c.epigenetics.profile.marks:
-			lines.append("  %s" % mark.display_name)
-
-	_detail.text = "\n".join(lines)
-
-
-func _show_stored(index: int) -> void:
-	if index < 0 or index >= session.party.stored.size():
-		return
-	var data: Dictionary = session.party.stored[index]
-	var identity: Dictionary = data.get("identity", {})
-	_detail.text = "[b]%s[/b]\n\n[color=#9a9aa5]Held on the ship. Bring it out to see more.[/color]" \
-		% identity.get("given_name", "?")
-
-
-# --- Actions -------------------------------------------------------------------------
-
-func _deposit_selected() -> void:
-	var selected := _party_list.get_selected_items()
-	if selected.is_empty() or session.party.active.size() <= 1:
-		return
-	session.party.deposit(session.party.active[selected[0]])
-	_frame.flash(0.5)
-	_refresh()
-
-
-func _withdraw_selected() -> void:
-	var selected := _stored_list.get_selected_items()
-	if selected.is_empty():
-		return
-	if not session.party.has_room(session.ship):
-		_detail.text = "[color=#ff9a9a]Party is full. Send one to the ship first,\nor upgrade the Habitat Ring.[/color]"
-		return
-	var brought := session.party.withdraw(selected[0], _owner_scene, session.ship)
-	if brought != null:
-		brought.position = _owner_scene.player.position
-		_frame.flash(0.6)
-	_refresh()
+	var d := c.stats.derived() if c.stats != null else {}
+	var ph := c.stats.phenotype() if c.stats != null else {}
+	var arch := ""
+	if c.archetype != null and c.archetype.state != null and c.archetype.state.has_any_archetype():
+		for archetype_id in c.archetype.state.progress:
+			if c.archetype.state.is_crystallized(archetype_id):
+				var def: ArchetypeDefinitionResource = GenomeDB.get_archetype(archetype_id)
+				arch = " · %s" % (def.display_name if def != null else String(archetype_id))
+				break
+	_detail.text = "%s · size %.1f · atk %.1f · def %.1f · spd %.0f%s" % [
+		c.display_name(),
+		float(ph.get("size", 1.0)),
+		float(d.get("attack_power", 0.0)),
+		float(d.get("defense", 0.0)),
+		float(d.get("move_speed", 0.0)),
+		arch]
