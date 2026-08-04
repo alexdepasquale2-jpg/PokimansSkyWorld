@@ -129,6 +129,39 @@ static func note_birth(culture_id: String, child_generation: int) -> void:
 			float(living_members(culture.culture_id)))
 
 
+## Gradient applications a clan lives through between generations.
+##
+## Roughly a generation every forty batches of sixteen experiences. The number is
+## a guess; the *shape* is not — see `press_generation` for what happens when this
+## is asked as a level rather than an edge.
+const APPLIES_PER_GENERATION: int = 40
+
+
+## Living long enough turns a generation over. Returns true if one did.
+##
+## EDGE-TRIGGERED, AND THAT IS THE ENTIRE POINT. The rule this replaces lived
+## inline in SettlementRuntime and asked `live.applies % 40 == 0` — a level, not
+## an edge. An apply lands only every sixteen accumulated gradients, so that
+## condition stays true across every check in between, and village life checks it
+## once per lesson. Measured over three in-game years of a competent campaign it
+## turned 7,086 generations against an intended two dozen, and the clan kept 3%
+## of everything it worked out: buy an understanding, watch it evaporate before
+## the next lesson. Nothing detected it because no test played a campaign.
+##
+## Asking it here, from the stored watermark, makes double-firing impossible
+## regardless of how often anybody calls this.
+static func press_generation(culture_id: String) -> bool:
+	var culture := ensure(String(culture_id))
+	culture.ensure_nets()
+	var applies: int = culture.live.applies
+	if applies - culture.applies_at_last_generation < APPLIES_PER_GENERATION:
+		return false
+	culture.applies_at_last_generation = applies
+	var before := culture.generation
+	note_birth(culture.culture_id, culture.generation + 1)
+	return culture.generation > before
+
+
 ## How many of this clan are alive right now.
 ##
 ## THE ONE ANSWER, because there were three and they disagreed. The boundary used

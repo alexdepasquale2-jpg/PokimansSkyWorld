@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**967 assertions pass** across eighteen suites plus a whole-project compile
+**975 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -462,6 +462,62 @@ lets a distant herd still reflect what the clan knows for near-zero cost.
 
 ---
 
+## Pacing
+
+Every number in the progression was invented: three evolution leaps to win, six
+understandings per crossing, two living members per pending neuron, a generation
+every forty gradient applications. Nothing could check them, because the suites
+drive systems directly — `StakesSelfTest` reaches the ambition by handing the
+tree a thousand support and unlimited energy, which says nothing about whether a
+player gets there.
+
+`PacingSelfTest` plays one campaign forward instead. A clan of six, kept fed, for
+three in-game years, through the real router and the real generation rule, buying
+the cheapest thing it can afford and crossing whenever it has earned it. One
+in-game day is 1,200 ticks at 60Hz — twenty real seconds — and village life
+teaches about seven times a day.
+
+```
+in-game days to carry the bloodline across              383.00
+gradient applications (a generation every 40)           240.00
+real hours of play, at twenty seconds a day               2.13
+generations that turned over                              6.00
+neuronal energy earned in total                        2704.00
+understandings locked into the lineage                   18.00
+understandings lost at a boundary                        14.00
+share of what they worked out that survived               0.56
+
+  day   21  generation 1 · 3 locked · 165 banked
+  day   44  generation 2 · 6 locked · 175 banked
+  day   44  EVOLUTION LEAP 1 · 6 understandings held
+  day   68  generation 3 · 9 locked · 26 banked
+  day  107  generation 4 · 12 locked · 136 banked
+  day  107  EVOLUTION LEAP 2 · 12 understandings held
+  day  214  generation 5 · 15 locked · 597 banked
+  day  383  generation 6 · 18 locked · 1422 banked
+  day  383  EVOLUTION LEAP 3 · 18 understandings held
+```
+
+**Two things in that table need a decision, and neither is a bug.**
+
+*The generation cadence decays badly.* Intervals between generations run 21, 23,
+24, 39, 107, 169 days. Gradient applications slow as the reward baseline
+converges and the per-day caps bind, so the boundary — which is clocked off
+applications — stretches out. The last third of the campaign is 169 days waiting
+for one generation.
+
+*Energy has no sink.* Banked energy at each boundary runs 165, 175, 26, 136,
+**597, 1,422**. Once the affordable frontier of a 24-neuron catalog is exhausted,
+the only way to unlock more is to wait for the generation that locks the
+prerequisites. The player spends the late campaign rich and idle. Either the
+catalog wants a deeper tail, or energy wants somewhere else to go, or the
+boundary wants to be clocked off something that does not decay.
+
+The probe is what makes those arguable. Re-run it after any change to the reward
+catalog, the neuron costs, or the boundary rule.
+
+---
+
 ## Running
 
 Open the folder in Godot 4.3+ and press F5 — that starts the **game**, at the
@@ -471,7 +527,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (967 assertions)
+# the full suite (975 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 
@@ -544,6 +600,13 @@ its environment, saved and reloaded:
   catalog and every experience kind in the reward catalog must have a sentence.
   Adding a drive and forgetting its voice fails the build rather than shipping
   *"The Vess are becoming more tool_confidence."*
+- `PacingSelfTest` — plays a competent campaign forward for three in-game years
+  through the real router, real decisions, the real settlement generation rule
+  and a spend-the-cheapest-thing policy, and reports what happened. Only seven
+  assertions, all of them things that must hold whatever the tuning is — chiefly
+  that a competent clan can actually finish. Everything else is measured and
+  printed rather than asserted, because a test that pinned those numbers would
+  be freezing a guess into a requirement. See [Pacing](#pacing).
 - `GameplaySelfTest` — 35 assertions over the loop end to end: colony, harvest,
   jump, save.
 - `WorldSelfTest` — 79 assertions over planet derivation and chunk streaming.

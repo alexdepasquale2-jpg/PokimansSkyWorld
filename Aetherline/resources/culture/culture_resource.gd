@@ -81,6 +81,18 @@ const MEAN_POLICY_INTERVAL: int = 300
 ## Highest generation ever born into this culture. Consolidation triggers off it.
 @export var high_water_generation: int = 0
 
+## `live.applies` as of the last generation pressed by living activity.
+##
+## The boundary has to be EDGE-TRIGGERED, and this is what remembers the edge.
+## The rule it replaces asked whether `applies % 40 == 0`, which is a level: an
+## apply only lands every sixteen accumulated gradients, so that condition stays
+## true across many consecutive checks and fired a generation on every one of
+## them. Measured over three in-game years it produced 7,086 generations against
+## an intended two dozen, and a clan kept 3% of what it worked out.
+##
+## Serialized, or a reload lands back on the same `applies` and fires again.
+@export var applies_at_last_generation: int = 0
+
 ## Running reward statistics. Baseline subtraction is not optional: without it
 ## every positive reward pushes every taken action up, and the policy walks
 ## instead of learning.
@@ -449,6 +461,7 @@ func to_dict() -> Dictionary:
 		"generation": generation,
 		"member_count": member_count,
 		"high_water_generation": high_water_generation,
+		"applies_at_last_generation": applies_at_last_generation,
 		"reward_baseline": reward_baseline,
 		"reward_variance": reward_variance,
 		"reward_tally": reward_tally.duplicate(),
@@ -481,6 +494,7 @@ static func from_dict(d: Dictionary) -> CultureResource:
 	c.generation = int(d.get("generation", 0))
 	c.member_count = int(d.get("member_count", 0))
 	c.high_water_generation = int(d.get("high_water_generation", 0))
+	c.applies_at_last_generation = int(d.get("applies_at_last_generation", 0))
 	c.reward_baseline = float(d.get("reward_baseline", 0.0))
 	c.reward_variance = float(d.get("reward_variance", 1.0))
 	c.reward_tally = d.get("reward_tally", {}).duplicate()

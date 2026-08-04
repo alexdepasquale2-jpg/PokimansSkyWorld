@@ -122,6 +122,12 @@ func _ready() -> void:
 		for line in neuron_tests.stats:
 			_out(line)
 
+	_section("Pacing  (three in-game years of a competent campaign)")
+	var pacing_tests := PacingSelfTest.new()
+	_report(pacing_tests.run(_creature_root))
+	for line in pacing_tests.stats:
+		_out(line)
+
 	_section("Lore voice self-test  (can the game explain itself?)")
 	var voice_tests := LoreVoiceSelfTest.new()
 	_report(voice_tests.run(_creature_root))
