@@ -56,6 +56,7 @@ func run(parent: Node) -> Dictionary:
 	# for the wrong reason.
 	_test_hundredth_monkey()
 	_test_save_file()
+	_test_separation()
 	_test_stability()
 	_test_tiers()
 	_test_rate_limiting()
@@ -621,7 +622,93 @@ func _test_save_file() -> void:
 	_despawn([creature])
 
 
-# --- G. Stability --------------------------------------------------------------
+# --- G. Separation: a colony left behind becomes its own people -----------------
+
+## The other half of the transmission claim.
+##
+## The hundredth-monkey test proves a discovery spreads to everyone who shares a
+## brain. This proves the boundary of that: people who STOP sharing a brain stop
+## sharing discoveries, and a colony left on a rock for years greets you with its
+## own opinions rather than a recording of yours.
+##
+## Until this existed, `drift` — the whole mechanism for two clans becoming two
+## peoples — had nothing to act on, because a culture could only ever be one
+## shared brain per clan and departure never split it.
+func _test_separation() -> void:
+	CultureRegistry.reset(20260805)
+	CultureRegistry.install(20260805)
+
+	var parent := CultureRegistry.ensure("clan_home", "The Home Clan")
+	parent.ensure_nets()
+	parent.member_count = 10
+	var founding_blob := parent.live.to_blob()
+
+	var child := CultureRegistry.fork("clan_home", "clan_home@rock", "left_behind")
+	_check("separation: forking produces a new culture", child != null
+		and child.culture_id == "clan_home@rock")
+	_check("separation: the castaways leave knowing exactly what the clan knew",
+		child.live.to_blob() == founding_blob)
+	_check("separation: and they inherit its history, not its membership",
+		child.generation == parent.generation and child.member_count == 0)
+	_check("separation: forking the same split twice does not found a third people",
+		CultureRegistry.fork("clan_home", "clan_home@rock") == child)
+	_check("separation: forking an unknown parent does not invent one",
+		CultureRegistry.fork("clan_that_never_was", "orphan").culture_id == "orphan")
+
+	# Now the years pass with nobody watching.
+	var generations := child.age_unattended(CultureResource.GENERATION_DAYS * 3.0)
+	_check("separation: three hundred days is a generation, so nine hundred is three",
+		generations == 3)
+	_check("separation: and the clan you come back to is not the one you left",
+		child.live.to_blob() != founding_blob)
+	_check("separation: while the people who flew away are unchanged",
+		parent.live.to_blob() == founding_blob)
+
+	var apart := child.live.mean_abs_difference(parent.live)
+	_note("how far apart the two halves drifted, per weight", apart)
+	_check("separation: they are measurably different peoples now", apart > 0.0)
+	# Different, not unrecognisable — they are still cousins.
+	_check("separation: but still recognisably from the same stock", apart < 0.5)
+
+	# An absence long enough to be geological must not run drift forever.
+	var abandoned := CultureRegistry.fork("clan_home", "clan_home@deep", "left_behind")
+	var capped := abandoned.age_unattended(CultureResource.GENERATION_DAYS * 500.0)
+	_check("separation: an absence beyond memory is capped rather than run to noise",
+		capped == CultureResource.MAX_UNATTENDED_GENERATIONS)
+
+	# Coming back within a season changes nothing — you were not gone long enough.
+	var brief := CultureRegistry.fork("clan_home", "clan_home@brief", "left_behind")
+	var brief_blob := brief.live.to_blob()
+	_check("separation: a short absence turns no generations",
+		brief.age_unattended(CultureResource.GENERATION_DAYS * 0.5) == 0)
+	_check("separation: and leaves the culture untouched",
+		brief.live.to_blob() == brief_blob)
+
+	# Reunion. The larger group dominates, but does not erase the smaller.
+	parent.member_count = 30
+	child.member_count = 10
+	var before_merge := parent.live.to_blob()
+	_check("separation: two peoples can be brought back together",
+		CultureRegistry.merge("clan_home", "clan_home@rock"))
+	_check("separation: and the reunion changes the ones who stayed home",
+		parent.live.to_blob() != before_merge)
+	_check("separation: the merged clan counts everybody",
+		parent.member_count == 40)
+	_check("separation: merging a culture into itself is refused",
+		not CultureRegistry.merge("clan_home", "clan_home"))
+
+	# Forked cultures are real cultures: they have to survive a save.
+	var section := CultureRegistry.save_section()
+	var round_tripped: Variant = JSON.parse_string(JSON.stringify(section))
+	CultureRegistry.load_section(round_tripped)
+	var reloaded := CultureRegistry.get_culture("clan_home@deep")
+	_check("separation: a colony's own culture survives the campaign save",
+		reloaded != null and reloaded.live.to_blob() == abandoned.live.to_blob())
+
+	CultureRegistry.reset()
+
+
+# --- H. Stability --------------------------------------------------------------
 
 ## Five thousand contradictory rewards must leave a network that is still a
 ## network: finite, and still capable of an opinion other than its favourite.

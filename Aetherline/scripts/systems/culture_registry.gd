@@ -117,6 +117,82 @@ static func note_birth(culture_id: String, child_generation: int) -> void:
 		culture.advance_generation()
 
 
+## Split a culture in two, giving the child everything the parent knows today.
+##
+## THE MOMENT A PEOPLE BECOMES TWO PEOPLES. Up to here a culture could only ever
+## be one shared brain per clan id, which meant a colony left behind on another
+## world for nine years came back thinking exactly what the crew that flew away
+## thought — the two halves stayed in telepathic contact across interstellar
+## distance. `drift` existed to make separated clans diverge and had nothing to
+## separate.
+##
+## The child starts as an exact copy and then goes its own way: its RNG is seeded
+## from the child id, not the parent's, so the drift it accumulates is its own
+## and is reproducible from the campaign seed.
+##
+## Returns the child. Idempotent — forking onto an id that already exists hands
+## back the existing culture rather than overwriting a people who already have a
+## history.
+static func fork(parent_id: String, child_id: String, reason: String = "split") -> CultureResource:
+	install()
+	var parent: CultureResource = _cultures.get(parent_id)
+	if parent == null or child_id.is_empty() or child_id == parent_id:
+		return ensure(child_id if not child_id.is_empty() else parent_id)
+	if _cultures.has(child_id):
+		return _cultures[child_id]
+
+	parent.ensure_nets()
+	var child := CultureResource.create(child_id, _world_seed,
+		parent.display_name + " (apart)")
+	child.live.copy_from(parent.live)
+	child.locked.copy_from(parent.locked)
+	# Inherited history, not inherited membership: who is in the new clan is
+	# decided by whoever actually went with it.
+	child.generation = parent.generation
+	child.high_water_generation = parent.high_water_generation
+	child.learning_rate = parent.learning_rate
+	child.inheritance_fraction = parent.inheritance_fraction
+	child.drift = parent.drift
+	child.reward_baseline = parent.reward_baseline
+	child.reward_variance = parent.reward_variance
+	child.member_count = 0
+
+	_cultures[child_id] = child
+	EventBus.culture_forked.emit(parent_id, child_id, reason)
+	_prune()
+	return child
+
+
+## Blend `from_id`'s culture into `into_id`, weighted by how many people each
+## side brings. Two clans that meet again after a long separation do not simply
+## pick one accent — the larger group dominates, but not completely.
+##
+## The absorbed culture is left in the registry as a record rather than deleted:
+## a creature still carrying its id must not find itself with no brain at all.
+static func merge(into_id: String, from_id: String) -> bool:
+	var into: CultureResource = _cultures.get(into_id)
+	var from: CultureResource = _cultures.get(from_id)
+	if into == null or from == null or into == from:
+		return false
+	into.ensure_nets()
+	from.ensure_nets()
+	if not into.live.same_shape_as(from.live):
+		push_warning("CultureRegistry.merge: '%s' and '%s' have different brains; kept apart."
+			% [into_id, from_id])
+		return false
+
+	var mine := maxf(1.0, float(into.member_count))
+	var theirs := maxf(1.0, float(from.member_count))
+	var share := theirs / (mine + theirs)
+	CultureResource.blend_nets(into.live, from.live, share)
+	CultureResource.blend_nets(into.locked, from.locked, share)
+	into.member_count += from.member_count
+	into.generation = maxi(into.generation, from.generation)
+	into.high_water_generation = maxi(into.high_water_generation, from.high_water_generation)
+	EventBus.culture_forked.emit(from_id, into_id, "merge")
+	return true
+
+
 ## Drop the least-recently-active cultures once the cap is exceeded. Kept simple:
 ## a culture with no living members and no learning is a record, not a brain.
 static func _prune() -> void:

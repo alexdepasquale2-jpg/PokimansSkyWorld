@@ -124,7 +124,7 @@ func _test_party(parent: Node) -> void:
 		caught.append(c)
 		_check("party: catch %d joins the party" % i, party.accept(c, ship) == "party")
 
-	# A full party must never block a catch ΓÇö it overflows to the ship.
+	# A full party must never block a catch — it overflows to the ship.
 	var overflow := CreatureFactory.spawn_random(parent, _rng, {})
 	_check("party: a full party sends the next catch to the ship",
 		party.accept(overflow, ship) == "stored")

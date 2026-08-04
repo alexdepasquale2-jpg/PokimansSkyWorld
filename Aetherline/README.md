@@ -25,7 +25,11 @@ headless on 4.5.1-stable.
 | 4a | AI: the shared cultural network | **complete — 383/383 self-tests pass** |
 | 4b | AI: combat, utility, embodiment | **complete** — combat + work/relationships/audio + culture AI |
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
-| 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades |
+| 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
+
+**709 assertions pass** across fourteen suites. Run them with the command in
+[Running](#running) — note that it names `bootstrap.tscn` explicitly, because
+the main scene is the game now.
 
 ---
 
@@ -64,13 +68,21 @@ Aetherline/
 │       └── culture_resource.gd           ← one clan's brain: live + locked
 ├── scenes/
 │   ├── creatures/
-│   │   ├── creature.tscn         composition root: 9 sibling components
+│   │   ├── creature.tscn         composition root: 12 sibling components
 │   │   └── creature.gd           wiring, ticking, serialization only
-│   ├── world/                    (Phase 3)
+│   ├── world/
+│   │   ├── overworld.gd          the planet layer: five verbs, chunk streaming
+│   │   └── planet_world.gd       per-planet host + ecological field
 │   └── ui/
+│       ├── main_menu.tscn/.gd    THE MAIN SCENE since Phase 5
 │       ├── bootstrap.tscn/.gd    test harness + creature readout
 │       ├── genome_lab.tscn/.gd   interactive breeding bench
-│       └── culture_lab.tscn/.gd  watch a culture form; drift chart + ledger
+│       ├── culture_lab.tscn/.gd  watch a culture form; drift chart + ledger
+│       ├── star_map.gd           choose where to fall next
+│       ├── ship_view.gd          the incremental layer's shopfront
+│       ├── service_menu.gd · inventory_panel.gd · party_panel.gd
+│       ├── lineage_panel.gd · landfall_card.gd
+│       └── fps_bench.gd          population stress bench
 ├── scripts/
 │   ├── systems/
 │   │   ├── aether_types.gd       shared enums + i64 JSON helpers
@@ -79,7 +91,9 @@ Aetherline/
 │   │   ├── perception.gd         the 32-slot layout, owned in exactly one place
 │   │   ├── culture_reward_router.gd  events -> rewards -> gradients
 │   │   ├── culture_ticker.gd     drives FULL/NEAR/ABSTRACT off the LOD slices
-│   │   ├── culture_selftest.gd       70 assertions, incl. the hundredth monkey
+│   │   ├── culture_selftest.gd       88 assertions: hundredth monkey + separation
+│   │   ├── ship_system.gd        the incremental layer: modules, salvage
+│   │   ├── ship_selftest.gd          55 assertions, mostly salvage conservation
 │   │   ├── phenotype_resolver.gd genome -> traits, pure & static
 │   │   ├── condition_eval.gd     shared by archetypes and story templates
 │   │   ├── creature_factory.gd   the only place creatures come into existence
@@ -108,7 +122,14 @@ Aetherline/
 	├── archetypes/               archetypes.json (10 definitions)
 	├── culture/                  drives.json (12) · rewards.json (22) ·
 	│                             priors.json (6 authored dispositions)
-	├── biomes/                   (Phase 3)
+	├── biomes/                   biomes.json
+	├── colony/                   structures.json
+	├── economy/                  market.json · recipes.json
+	├── research/                 research.json
+	├── settlements/              buildings.json
+	├── ship/                     modules.json · achievements.json
+	├── upgrades/                 catalog.json
+	├── world/                    forage/population tables
 	└── events/                   story_events.json (8 templates)
 ```
 
@@ -437,16 +458,25 @@ lets a distant herd still reflect what the clan knows for near-zero cost.
 
 ## Running
 
-Open the folder in Godot 4.3+ and press F5, or headless:
+Open the folder in Godot 4.3+ and press F5 — that starts the **game**, at the
+main menu. The test harness is a separate scene and has to be named explicitly:
 
 ```bash
-godot --path . --headless --import && godot --path . --headless --quit-after 120
+# once, and after adding any new class_name
+godot --path . --headless --import
+
+# the full suite (709 assertions)
+godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
+
+Naming `bootstrap.tscn` matters and is easy to get wrong: `run/main_scene` is
+`main_menu.tscn` since Phase 5, so a bare `--quit-after` boots the game and runs
+no tests at all while looking like a clean pass.
 
 The `--import` pass is required after adding any new `class_name`; without it
 Godot has no global class registry and every type reference fails to parse.
 
-The bootstrap screen prints every autoload's self-report, runs both suites, and
+The bootstrap screen prints every autoload's self-report, runs every suite, and
 dumps a full readout of a creature that has been spawned, mutated, marked by
 its environment, saved and reloaded:
 
@@ -473,6 +503,21 @@ its environment, saved and reloaded:
   authored floor holding against a network pinned against it, 5,000 adversarial
   updates without collapse, a real save file round-tripped bit-for-bit — and the
   headline scenario below.
+- `CombatSelfTest` — 16 assertions over damage, defence and resolution.
+- `CatchingSelfTest` — 34 assertions: party limits, ship overflow, discovery,
+  the catch itself, and session state.
+- `ColonySelfTest` — 36 assertions: building, research, relationships, work.
+- `ProgressionSelfTest` — 53 assertions: stockpile, crafting, legacy score,
+  save robustness, LOD banding, and the audio/visual hooks.
+- `ShipSelfTest` — 55 assertions over the incremental layer, and mostly about
+  conservation rather than features: 400 randomised buy/sell operations must
+  never drive salvage negative nor create it from nothing, no owned level may
+  exist without a record of having been paid for, an achievement must not pay
+  twice, and a save written before the sell ledger existed must still refund
+  something when its modules are sold.
+- `GameplaySelfTest` — 35 assertions over the loop end to end: colony, harvest,
+  jump, save.
+- `WorldSelfTest` — 79 assertions over planet derivation and chunk streaming.
 - `CultureLab.run_smoke_test` — drives the culture bench end to end: teaching
   moves the clan, reset-to-inherited is an exact undo, generations advance,
   priors seed, clans fork.

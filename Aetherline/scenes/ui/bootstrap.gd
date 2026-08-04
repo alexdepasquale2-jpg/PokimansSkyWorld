@@ -87,6 +87,15 @@ func _ready() -> void:
 	_section("Progression self-test  (economy · legacy · upgrades · A/V hooks)")
 	_report(ProgressionSelfTest.new().run(_creature_root))
 
+	_section("Ship self-test  (modules · salvage conservation · achievements)")
+	var ship_tests := ShipSelfTest.new()
+	_report(ship_tests.run(_creature_root))
+	if not ship_tests.stats.is_empty():
+		_out("")
+		_out("  measured:")
+		for line in ship_tests.stats:
+			_out(line)
+
 	_section("Gameplay loop self-test  (colony · harvest · jump · save)")
 	_report(GameplaySelfTest.new().run(_creature_root))
 

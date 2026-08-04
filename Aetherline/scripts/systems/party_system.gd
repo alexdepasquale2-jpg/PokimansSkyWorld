@@ -4,7 +4,7 @@ class_name PartySystem
 ## Your team, and everything else you've caught.
 ##
 ## The active party walks the world with you and fights. Storage is unlimited
-## and lives on the ship ΓÇö you never lose a catch, you just aren't carrying it.
+## and lives on the ship — you never lose a catch, you just aren't carrying it.
 ## Party size is gated by the ship's habitat module, so "I can bring one more"
 ## is a real upgrade reward.
 ##
@@ -52,7 +52,7 @@ func cycle() -> Creature:
 
 
 ## Adds a caught creature. Goes to the party if there is room, otherwise
-## straight to storage ΓÇö a full party never blocks a catch.
+## straight to storage — a full party never blocks a catch.
 ## Returns "party" or "stored".
 func accept(creature: Creature, ship: ShipSystem) -> String:
 	if has_room(ship):
@@ -83,7 +83,7 @@ func deposit(creature: Creature) -> bool:
 	return true
 
 
-## Everyone in the party back to full. The only "healing" the game has ΓÇö
+## Everyone in the party back to full. The only "healing" the game has —
 ## no food, no medicine, just a rest at a settlement or the ship.
 func heal_all() -> void:
 	for entry in active:

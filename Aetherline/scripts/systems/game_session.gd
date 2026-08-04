@@ -6,7 +6,7 @@ class_name GameSession
 ## project holds to six), and registered with SaveSystem via the provider seam
 ## that has existed since Phase 0 for exactly this.
 ##
-## Everything the player accumulates lives here. Creature BODIES do not ΓÇö those
+## Everything the player accumulates lives here. Creature BODIES do not — those
 ## are spawned by the world scene and serialized through PlanetManager on
 ## departure; this holds the roster of who belongs to the colony.
 
@@ -30,7 +30,7 @@ var discovery := DiscoverySystem.new()
 ## Your team, and everything you've caught.
 var party := PartySystem.new()
 
-## Party data read from a save, waiting for the world scene to inflate it ΓÇö
+## Party data read from a save, waiting for the world scene to inflate it —
 ## creatures need a parent node, which does not exist at load time.
 var pending_party: Dictionary = {}
 
@@ -126,7 +126,7 @@ func spend(costs: Dictionary) -> bool:
 	return ok
 
 
-## Total edible material on hand ΓÇö what feeding actually draws from.
+## Total edible material on hand — what feeding actually draws from.
 func food_available() -> float:
 	return stock.amount("forage") + stock.amount("grain") + stock.amount("feed")
 
@@ -138,7 +138,7 @@ func consume_meal(amount: float = 8.0) -> float:
 		if stock.amount(res_id) >= amount:
 			stock.spend({res_id: amount})
 			resources_changed.emit()
-			# Compound feed is worth more than raw forage ΓÇö the whole point of
+			# Compound feed is worth more than raw forage — the whole point of
 			# researching it.
 			return {"feed": 1.0, "grain": 0.7, "forage": 0.5}[res_id]
 	return 0.0
@@ -166,7 +166,7 @@ func complete_jump() -> void:
 	jumps_made += 1
 	resources_changed.emit()
 	if not left.is_empty():
-		notice.emit("Left %d resource type(s) behind ΓÇö the hold was full." % left.size())
+		notice.emit("Left %d resource type(s) behind — the hold was full." % left.size())
 
 
 # --- Serialization ---------------------------------------------------------------

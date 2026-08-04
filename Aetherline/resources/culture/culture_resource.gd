@@ -253,6 +253,18 @@ func _blend_into_locked(blend: float) -> void:
 	_blend_array(locked.w2, live.w2, blend); _blend_array(locked.b2, live.b2, blend)
 
 
+## Blend one whole network toward another, in place. `share` is how much of
+## `source` ends up in `target`. Exposed because merging two clans needs exactly
+## this and should not re-derive it.
+static func blend_nets(target: CultureNet, source: CultureNet, share: float) -> void:
+	if target == null or source == null or not target.same_shape_as(source):
+		return
+	var s := clampf(share, 0.0, 1.0)
+	_blend_array(target.w0, source.w0, s); _blend_array(target.b0, source.b0, s)
+	_blend_array(target.w1, source.w1, s); _blend_array(target.b1, source.b1, s)
+	_blend_array(target.w2, source.w2, s); _blend_array(target.b2, source.b2, s)
+
+
 static func _blend_array(target: PackedFloat32Array, source: PackedFloat32Array,
 		blend: float) -> void:
 	if target.size() != source.size():
@@ -306,6 +318,39 @@ static func _correlation(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 		var_b += db * db
 	var denom := sqrt(var_a * var_b)
 	return 1.0 if denom <= 0.0 else clampf(cov / denom, -1.0, 1.0)
+
+
+## In-game days a generation takes to turn over, for a clan nobody is watching.
+##
+## Matches the species' default `max_age_days` (300 x lifespan baseline 1.0), so
+## a colony left alone for three hundred days has genuinely replaced itself once.
+const GENERATION_DAYS: float = 300.0
+
+## Beyond this many unattended generations, a culture is drifting rather than
+## living. Left uncapped, a two-thousand-day absence would run seven consecutive
+## drift passes over weights nobody is correcting, and the clan you come back to
+## would be noise rather than a people who changed.
+const MAX_UNATTENDED_GENERATIONS: int = 6
+
+
+## Age this culture through a stretch of time in which nobody was simulated.
+##
+## The counterpart to PlanetManager._catch_up, which ages the bodies: this ages
+## what they believe. Nothing is learned — learning needs lived experience, and
+## there was none — but generations turn over, and each one carries `drift`. That
+## is what makes a colony you left for nine years greet you with its own accent
+## instead of your own opinions read back to you.
+##
+## Returns how many generations passed.
+func age_unattended(days: float) -> int:
+	if days <= 0.0:
+		return 0
+	ensure_nets()
+	var generations: int = mini(
+		int(days / GENERATION_DAYS), MAX_UNATTENDED_GENERATIONS)
+	for _i in generations:
+		advance_generation()
+	return generations
 
 
 func note_birth(child_generation: int) -> void:
