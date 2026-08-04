@@ -157,6 +157,10 @@ func _build_run() -> Control:
 	_clan_note = Label.new()
 	_clan_note.add_theme_font_size_override("font_size", 11)
 	_clan_note.add_theme_color_override("font_color", Color(0.60, 0.68, 0.80))
+	# Wrapped, because a clan's disposition is a sentence of unbounded length and
+	# rendering the HUD showed it running off the panel edge mid-word.
+	_clan_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_clan_note.custom_minimum_size = Vector2(WIDTH - 28, 0)
 	box.add_child(_clan_note)
 
 	_mind_note = Label.new()

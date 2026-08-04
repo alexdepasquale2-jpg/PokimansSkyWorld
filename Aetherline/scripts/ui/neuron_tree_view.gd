@@ -211,11 +211,28 @@ func _draw() -> void:
 
 ## An elbow rather than a straight line: down the parent's indent, then across.
 ## Straight diagonals across a column of 11px text turn into hatching.
+##
+## CROSS-BRANCH LINKS ARE DRAWN DIFFERENTLY, and rendering the screen is what
+## made that necessary. A few understandings depend on something in another
+## branch, and running the same solid elbow to them drew a horizontal rule
+## straight through every row in between — the tree looked struck out. Those now
+## run faint, and along the gap between rows rather than through one.
 func _draw_elbow(from: Vector2, to: Vector2, satisfied: bool) -> void:
 	var colour := EDGE_LIVE if satisfied else EDGE
-	var knee := Vector2(from.x, to.y)
-	draw_line(from, knee, colour, 1.0, true)
-	draw_line(knee, to, colour, 1.0, true)
+	var same_column := int(from.x / COLUMN_W) == int(to.x / COLUMN_W)
+	if same_column:
+		var knee := Vector2(from.x, to.y)
+		draw_line(from, knee, colour, 1.0, true)
+		draw_line(knee, to, colour, 1.0, true)
+		return
+
+	# Faint, and along the seam above the target row, so it reads as "this comes
+	# from somewhere else" without competing with the branch it crosses.
+	var faint := Color(colour.r, colour.g, colour.b, 0.28)
+	var lane := to.y - ROW_H * 0.5 + 2.0
+	draw_line(from, Vector2(from.x, lane), faint, 1.0, true)
+	draw_line(Vector2(from.x, lane), Vector2(to.x, lane), faint, 1.0, true)
+	draw_line(Vector2(to.x, lane), to, faint, 1.0, true)
 
 
 func _draw_node(font: Font, id: String, node: Dictionary) -> void:

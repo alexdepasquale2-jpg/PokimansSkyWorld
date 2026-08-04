@@ -179,9 +179,17 @@ func _test_plain_view_has_no_machine_vocabulary(parent: Node) -> void:
 	# A brand-new clan must say so rather than inventing a personality.
 	var fresh := CultureRegistry.ensure("clan_fresh", "The Unproven")
 	fresh.ensure_nets()
+	var fresh_words := LoreVoice.disposition(fresh)
 	_check("plain: a clan with no history admits it",
-		LoreVoice.disposition(fresh).contains("no strong habits")
-			or LoreVoice.disposition(fresh).contains("no history"))
+		fresh_words.contains("without strong habits")
+			or fresh_words.contains("no history"))
+	# And it has to COMPLETE the sentence the screens wrap it in. Both the
+	# People panel and the HUD write "They are %s." — the previous wording gave
+	# a player "They are no strong habits yet", which no assertion could see
+	# because it is not an id, not a digit and not blank. A rendered screenshot
+	# found it.
+	_check("plain: and the disposition completes 'They are ___'",
+		not fresh_words.begins_with("no ") and not fresh_words.begins_with("a people"))
 
 	stats.append("  disposition:  %s" % surfaces["disposition"])
 	stats.append("  history:      %s" % surfaces["clan history"])

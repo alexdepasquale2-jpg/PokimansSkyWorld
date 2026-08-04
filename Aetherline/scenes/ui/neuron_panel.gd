@@ -26,7 +26,11 @@ class_name NeuronPanel
 
 signal closed
 
-const PANEL_WIDTH := 820
+## Wide enough for the whole tree plus the detail pane. Rendering it revealed
+## the old 820 gave the tree 430px against four 196px columns — Communication
+## was cut off mid-word and Motricity was off-screen behind a scrollbar, so half
+## the catalog was invisible on a screen whose entire purpose is planning.
+const PANEL_WIDTH := 1240
 const MONO_SIZE := 13
 
 var _session: Node = null
@@ -84,7 +88,7 @@ func _build() -> void:
 	# A drawn tree rather than a list, inside a scroller so a deeper catalog
 	# still fits. What unlocks what is the only thing a player can plan against.
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(430, 0)
+	scroll.custom_minimum_size = Vector2(NeuronTreeView.COLUMN_W * 4 + 18, 0)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	split.add_child(scroll)
 	_tree_view = NeuronTreeView.new()

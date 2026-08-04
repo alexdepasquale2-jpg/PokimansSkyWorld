@@ -184,8 +184,12 @@ func refresh() -> void:
 	lines.append("  " + (", ".join(held) if not held.is_empty()
 		else "Nothing yet. They are still only surviving."))
 	if not trying.is_empty():
-		lines.append("  [i]Still working out: %s — none of it survives the next "
-			+ "generation unless there are enough of them to carry it.[/i]"
+		# Parenthesised, and that is not style. `%` binds tighter than `+` in
+		# GDScript, so the original applied the format to the SECOND fragment —
+		# which has no placeholder — and shipped a literal "%s" to the player.
+		# Neither the jargon assertions nor the blank-text ones can see that: it
+		# is not an id, not a digit, and not empty.
+		lines.append("  [i]Still working out: %s — none of it survives the next generation unless there are enough of them to carry it.[/i]"
 			% ", ".join(trying))
 	if not lost.is_empty():
 		lines.append("  [i]Once knew, and lost: %s[/i]" % ", ".join(lost))
@@ -253,6 +257,19 @@ func run_smoke_test(session: Node) -> Array[String]:
 			"applies", "PackedFloat32Array"]:
 		if _prose.text.contains(jargon):
 			problems.append("jargon '%s' leaked into the plain view" % jargon)
+
+	# AN UNFORMATTED FORMAT SPECIFIER is its own class of bug, and nothing else
+	# here can see it: "%s" is not an id, not a digit, and not empty. One
+	# shipped — `"a" + "b" % args` applies the format to "b", because `%` binds
+	# tighter than `+` in GDScript — and this screen read "Still working out: %s"
+	# until somebody rendered it and looked at it.
+	for specifier in ["%s", "%d", "%.1f", "%.2f"]:
+		if _prose.text.contains(specifier):
+			problems.append("an unformatted '%s' reached the player" % specifier)
+
+	# And the disposition has to complete the sentence this screen wraps it in.
+	if _prose.text.contains("They are no ") or _prose.text.contains("They are a people"):
+		problems.append("the disposition does not complete 'They are ___'")
 
 	if _show_advanced:
 		problems.append("the advanced view is open before it was asked for")

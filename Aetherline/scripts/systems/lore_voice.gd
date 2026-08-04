@@ -113,7 +113,10 @@ static func disposition(culture: CultureResource) -> String:
 	if defining.is_empty():
 		# A young clan genuinely has no opinions yet, and saying so is more
 		# honest — and more interesting — than inventing a personality.
-		return "no strong habits yet — they are still finding out what works"
+		# Every branch of this must complete the sentence "They are ___", which
+		# is how the People screen and the HUD both use it. "no strong habits
+		# yet" reached a player as "They are no strong habits yet".
+		return "without strong habits yet, still finding out what works"
 	if defining.size() == 1:
 		return defining[0]
 	return "%s, and %s" % [defining[0], defining[1]]
