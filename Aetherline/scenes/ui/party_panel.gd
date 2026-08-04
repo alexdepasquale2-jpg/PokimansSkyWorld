@@ -104,23 +104,34 @@ func _refresh() -> void:
 		var c: Creature = entry
 		if not is_instance_valid(c):
 			continue
+		# Condition in words, not `[████░░░░░░]  61/61`. This screen was the last
+		# place still drawing a health bar out of block characters, which reads
+		# as a terminal readout beside the HUD's actual bars — and the numbers it
+		# padded with told a player nothing they could act on.
 		var hp_frac := c.stats.hp_fraction() if c.stats != null else 0.0
-		var bars := int(round(hp_frac * 10.0))
-		var bar := "█".repeat(bars) + "░".repeat(10 - bars)
-		var down := "  · DOWNED" if c.stats != null and c.stats.downed else ""
-		var human := " · human" if c.identity != null and c.identity.is_human else ""
-		_list.add_item("%s   [%s]  %d/%d%s%s" % [
-			c.display_name(), bar,
-			int(c.stats.hp) if c.stats else 0,
-			int(c.stats.max_hp()) if c.stats else 0,
+		var down := "  ·  down" if c.stats != null and c.stats.downed else ""
+		var human := "  ·  human" if c.identity != null and c.identity.is_human else ""
+		_list.add_item("%s   —   %s%s%s" % [
+			c.display_name(), LoreVoice.creature_condition(c).trim_suffix("."),
 			down, human])
+		# Coloured on the SAME basis the sentence beside it is written from —
+		# the worst unmet need, not hp alone. Rendering the panel showed a
+		# creature described as "Close to death — badly hurt" printed in the
+		# healthy green, because it was at full HP and starving. Colour and words
+		# disagreeing about the same animal is worse than either being wrong.
 		var idx := _list.item_count - 1
+		var worst := hp_frac
+		if c.needs != null:
+			worst = minf(worst, minf(c.needs.hunger,
+				minf(c.needs.energy, c.needs.health)))
 		if c.stats != null and c.stats.downed:
-			_list.set_item_custom_fg_color(idx, Color(1.0, 0.45, 0.4))
-		elif hp_frac < 0.35:
-			_list.set_item_custom_fg_color(idx, Color(1.0, 0.75, 0.4))
+			_list.set_item_custom_fg_color(idx, VitalBar.CRITICAL)
+		elif worst <= VitalBar.CRITICAL_AT:
+			_list.set_item_custom_fg_color(idx, VitalBar.CRITICAL)
+		elif worst <= VitalBar.WARN_AT:
+			_list.set_item_custom_fg_color(idx, VitalBar.WARN)
 		else:
-			_list.set_item_custom_fg_color(idx, Color(0.7, 0.95, 0.8))
+			_list.set_item_custom_fg_color(idx, VitalBar.GOOD)
 	if not session.party.active.is_empty():
 		_list.select(0)
 		_on_selected(0)
@@ -138,7 +149,7 @@ func _on_selected(index: int) -> void:
 	if not is_instance_valid(c):
 		return
 	var d := c.stats.derived() if c.stats != null else {}
-	var ph := c.stats.phenotype() if c.stats != null else {}
+
 	var arch := ""
 	if c.archetype != null and c.archetype.state != null and c.archetype.state.has_any_archetype():
 		for archetype_id in c.archetype.state.progress:
@@ -146,10 +157,17 @@ func _on_selected(index: int) -> void:
 				var def: ArchetypeDefinitionResource = GenomeDB.get_archetype(archetype_id)
 				arch = " · %s" % (def.display_name if def != null else String(archetype_id))
 				break
-	_detail.text = "%s · size %.1f · atk %.1f · def %.1f · spd %.0f%s" % [
-		c.display_name(),
-		float(ph.get("size", 1.0)),
-		float(d.get("attack_power", 0.0)),
-		float(d.get("defense", 0.0)),
-		float(d.get("move_speed", 0.0)),
-		arch]
+	# What this animal IS, in the register LoreVoice owns, with the numbers a
+	# player actually fights with kept to one line underneath. The old version
+	# was only the numbers, and "size 1.5 · atk 21.4 · def 5.0 · spd 43" does not
+	# tell you which of your people to take with you.
+	var lines: Array[String] = []
+	lines.append("%s%s" % [c.display_name(), arch])
+	lines.append(LoreVoice.creature_blurb(c))
+	var becoming := LoreVoice.creature_becoming(c)
+	if not becoming.is_empty():
+		lines.append(becoming)
+	lines.append("strikes for %d · holds off %d · moves %d" % [
+		int(d.get("attack_power", 0.0)), int(d.get("defense", 0.0)),
+		int(d.get("move_speed", 0.0))])
+	_detail.text = "\n".join(lines)

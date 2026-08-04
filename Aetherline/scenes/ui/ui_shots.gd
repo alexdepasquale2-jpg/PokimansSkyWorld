@@ -23,12 +23,20 @@ extends Control
 ## Writes to `--shot-dir <path>` (from the user args after `--`), defaulting to
 ## `user://shots`.
 
-const SETTLE_FRAMES := 3
+## Real seconds to let a screen finish ARRIVING before photographing it.
+##
+## Frames are the wrong unit and three of them was nowhere near enough. The main
+## menu fades its title in over 0.9s; a three-frame settle caught it at about 5%
+## opacity and I very nearly "fixed" the contrast of a title that was simply not
+## there yet. Anything with an intro tween, a pulse, or an eased bar needs wall
+## time, and a screenshot taken before a screen has finished arriving is worse
+## than no screenshot — it invents defects.
+const SETTLE_SECONDS := 1.4
 
 var _out_dir := "user://shots"
 var _shots: Array[Dictionary] = []
 var _index: int = -1
-var _settle: int = 0
+var _settle: float = 0.0
 var _current: Node = null
 
 
@@ -43,9 +51,20 @@ func _ready() -> void:
 	_seed_world()
 
 	_shots = [
+		{"name": "main_menu", "build": _build_main_menu},
 		{"name": "hud", "build": _build_hud},
-		{"name": "understandings", "build": _build_neurons},
-		{"name": "your_people", "build": _build_people},
+		{"name": "understandings", "build": _build_neurons,
+			"arm": func(n): n.open(_session, "culture_colony")},
+		{"name": "your_people", "build": _build_people,
+			"arm": func(n): n.open(_session)},
+		{"name": "party", "build": _build_party,
+			"arm": func(n): n.open(_session)},
+		{"name": "inventory", "build": _build_inventory,
+			"arm": func(n): n.open(_session)},
+		{"name": "ship", "build": _build_ship,
+			"arm": func(n): n.open(_session)},
+		{"name": "star_map", "build": _build_star_map,
+			"arm": func(n): n.open(PlanetManager.known_planets.keys())},
 		{"name": "ending_triumph", "build": _build_ending_won},
 		{"name": "ending_extinction", "build": _build_ending_lost},
 	]
@@ -64,6 +83,9 @@ func _seed_world() -> void:
 
 	_session = GameSession.new()
 	add_child(_session)
+	# A few worlds, so the star map has somewhere to point at.
+	for i in 5:
+		PlanetManager.derive_planet("world_%d" % i)
 
 	var culture := CultureRegistry.ensure("culture_colony", "The Vess")
 	culture.ensure_nets()
@@ -98,11 +120,11 @@ func _seed_world() -> void:
 	_session.arc.evaluate(_clan.size())
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _index < 0 or _index >= _shots.size():
 		return
-	_settle -= 1
-	if _settle > 0:
+	_settle -= delta
+	if _settle > 0.0:
 		return
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
@@ -124,8 +146,16 @@ func _advance() -> void:
 		return
 	_current = (_shots[_index]["build"] as Callable).call()
 	if _current != null:
+		# ADDED BEFORE IT IS OPENED. Several panels build their children in
+		# `_ready`, so calling `open()` on a node that is not in the tree yet
+		# assigns text to labels that do not exist — the first run of this
+		# harness photographed the party panel as an empty grey screen and the
+		# ship view half-built, and neither is a bug in those panels.
 		add_child(_current)
-	_settle = SETTLE_FRAMES
+		var arm: Variant = _shots[_index].get("arm")
+		if arm is Callable:
+			(arm as Callable).call(_current)
+	_settle = SETTLE_SECONDS
 
 
 # --- The screens ---------------------------------------------------------------
@@ -147,14 +177,43 @@ func _build_hud() -> Node:
 func _build_neurons() -> Node:
 	var panel := NeuronPanel.new()
 	panel.position = Vector2(120, 60)
-	panel.open(_session, "culture_colony")
 	return panel
 
 
 func _build_people() -> Node:
 	var panel := PeoplePanel.new()
 	panel.position = Vector2(200, 90)
-	panel.open(_session)
+	return panel
+
+
+func _build_main_menu() -> Node:
+	return load("res://scenes/ui/main_menu.tscn").instantiate()
+
+
+func _build_party() -> Node:
+	var panel := PartyPanel.new()
+	panel.position = Vector2(180, 80)
+	return panel
+
+
+func _build_inventory() -> Node:
+	_session.stock.add_local("res_biomass", 22.0)
+	_session.stock.add_local("res_alloy", 6.0)
+	var panel := InventoryPanel.new()
+	panel.position = Vector2(180, 80)
+	return panel
+
+
+func _build_ship() -> Node:
+	_session.ship.salvage = 480.0
+	var view := ShipView.new()
+	view.position = Vector2(120, 60)
+	return view
+
+
+func _build_star_map() -> Node:
+	var panel := StarMap.new()
+	panel.position = Vector2(140, 70)
 	return panel
 
 
