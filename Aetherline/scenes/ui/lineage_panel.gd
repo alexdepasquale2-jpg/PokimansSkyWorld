@@ -20,10 +20,17 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# `set_anchors_and_offsets_preset`, not `set_anchors_preset`. The latter moves
+	# the anchors and leaves the offsets where they were, so a Control built in
+	# code rather than loaded as a scene root keeps whatever size it happened to
+	# have — this screen laid itself out inside about 490 pixels and drew the
+	# bloodline into a 180px strip with most of the line off the edge. It only
+	# looked right because the game reaches it via `change_scene_to_file`, where
+	# the scene root is sized by the window and the bug cannot show.
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var backdrop := ColorRect.new()
-	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var star_material := ShaderMaterial.new()
 	star_material.shader = preload("res://shaders/ui_starfield.gdshader")
 	star_material.set_shader_parameter("tint", Vector3(0.03, 0.04, 0.07))
@@ -33,7 +40,7 @@ func _build_ui() -> void:
 
 	# Inset from the screen edge — the header read "Lin ages: 4" against it.
 	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 18)
 	add_child(margin)

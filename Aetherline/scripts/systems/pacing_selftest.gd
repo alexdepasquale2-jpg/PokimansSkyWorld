@@ -179,6 +179,12 @@ func _test_a_tended_clan_grows(parent: Node) -> void:
 		% [before, CultureRegistry.living_members("clan_grown")],
 		CultureRegistry.living_members("clan_grown") == before + 1)
 	if child != null:
+		# A NAMED child. Every creature born in this game was nameless until the
+		# bloodline was drawn and an entire generation came out as "unnamed":
+		# `_make_identity` tested `opts.has("name")`, and the conception path
+		# always passes the key with an empty string.
+		_check("growth: the child has a name (%s)" % child.display_name(),
+			not child.identity.given_name.strip_edges().is_empty())
 		_check("growth: the child belongs to its parents' clan",
 			CultureRegistry.culture_for(child).culture_id == "clan_grown")
 		_check("growth: and inherits what the lineage understands, not a fresh tree",

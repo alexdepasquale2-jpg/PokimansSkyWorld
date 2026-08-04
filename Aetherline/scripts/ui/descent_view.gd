@@ -240,6 +240,10 @@ func _draw_person(font: Font, uid: String, node: Dictionary) -> void:
 	var name := String(entry.get("name", ""))
 	if name.is_empty():
 		name = "unnamed"
-	draw_string(font, pos + Vector2(-MIN_GAP * 0.5, NODE_R + 12.0), name,
-		HORIZONTAL_ALIGNMENT_CENTER, MIN_GAP, 10,
+	# Given a little more than the node gap to write in, and centred, so a name
+	# overlaps its neighbours' whitespace rather than being cut to four letters.
+	# The first render of this screen showed a generation of "unna".
+	var label_w := MIN_GAP + 22.0
+	draw_string(font, pos + Vector2(-label_w * 0.5, NODE_R + 12.0), name,
+		HORIZONTAL_ALIGNMENT_CENTER, label_w, 10,
 		Color(colour.r, colour.g, colour.b, 0.9 if alive else 0.65))
