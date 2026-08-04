@@ -112,6 +112,9 @@ func _ready() -> void:
 	EventBus.culture_generation_advanced.connect(_on_generation_advanced)
 	EventBus.culture_forked.connect(_on_culture_forked)
 	EventBus.story_event_fired.connect(_on_story_event)
+	EventBus.neurons_locked.connect(_on_neurons_locked)
+	EventBus.neurons_lost.connect(_on_neurons_lost)
+	EventBus.evolution_leap.connect(_on_evolution_leap)
 
 	_build_ui()
 	if bool(Engine.get_meta("aetherline_new_campaign", true)):
@@ -130,6 +133,9 @@ func _exit_tree() -> void:
 	_unbind(EventBus.culture_generation_advanced, _on_generation_advanced)
 	_unbind(EventBus.culture_forked, _on_culture_forked)
 	_unbind(EventBus.story_event_fired, _on_story_event)
+	_unbind(EventBus.neurons_locked, _on_neurons_locked)
+	_unbind(EventBus.neurons_lost, _on_neurons_lost)
+	_unbind(EventBus.evolution_leap, _on_evolution_leap)
 
 
 func _unbind(source: Signal, handler: Callable) -> void:
@@ -213,6 +219,27 @@ func _on_story_event(event: Dictionary) -> void:
 	if text.is_empty():
 		return
 	_log("[i]%s[/i]" % text)
+
+
+func _on_neurons_locked(clan_id: String, neuron_ids: Array) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.neurons_locked_sentence(neuron_ids))
+
+
+## The loss is the mechanic, so it is said loudly and it says why.
+func _on_neurons_lost(clan_id: String, neuron_ids: Array) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.neurons_lost_sentence(neuron_ids))
+
+
+func _on_evolution_leap(clan_id: String, leap: int, locked_neurons: int) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.leap_sentence(leap, locked_neurons))
+	if player != null:
+		ImpactEffect.spawn(self, player.global_position, Color(1.0, 0.9, 0.5), 320.0)
 
 
 ## Any culture the player's own creatures belong to.

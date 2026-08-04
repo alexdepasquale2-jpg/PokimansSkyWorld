@@ -162,9 +162,33 @@ static func the(name: String) -> String:
 static func clan_name(culture: CultureResource) -> String:
 	if culture == null:
 		return "the clan"
-	if not culture.display_name.is_empty():
+	if not culture.display_name.is_empty() and culture.display_name != culture.culture_id:
 		return culture.display_name
-	return culture.culture_id
+	# No authored name. Never fall through to the raw id — `clan_home@rock` is a
+	# key, not a name, and a player should never be shown one. Cultures are
+	# minted implicitly all the time (a wild herd, a lineage nobody named), so
+	# this path is the common case rather than the exception.
+	return humanise(culture.culture_id)
+
+
+## Turn an id into something sayable: "clan_home@rock" -> "Home Of Rock".
+static func humanise(id: String) -> String:
+	var text := id
+	for prefix in ["culture_", "clan_", "lin_", "neu_", "arch_"]:
+		if text.begins_with(prefix):
+			text = text.substr(prefix.length())
+			break
+	# `@` is the fork separator: a clan named for the place it was left behind.
+	text = text.replace("@", " of ").replace("_", " ").replace("-", " ")
+	var words := text.split(" ", false)
+	var out: Array[String] = []
+	for word in words:
+		if word == "of":
+			out.append(word)
+		else:
+			out.append(word.substr(0, 1).to_upper() + word.substr(1))
+	var joined := " ".join(out)
+	return joined if not joined.is_empty() else "the clan"
 
 
 ## "Three generations, and they have learned a great deal." The experience line.
@@ -352,6 +376,76 @@ static func crystallized_sentence(name: String, archetype_id: String) -> String:
 	return "%s has become %s." % [name, what]
 
 
+# --- The neuronal tree -----------------------------------------------------------------
+
+static func neuron_name(neuron_id: String) -> String:
+	var definition := NeuronalTree.definition(neuron_id)
+	return String(definition.get("display_name", humanise(neuron_id)))
+
+
+static func reinforced_sentence(neuron_id: String) -> String:
+	return "Someone has worked out %s. It will not last unless the clan does." \
+		% neuron_name(neuron_id)
+
+
+## What a generation kept. The good half of the boundary.
+static func neurons_locked_sentence(names: Array) -> String:
+	if names.is_empty():
+		return ""
+	var spoken: Array[String] = []
+	for id in names:
+		spoken.append(neuron_name(String(id)))
+	return "The lineage will carry %s from now on." % _list(spoken)
+
+
+## What it could not keep — and the reason, which is the part that stings and the
+## part a player can do something about next time.
+static func neurons_lost_sentence(names: Array) -> String:
+	if names.is_empty():
+		return ""
+	var spoken: Array[String] = []
+	for id in names:
+		spoken.append(neuron_name(String(id)))
+	return "There were too few of them to hold on to %s. It is gone with the ones who knew it." \
+		% _list(spoken)
+
+
+static func leap_sentence(leap: int, locked_neurons: int) -> String:
+	return "The clan crosses into something new — the %s leap, carrying %d hard-won understandings." \
+		% [_ordinal(leap), locked_neurons]
+
+
+## How close the clan is to being able to cross, in plain terms.
+static func leap_readiness(tree: NeuronalTree) -> String:
+	if tree == null:
+		return ""
+	if tree.leap_ready():
+		return "They are ready to become something else."
+	var remaining := tree.neurons_until_leap()
+	if remaining == 1:
+		return "One more understanding, and they could become something else."
+	return "%d more understandings, and they could become something else." % remaining
+
+
+static func _list(items: Array[String]) -> String:
+	if items.size() == 1:
+		return items[0]
+	if items.size() == 2:
+		return "%s and %s" % [items[0], items[1]]
+	var head := items.slice(0, items.size() - 1)
+	return "%s and %s" % [", ".join(head), items[items.size() - 1]]
+
+
+static func _ordinal(n: int) -> String:
+	match n:
+		1: return "first"
+		2: return "second"
+		3: return "third"
+		4: return "fourth"
+		5: return "fifth"
+		_: return "%dth" % n
+
+
 # --- Advanced view ------------------------------------------------------------------
 
 ## The numbers, for the menu that asks for them.
@@ -379,6 +473,22 @@ static func advanced_lines(culture: CultureResource) -> Array[String]:
 		CultureNet.max_entropy(culture.live.out_size)])
 	lines.append("drift from forebears  %.5f per weight" % (
 		culture.live.mean_abs_difference(culture.locked)))
+
+	# The chosen inheritance, in the same breath as the learned one, because a
+	# player comparing them is exactly the point of showing either.
+	var tree := NeuronalTree.for_clan(culture.culture_id)
+	lines.append("")
+	lines.append("neuronal energy     %.1f banked, %.1f earned all told" % [
+		tree.energy, tree.lifetime_energy])
+	lines.append("neurons             %d locked, %d pending, %d forgotten" % [
+		tree.locked.size(), tree.pending.size(), tree.forgotten.size()])
+	lines.append("leaps taken         %d   (%d neurons to the next)" % [
+		tree.leaps, tree.neurons_until_leap()])
+	lines.append("")
+	lines.append("%-22s %-13s %7s  %s" % ["neuron", "branch", "cost", "state"])
+	for entry in tree.survey():
+		lines.append("%-22s %-13s %7.0f  %s" % [
+			entry["name"], entry["branch"], entry["cost"], entry["state"]])
 	lines.append("")
 	lines.append("%-20s %7s  %7s" % ["drive", "share", "bias"])
 	for entry in culture.drive_report():

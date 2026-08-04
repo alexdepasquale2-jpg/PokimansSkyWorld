@@ -84,6 +84,22 @@ signal culture_generation_advanced(culture_id: String, generation: int, retained
 signal culture_forked(parent_culture_id: String, child_culture_id: String, reason: String)
 
 
+# --- The neuronal tree ---------------------------------------------------------
+#
+# Discrete, chosen inheritance, as against the culture signals above which report
+# learning nobody decided on. All four are events a player acts on or grieves
+# over, so all four belong on the bus.
+
+## A neuron was reinforced. Provisional until a generation turns over.
+signal neuron_reinforced(clan_id: String, neuron_id: String)
+## A generation carried these into the lineage permanently.
+signal neurons_locked(clan_id: String, neuron_ids: Array)
+## And could not carry these. The clan had worked them out and lost them.
+signal neurons_lost(clan_id: String, neuron_ids: Array)
+## The clan crossed the gap.
+signal evolution_leap(clan_id: String, leap: int, locked_neurons: int)
+
+
 # --- World & travel -----------------------------------------------------------
 
 signal planet_generated(planet_id: String, seed: int)

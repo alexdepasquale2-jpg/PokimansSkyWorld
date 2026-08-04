@@ -87,6 +87,15 @@ func _ready() -> void:
 	_section("Progression self-test  (economy · legacy · upgrades · A/V hooks)")
 	_report(ProgressionSelfTest.new().run(_creature_root))
 
+	_section("Neuronal self-test  (discover · reinforce · lock or lose · leap)")
+	var neuron_tests := NeuronalSelfTest.new()
+	_report(neuron_tests.run(_creature_root))
+	if not neuron_tests.stats.is_empty():
+		_out("")
+		_out("  measured:")
+		for line in neuron_tests.stats:
+			_out(line)
+
 	_section("Lore voice self-test  (can the game explain itself?)")
 	var voice_tests := LoreVoiceSelfTest.new()
 	_report(voice_tests.run(_creature_root))

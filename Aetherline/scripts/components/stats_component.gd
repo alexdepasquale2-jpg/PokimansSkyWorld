@@ -68,6 +68,11 @@ func _resolve() -> void:
 	var traits := lived_traits()
 	if creature.archetype != null:
 		traits = creature.archetype.apply_to(traits)
+	# And last, what the whole LINEAGE worked out. Genetics is what it was born,
+	# epigenetics what its life made of it, archetype what it became, neurons what
+	# its people have understood — broadest inheritance applied last.
+	if creature.identity != null:
+		traits = NeuronalTree.for_creature(creature).apply_to(traits)
 	_phenotype = traits
 	_derived = _derive(traits)
 	_dirty = false

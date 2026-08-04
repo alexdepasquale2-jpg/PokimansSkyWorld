@@ -65,6 +65,12 @@ static func ensure(id: String, name_hint: String = "") -> CultureResource:
 	var existing: CultureResource = _cultures.get(id)
 	if existing != null:
 		existing.ensure_nets()
+		# A clan is usually minted implicitly, the first time one of its members
+		# is asked what it belongs to, and at that moment nobody has a name for
+		# it. When a name does turn up later, take it — otherwise the placeholder
+		# is permanent and the raw id is what a player ends up reading.
+		if not name_hint.is_empty() and existing.display_name == existing.culture_id:
+			existing.display_name = name_hint
 		return existing
 	var culture := CultureResource.create(id, _world_seed, name_hint)
 	_cultures[id] = culture
@@ -115,6 +121,12 @@ static func note_birth(culture_id: String, child_generation: int) -> void:
 	culture.note_birth(child_generation)
 	if culture.generation_advance_due():
 		culture.advance_generation()
+		# The same boundary decides both inheritances. The network keeps a
+		# fraction of what it drifted toward; the tree keeps only what the clan
+		# is numerous enough to carry. One is automatic and one is brutal, and
+		# they turn over together because they are the same generation.
+		NeuronalTree.for_clan(culture.culture_id).advance_generation(
+			float(culture.member_count))
 
 
 ## Split a culture in two, giving the child everything the parent knows today.
@@ -158,6 +170,9 @@ static func fork(parent_id: String, child_id: String, reason: String = "split") 
 	child.member_count = 0
 
 	_cultures[child_id] = child
+	# What the lineage understands goes with them; what it was mid-way through
+	# working out does not.
+	NeuronalTree.fork(parent_id, child_id)
 	EventBus.culture_forked.emit(parent_id, child_id, reason)
 	_prune()
 	return child

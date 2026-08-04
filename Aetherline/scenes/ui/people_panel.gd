@@ -167,6 +167,30 @@ func refresh() -> void:
 		+ "made of them, and it is shared — what one of them works out, all of "
 		+ "them know.[/i]")
 
+	# What the lineage has understood — the chosen inheritance, as against the
+	# learned one described above. Plain names and plain stakes; the costs and the
+	# branch structure are in the advanced view.
+	var tree := NeuronalTree.for_clan(_selected_culture)
+	lines.append("")
+	lines.append("[b]What they have understood[/b]")
+	var held: Array[String] = []
+	var trying: Array[String] = []
+	var lost: Array[String] = []
+	for entry in tree.survey():
+		match String(entry["state"]):
+			"locked": held.append(String(entry["name"]))
+			"pending": trying.append(String(entry["name"]))
+			"forgotten": lost.append(String(entry["name"]))
+	lines.append("  " + (", ".join(held) if not held.is_empty()
+		else "Nothing yet. They are still only surviving."))
+	if not trying.is_empty():
+		lines.append("  [i]Still working out: %s — none of it survives the next "
+			+ "generation unless there are enough of them to carry it.[/i]"
+			% ", ".join(trying))
+	if not lost.is_empty():
+		lines.append("  [i]Once knew, and lost: %s[/i]" % ", ".join(lost))
+	lines.append("  %s" % LoreVoice.leap_readiness(tree))
+
 	lines.append("")
 	lines.append("[b]The clan[/b]")
 	var counted := 0
