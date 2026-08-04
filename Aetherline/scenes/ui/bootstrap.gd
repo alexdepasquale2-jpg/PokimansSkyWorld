@@ -104,6 +104,17 @@ func _ready() -> void:
 	neuron_panel.queue_free()
 	neuron_session.queue_free()
 
+	_section("Ending screen  (the two ways a run finishes)")
+	var ending := EndingScreen.new()
+	_creature_root.add_child(ending)
+	var ending_problems := ending.run_smoke_test()
+	_out("%d passed, %d failed%s" % [
+		1 if ending_problems.is_empty() else 0, ending_problems.size(),
+		"" if ending_problems.is_empty() else "   <<< ATTENTION"])
+	for problem in ending_problems:
+		_out("  FAIL · " + problem)
+	ending.queue_free()
+
 	_section("Stakes self-test  (death · decline · extinction · triumph)")
 	var stakes_tests := StakesSelfTest.new()
 	_report(stakes_tests.run(_creature_root))

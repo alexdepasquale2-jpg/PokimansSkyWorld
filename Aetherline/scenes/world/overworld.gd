@@ -47,6 +47,7 @@ var _ship_view: ShipView
 var _inventory_panel: InventoryPanel
 var _people_panel: PeoplePanel
 var _neuron_panel: NeuronPanel
+var _ending_screen: EndingScreen
 var _service_menu: ServiceMenu
 
 var _info: Label
@@ -371,6 +372,44 @@ func _on_campaign_ended(_clan_id: String, outcome: int, chronicle: Dictionary) -
 	for line in LoreVoice.ending_lines(outcome, chronicle):
 		_log(line)
 	SimulationBudget.set_paused(true)
+	_show_ending(outcome, chronicle)
+
+
+## Take the screen. Pausing and logging four lines into the same feed that
+## carries every other event is not an ending, and it left the player frozen in
+## place with nowhere to go.
+func _show_ending(outcome: int, chronicle: Dictionary) -> void:
+	if _ending_screen == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 20   # Above every panel; nothing outranks the end of a run.
+		layer.name = "EndingLayer"
+		add_child(layer)
+		_ending_screen = EndingScreen.new()
+		_ending_screen.begin_again.connect(_restart_campaign)
+		_ending_screen.to_menu.connect(_abandon_to_menu)
+		layer.add_child(_ending_screen)
+	_ending_screen.show_ending(outcome, chronicle)
+
+
+## Start over, and CLEAR THE SLOT FIRST.
+##
+## Without the delete, the finished run stays on disk: the menu's Continue is
+## enabled, and taking it reopens a resolved campaign whose arc has already
+## latched and can never fire again. A player would be handed their own corpse
+## with no ending and no way to tell it had happened.
+func _restart_campaign() -> void:
+	SaveSystem.delete_slot(SAVE_SLOT)
+	SimulationBudget.set_paused(false)
+	Engine.set_meta("aetherline_new_campaign", true)
+	get_tree().reload_current_scene()
+
+
+## Leave a finished run without writing it back to disk. `_to_menu` saves on the
+## way out, which is right for a run still in progress and exactly wrong here.
+func _abandon_to_menu() -> void:
+	SaveSystem.delete_slot(SAVE_SLOT)
+	SimulationBudget.set_paused(false)
+	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
 
 
 ## Any culture the player's own creatures belong to.
@@ -411,7 +450,8 @@ func _menu_open() -> bool:
 		or (_inventory_panel != null and _inventory_panel.visible) \
 		or (_people_panel != null and _people_panel.visible) \
 		or (_neuron_panel != null and _neuron_panel.visible) \
-		or (_service_menu != null and _service_menu.visible)
+		or (_service_menu != null and _service_menu.visible) \
+		or (_ending_screen != null and _ending_screen.visible)
 
 
 func _begin_new_campaign() -> void:
@@ -478,6 +518,13 @@ func _resume_campaign() -> void:
 	if backdrop != null:
 		backdrop.queue_redraw()
 	_log("Back on %s." % world.planet.display_name)
+
+	# A run that was already over when it was saved must not resume as if it were
+	# not. The arc latches, so nothing would ever end it a second time: the player
+	# would be walking a dead clan around a live world forever.
+	if session.arc != null and session.arc.is_resolved():
+		SimulationBudget.set_paused(true)
+		_show_ending(session.arc.outcome, session.arc.chronicle())
 
 
 func _ensure_player() -> void:
@@ -858,6 +905,10 @@ func _process(delta: float) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	# Nothing outranks the end of a run. Without this the player can walk the
+	# corpse around and open panels behind their own ending.
+	if _ending_screen != null and _ending_screen.visible:
 		return
 	if _star_map != null and _star_map.visible:
 		if event.keycode == KEY_ESCAPE or event.keycode == KEY_J:

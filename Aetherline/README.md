@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**994 assertions pass** across nineteen suites plus a whole-project compile
+**996 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -547,7 +547,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (994 assertions)
+# the full suite (996 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 
@@ -642,6 +642,10 @@ its environment, saved and reloaded:
   priors seed, clans fork.
 - `GenomeLab.run_smoke_test` — drives the debug panel end to end, so a broken
   debug tool fails the build rather than being discovered later.
+- `EndingScreen.run_smoke_test` — both ways a run finishes, asserted to read
+  differently from each other, to name what the lineage understood and what it
+  could not keep, to say something rather than nothing for a clan that achieved
+  neither, and to report the way out being taken.
 
 **The hundredth monkey**, run verbatim as the Phase 4 deliverable: twenty
 creatures share one culture, a synthetic cold snap rewards migrating, and **only
