@@ -131,9 +131,12 @@ func land(planet_id: String) -> Array:
 		SimulationBudget.current_tick, SimulationBudget.TICKS_PER_DAY)
 	var residents := summary.take_residents()
 	if elapsed_days > 0.0:
+		var aged_cultures := _catch_up_cultures(residents, elapsed_days)
 		residents = _catch_up(residents, planet_id, elapsed_days)
-		EventBus.trace("planet_catchup",
-			{"planet": planet_id, "days": elapsed_days, "residents": residents.size()})
+		EventBus.trace("planet_catchup", {
+			"planet": planet_id, "days": elapsed_days, "residents": residents.size(),
+			"cultures_aged": aged_cultures,
+		})
 	EventBus.planet_landed.emit(planet_id)
 	return residents
 
@@ -157,6 +160,11 @@ func depart(carried_uids: Array, serializer: Callable = Callable()) -> void:
 		if serializer.is_valid():
 			var data: Variant = serializer.call(StringName(uid))
 			if typeof(data) == TYPE_DICTIONARY:
+				# Whoever stays here stops being part of the clan that leaves.
+				# Their culture forks now, while both halves still think the
+				# same thing, and diverges over the absence — see
+				# CultureResource.age_unattended.
+				_fork_culture_for_resident(data, planet_id)
 				summary.add_resident(data)
 		SimulationBudget.set_lod(StringName(uid), AetherTypes.SimLOD.DORMANT)
 
@@ -166,6 +174,47 @@ func depart(carried_uids: Array, serializer: Callable = Callable()) -> void:
 	active_planet_id = ""
 	active_world_root = null
 	EventBus.planet_departed.emit(planet_id, left_behind)
+
+
+## Move one departing resident onto a planet-local fork of its clan's culture.
+##
+## The id is derived from the parent and the planet, so landing here twice puts
+## the second wave of castaways into the same people the first wave became rather
+## than founding a third clan on the same rock.
+func _fork_culture_for_resident(data: Dictionary, planet_id: String) -> void:
+	var identity: Dictionary = data.get("identity", {})
+	if identity.is_empty():
+		return
+	var parent_id := String(identity.get("culture_id", ""))
+	if parent_id.is_empty():
+		# Empty means "resolve to lineage", which is what CultureRegistry does
+		# for a creature that never joined a named clan.
+		parent_id = String(identity.get("lineage_id", ""))
+	if parent_id.is_empty():
+		return
+	var child_id := "%s@%s" % [parent_id, planet_id]
+	var child := CultureRegistry.fork(parent_id, child_id, "left_behind")
+	child.member_count += 1
+	identity["culture_id"] = child.culture_id
+	data["identity"] = identity
+
+
+## Age every culture whose people were left here, across the absence.
+##
+## Bodies are caught up by `_catch_up`; this is the same idea applied to what
+## those bodies believe. Done once per culture rather than once per resident —
+## a culture is shared, and running it per head would drift it N times as far.
+func _catch_up_cultures(residents: Array, days: float) -> Dictionary:
+	var aged: Dictionary = {}
+	for data in residents:
+		var culture_id := String((data.get("identity", {}) as Dictionary).get("culture_id", ""))
+		if culture_id.is_empty() or aged.has(culture_id):
+			continue
+		var culture := CultureRegistry.get_culture(culture_id)
+		if culture == null:
+			continue
+		aged[culture_id] = culture.age_unattended(days)
+	return aged
 
 
 ## Integrate `days` of absence over creatures left behind without inflating
@@ -243,7 +292,7 @@ func _mourn(identity: Dictionary, planet_id: String, cause: String) -> void:
 	EventBus.creature_died.emit(uid, cause, SimulationBudget.current_tick)
 	var lineage := StoryDirector.get_lineage(StringName(identity.get("lineage_id", "")))
 	if lineage != null:
-		lineage.record_death(String(uid))
+		lineage.record_death(String(uid), cause, SimulationBudget.current_tick)
 		lineage.add_event(SimulationBudget.current_tick, planet_id, String(uid), "death",
 			"%s %s." % [identity.get("given_name", "Something"), cause], 0.8)
 

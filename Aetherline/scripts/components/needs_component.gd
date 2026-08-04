@@ -33,6 +33,11 @@ const RECOVERY_RATE := 0.7
 ## Needs already reported as critical, so the bus is not spammed every tick.
 var _critical_flags: Dictionary = {}
 
+## Reported dead already. Death fires exactly once — the StoryDirector, the
+## lineage record, the culture router and the campaign arc all react to it, and
+## none of them survive hearing it twice.
+var _dead: bool = false
+
 
 func values() -> Dictionary:
 	return {"hunger": hunger, "energy": energy, "health": health, "mood": mood, "social": social}
@@ -92,6 +97,7 @@ func tick(days: float) -> void:
 	mood = clampf(lerpf(mood, worst, clampf(days * 0.3, 0.0, 1.0)), 0.0, 1.0)
 
 	_check_critical()
+	_check_collapse()
 
 
 func feed(amount: float) -> void:
@@ -113,6 +119,53 @@ func heal(amount: float) -> void:
 	health = clampf(health + amount, 0.0, 1.0)
 	if creature != null and health > 0.25:
 		creature.stats.revive(0.4)
+
+
+## Health reaching zero through neglect ends the creature, exactly as a mortal
+## blow does.
+##
+## THIS WAS THE HOLE UNDER THE WHOLE SURVIVAL GAME. `tick` drained hunger into
+## health and then stopped at 0.0, and nothing anywhere checked it — so a starved
+## creature kept walking, foraging and breeding indefinitely. Combat had a proper
+## terminal state and neglect had none, which meant hunger was a number that went
+## down and never a thing that could take somebody from you.
+##
+## It routes through `resolve_mortal_blow` rather than reimplementing death, so
+## starvation behaves like every other lethal thing in the game: the fragile —
+## the very old and the very young — die, and everything else collapses first and
+## gets one chance to be helped back up. A clan losing its infants and its elders
+## to a bad winter first is both the correct simulation and the better story.
+func _check_collapse() -> void:
+	if _dead or creature == null or creature.stats == null:
+		return
+	if health > 0.0:
+		return
+
+	var stats: StatsComponent = creature.stats
+	if not stats.downed:
+		# First time down: collapse rather than die, unless this creature was
+		# never going to survive it.
+		if not stats.resolve_mortal_blow():
+			return
+	elif not stats.is_fragile():
+		# Already down and still at zero health: nobody came. Even the strong
+		# run out, or being downed would be a permanent safe state and the clan
+		# would accumulate a pile of invulnerable unconscious bodies.
+		pass
+
+	_dead = true
+	var cause := "starvation" if hunger <= 0.0 else (
+		"exhaustion" if energy <= 0.0 else "injury")
+	if creature.identity != null:
+		creature.identity.death_tick = SimulationBudget.current_tick
+		creature.identity.death_cause = cause
+	EventBus.creature_died.emit(
+		creature.identity.uid if creature.identity != null else &"",
+		cause, SimulationBudget.current_tick)
+
+
+func is_dead() -> bool:
+	return _dead
 
 
 func _check_critical() -> void:
@@ -139,6 +192,7 @@ func to_dict() -> Dictionary:
 	return {
 		"hunger": hunger, "energy": energy, "health": health, "mood": mood, "social": social,
 		"critical_flags": _critical_flags.duplicate(),
+		"dead": _dead,
 	}
 
 
@@ -149,3 +203,4 @@ func from_dict(d: Dictionary) -> void:
 	mood = float(d.get("mood", 0.7))
 	social = float(d.get("social", 0.5))
 	_critical_flags = d.get("critical_flags", {}).duplicate()
+	_dead = bool(d.get("dead", false))

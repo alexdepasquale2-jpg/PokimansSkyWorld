@@ -184,6 +184,15 @@ func uids_on_planet(planet_id: String) -> Array:
 	return out
 
 
+## Every creature the simulation knows about, whatever band it is in.
+##
+## The registry is the only place that knows the whole population — party,
+## settlers, colonists left behind on another world. Anything that counts people
+## by walking one of those lists instead counts a subset, and the subsets differ.
+func uids() -> Array:
+	return _registry.keys()
+
+
 func node_for(uid: StringName) -> Node:
 	var entry: Variant = _registry.get(String(uid))
 	return null if entry == null else entry["node"]

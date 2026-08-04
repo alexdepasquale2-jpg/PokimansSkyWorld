@@ -140,23 +140,18 @@ func describe() -> String:
 	if layout.is_empty():
 		return ""
 	var culture := CultureRegistry.get_culture(culture_id)
-	var lessons := 0
-	var gen := 0
-	var lean := ""
-	if culture != null:
-		culture.ensure_nets()
-		gen = culture.generation
-		lessons = culture.live.applies if culture.live != null else 0
-		var report: Array = culture.drive_report()
-		if not report.is_empty() and report[0] is Dictionary:
-			lean = String(report[0].get("drive", ""))
-	return "%s (%s) · %s · %d folk · clan gen %d · %d lessons%s" % [
+	# THROUGH LoreVoice, like everything else a player reads. This was the last
+	# raw clan readout in the game and it went straight into the event feed:
+	# "Kelwatch Watch (town) · wary · 18 folk · clan gen 0 · 3 lessons · lean
+	# foraging_priority." Rendering the opening minute of a campaign is what
+	# found it — the HUD had been cleaned up and this had not.
+	var who := LoreVoice.clan_name(culture) if culture != null else "folk"
+	var mood := LoreVoice.disposition(culture) if culture != null else ""
+	return "%s, a %s of %d — %s%s" % [
 		layout.get("name", "Settlement"),
-		SettlementGenerator.tier_name(int(layout.get("tier", 0))),
-		String(layout.get("ethos", "?")),
-		_living_count(),
-		gen, lessons,
-		(" · lean " + lean) if not lean.is_empty() else ""]
+		SettlementGenerator.tier_name(int(layout.get("tier", 0))).to_lower(),
+		_living_count(), who,
+		(", %s" % mood) if not mood.is_empty() else ""]
 
 
 func dialogue_flavor(building_entry: Dictionary) -> String:
@@ -189,7 +184,9 @@ func dialogue_flavor(building_entry: Dictionary) -> String:
 		_:
 			lines.append("We are still learning how to stay.")
 	if not lean.is_empty():
-		lines.append("These days the clan leans toward %s." % lean.to_lower())
+		# `drive_noun`, not the raw id. A villager was saying "These days the clan
+		# leans toward foraging_priority." out loud, in dialogue, to the player.
+		lines.append("These days we lean toward %s." % LoreVoice.drive_noun(lean))
 	if culture != null and culture.generation > 0:
 		lines.append("This is generation %d of our fire." % culture.generation)
 	return "%s the %s: \"%s\"" % [name, role, " ".join(lines)]
@@ -412,15 +409,15 @@ func _village_life_lesson() -> void:
 	if kind == "distance_travelled":
 		amt = 20.0 + _rng.randf() * 40.0
 	c.experience.log_event(kind, amt)
-	# Rare generation pressure: high member activity advances the clan story.
-	var culture := CultureRegistry.get_culture(culture_id)
-	if culture != null and culture.live != null and culture.live.applies > 0 \
-			and culture.live.applies % 40 == 0:
-		culture.note_birth(culture.generation + 1)
-		if culture.generation_advance_due():
-			culture.advance_generation()
-			culture_taught.emit("%s advanced to generation %d — the fire remembers more." % [
-				layout.get("name", "The village"), culture.generation])
+	# Generations are NOT pressed from here any more.
+	#
+	# This used to reimplement the boundary inline and got it wrong three ways: it
+	# skipped the half that turns the neuronal tree over; it asked
+	# `applies % 40 == 0`, a level rather than an edge, so it fired on every lesson
+	# for as long as `applies` sat on a multiple of forty; and hanging the clock
+	# off village life at all meant a party out in the field never aged. It is a
+	# day counter now, owned by CultureTicker, and the generation is narrated
+	# through LoreVoice like every other thing a player is told.
 
 
 func _deed_line(kind: String, culture: CultureResource) -> String:

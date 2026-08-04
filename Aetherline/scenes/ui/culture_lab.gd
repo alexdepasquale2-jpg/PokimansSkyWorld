@@ -515,7 +515,10 @@ func run_smoke_test() -> Array[String]:
 	if CultureRegistry.count() < 2:
 		problems.append("forking did not produce a second culture")
 
-	_draw_chart()
+	# `queue_redraw`, not `_draw_chart` directly: drawing outside `_draw` is an
+	# engine error, and this smoke test printed one on every run while still
+	# reporting a clean pass. The chart is exercised by the redraw it schedules.
+	_chart.queue_redraw()
 	_refresh_all()
 	if _ledger.text.is_empty():
 		problems.append("ledger went blank after edits")

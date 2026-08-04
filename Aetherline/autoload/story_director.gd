@@ -431,6 +431,16 @@ func _on_experience_logged(uid: StringName, kind: String, amount: float, payload
 
 func _on_creature_died(uid: StringName, cause: String, tick: int) -> void:
 	observe("death", uid, 1.0, {"cause": cause, "tick": tick}, 0.9)
+	# Close the entry in the bloodline. Deaths reached the lineage from exactly
+	# one place — `PlanetManager._mourn`, the catch-up path for people who died
+	# while nobody was watching — so anybody who died in front of the player
+	# stayed marked living in the record named after them.
+	var node := SimulationBudget.node_for(uid)
+	if node == null or not is_instance_valid(node) or node.identity == null:
+		return
+	var lineage := get_lineage(node.identity.lineage_id)
+	if lineage != null:
+		lineage.record_death(String(uid), cause, tick)
 
 
 func _on_archetype_crystallized(uid: StringName, archetype_id: StringName, tick: int) -> void:

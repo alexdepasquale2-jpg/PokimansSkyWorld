@@ -46,10 +46,23 @@ func apply(mark: EpigeneticMarkResource, reinforce_amount: float = 0.15,
 
 
 ## Age every mark and drop the ones that have faded to nothing.
-func decay_all(delta_days: float, base_rate: float = 0.02) -> void:
+## Age every mark, dropping the ones that have faded to nothing.
+##
+## Returns the definition ids that expired, so a caller can say so. It used to
+## return nothing and the marks simply disappeared: the world would mark a
+## creature, the feed would announce it, and then the mark would quietly vanish
+## along with whatever it was doing to that creature's traits. A player watching
+## an animal get slower with no event to attach it to has been told a lie by
+## omission.
+func decay_all(delta_days: float, base_rate: float = 0.02) -> Array[StringName]:
+	var lost: Array[StringName] = []
 	for m in marks:
 		m.decay(delta_days, base_rate)
-	marks = marks.filter(func(m): return not m.is_expired())
+		if m.is_expired():
+			lost.append(m.definition_id)
+	if not lost.is_empty():
+		marks = marks.filter(func(m): return not m.is_expired())
+	return lost
 
 
 func remove(uid: StringName) -> void:

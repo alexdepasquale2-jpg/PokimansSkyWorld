@@ -6,6 +6,18 @@ class_name Overworld
 ## LOD) and ports phase3on verb handlers onto GameSession / Catch / Combat.
 
 const SAVE_SLOT := "campaign"
+
+## The keys worth naming on screen, and no more.
+##
+## The HUD used to carry all thirteen bindings permanently: "WASD · Q scan ·
+## Space fight · C throw · E interact · I inventory · U ship · J jump · P party ·
+## L your people · N understandings · M menu". A player has learned those inside
+## a minute and then spends the rest of the campaign with a line of text over
+## their world. These are the five that open something they cannot find any other
+## way; the rest are discoverable from the prompt line and the panels themselves.
+const HUD_KEYS: Array[String] = [
+	"WASD move", "E interact", "L your people", "N understandings", "M menu",
+]
 const FAUNA_COUNT := 8
 const FAUNA_SPAWN_RADIUS := 900.0
 const ALLY_RADIUS := 400.0
@@ -16,6 +28,7 @@ const TARGET_RANGE := 260.0
 const LOD_REFRESH_INTERVAL := 0.5
 const SENSE_REFRESH_INTERVAL := 0.25
 const ATMOS_REFRESH_INTERVAL := 0.4
+const MIND_REFRESH_INTERVAL := 0.5
 const CAMERA_ZOOM := Vector2(1.65, 1.65)
 
 var session: GameSession
@@ -29,6 +42,7 @@ var resource_nodes: Array = []
 var settlement: SettlementView
 var settlement_runtime: SettlementRuntime
 var ticker: CultureTicker
+var growth: ClanGrowth
 var camera: Camera2D
 var atmos: CanvasModulate
 var backdrop: Node2D
@@ -44,15 +58,30 @@ var _party_panel: PartyPanel
 var _star_map
 var _ship_view: ShipView
 var _inventory_panel: InventoryPanel
+var _people_panel: PeoplePanel
+var _neuron_panel: NeuronPanel
+var _ending_screen: EndingScreen
 var _service_menu: ServiceMenu
 
-var _info: Label
+var _hud: HudRoot
 var _prompt: Label
 var _target_bar: Label
 var _log_label: RichTextLabel
 var _log_lines: Array[String] = []
 var _hud_panel: FxPanel
 var _target_panel: FxPanel
+
+## Presentation throttles for the neuronal feed. Not simulation state, so neither
+## is saved: a reload may repeat one line, which is cheaper than a save format
+## that carries what the player has already read.
+var _last_fear_line: int = -100000
+var _prompted_understanding: bool = false
+
+## HUD figures that cost a collection walk each. Refreshed on a timer, not per
+## frame — see `_refresh_mind_readout`.
+var _mind_timer: float = 0.0
+var _cached_living: int = 0
+var _cached_affordable: int = 0
 
 var _lod_timer: float = 0.0
 var _sense_timer: float = 0.0
@@ -75,6 +104,12 @@ func _ready() -> void:
 	var rewards := CultureRewardRouter.new()
 	rewards.name = "CultureRewardRouter"
 	add_child(rewards)
+	# A clan that is looked after grows. Before this the only way a lineage
+	# continued was paying for it at a settlement.
+	growth = ClanGrowth.new()
+	growth.name = "ClanGrowth"
+	growth.nursery = node_layer
+	add_child(growth)
 
 	session = GameSession.new()
 	session.name = "GameSession"
@@ -100,18 +135,59 @@ func _ready() -> void:
 	EventBus.planet_chunk_loaded.connect(_on_chunk_loaded)
 	EventBus.planet_chunk_unloaded.connect(_on_chunk_unloaded)
 	EventBus.archetype_crystallized.connect(_on_crystallized)
+	# The emergent layer announces itself IN PLAY. Until now every one of these
+	# fired into a debug bench or into nothing at all, so a player could run a
+	# whole campaign without ever being told that their bloodline had mutated,
+	# that the world was marking their animals, or that their clan had changed
+	# its mind. The systems were working and silent, which is the same as absent.
+	EventBus.mutation_occurred.connect(_on_mutation)
+	EventBus.epigenetic_mark_gained.connect(_on_mark_gained)
+	EventBus.epigenetic_mark_lost.connect(_on_mark_lost)
+	EventBus.culture_shifted.connect(_on_culture_shifted)
+	EventBus.culture_generation_advanced.connect(_on_generation_advanced)
+	EventBus.culture_forked.connect(_on_culture_forked)
+	EventBus.story_event_fired.connect(_on_story_event)
+	EventBus.neuronal_energy_gained.connect(_on_neuronal_energy)
+	EventBus.neuron_reinforced.connect(_on_neuron_reinforced)
+	EventBus.neurons_locked.connect(_on_neurons_locked)
+	EventBus.neurons_lost.connect(_on_neurons_lost)
+	EventBus.evolution_leap.connect(_on_evolution_leap)
+	# Stakes. A run can now be lost and won, and both need somebody watching.
+	EventBus.creature_born.connect(_on_creature_born)
+	EventBus.creature_died.connect(_on_creature_died)
+	EventBus.lineage_imperilled.connect(_on_lineage_imperilled)
+	EventBus.campaign_ended.connect(_on_campaign_ended)
 
 	_build_ui()
 	if bool(Engine.get_meta("aetherline_new_campaign", true)):
 		_begin_new_campaign()
 	else:
 		_resume_campaign()
+	# Primed before the first frame, or the HUD spends half a second claiming
+	# nobody is alive and warning the player that their people are dying.
+	_refresh_mind_readout()
 
 
 func _exit_tree() -> void:
 	_unbind(EventBus.planet_chunk_loaded, _on_chunk_loaded)
 	_unbind(EventBus.planet_chunk_unloaded, _on_chunk_unloaded)
 	_unbind(EventBus.archetype_crystallized, _on_crystallized)
+	_unbind(EventBus.mutation_occurred, _on_mutation)
+	_unbind(EventBus.epigenetic_mark_gained, _on_mark_gained)
+	_unbind(EventBus.epigenetic_mark_lost, _on_mark_lost)
+	_unbind(EventBus.culture_shifted, _on_culture_shifted)
+	_unbind(EventBus.culture_generation_advanced, _on_generation_advanced)
+	_unbind(EventBus.culture_forked, _on_culture_forked)
+	_unbind(EventBus.story_event_fired, _on_story_event)
+	_unbind(EventBus.neuronal_energy_gained, _on_neuronal_energy)
+	_unbind(EventBus.neuron_reinforced, _on_neuron_reinforced)
+	_unbind(EventBus.neurons_locked, _on_neurons_locked)
+	_unbind(EventBus.neurons_lost, _on_neurons_lost)
+	_unbind(EventBus.evolution_leap, _on_evolution_leap)
+	_unbind(EventBus.creature_born, _on_creature_born)
+	_unbind(EventBus.creature_died, _on_creature_died)
+	_unbind(EventBus.lineage_imperilled, _on_lineage_imperilled)
+	_unbind(EventBus.campaign_ended, _on_campaign_ended)
 
 
 func _unbind(source: Signal, handler: Callable) -> void:
@@ -131,6 +207,293 @@ func _on_crystallized(uid: StringName, archetype_id: StringName, _tick: int) -> 
 		return
 
 
+## --- The emergent layer, said out loud ------------------------------------------
+##
+## Every handler below is deliberately quiet about anything the player has no
+## stake in. A herd on the far side of the planet mutating is a true fact and
+## noise; the animal in their party mutating is news. The filter is ownership,
+## not distance.
+
+## Is this one of the player's own creatures?
+func _is_mine(uid: StringName) -> Creature:
+	if session == null or session.party == null:
+		return null
+	for entry in session.party.active:
+		var c: Creature = entry
+		if is_instance_valid(c) and c.identity != null and c.identity.uid == uid:
+			return c
+	return null
+
+
+func _on_mutation(uid: StringName, locus_id: StringName, _old: StringName,
+		_new: StringName) -> void:
+	var c := _is_mine(uid)
+	if c == null:
+		return
+	_log(LoreVoice.mutation_sentence(c.display_name(), String(locus_id)))
+
+
+func _on_mark_gained(uid: StringName, definition_id: StringName, _source: int) -> void:
+	var c := _is_mine(uid)
+	if c == null:
+		return
+	_log(LoreVoice.mark_sentence(c.display_name(), String(definition_id)))
+
+
+## And a mark has faded. Said as plainly as gaining one, because the trait moves
+## either way and only one direction used to be explained.
+func _on_mark_lost(uid: StringName, definition_id: StringName) -> void:
+	var c := _is_mine(uid)
+	if c == null:
+		return
+	_log(LoreVoice.mark_faded_sentence(c.display_name(), String(definition_id)))
+
+
+## The clan changed its mind about something. Already throttled at the emitter
+## (CultureRewardRouter.SHIFT_INTERVAL), so this cannot become chatter.
+func _on_culture_shifted(culture_id: String, drive_id: String, delta: float) -> void:
+	var culture := CultureRegistry.get_culture(culture_id)
+	if culture == null or not _is_player_culture(culture_id):
+		return
+	_log(LoreVoice.shift_sentence(LoreVoice.clan_name(culture), drive_id, delta))
+
+
+func _on_generation_advanced(culture_id: String, _generation: int, retained: float) -> void:
+	if not _is_player_culture(culture_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.generation_sentence(
+		CultureRegistry.get_culture(culture_id), retained))
+
+
+func _on_culture_forked(parent_culture_id: String, _child_culture_id: String,
+		reason: String) -> void:
+	var parent := CultureRegistry.get_culture(parent_culture_id)
+	if parent == null:
+		return
+	_log("[b]%s[/b]" % LoreVoice.fork_sentence(LoreVoice.clan_name(parent), reason))
+
+
+## StoryDirector narration. It has been producing real sentences about the
+## player's own animals since Phase 2 and delivering them to the genome lab.
+func _on_story_event(event: Dictionary) -> void:
+	var text := String(event.get("text", ""))
+	if text.is_empty():
+		return
+	_log("[i]%s[/i]" % text)
+
+
+## Somebody earned the clan something. The loudest thing in the loop that a
+## player can actually cause on purpose.
+##
+## A FIRST is always said, because it happens once ever per kind and it is the
+## sentence that teaches the player what the tree runs on. FEAR is throttled to
+## one line a day here in the presenter rather than on the bus: winning a fight
+## pays every time and should keep paying, but five identical lines a day would
+## train the player to stop reading the feed, and the feed is where every other
+## emergent system speaks.
+func _on_neuronal_energy(clan_id: String, kind: String, gained: float,
+		was_first: bool) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	if not was_first:
+		if float(SimulationBudget.current_tick - _last_fear_line) \
+				< SimulationBudget.TICKS_PER_DAY:
+			return
+		_last_fear_line = SimulationBudget.current_tick
+	var line := LoreVoice.energy_sentence(kind, was_first)
+	_log(("[b]%s[/b]" % line) if was_first else "[i]%s[/i]" % line)
+	if was_first and player != null:
+		ImpactEffect.spawn(self, player.global_position, Color(0.7, 0.95, 1.0), 180.0)
+	_hint_at_understanding(gained)
+
+
+## Spending is provisional, and the feed should say so at the moment it happens
+## rather than letting the player find out at the generation boundary.
+func _on_neuron_reinforced(clan_id: String, neuron_id: String) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log(LoreVoice.reinforced_sentence(neuron_id))
+
+
+## Say it once, the first time there is anything to spend. After that the HUD
+## carries it and the feed stays out of the way.
+func _hint_at_understanding(_gained: float) -> void:
+	if _prompted_understanding:
+		return
+	var tree := NeuronalTree.for_clan(_player_clan_id())
+	if not tree.affordable_ids().is_empty():
+		_prompted_understanding = true
+		_log("[i]They have understood enough to change something about "
+			+ "themselves. Press N.[/i]")
+
+
+func _on_neurons_locked(clan_id: String, neuron_ids: Array) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.neurons_locked_sentence(neuron_ids))
+
+
+## The loss is the mechanic, so it is said loudly and it says why.
+func _on_neurons_lost(clan_id: String, neuron_ids: Array) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.neurons_lost_sentence(neuron_ids))
+
+
+func _on_evolution_leap(clan_id: String, leap: int, locked_neurons: int) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.leap_sentence(leap, locked_neurons))
+	if player != null:
+		ImpactEffect.spawn(self, player.global_position, Color(1.0, 0.9, 0.5), 320.0)
+	# A leap is the only thing that can win the run, so the arc is asked here
+	# rather than waiting for the next death to prompt it.
+	_evaluate_arc()
+
+
+## Somebody was born. `creature_born` has existed since Phase 1 with no listener
+## anywhere, because nothing in play produced a birth that was not the player
+## paying for one at a settlement.
+func _on_creature_born(child_uid: StringName, parent_a_uid: StringName,
+		_parent_b_uid: StringName) -> void:
+	var child := SimulationBudget.node_for(child_uid) as Creature
+	if child == null or not is_instance_valid(child):
+		return
+	if not _is_player_culture(CultureRegistry.culture_for(child).culture_id):
+		return
+	var mother := String(session.roster_names.get(String(parent_a_uid), ""))
+	_log("[b]%s[/b]" % LoreVoice.birth_sentence(child.display_name(), mother))
+	# Into the party if there is room for them, and left with the clan if not —
+	# `accept` stores and frees an overflow, which would delete a newborn the
+	# support arithmetic has just started counting.
+	if session.party.has_room(session.ship):
+		session.party.accept(child, session.ship)
+		session.enroll(child)
+	_refresh_mind_readout()
+
+
+## Somebody died. If they were yours, it matters, and it may have ended the run.
+func _on_creature_died(uid: StringName, cause: String, _tick: int) -> void:
+	if session == null:
+		return
+	var name := String(session.roster_names.get(String(uid), ""))
+	var mine := name != "" or _is_mine(uid) != null
+	if mine:
+		session.arc.note_death()
+		_log("[b]%s[/b]" % LoreVoice.death_sentence(
+			name if name != "" else "One of yours", cause))
+	_evaluate_arc()
+
+
+## The count that decides whether the lineage still exists.
+##
+## Read from the live party and colony rather than a tally kept somewhere: a
+## number maintained by hand is a number that eventually disagrees with the
+## bodies, and this one decides whether the player has lost.
+## How many of the player's clan are still alive.
+##
+## Same number the generational boundary uses, from the same owner — see
+## `CultureRegistry.living_members`. Counting the party and the settlers by hand
+## here gave a third answer, and the HUD's death warning and the boundary's
+## verdict have to be the same arithmetic or the warning is decoration.
+func _living_clan() -> int:
+	if session == null:
+		return 0
+	var counted := CultureRegistry.living_members(_player_clan_id())
+	if counted > 0 or session.party == null:
+		return counted
+	var living := 0
+	for entry in session.party.active:
+		var c: Creature = entry
+		if is_instance_valid(c) and c.needs != null and not c.needs.is_dead():
+			living += 1
+	return living
+
+
+func _evaluate_arc() -> void:
+	if session == null or session.arc.is_resolved():
+		return
+	var culture := CultureRegistry.get_culture("culture_colony")
+	session.arc.evaluate(_living_clan(), culture.generation if culture != null else 0)
+
+
+func _on_lineage_imperilled(_clan_id: String, living: int) -> void:
+	_log("[b]%s[/b]" % LoreVoice.imperilled_sentence(living))
+
+
+func _on_campaign_ended(_clan_id: String, outcome: int, chronicle: Dictionary) -> void:
+	for line in LoreVoice.ending_lines(outcome, chronicle):
+		_log(line)
+	SimulationBudget.set_paused(true)
+	_show_ending(outcome, chronicle)
+
+
+## Take the screen. Pausing and logging four lines into the same feed that
+## carries every other event is not an ending, and it left the player frozen in
+## place with nowhere to go.
+func _show_ending(outcome: int, chronicle: Dictionary) -> void:
+	if _ending_screen == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 20   # Above every panel; nothing outranks the end of a run.
+		layer.name = "EndingLayer"
+		add_child(layer)
+		_ending_screen = EndingScreen.new()
+		_ending_screen.begin_again.connect(_restart_campaign)
+		_ending_screen.to_menu.connect(_abandon_to_menu)
+		layer.add_child(_ending_screen)
+	_ending_screen.show_ending(outcome, chronicle)
+
+
+## Start over, and CLEAR THE SLOT FIRST.
+##
+## Without the delete, the finished run stays on disk: the menu's Continue is
+## enabled, and taking it reopens a resolved campaign whose arc has already
+## latched and can never fire again. A player would be handed their own corpse
+## with no ending and no way to tell it had happened.
+func _restart_campaign() -> void:
+	SaveSystem.delete_slot(SAVE_SLOT)
+	SimulationBudget.set_paused(false)
+	Engine.set_meta("aetherline_new_campaign", true)
+	get_tree().reload_current_scene()
+
+
+## Leave a finished run without writing it back to disk. `_to_menu` saves on the
+## way out, which is right for a run still in progress and exactly wrong here.
+func _abandon_to_menu() -> void:
+	SaveSystem.delete_slot(SAVE_SLOT)
+	SimulationBudget.set_paused(false)
+	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
+
+
+## Any culture the player's own creatures belong to.
+## The clan the player is actually travelling with.
+##
+## Read from the party rather than assumed, because `culture_colony` stops being
+## the answer the moment a culture forks — a colony left behind takes a
+## planet-local id, and the HUD and the Understandings screen must follow the
+## people on the ship, not the name they started under. Falls back to the
+## founding id before there is a party to ask.
+func _player_clan_id() -> String:
+	if session != null and session.party != null:
+		for entry in session.party.active:
+			var c: Creature = entry
+			if is_instance_valid(c) and c.identity != null:
+				return CultureRegistry.culture_for(c).culture_id
+	return "culture_colony"
+
+
+func _is_player_culture(culture_id: String) -> bool:
+	if session == null or session.party == null:
+		return false
+	for entry in session.party.active:
+		var c: Creature = entry
+		if not is_instance_valid(c):
+			continue
+		if CultureRegistry.culture_for(c).culture_id == culture_id:
+			return true
+	return false
+
+
 # --- Campaign --------------------------------------------------------------------
 
 func _menu_open() -> bool:
@@ -138,7 +501,10 @@ func _menu_open() -> bool:
 		or (_star_map != null and _star_map.visible) \
 		or (_ship_view != null and _ship_view.visible) \
 		or (_inventory_panel != null and _inventory_panel.visible) \
-		or (_service_menu != null and _service_menu.visible)
+		or (_people_panel != null and _people_panel.visible) \
+		or (_neuron_panel != null and _neuron_panel.visible) \
+		or (_service_menu != null and _service_menu.visible) \
+		or (_ending_screen != null and _ending_screen.visible)
 
 
 func _begin_new_campaign() -> void:
@@ -179,7 +545,8 @@ func _begin_new_campaign() -> void:
 	_log("Cultures learn from what they live. Villages keep their own fire.")
 	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
 		_log("Smoke on the wind: %s." % settlement_runtime.describe())
-	_log("Q scan · Space fight · C throw · E village/ship · J jump · U ship bay")
+	# The key list lives on the HUD now. Logging it here too put a second copy at
+	# the bottom of the screen, where the feed then scrolled it away.
 
 
 func _resume_campaign() -> void:
@@ -205,6 +572,13 @@ func _resume_campaign() -> void:
 	if backdrop != null:
 		backdrop.queue_redraw()
 	_log("Back on %s." % world.planet.display_name)
+
+	# A run that was already over when it was saved must not resume as if it were
+	# not. The arc latches, so nothing would ever end it a second time: the player
+	# would be walking a dead clan around a live world forever.
+	if session.arc != null and session.arc.is_resolved():
+		SimulationBudget.set_paused(true)
+		_show_ending(session.arc.outcome, session.arc.chronicle())
 
 
 func _ensure_player() -> void:
@@ -423,7 +797,7 @@ func _open_inventory() -> void:
 		_inventory_panel = InventoryPanel.new()
 		layer.add_child(_inventory_panel)
 		_inventory_panel.changed.connect(func():
-			if _info != null:
+			if _hud != null:
 				_update_info())
 	if _ship_view != null:
 		_ship_view.visible = false
@@ -502,6 +876,37 @@ func _on_settler_recruited(creature: Creature) -> void:
 	ImpactEffect.spawn(self, creature.global_position, Color(0.55, 0.9, 0.65), 90.0)
 
 
+## The screen the whole simulation exists to justify.
+func _open_people() -> void:
+	if session == null:
+		return
+	if _people_panel == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 6
+		layer.name = "PeopleLayer"
+		add_child(layer)
+		_people_panel = PeoplePanel.new()
+		_people_panel.set_anchors_preset(Control.PRESET_CENTER)
+		_people_panel.position = Vector2(180, 70)
+		layer.add_child(_people_panel)
+	_people_panel.open(session)
+
+
+## Where the player decides what their people become.
+func _open_neurons() -> void:
+	if session == null:
+		return
+	if _neuron_panel == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 6
+		layer.name = "NeuronLayer"
+		add_child(layer)
+		_neuron_panel = NeuronPanel.new()
+		_neuron_panel.position = Vector2(150, 50)
+		layer.add_child(_neuron_panel)
+	_neuron_panel.open(session, _player_clan_id())
+
+
 func _to_menu() -> void:
 	SaveSystem.save_game(SAVE_SLOT)
 	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
@@ -535,6 +940,11 @@ func _process(delta: float) -> void:
 		_sense_timer = 0.0
 		_refresh_world_senses()
 
+	_mind_timer += delta
+	if _mind_timer >= MIND_REFRESH_INTERVAL:
+		_mind_timer = 0.0
+		_refresh_mind_readout()
+
 	_atmos_timer += delta
 	if _atmos_timer >= ATMOS_REFRESH_INTERVAL:
 		_atmos_timer = 0.0
@@ -549,6 +959,10 @@ func _process(delta: float) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	# Nothing outranks the end of a run. Without this the player can walk the
+	# corpse around and open panels behind their own ending.
+	if _ending_screen != null and _ending_screen.visible:
 		return
 	if _star_map != null and _star_map.visible:
 		if event.keycode == KEY_ESCAPE or event.keycode == KEY_J:
@@ -576,6 +990,22 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.keycode == KEY_P or event.keycode == KEY_ESCAPE:
 			_party_panel.close()
 		return
+	if _neuron_panel != null and _neuron_panel.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_N:
+			_neuron_panel.close_panel()
+		elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			_neuron_panel.reinforce_selected()
+		elif event.keycode == KEY_X:
+			_neuron_panel.take_leap()
+		return
+	if _people_panel != null and _people_panel.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_L:
+			_people_panel.close_panel()
+		elif event.keycode == KEY_V:
+			# The one keystroke between "who your people are" and the policy
+			# that makes them that way.
+			_people_panel.toggle_advanced()
+		return
 	match event.keycode:
 		KEY_Q:
 			_scan()
@@ -595,6 +1025,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_toggle_ship()
 		KEY_I:
 			_open_inventory()
+		KEY_L:
+			_open_people()
+		KEY_N:
+			_open_neurons()
 		KEY_M:
 			_to_menu()
 
@@ -724,25 +1158,21 @@ func _scan() -> void:
 			% [discovered, totals["species"], totals["planets"], salvage])
 
 
+## What the player is told when they look at one of their own animals.
+##
+## Was: "clan lin_00000000_0004 · creature · gen 3 · 412 lessons · lean
+## foraging_priority 14%". Every term in that line is a true fact about a running
+## system and not one of them is a sentence. The numbers still exist and are one
+## keystroke away in the People menu; here the game speaks English.
 func _log_culture_summary(c: Creature) -> void:
 	if c == null or c.identity == null:
 		return
 	var culture := CultureRegistry.culture_for(c)
-	culture.ensure_nets()
-	var drives: Array = culture.drive_report()
-	var top := ""
-	if not drives.is_empty() and drives[0] is Dictionary:
-		var first: Dictionary = drives[0]
-		top = "%s %.0f%%" % [String(first.get("drive", "?")), float(first.get("p", 0.0)) * 100.0]
-	var kind := "human" if c.identity.is_human else "creature"
-	var gen := culture.generation
-	var applies := culture.live.applies if culture.live != null else 0
-	_log("  clan %s · %s · gen %d · %d lessons%s" % [
-		culture.display_name if not culture.display_name.is_empty() else culture.culture_id,
-		kind, gen, applies,
-		(" · lean " + top) if not top.is_empty() else ""])
-	if c.ai != null:
-		_log("  doing: %s" % c.ai.state_name().to_lower())
+	_log("  %s" % LoreVoice.clan_headline(culture))
+	_log("  %s" % LoreVoice.clan_history(culture))
+	var becoming := LoreVoice.creature_becoming(c)
+	if not becoming.is_empty():
+		_log("  %s" % becoming)
 
 
 func _log_phenotype_summary(c: Creature, species_name: String) -> void:
@@ -1324,46 +1754,13 @@ func _build_ui() -> void:
 	layer.layer = 5
 	add_child(layer)
 
-	_hud_panel = FxPanel.new(Color(0.40, 0.78, 1.0), 0.72)
-	_hud_panel.position = Vector2(12, 12)
-	_hud_panel.custom_minimum_size = Vector2(460, 0)
-	layer.add_child(_hud_panel)
-	var hud_margin := MarginContainer.new()
-	for side in ["left", "top", "right", "bottom"]:
-		hud_margin.add_theme_constant_override("margin_" + side, 12)
-	_hud_panel.add_child(hud_margin)
-	var hud_box := VBoxContainer.new()
-	hud_box.add_theme_constant_override("separation", 4)
-	hud_margin.add_child(hud_box)
-
-	_info = Label.new()
-	_info.add_theme_color_override("font_color", Color(0.90, 0.93, 0.98))
-	_info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	_info.add_theme_constant_override("outline_size", 3)
-	_info.add_theme_font_size_override("font_size", 14)
-	hud_box.add_child(_info)
-
-	var hint := Label.new()
-	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · M menu"
-	hint.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
-	hint.add_theme_font_size_override("font_size", 11)
-	hud_box.add_child(hint)
-
-	_target_panel = FxPanel.new(Color(1.0, 0.55, 0.45), 0.65)
-	_target_panel.position = Vector2(12, 118)
-	_target_panel.custom_minimum_size = Vector2(360, 0)
-	_target_panel.visible = false
-	layer.add_child(_target_panel)
-	var t_margin := MarginContainer.new()
-	for side in ["left", "top", "right", "bottom"]:
-		t_margin.add_theme_constant_override("margin_" + side, 10)
-	_target_panel.add_child(t_margin)
-	_target_bar = Label.new()
-	_target_bar.add_theme_font_size_override("font_size", 16)
-	_target_bar.add_theme_color_override("font_color", Color(1.0, 0.78, 0.72))
-	_target_bar.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	_target_bar.add_theme_constant_override("outline_size", 3)
-	t_margin.add_child(_target_bar)
+	# The HUD is its own component now. It used to be built and formatted inline
+	# here — about 120 lines of Label wiring and one six-line format string —
+	# in the middle of the planet-streaming layer, which is neither where it
+	# belongs nor anywhere anybody would look for it.
+	_hud = HudRoot.new()
+	layer.add_child(_hud)
+	_hud.show_keys(HUD_KEYS)
 
 	_prompt = Label.new()
 	_prompt.add_theme_font_size_override("font_size", 17)
@@ -1407,42 +1804,64 @@ func _log(text: String) -> void:
 	_log_label.text = "\n".join(_log_lines.map(func(l): return "· " + l))
 
 
+## Hand the HUD what it needs. It decides how any of it reads.
+##
+## Every frame, but cheap by construction: the two figures that cost a collection
+## walk (`living_members`, `affordable_ids`) are cached on a timer in
+## `_refresh_mind_readout`, and everything else here is a field read.
 func _update_info() -> void:
-	if world == null or player == null or session == null or _info == null:
+	if world == null or player == null or session == null or _hud == null:
 		return
-	var biome_name := "?"
+
+	var biome_name := ""
 	var biome_id := world.biome_at(player.position)
 	if not biome_id.is_empty():
 		biome_name = String(PlanetGenerator.get_biome(biome_id).get("display_name", biome_id))
-	var leader := session.party.leader()
-	var leader_text := "no one able"
-	var culture_line := ""
-	var colony := CultureRegistry.get_culture("culture_colony")
-	if colony != null:
-		colony.ensure_nets()
-		var report: Array = colony.drive_report()
-		var lean := ""
-		if not report.is_empty() and report[0] is Dictionary:
-			lean = String(report[0].get("drive", ""))
-		culture_line = "\nclan %s · gen %d · %d lessons%s" % [
-			colony.display_name, colony.generation, colony.live.applies if colony.live != null else 0,
-			(" · " + lean) if not lean.is_empty() else ""]
-	var village_line := ""
-	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
-		var d_plaza := player.position.distance_to(settlement_runtime.center())
-		if d_plaza < 520.0:
-			village_line = "\n%s" % settlement_runtime.describe()
-	if leader != null:
-		leader_text = "%s   %d/%d hp" % [leader.display_name(),
-			int(leader.stats.hp), int(leader.stats.max_hp())]
-	var pos := player.position
-	var dex := session.discovery.totals()
-	var mass := session.stock.carried_mass()
-	var cap := session.stock.carry_capacity
-	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s" % [
-		world.planet.display_name, biome_name, pos.x, pos.y,
-		leader_text,
-		session.party.size(), session.party.party_limit(session.ship),
-		session.party.total_caught(),
-		dex["species"], session.ship.salvage, mass, cap, session.jumps_made,
-		culture_line, village_line]
+	_hud.show_place(world.planet.display_name, biome_name)
+
+	_hud.show_leader(session.party.leader())
+
+	var arc: CampaignArc = session.arc
+	_hud.show_run(arc.leaps_taken() if arc != null else 0, _cached_living,
+		_clan_line())
+
+	var tree := NeuronalTree.for_clan(_player_clan_id())
+	_hud.show_understanding(tree.energy, _cached_affordable, tree.pending.size(),
+		int(floor(float(_cached_living) / NeuronalTree.SUPPORT_PER_PENDING)))
+
+	# A state, not an event, so it is sticky and it outranks everything else the
+	# HUD can raise. Cleared the moment the clan recovers.
+	#
+	# GATED ON HAVING LOST SOMEBODY. A campaign opens with one human and a
+	# failing ship, so `living <= DIRE_MEMBERS` is true on the very first frame —
+	# rendering the game showed "Your people are dying out — one left." over the
+	# landfall card of a run four seconds old. Dying OUT means having been more
+	# than this and fallen, which is what `peak_members` records.
+	if _cached_living > 0 and _cached_living <= CampaignArc.DIRE_MEMBERS \
+			and arc != null and arc.peak_members > _cached_living:
+		_hud.raise_alarm("Your people are dying out — %s left."
+			% ("one" if _cached_living == 1 else str(_cached_living)), true)
+	else:
+		_hud.clear_sticky_alarm()
+
+
+## Who the clan are, in the plain register LoreVoice owns. This used to read
+## `clan Survivors · gen 3 · 412 lessons · lean foraging_priority`, which is the
+## machine talking.
+func _clan_line() -> String:
+	var culture := CultureRegistry.get_culture(_player_clan_id())
+	if culture == null:
+		return ""
+	return "%s — %s" % [LoreVoice.clan_name(culture), LoreVoice.disposition(culture)]
+
+
+## The two HUD figures that cost a collection walk each.
+##
+## `_update_info` runs every frame; `living_members` walks the whole simulation
+## registry and `affordable_ids` walks the neuron catalog checking prerequisites.
+## Neither changes fast enough to be worth that per frame, and the LOD governor
+## exists precisely so this project does not do O(population) work sixty times a
+## second. Everything else the HUD reads is a field.
+func _refresh_mind_readout() -> void:
+	_cached_living = _living_clan()
+	_cached_affordable = NeuronalTree.for_clan(_player_clan_id()).affordable_ids().size()

@@ -31,7 +31,7 @@ func add_local(res_id, qty: float) -> void:
 
 
 ## Spends from local first, then the hold. Returns false and changes nothing
-## if the total is insufficient ΓÇö partial spends would corrupt recipe atomicity.
+## if the total is insufficient — partial spends would corrupt recipe atomicity.
 func spend(costs: Dictionary) -> bool:
 	for res_id in costs:
 		if amount(res_id) < float(costs[res_id]):

@@ -1,7 +1,7 @@
 extends RefCounted
 class_name ShipSystem
 
-## The incremental layer ΓÇö and the reason to come back to orbit.
+## The incremental layer — and the reason to come back to orbit.
 ##
 ## Everything you do planetside earns salvage; salvage buys modules; modules
 ## widen what the planet layer is allowed to contain. Crucially the modules do
@@ -161,7 +161,7 @@ func jump_candidates() -> int:
 	return 3 + int(stat("candidates"))
 
 
-## Exotic worlds ΓÇö the extremes of the generator ΓÇö only become reachable once
+## Exotic worlds — the extremes of the generator — only become reachable once
 ## the drive can get there.
 func exotic_chance() -> float:
 	return clampf(stat("exotic_chance"), 0.0, 0.8)

@@ -25,7 +25,17 @@ headless on 4.5.1-stable.
 | 4a | AI: the shared cultural network | **complete — 383/383 self-tests pass** |
 | 4b | AI: combat, utility, embodiment | **complete** — combat + work/relationships/audio + culture AI |
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
-| 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades |
+| 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
+
+**1,025 assertions pass** across nineteen suites plus a whole-project compile
+gate. Run them with the command in [Running](#running) — note that it names
+`bootstrap.tscn` explicitly, because the main scene is the game now.
+
+The compile gate is first and is not a formality. The suites exercise *systems*,
+and the largest script in the project — `overworld.gd`, where the game actually
+happens — is touched by none of them, so a compile error there used to show a
+clean pass and then fail on New Game. Every `.gd` file outside `addons/` is now
+loaded and checked before anything else runs.
 
 ---
 
@@ -64,13 +74,21 @@ Aetherline/
 │       └── culture_resource.gd           ← one clan's brain: live + locked
 ├── scenes/
 │   ├── creatures/
-│   │   ├── creature.tscn         composition root: 9 sibling components
+│   │   ├── creature.tscn         composition root: 12 sibling components
 │   │   └── creature.gd           wiring, ticking, serialization only
-│   ├── world/                    (Phase 3)
+│   ├── world/
+│   │   ├── overworld.gd          the planet layer: five verbs, chunk streaming
+│   │   └── planet_world.gd       per-planet host + ecological field
 │   └── ui/
+│       ├── main_menu.tscn/.gd    THE MAIN SCENE since Phase 5
 │       ├── bootstrap.tscn/.gd    test harness + creature readout
 │       ├── genome_lab.tscn/.gd   interactive breeding bench
-│       └── culture_lab.tscn/.gd  watch a culture form; drift chart + ledger
+│       ├── culture_lab.tscn/.gd  watch a culture form; drift chart + ledger
+│       ├── star_map.gd           choose where to fall next
+│       ├── ship_view.gd          the incremental layer's shopfront
+│       ├── service_menu.gd · inventory_panel.gd · party_panel.gd
+│       ├── lineage_panel.gd · landfall_card.gd
+│       └── fps_bench.gd          population stress bench
 ├── scripts/
 │   ├── systems/
 │   │   ├── aether_types.gd       shared enums + i64 JSON helpers
@@ -79,7 +97,9 @@ Aetherline/
 │   │   ├── perception.gd         the 32-slot layout, owned in exactly one place
 │   │   ├── culture_reward_router.gd  events -> rewards -> gradients
 │   │   ├── culture_ticker.gd     drives FULL/NEAR/ABSTRACT off the LOD slices
-│   │   ├── culture_selftest.gd       70 assertions, incl. the hundredth monkey
+│   │   ├── culture_selftest.gd       88 assertions: hundredth monkey + separation
+│   │   ├── ship_system.gd        the incremental layer: modules, salvage
+│   │   ├── ship_selftest.gd          55 assertions, mostly salvage conservation
 │   │   ├── phenotype_resolver.gd genome -> traits, pure & static
 │   │   ├── condition_eval.gd     shared by archetypes and story templates
 │   │   ├── creature_factory.gd   the only place creatures come into existence
@@ -108,7 +128,14 @@ Aetherline/
 	├── archetypes/               archetypes.json (10 definitions)
 	├── culture/                  drives.json (12) · rewards.json (22) ·
 	│                             priors.json (6 authored dispositions)
-	├── biomes/                   (Phase 3)
+	├── biomes/                   biomes.json
+	├── colony/                   structures.json
+	├── economy/                  market.json · recipes.json
+	├── research/                 research.json
+	├── settlements/              buildings.json
+	├── ship/                     modules.json · achievements.json
+	├── upgrades/                 catalog.json
+	├── world/                    forage/population tables
 	└── events/                   story_events.json (8 templates)
 ```
 
@@ -435,21 +462,128 @@ lets a distant herd still reflect what the clan knows for near-zero cost.
 
 ---
 
+## Pacing
+
+Every number in the progression was invented: three evolution leaps to win, six
+understandings per crossing, two living members per pending neuron, a generation
+every forty gradient applications. Nothing could check them, because the suites
+drive systems directly — `StakesSelfTest` reaches the ambition by handing the
+tree a thousand support and unlimited energy, which says nothing about whether a
+player gets there.
+
+`PacingSelfTest` plays one campaign forward instead. A clan of six, kept fed, for
+three in-game years, through the real router and the real generational clock,
+buying the cheapest thing it can afford and crossing whenever it has earned it.
+One in-game day is 1,200 ticks at 60Hz — twenty real seconds.
+
+```
+in-game days to carry the bloodline across              300.00
+in-game days per generation                              60.00
+real hours of play, at twenty seconds a day               1.67
+generations that turned over                              5.00
+neuronal energy earned in total                        2212.00
+understandings locked into the lineage                   21.00
+understandings lost at a boundary                         8.00
+share of what they worked out that survived               0.72
+children born into the clan                               5.00
+living at the end                                        11.00
+
+  day   59  generation 1 ·  3 locked · 445 banked
+  day  119  generation 2 ·  7 locked · 751 banked
+  day  120  EVOLUTION LEAP 1 ·  7 understandings held
+  day  179  generation 3 · 11 locked · 242 banked
+  day  239  generation 4 · 16 locked · 493 banked
+  day  240  EVOLUTION LEAP 2 · 16 understandings held
+  day  299  generation 5 · 21 locked ·   8 banked
+  day  300  EVOLUTION LEAP 3 · 21 understandings held
+```
+
+### What the probe found
+
+**The boundary was firing on a level, not an edge.** The rule was
+`live.applies % 40 == 0`, checked once per village lesson. An apply lands only
+every sixteen accumulated gradients, so the condition stayed true across every
+check in between. The first run of this probe reported **7,086 generations** and
+a clan keeping **3%** of what it worked out — buy an understanding, watch it
+evaporate before the next lesson. The `degenerate softmax; falling back to
+uniform` warnings the run was throwing were the network being blended and
+drifted seven thousand times.
+
+**And it was clocked off the wrong thing.** Edge-triggering fixed the storm but
+not the premise. Generations tied to gradient throughput meant a clan aged
+faster when it was learning hard, so the cadence decayed as the reward baseline
+converged: 21, 23, 24, 39, 107, 169 days apart, the last third of a campaign
+spent waiting with 1,422 unspendable energy banked. Worse, it disagreed with
+`age_unattended` — leave a colony for three hundred days and it aged once; stay
+with it and it aged five times. **The same clan aged at two different rates
+depending on whether anybody was watching.**
+
+The clock is lived days now, for both paths, with `GENERATION_DAYS` as the only
+knob and an assertion that a watched clan and an absence buy exactly the same
+generations. The cadence is uniform and banked energy no longer runs away — most
+of that problem was the decay, not the catalog.
+
+**And the clan could not grow.** `BreedingSystem` has been complete since
+Phase 1 and was reachable in play from exactly one place: paying for "the
+stalls" at a settlement service menu. But the ceiling on everything the neuronal
+tree does is the number of living members — a boundary carries
+`floor(living / 2)` provisional understandings — so a clan that could not grow
+had a ceiling fixed at character creation that could only ever fall. `ClanGrowth`
+breeds one child per boundary from parents who are fed, whole and grown, which
+turns "look after your people" into "your people can hold more of what they have
+worked out". It is the arc the support arithmetic was always describing and
+nothing was producing. Locked-per-generation now climbs 3, 4, 4, 5, 5 as the
+clan grows from six to eleven, and the share of understandings that survive a
+boundary went from 0.55 to 0.72.
+
+### Still a judgement call
+
+`GENERATION_DAYS` is **60**, chosen to preserve what the old broken clock was
+actually delivering, so that fixing the clock did not silently reprice the
+campaign. It used to be 300, justified as the species' default `max_age_days` —
+a generation is a lifetime, which is the better story. Set it back to 300 and
+the same campaign takes about ten hours. That trade is a design decision, the
+constant is where to make it, and the probe prints what the change did.
+
+Re-run the probe after any change to the reward catalog, the neuron costs, or
+the boundary rule.
+
+---
+
 ## Running
 
-Open the folder in Godot 4.3+ and press F5, or headless:
+Open the folder in Godot 4.3+ and press F5 — that starts the **game**, at the
+main menu. The test harness is a separate scene and has to be named explicitly:
 
 ```bash
-godot --path . --headless --import && godot --path . --headless --quit-after 120
+# once, and after adding any new class_name
+godot --path . --headless --import
+
+# render every player-facing screen and write PNGs, under a virtual framebuffer
+xvfb-run -a -s "-screen 0 1600x900x24" godot --path Aetherline \
+    --display-driver x11 --rendering-driver opengl3 --resolution 1600x900 \
+    res://scenes/ui/ui_shots.tscn -- --shot-dir /tmp/shots
+
+# the full suite (1,025 assertions)
+godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
+
+Naming `bootstrap.tscn` matters and is easy to get wrong: `run/main_scene` is
+`main_menu.tscn` since Phase 5, so a bare `--quit-after` boots the game and runs
+no tests at all while looking like a clean pass.
 
 The `--import` pass is required after adding any new `class_name`; without it
 Godot has no global class registry and every type reference fails to parse.
 
-The bootstrap screen prints every autoload's self-report, runs both suites, and
+The bootstrap screen prints every autoload's self-report, runs every suite, and
 dumps a full readout of a creature that has been spawned, mutated, marked by
 its environment, saved and reloaded:
 
+- **The compile gate** — 114 assertions, one per `.gd` file in the project: it
+  loads every script and asks whether it compiled into something instantiable.
+  `load()` alone is not the check — a GDScript that fails to parse still comes
+  back non-null, and the first version of this gate passed a deliberately broken
+  `overworld.gd` and reported 114/114.
 - `DataModelSelfTest` — 82 assertions over the core resources, round-tripped
   through real JSON.
 - `CreatureSelfTest` — 94 assertions over the live creature: schema coverage
@@ -466,18 +600,69 @@ its environment, saved and reloaded:
   crystallization → consequences → narration), exclusivity, shattering,
   prerequisites, story templates, and save/load of all of it. Prints the
   narrative it actually produced.
-- `CultureSelfTest` — 70 assertions over the shared network: the analytic
+- `CultureSelfTest` — 88 assertions over the shared network: the analytic
   gradient checked against a numeric one in every layer (the assertion that
   separates "this learns" from "this random-walks"), softmax stability at
   ±900 logits, gradient clipping, NaN rollback, dead-slot inertness, the
   authored floor holding against a network pinned against it, 5,000 adversarial
   updates without collapse, a real save file round-tripped bit-for-bit — and the
   headline scenario below.
+- `CombatSelfTest` — 16 assertions over damage, defence and resolution.
+- `CatchingSelfTest` — 34 assertions: party limits, ship overflow, discovery,
+  the catch itself, and session state.
+- `ColonySelfTest` — 36 assertions: building, research, relationships, work.
+- `ProgressionSelfTest` — 53 assertions: stockpile, crafting, legacy score,
+  save robustness, LOD banding, and the audio/visual hooks.
+- `ShipSelfTest` — 55 assertions over the incremental layer, and mostly about
+  conservation rather than features: 400 randomised buy/sell operations must
+  never drive salvage negative nor create it from nothing, no owned level may
+  exist without a record of having been paid for, an achievement must not pay
+  twice, and a save written before the sell ledger existed must still refund
+  something when its modules are sold.
+- `StakesSelfTest` — 36 assertions about whether this game can be lost: neglect
+  killing, the tough collapsing before they die, extinction latching so a run
+  cannot be reloaded back into life, and the one that the rest exist to make
+  reachable — a clan thinned by death losing understandings it had worked out,
+  driven through `CultureRegistry.note_birth` with real registered creatures
+  rather than by calling the tree, because the tree was never the broken part.
+- `NeuronalSelfTest` — 67 assertions over the Ancestors loop end to end:
+  discovery paying only once, fear paying every time, prerequisites gating on
+  *locked* rather than pending, the generational boundary keeping what a clan can
+  support and losing the rest cheapest-first, leaps carrying banked surplus
+  forward, and — through the live router rather than by calling the tree — that
+  earning announces itself on the bus at all.
+- `LoreVoiceSelfTest` — 40 assertions that the game can explain itself, pulling
+  in two directions on purpose: the plain view must contain no ids, digits or
+  underscores, the advanced view must contain plenty, and every drive in the
+  catalog and every experience kind in the reward catalog must have a sentence.
+  Adding a drive and forgetting its voice fails the build rather than shipping
+  *"The Vess are becoming more tool_confidence."*
+- `PacingSelfTest` — plays a competent campaign forward for three in-game years
+  through the real router, real decisions, the real settlement generation rule
+  and a spend-the-cheapest-thing policy, and reports what happened. Only seven
+  assertions, all of them things that must hold whatever the tuning is — chiefly
+  that a competent clan can actually finish. Everything else is measured and
+  printed rather than asserted, because a test that pinned those numbers would
+  be freezing a guess into a requirement. See [Pacing](#pacing). It then saves
+  that finished campaign to a real file, reloads it, and asserts it came back
+  identical — the only place a campaign with a history is round-tripped rather
+  than a clean object built seconds earlier — and opens both player-facing
+  panels on it, which is the only place they meet a clan that has forgotten
+  something.
+- `GameplaySelfTest` — 35 assertions over the loop end to end: colony, harvest,
+  jump, save.
+- `WorldSelfTest` — 79 assertions over planet derivation and chunk streaming.
+- `NeuronPanel.run_smoke_test` — drives the Understandings screen: it opens,
+  refuses with a reason rather than greying out, and spends energy.
 - `CultureLab.run_smoke_test` — drives the culture bench end to end: teaching
   moves the clan, reset-to-inherited is an exact undo, generations advance,
   priors seed, clans fork.
 - `GenomeLab.run_smoke_test` — drives the debug panel end to end, so a broken
   debug tool fails the build rather than being discovered later.
+- `EndingScreen.run_smoke_test` — both ways a run finishes, asserted to read
+  differently from each other, to name what the lineage understood and what it
+  could not keep, to say something rather than nothing for a clan that achieved
+  neither, and to report the way out being taken.
 
 **The hundredth monkey**, run verbatim as the Phase 4 deliverable: twenty
 creatures share one culture, a synthetic cold snap rewards migrating, and **only

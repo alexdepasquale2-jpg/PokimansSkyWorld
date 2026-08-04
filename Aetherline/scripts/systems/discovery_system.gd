@@ -1,7 +1,7 @@
 extends RefCounted
 class_name DiscoverySystem
 
-## The Aetherdex ΓÇö the catalog that fills.
+## The Aetherdex — the catalog that fills.
 ##
 ## This is the loop's connective tissue. Every creature, resource and site you
 ## scan becomes a permanent entry with YOUR name on it, pays salvage, and
@@ -10,7 +10,7 @@ class_name DiscoverySystem
 ##
 ## Species identity is derived from the GENOME, not from a species table: two
 ## animals count as the same species when their defining alleles match. That
-## means a mutated line eventually reads as something new ΓÇö discovery and
+## means a mutated line eventually reads as something new — discovery and
 ## genetics are the same system seen from different ends.
 
 ## Loci that define a "species" for catalog purposes. Deliberately the visible,
@@ -86,7 +86,7 @@ func scan_creature(creature: Creature, planet: PlanetSeedResource, ship: ShipSys
 	var entry: Dictionary = species[key]
 	entry["sightings"] = int(entry["sightings"]) + 1
 
-	# A better bio-sensor records more about what it sees ΓÇö the same animal
+	# A better bio-sensor records more about what it sees — the same animal
 	# yields a richer entry later, which is a real reason to re-scan.
 	var depth := ship.reveal_depth()
 	var traits: Dictionary = entry["traits"]

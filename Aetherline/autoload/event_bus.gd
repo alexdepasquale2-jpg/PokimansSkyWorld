@@ -84,6 +84,47 @@ signal culture_generation_advanced(culture_id: String, generation: int, retained
 signal culture_forked(parent_culture_id: String, child_culture_id: String, reason: String)
 
 
+# --- The neuronal tree ---------------------------------------------------------
+#
+# Discrete, chosen inheritance, as against the culture signals above which report
+# learning nobody decided on. All four are events a player acts on or grieves
+# over, so all four belong on the bus.
+
+## Somebody did a thing nobody in this clan had ever done, or came through
+## something that should have killed them.
+##
+## THE EARNING HALF OF THE LOOP, and until this signal existed it was the only
+## half with no voice: spending, keeping and losing all announced themselves and
+## the thing that paid for them went out on `trace` — a debug channel. A player
+## could not find out what produces energy by playing, only by reading the
+## source, which makes the entire tree feel like it fills itself.
+##
+## Rare by construction rather than by throttling: a clan-first fires once per
+## experience kind for the life of the clan, and the fearful kinds are the ones
+## that were already rare enough to be worth surviving.
+signal neuronal_energy_gained(clan_id: String, kind: String, gained: float, was_first: bool)
+## A neuron was reinforced. Provisional until a generation turns over.
+signal neuron_reinforced(clan_id: String, neuron_id: String)
+## A generation carried these into the lineage permanently.
+signal neurons_locked(clan_id: String, neuron_ids: Array)
+## And could not carry these. The clan had worked them out and lost them.
+signal neurons_lost(clan_id: String, neuron_ids: Array)
+## The clan crossed the gap.
+signal evolution_leap(clan_id: String, leap: int, locked_neurons: int)
+
+
+# --- The run itself ------------------------------------------------------------
+#
+# A campaign can now be won and lost, which it could not before. Both are
+# once-per-run and both are the loudest thing the bus ever carries.
+
+## The clan is down to its last few. Fired once, while there is still time.
+signal lineage_imperilled(clan_id: String, living: int)
+## The run is over. `outcome` is a CampaignArc.Outcome; `chronicle` is what this
+## lineage did, for the ending to read back.
+signal campaign_ended(clan_id: String, outcome: int, chronicle: Dictionary)
+
+
 # --- World & travel -----------------------------------------------------------
 
 signal planet_generated(planet_id: String, seed: int)

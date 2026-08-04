@@ -231,6 +231,10 @@ func gate_logits() -> PackedFloat32Array:
 	var needs: NeedsComponent = creature.needs
 	var traits: Dictionary = creature.stats.phenotype() if creature.stats != null else {}
 	var bias: Dictionary = creature.archetype.ai_bias() if creature.archetype != null else {}
+	# Locked neurons bias the same gate layer, but keyed by DRIVE rather than by
+	# action — a neuron is a fact about cognition, not about one behaviour — so it
+	# is looked up separately below and multiplied in alongside the archetype.
+	var neuron_bias: Dictionary = NeuronalTree.for_creature(creature).drive_bias()
 	var need_scores := _need_scores(needs, traits)
 
 	for i in count:
@@ -258,6 +262,12 @@ func gate_logits() -> PackedFloat32Array:
 			var key := _key_for_state(as_state)
 			if bias.has(key):
 				gate *= float(bias[key])
+
+		# What the lineage has understood. Multiplies with the archetype rather
+		# than replacing it: a Guardian in a clan that has worked out Alarm Call
+		# is more protective than either fact alone would make it.
+		if neuron_bias.has(drive_id):
+			gate *= float(neuron_bias[drive_id])
 
 		out[i] = log(clampf(gate, GATE_FLOOR, GATE_CEILING))
 	return out

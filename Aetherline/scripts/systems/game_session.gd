@@ -6,7 +6,7 @@ class_name GameSession
 ## project holds to six), and registered with SaveSystem via the provider seam
 ## that has existed since Phase 0 for exactly this.
 ##
-## Everything the player accumulates lives here. Creature BODIES do not ΓÇö those
+## Everything the player accumulates lives here. Creature BODIES do not — those
 ## are spawned by the world scene and serialized through PlanetManager on
 ## departure; this holds the roster of who belongs to the colony.
 
@@ -30,7 +30,7 @@ var discovery := DiscoverySystem.new()
 ## Your team, and everything you've caught.
 var party := PartySystem.new()
 
-## Party data read from a save, waiting for the world scene to inflate it ΓÇö
+## Party data read from a save, waiting for the world scene to inflate it —
 ## creatures need a parent node, which does not exist at load time.
 var pending_party: Dictionary = {}
 
@@ -41,6 +41,10 @@ var roster: Array[String] = []
 ## uid -> last known display name, so the star map and menus can name someone
 ## whose body is currently in cold storage on another world.
 var roster_names: Dictionary = {}
+
+## What this run is for, and how it ends. Before this the session counted days
+## and jumps and nothing consumed either.
+var arc := CampaignArc.new("culture_colony")
 
 var days_elapsed: int = 0
 var jumps_made: int = 0
@@ -126,7 +130,7 @@ func spend(costs: Dictionary) -> bool:
 	return ok
 
 
-## Total edible material on hand ΓÇö what feeding actually draws from.
+## Total edible material on hand — what feeding actually draws from.
 func food_available() -> float:
 	return stock.amount("forage") + stock.amount("grain") + stock.amount("feed")
 
@@ -138,7 +142,7 @@ func consume_meal(amount: float = 8.0) -> float:
 		if stock.amount(res_id) >= amount:
 			stock.spend({res_id: amount})
 			resources_changed.emit()
-			# Compound feed is worth more than raw forage ΓÇö the whole point of
+			# Compound feed is worth more than raw forage — the whole point of
 			# researching it.
 			return {"feed": 1.0, "grain": 0.7, "forage": 0.5}[res_id]
 	return 0.0
@@ -166,13 +170,14 @@ func complete_jump() -> void:
 	jumps_made += 1
 	resources_changed.emit()
 	if not left.is_empty():
-		notice.emit("Left %d resource type(s) behind ΓÇö the hold was full." % left.size())
+		notice.emit("Left %d resource type(s) behind — the hold was full." % left.size())
 
 
 # --- Serialization ---------------------------------------------------------------
 
 func to_dict() -> Dictionary:
 	return {
+		"arc": arc.to_dict(),
 		"stock": stock.to_dict(),
 		"research": research.to_dict(),
 		"ship": ship.to_dict(),
@@ -200,5 +205,7 @@ func from_dict(d: Dictionary) -> void:
 	days_elapsed = int(d.get("days_elapsed", 0))
 	jumps_made = int(d.get("jumps_made", 0))
 	campaign_started = bool(d.get("campaign_started", false))
+	if d.has("arc"):
+		arc = CampaignArc.from_dict(d["arc"])
 	roster_changed.emit()
 	resources_changed.emit()
