@@ -65,6 +65,7 @@ func _ready() -> void:
 			"arm": func(n): n.open(_session)},
 		{"name": "star_map", "build": _build_star_map,
 			"arm": func(n): n.open(PlanetManager.known_planets.keys())},
+		{"name": "bloodline", "build": _build_bloodline},
 		{"name": "ending_triumph", "build": _build_ending_won},
 		{"name": "ending_extinction", "build": _build_ending_lost},
 	]
@@ -215,6 +216,57 @@ func _build_star_map() -> Node:
 	var panel := StarMap.new()
 	panel.position = Vector2(140, 70)
 	return panel
+
+
+## A line with real depth.
+##
+## Built through `ClanGrowth` — the same path the game uses — rather than by
+## calling `BreedingSystem` directly, because breeding refuses on reproductive
+## roles and a hand-rolled pairing quietly produced nothing. Two earlier attempts
+## at this shot photographed a scroll box containing one dot.
+func _build_bloodline() -> Node:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260902
+
+	var growth := ClanGrowth.new()
+	growth.rng.seed = 20260902
+	growth.nursery = self
+	add_child(growth)
+
+	var stock: Array[Creature] = []
+	for i in 8:
+		var c := CreatureFactory.spawn_random(self, rng, {"culture_id": "clan_shot"})
+		c.stats.initialize_vitals()
+		c.stats.age_days = c.stats.stat("max_age_days") * 0.4
+		c.needs.feed(1.0)
+		c.needs.heal(1.0)
+		stock.append(c)
+
+	for _i in 10:
+		var born := growth.attempt("clan_shot")
+		if born == null:
+			continue
+		born.stats.age_days = born.stats.stat("max_age_days") * 0.4
+		born.needs.feed(1.0)
+		born.needs.heal(1.0)
+	growth.free()
+
+	# Somebody does not make it, so the drawing has a hollow node in it — an
+	# ancestor who died is the reason the rest of the line exists.
+	var deepest: LineageRecordResource = null
+	for record in StoryDirector.lineages.values():
+		var line: LineageRecordResource = record
+		if deepest == null or line.descent.size() > deepest.descent.size():
+			deepest = line
+	if deepest != null and deepest.descent.size() > 2:
+		var last := ""
+		for uid in deepest.descent:
+			last = String(uid)
+		deepest.record_death(last, "starvation", SimulationBudget.current_tick)
+		print("  deepest line %s: %d people" % [deepest.display_name,
+			deepest.descent.size()])
+
+	return LineagePanel.new()
 
 
 func _build_ending_won() -> Node:

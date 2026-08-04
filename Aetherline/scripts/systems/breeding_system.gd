@@ -235,7 +235,10 @@ static func _announce_birth(child: Creature, sire: Creature, gestator: Creature,
 
 	var lineage := StoryDirector.get_lineage(child.identity.lineage_id)
 	if lineage != null:
-		lineage.record_birth(String(child.identity.uid), child.identity.generation)
+		lineage.record_birth(String(child.identity.uid), child.identity.generation,
+			child.identity.given_name, child.identity.parent_uids,
+			child.identity.birth_tick,
+			[sire.identity.given_name, gestator.identity.given_name])
 		lineage.note_planet(child.identity.birth_planet_id)
 
 	# The clan's culture learns that it has a new generation. Consolidation is

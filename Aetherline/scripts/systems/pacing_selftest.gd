@@ -212,6 +212,40 @@ func _test_a_tended_clan_grows(parent: Node) -> void:
 		% CultureRegistry.living_members("clan_grown"),
 		CultureRegistry.living_members("clan_grown") <= ClanGrowth.CLAN_SOFT_CAP)
 
+	# THE BLOODLINE IS RECORDED. The game is named for it and kept only a flat
+	# member list and a depth integer — every creature has carried
+	# `identity.parent_uids` since Phase 1 and it was discarded on arrival at the
+	# record whose whole job is remembering them.
+	var lineage := StoryDirector.get_lineage(child.identity.lineage_id) if child != null else null
+	if lineage != null:
+		_check("descent: a birth is written into the bloodline",
+			lineage.descent.has(String(child.identity.uid)))
+		var entry: Dictionary = lineage.descent.get(String(child.identity.uid), {})
+		_check("descent: with both parents named",
+			(entry.get("parents", []) as Array).size() == 2)
+		# Both parents are NAMED; only the gestating one is necessarily a member.
+		# Offspring join the maternal line, so the sire is routinely somebody
+		# else's bloodline — a tree that required both to be present would draw
+		# every child with a single parent.
+		_check("descent: with both of them named, whichever line they were from",
+			(entry.get("parent_names", []) as Array).size() == 2)
+		var in_record := 0
+		for forebear in (entry["parents"] as Array):
+			if lineage.descent.has(String(forebear)):
+				in_record += 1
+		_check("descent: and at least the one who carried them is in the line",
+			in_record >= 1)
+		_check("descent: a living child has no death on it",
+			int(entry.get("died", 0)) < 0)
+		var view := DescentView.new()
+		view.set_descent(lineage.descent, lineage.founder_uid)
+		_check("descent: and it draws as a tree, with links (%d people, %d links)"
+			% [view.node_count(), view.link_count()],
+			view.node_count() >= 3 and view.link_count() >= 2)
+		_check("descent: spanning more than one generation",
+			view.generations() >= 2)
+		view.free()
+
 	# THE RECURSION GUARD. Breeding calls note_birth, which can advance a
 	# generation, which emits the signal this listens to. Unguarded, one boundary
 	# breeds a clan into the ceiling in a single frame and the loop is invisible

@@ -140,7 +140,8 @@ static func _register_lineage(creature: Creature, opts: Dictionary) -> void:
 		lineage.founding_planet_id = identity.birth_planet_id
 		lineage.founding_planet_name = identity.birth_planet_name
 
-	lineage.record_birth(String(identity.uid), identity.generation)
+	lineage.record_birth(String(identity.uid), identity.generation,
+		identity.given_name, identity.parent_uids, identity.birth_tick)
 	if not identity.birth_planet_id.is_empty():
 		lineage.note_planet(identity.birth_planet_id)
 

@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**1,016 assertions pass** across nineteen suites plus a whole-project compile
+**1,024 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -564,7 +564,7 @@ xvfb-run -a -s "-screen 0 1600x900x24" godot --path Aetherline \
     --display-driver x11 --rendering-driver opengl3 --resolution 1600x900 \
     res://scenes/ui/ui_shots.tscn -- --shot-dir /tmp/shots
 
-# the full suite (1,016 assertions)
+# the full suite (1,024 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 

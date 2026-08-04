@@ -292,7 +292,7 @@ func _mourn(identity: Dictionary, planet_id: String, cause: String) -> void:
 	EventBus.creature_died.emit(uid, cause, SimulationBudget.current_tick)
 	var lineage := StoryDirector.get_lineage(StringName(identity.get("lineage_id", "")))
 	if lineage != null:
-		lineage.record_death(String(uid))
+		lineage.record_death(String(uid), cause, SimulationBudget.current_tick)
 		lineage.add_event(SimulationBudget.current_tick, planet_id, String(uid), "death",
 			"%s %s." % [identity.get("given_name", "Something"), cause], 0.8)
 
