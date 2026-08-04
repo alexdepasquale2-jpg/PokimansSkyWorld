@@ -500,6 +500,15 @@ static func _ordinal(n: int) -> String:
 
 # --- Stakes ------------------------------------------------------------------------
 
+## Someone new. The counterweight to `death_sentence`, and it says what a birth
+## is FOR in this game: one more pair of hands to hold what the clan has worked
+## out through the next generation.
+static func birth_sentence(name: String, mother: String = "") -> String:
+	if mother.is_empty():
+		return "%s is born. One more of them to carry what they know." % name
+	return "%s is born to %s. One more of them to carry what they know." % [name, mother]
+
+
 ## Someone is gone. Named plainly, because a euphemism here reads as the game
 ## not taking its own loss seriously.
 static func death_sentence(name: String, cause: String) -> String:

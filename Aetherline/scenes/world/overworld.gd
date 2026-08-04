@@ -30,6 +30,7 @@ var resource_nodes: Array = []
 var settlement: SettlementView
 var settlement_runtime: SettlementRuntime
 var ticker: CultureTicker
+var growth: ClanGrowth
 var camera: Camera2D
 var atmos: CanvasModulate
 var backdrop: Node2D
@@ -91,6 +92,12 @@ func _ready() -> void:
 	var rewards := CultureRewardRouter.new()
 	rewards.name = "CultureRewardRouter"
 	add_child(rewards)
+	# A clan that is looked after grows. Before this the only way a lineage
+	# continued was paying for it at a settlement.
+	growth = ClanGrowth.new()
+	growth.name = "ClanGrowth"
+	growth.nursery = node_layer
+	add_child(growth)
 
 	session = GameSession.new()
 	session.name = "GameSession"
@@ -133,6 +140,7 @@ func _ready() -> void:
 	EventBus.neurons_lost.connect(_on_neurons_lost)
 	EventBus.evolution_leap.connect(_on_evolution_leap)
 	# Stakes. A run can now be lost and won, and both need somebody watching.
+	EventBus.creature_born.connect(_on_creature_born)
 	EventBus.creature_died.connect(_on_creature_died)
 	EventBus.lineage_imperilled.connect(_on_lineage_imperilled)
 	EventBus.campaign_ended.connect(_on_campaign_ended)
@@ -162,6 +170,7 @@ func _exit_tree() -> void:
 	_unbind(EventBus.neurons_locked, _on_neurons_locked)
 	_unbind(EventBus.neurons_lost, _on_neurons_lost)
 	_unbind(EventBus.evolution_leap, _on_evolution_leap)
+	_unbind(EventBus.creature_born, _on_creature_born)
 	_unbind(EventBus.creature_died, _on_creature_died)
 	_unbind(EventBus.lineage_imperilled, _on_lineage_imperilled)
 	_unbind(EventBus.campaign_ended, _on_campaign_ended)
@@ -317,6 +326,27 @@ func _on_evolution_leap(clan_id: String, leap: int, locked_neurons: int) -> void
 	# A leap is the only thing that can win the run, so the arc is asked here
 	# rather than waiting for the next death to prompt it.
 	_evaluate_arc()
+
+
+## Somebody was born. `creature_born` has existed since Phase 1 with no listener
+## anywhere, because nothing in play produced a birth that was not the player
+## paying for one at a settlement.
+func _on_creature_born(child_uid: StringName, parent_a_uid: StringName,
+		_parent_b_uid: StringName) -> void:
+	var child := SimulationBudget.node_for(child_uid) as Creature
+	if child == null or not is_instance_valid(child):
+		return
+	if not _is_player_culture(CultureRegistry.culture_for(child).culture_id):
+		return
+	var mother := String(session.roster_names.get(String(parent_a_uid), ""))
+	_log("[b]%s[/b]" % LoreVoice.birth_sentence(child.display_name(), mother))
+	# Into the party if there is room for them, and left with the clan if not —
+	# `accept` stores and frees an overflow, which would delete a newborn the
+	# support arithmetic has just started counting.
+	if session.party.has_room(session.ship):
+		session.party.accept(child, session.ship)
+		session.enroll(child)
+	_refresh_mind_readout()
 
 
 ## Somebody died. If they were yours, it matters, and it may have ended the run.

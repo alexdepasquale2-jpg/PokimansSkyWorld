@@ -56,6 +56,7 @@ var stats: Array[String] = []
 
 var _clan: Array[Creature] = []
 var _router: CultureRewardRouter = null
+var _growth: ClanGrowth = null
 var _culture: CultureResource = null
 var _tree: NeuronalTree = null
 var _arc: CampaignArc = null
@@ -76,6 +77,7 @@ func run(parent: Node) -> Dictionary:
 
 	var restore_tick := SimulationBudget.current_tick
 	_test_both_clocks_agree(parent)
+	_test_a_tended_clan_grows(parent)
 	_play(parent)
 	_report()
 	_test_the_campaign_survives_a_reload()
@@ -141,6 +143,91 @@ func _test_both_clocks_agree(parent: Node) -> void:
 	CultureRegistry.reset()
 
 
+# --- Growth --------------------------------------------------------------------------
+
+## A clan that is looked after grows; a starving one does not.
+##
+## The ceiling on everything the neuronal tree does is the number of living
+## members — `floor(living / SUPPORT_PER_PENDING)` provisional understandings
+## survive a boundary — and until now that number could only fall. `BreedingSystem`
+## has been complete since Phase 1 and was reachable in play from exactly one
+## place: paying for it at a settlement.
+func _test_a_tended_clan_grows(parent: Node) -> void:
+	NeuronalTree.reset()
+	CultureRegistry.reset(20260814)
+	CultureRegistry.install(20260814)
+
+	var growth := ClanGrowth.new()
+	growth.rng.seed = 20260814
+	growth.nursery = parent
+	parent.add_child(growth)
+
+	var clan: Array[Creature] = []
+	for _i in 4:
+		var c := CreatureFactory.spawn_random(parent, _rng, {"culture_id": "clan_grown"})
+		c.stats.initialize_vitals()
+		# Fed, whole and grown — every condition the player controls.
+		c.stats.age_days = c.stats.stat("max_age_days") * 0.4
+		c.needs.feed(1.0)
+		c.needs.heal(1.0)
+		clan.append(c)
+
+	var before := CultureRegistry.living_members("clan_grown")
+	var child := growth.attempt("clan_grown")
+	_check("growth: a fed, whole clan produces a child", child != null)
+	_check("growth: and the support arithmetic counts them (%d -> %d)"
+		% [before, CultureRegistry.living_members("clan_grown")],
+		CultureRegistry.living_members("clan_grown") == before + 1)
+	if child != null:
+		_check("growth: the child belongs to its parents' clan",
+			CultureRegistry.culture_for(child).culture_id == "clan_grown")
+		_check("growth: and inherits what the lineage understands, not a fresh tree",
+			NeuronalTree.for_creature(child) == NeuronalTree.for_clan("clan_grown"))
+
+	# One at a time. A boundary that can double a clan makes the support
+	# arithmetic meaningless, whatever the parents' litter_size says.
+	_check("growth: exactly one, never a litter", growth.births == 1)
+
+	# Starve them and it stops. This is the half that makes growth a reward
+	# rather than a timer.
+	for c in clan:
+		c.needs.hunger = 0.1
+	var refused_at := growth.births
+	growth.attempt("clan_grown")
+	_check("growth: a starving clan does not have children",
+		growth.births == refused_at)
+
+	for c in clan:
+		c.needs.feed(1.0)
+	# And it stops at the ceiling rather than filling the world.
+	var guard := 0
+	while growth.births < ClanGrowth.CLAN_SOFT_CAP + 4 and guard < 40:
+		guard += 1
+		var born := growth.attempt("clan_grown")
+		if born != null:
+			born.needs.feed(1.0)
+			born.needs.heal(1.0)
+			born.stats.age_days = born.stats.stat("max_age_days") * 0.4
+	_check("growth: and stops at the clan's ceiling (%d living)"
+		% CultureRegistry.living_members("clan_grown"),
+		CultureRegistry.living_members("clan_grown") <= ClanGrowth.CLAN_SOFT_CAP)
+
+	# THE RECURSION GUARD. Breeding calls note_birth, which can advance a
+	# generation, which emits the signal this listens to. Unguarded, one boundary
+	# breeds a clan into the ceiling in a single frame and the loop is invisible
+	# from any one call site.
+	var births_before := growth.births
+	EventBus.culture_generation_advanced.emit("clan_grown", 1, 0.5)
+	_check("growth: a boundary cannot re-enter itself",
+		growth.births - births_before <= 1)
+
+	growth.free()
+	for c in clan:
+		c.queue_free()
+	NeuronalTree.reset()
+	CultureRegistry.reset()
+
+
 # --- The run ---------------------------------------------------------------------
 
 func _play(parent: Node) -> void:
@@ -155,6 +242,14 @@ func _play(parent: Node) -> void:
 
 	_router = CultureRewardRouter.new()
 	parent.add_child(_router)
+
+	# The clan grows if it is looked after, which is the arc the whole support
+	# arithmetic is built on: more living members, more understandings survive a
+	# boundary. Measuring a campaign with a fixed clan measured a floor.
+	_growth = ClanGrowth.new()
+	_growth.rng.seed = 20260812
+	_growth.nursery = parent
+	parent.add_child(_growth)
 
 	var energy_handler := func(_clan_id: String, _kind: String, gained: float, _first: bool):
 		_energy_earned += gained
@@ -204,9 +299,14 @@ func _live_a_day(day: int) -> void:
 	# attrition is not eating it. A first pass fed half a day's hunger and rested
 	# less than the daily drain, and five of six died inside a month; that says
 	# something about the needs curve, but it was measuring the wrong thing.
-	for c in _clan:
-		if c.needs.is_dead():
-			continue
+	for c in _living_clan():
+		# `tick_days` first, exactly as `Creature._on_day_passed` does it in play.
+		# A first pass ticked only needs, so nobody in the clan ever got a day
+		# older — and since ClanGrowth will not breed a creature younger than 15%
+		# of its lifespan, that quietly meant a clan that could never have
+		# children: 36 boundaries passed, 0 born, and the readout said "6 living"
+		# at the end of three years without ever explaining why.
+		c.tick_days(1.0)
 		c.needs.tick(1.0)
 		c.needs.feed(1.0)
 		c.needs.rest(1.0)
@@ -249,13 +349,27 @@ func _spend_like_a_player(day: int) -> void:
 
 
 func _someone_alive() -> Creature:
-	var living: Array[Creature] = []
-	for c in _clan:
-		if is_instance_valid(c) and not c.needs.is_dead():
-			living.append(c)
+	var living := _living_clan()
 	if living.is_empty():
 		return null
 	return living[_rng.randi() % living.size()]
+
+
+## Everyone in the clan, including anybody born into it since the run started —
+## children are not in `_clan`, they arrive through ClanGrowth and register
+## themselves, which is how the real game learns about them too.
+func _living_clan() -> Array[Creature]:
+	var living: Array[Creature] = []
+	for uid in SimulationBudget.uids():
+		var node := SimulationBudget.node_for(StringName(uid)) as Creature
+		if node == null or not is_instance_valid(node) or node.identity == null:
+			continue
+		if CultureRegistry.culture_for(node).culture_id != "clan_pacing":
+			continue
+		if node.needs == null or node.needs.is_dead():
+			continue
+		living.append(node)
+	return living
 
 
 # --- What it cost ------------------------------------------------------------------
@@ -309,6 +423,8 @@ func _report() -> void:
 	if reinforced > 0:
 		_note("share of what they worked out that survived",
 			float(_locked_total) / float(reinforced))
+	_note("children born into the clan", float(_growth.births))
+	_note("attempts that produced nobody", float(_growth.refusals))
 	_note("living at the end", float(CultureRegistry.living_members("clan_pacing")))
 
 	if not _timeline.is_empty():
@@ -451,6 +567,9 @@ func _teardown() -> void:
 		if is_instance_valid(c):
 			c.queue_free()
 	_clan.clear()
+	if _growth != null:
+		_growth.free()
+		_growth = null
 	if _router != null:
 		# Freed now, not queued: every suite runs in one frame, and a router that
 		# outlives its suite doubles the rewards of every suite after it.

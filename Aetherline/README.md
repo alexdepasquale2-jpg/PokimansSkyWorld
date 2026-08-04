@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**996 assertions pass** across nineteen suites plus a whole-project compile
+**1,005 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -477,25 +477,25 @@ buying the cheapest thing it can afford and crossing whenever it has earned it.
 One in-game day is 1,200 ticks at 60Hz — twenty real seconds.
 
 ```
-in-game days to carry the bloodline across              360.00
-gradient applications the clan lived through            232.00
+in-game days to carry the bloodline across              300.00
 in-game days per generation                              60.00
-real hours of play, at twenty seconds a day               2.00
-generations that turned over                              6.00
-neuronal energy earned in total                        2564.00
-understandings locked into the lineage                   18.00
-understandings lost at a boundary                        15.00
-share of what they worked out that survived               0.55
+real hours of play, at twenty seconds a day               1.67
+generations that turned over                              5.00
+neuronal energy earned in total                        2212.00
+understandings locked into the lineage                   21.00
+understandings lost at a boundary                         8.00
+share of what they worked out that survived               0.72
+children born into the clan                               5.00
+living at the end                                        11.00
 
-  day   59  generation 1 · 3 locked · 429 banked
-  day  119  generation 2 · 6 locked · 671 banked
-  day  120  EVOLUTION LEAP 1 · 6 understandings held
-  day  179  generation 3 · 9 locked · 236 banked
-  day  239  generation 4 · 12 locked · 518 banked
-  day  240  EVOLUTION LEAP 2 · 12 understandings held
-  day  299  generation 5 · 15 locked · 261 banked
-  day  359  generation 6 · 18 locked · 378 banked
-  day  360  EVOLUTION LEAP 3 · 18 understandings held
+  day   59  generation 1 ·  3 locked · 445 banked
+  day  119  generation 2 ·  7 locked · 751 banked
+  day  120  EVOLUTION LEAP 1 ·  7 understandings held
+  day  179  generation 3 · 11 locked · 242 banked
+  day  239  generation 4 · 16 locked · 493 banked
+  day  240  EVOLUTION LEAP 2 · 16 understandings held
+  day  299  generation 5 · 21 locked ·   8 banked
+  day  300  EVOLUTION LEAP 3 · 21 understandings held
 ```
 
 ### What the probe found
@@ -520,9 +520,21 @@ depending on whether anybody was watching.**
 
 The clock is lived days now, for both paths, with `GENERATION_DAYS` as the only
 knob and an assertion that a watched clan and an absence buy exactly the same
-generations. The cadence is uniform, the campaign runs two hours, and banked
-energy no longer runs away — most of that problem was the decay, not the
-catalog.
+generations. The cadence is uniform and banked energy no longer runs away — most
+of that problem was the decay, not the catalog.
+
+**And the clan could not grow.** `BreedingSystem` has been complete since
+Phase 1 and was reachable in play from exactly one place: paying for "the
+stalls" at a settlement service menu. But the ceiling on everything the neuronal
+tree does is the number of living members — a boundary carries
+`floor(living / 2)` provisional understandings — so a clan that could not grow
+had a ceiling fixed at character creation that could only ever fall. `ClanGrowth`
+breeds one child per boundary from parents who are fed, whole and grown, which
+turns "look after your people" into "your people can hold more of what they have
+worked out". It is the arc the support arithmetic was always describing and
+nothing was producing. Locked-per-generation now climbs 3, 4, 4, 5, 5 as the
+clan grows from six to eleven, and the share of understandings that survive a
+boundary went from 0.55 to 0.72.
 
 ### Still a judgement call
 
@@ -547,7 +559,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (996 assertions)
+# the full suite (1,005 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 
