@@ -327,9 +327,18 @@ func _selected_row() -> Dictionary:
 
 
 ## Living members of the clan — the number that decides how much can be carried.
+##
+## Asked of CultureRegistry rather than counted here, because this screen's whole
+## job is to warn the player what the next generation will cost them. It used to
+## count only the party while the boundary used a different number entirely, so
+## the warning was arithmetic about people the boundary was not looking at. One
+## count, or the screen lies.
 func _living() -> int:
-	if _session == null or _session.party == null:
-		return 0
+	var counted := CultureRegistry.living_members(_clan_id)
+	if counted > 0 or _session == null or _session.party == null:
+		return counted
+	# Nothing registered with the simulation — a bench, or a panel opened before
+	# landfall. Fall back to the party so the screen still says something true.
 	var living := 0
 	for entry in _session.party.active:
 		var c: Creature = entry

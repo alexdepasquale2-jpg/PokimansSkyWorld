@@ -16,6 +16,7 @@ const TARGET_RANGE := 260.0
 const LOD_REFRESH_INTERVAL := 0.5
 const SENSE_REFRESH_INTERVAL := 0.25
 const ATMOS_REFRESH_INTERVAL := 0.4
+const MIND_REFRESH_INTERVAL := 0.5
 const CAMERA_ZOOM := Vector2(1.65, 1.65)
 
 var session: GameSession
@@ -61,6 +62,12 @@ var _target_panel: FxPanel
 ## that carries what the player has already read.
 var _last_fear_line: int = -100000
 var _prompted_understanding: bool = false
+
+## HUD figures that cost a collection walk each. Refreshed on a timer, not per
+## frame — see `_refresh_mind_readout`.
+var _mind_timer: float = 0.0
+var _cached_living: int = 0
+var _cached_mind_line: String = ""
 
 var _lod_timer: float = 0.0
 var _sense_timer: float = 0.0
@@ -134,6 +141,9 @@ func _ready() -> void:
 		_begin_new_campaign()
 	else:
 		_resume_campaign()
+	# Primed before the first frame, or the HUD spends half a second claiming
+	# nobody is alive and warning the player that their people are dying.
+	_refresh_mind_readout()
 
 
 func _exit_tree() -> void:
@@ -326,18 +336,23 @@ func _on_creature_died(uid: StringName, cause: String, _tick: int) -> void:
 ## Read from the live party and colony rather than a tally kept somewhere: a
 ## number maintained by hand is a number that eventually disagrees with the
 ## bodies, and this one decides whether the player has lost.
+## How many of the player's clan are still alive.
+##
+## Same number the generational boundary uses, from the same owner — see
+## `CultureRegistry.living_members`. Counting the party and the settlers by hand
+## here gave a third answer, and the HUD's death warning and the boundary's
+## verdict have to be the same arithmetic or the warning is decoration.
 func _living_clan() -> int:
-	if session == null or session.party == null:
+	if session == null:
 		return 0
+	var counted := CultureRegistry.living_members(_player_clan_id())
+	if counted > 0 or session.party == null:
+		return counted
 	var living := 0
 	for entry in session.party.active:
 		var c: Creature = entry
 		if is_instance_valid(c) and c.needs != null and not c.needs.is_dead():
 			living += 1
-	if settlement_runtime != null:
-		for c in settlement_runtime.settlers:
-			if is_instance_valid(c) and c.needs != null and not c.needs.is_dead():
-				living += 1
 	return living
 
 
@@ -823,6 +838,11 @@ func _process(delta: float) -> void:
 	if _sense_timer >= SENSE_REFRESH_INTERVAL:
 		_sense_timer = 0.0
 		_refresh_world_senses()
+
+	_mind_timer += delta
+	if _mind_timer >= MIND_REFRESH_INTERVAL:
+		_mind_timer = 0.0
+		_refresh_mind_readout()
 
 	_atmos_timer += delta
 	if _atmos_timer >= ATMOS_REFRESH_INTERVAL:
@@ -1747,26 +1767,12 @@ func _update_info() -> void:
 	# The ambition, always on screen. A player who cannot see what they are aiming
 	# at is not playing toward anything, and this run has a destination now.
 	var arc: CampaignArc = session.arc
-	var living := _living_clan()
 	var arc_line := ""
 	if arc != null:
 		arc_line = "\nbloodline: %d/%d crossings · %d alive%s" % [
-			arc.leaps_taken(), CampaignArc.EVOLUTION_LEAPS_TO_WIN, living,
-			"  <<< YOUR PEOPLE ARE DYING" if living <= CampaignArc.DIRE_MEMBERS else ""]
-
-	# The neuronal loop's own line, and the only ambient signal that there is
-	# anything to spend. Both halves matter: what is available now, and what is
-	# still provisional — pending understandings are the ones a thin generation
-	# loses, and a player who cannot see the count cannot weigh it.
-	var tree := NeuronalTree.for_clan(_player_clan_id())
-	var mind_line := ""
-	var affordable := tree.affordable_ids().size()
-	if tree.energy >= 1.0 or not tree.pending.is_empty():
-		var at_risk: int = tree.pending.size()
-		var supportable := int(floor(float(living) / NeuronalTree.SUPPORT_PER_PENDING))
-		mind_line = "\nunderstanding: %.0f banked · %d within reach (N) · %d not yet safe%s" % [
-			tree.energy, affordable, at_risk,
-			"  <<< MORE THAN THEY CAN HOLD" if at_risk > supportable else ""]
+			arc.leaps_taken(), CampaignArc.EVOLUTION_LEAPS_TO_WIN, _cached_living,
+			"  <<< YOUR PEOPLE ARE DYING" if _cached_living <= CampaignArc.DIRE_MEMBERS
+				else ""]
 
 	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s%s" % [
 		world.planet.display_name, biome_name, pos.x, pos.y,
@@ -1774,4 +1780,29 @@ func _update_info() -> void:
 		session.party.size(), session.party.party_limit(session.ship),
 		session.party.total_caught(),
 		dex["species"], session.ship.salvage, mass, cap, session.jumps_made,
-		culture_line, village_line, arc_line + mind_line]
+		culture_line, village_line, arc_line + _cached_mind_line]
+
+
+## The clan's headcount and the neuronal readout, refreshed on a timer.
+##
+## `_update_info` runs every frame, and both of these walk collections rather
+## than reading a counter: `living_members` walks the whole simulation registry
+## and `affordable_ids` walks the neuron catalog checking prerequisites. Neither
+## changes fast enough to be worth that per frame, and the LOD governor exists
+## precisely so this project does not do O(population) work sixty times a second.
+func _refresh_mind_readout() -> void:
+	_cached_living = _living_clan()
+
+	# The only ambient signal that there is anything to spend. Both halves
+	# matter: what is available now, and what is still provisional — pending
+	# understandings are what a thin generation loses, and a player who cannot
+	# see the count cannot weigh it.
+	var tree := NeuronalTree.for_clan(_player_clan_id())
+	_cached_mind_line = ""
+	if tree.energy >= 1.0 or not tree.pending.is_empty():
+		var at_risk: int = tree.pending.size()
+		var supportable := int(
+			floor(float(_cached_living) / NeuronalTree.SUPPORT_PER_PENDING))
+		_cached_mind_line = "\nunderstanding: %.0f banked · %d within reach (N) · %d not yet safe%s" % [
+			tree.energy, tree.affordable_ids().size(), at_risk,
+			"  <<< MORE THAN THEY CAN HOLD" if at_risk > supportable else ""]

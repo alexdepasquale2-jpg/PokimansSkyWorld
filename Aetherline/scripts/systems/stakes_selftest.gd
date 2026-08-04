@@ -33,6 +33,7 @@ func run(parent: Node) -> Dictionary:
 	_test_neglect_kills(parent)
 	_test_the_tough_collapse_first(parent)
 	_test_decline_costs_understanding()
+	_test_the_boundary_counts_the_living(parent)
 	_test_extinction()
 	_test_triumph()
 	_test_arc_persistence()
@@ -145,6 +146,92 @@ func _test_decline_costs_understanding() -> void:
 
 	stats.append("  a clan of two could hold %d of %d things it had worked out"
 		% [(thinned["locked"] as Array).size(), pending_before])
+
+
+## The number the player is warned with must be the number the boundary uses.
+##
+## `_test_decline_costs_understanding` above proves the TREE can lose things when
+## it is told the clan is small. It says nothing about whether the game ever
+## tells it that, and the honest answer in play was no: the boundary took its
+## support from `culture.member_count`, which `note_birth` only increments. Births
+## raised it, deaths never lowered it, so support climbed forever and nothing was
+## ever lost — while the Understandings screen counted the party and the HUD
+## counted the party plus settlers and both promised a loss that could not come.
+##
+## Driven through `CultureRegistry.note_birth`, the one call site the game uses,
+## with real creatures registered with the simulation. A test that reached past
+## it into `NeuronalTree.advance_generation` would be testing the thing that was
+## never broken.
+func _test_the_boundary_counts_the_living(parent: Node) -> void:
+	NeuronalTree.reset()
+	CultureRegistry.reset(20260811)
+	CultureRegistry.install(20260811)
+	var culture := CultureRegistry.ensure("clan_counted", "The Counted")
+	culture.ensure_nets()
+
+	var clan: Array[Creature] = []
+	for _i in 8:
+		var c := CreatureFactory.spawn_random(parent, _rng, {"culture_id": "clan_counted"})
+		c.stats.initialize_vitals()
+		clan.append(c)
+
+	_check("living: the registry counts everyone in the clan (%d)"
+		% CultureRegistry.living_members("clan_counted"),
+		CultureRegistry.living_members("clan_counted") == 8)
+
+	# Births raise the cumulative record. They must not be what support is read
+	# from — that was the bug.
+	var recorded_before := culture.member_count
+	for _i in 5:
+		culture.note_birth(culture.generation)
+	_check("living: births raise the record but not the count of the living",
+		culture.member_count == recorded_before + 5
+			and CultureRegistry.living_members("clan_counted") == 8)
+
+	# Bank more than a thinned clan could carry. Only the root of each branch is
+	# reachable before anything has locked, which is four — comfortably more than
+	# two survivors can hold, which is the case this test is about.
+	var tree := NeuronalTree.for_clan("clan_counted")
+	tree.energy = 100000.0
+	for id in NeuronalTree.ids():
+		if tree.can_reinforce(id):
+			tree.reinforce(id)
+	var pending_before := tree.pending.size()
+	_check("living: the clan has more provisional than two of them could hold",
+		pending_before > int(floor(2.0 / NeuronalTree.SUPPORT_PER_PENDING)))
+
+	# Now kill most of them, the way neglect does.
+	for i in range(6):
+		var c := clan[i]
+		var guard := 0
+		while not c.needs.is_dead() and guard < 400:
+			guard += 1
+			c.needs.tick(1.0)
+	var survivors := CultureRegistry.living_members("clan_counted")
+	_check("living: death lowers it (%d left of 8)" % survivors, survivors == 2)
+
+	# And the boundary, reached the way the game reaches it, must act on that.
+	# Appended into, never reassigned: a GDScript lambda captures locals by value,
+	# so `lost_ids = ids` inside the handler would leave this array empty and the
+	# assertion below would quietly pass on nothing.
+	var lost_ids: Array = []
+	var handler := func(_clan: String, ids: Array): lost_ids.append_array(ids)
+	EventBus.neurons_lost.connect(handler)
+	CultureRegistry.note_birth("clan_counted", culture.generation + 1)
+	EventBus.neurons_lost.disconnect(handler)
+
+	_check("living: a generation turning over on a clan of two costs them "
+		+ "understandings (%d of %d lost)" % [lost_ids.size(), pending_before],
+		not lost_ids.is_empty())
+	_check("living: and it is the boundary the game actually calls that does it",
+		tree.pending.is_empty() and tree.locked.size() < pending_before)
+	stats.append("  a clan cut from eight to two kept %d of %d understandings"
+		% [tree.locked.size(), pending_before])
+
+	for c in clan:
+		c.queue_free()
+	NeuronalTree.reset()
+	CultureRegistry.reset()
 
 
 # --- Extinction ---------------------------------------------------------------------

@@ -413,12 +413,21 @@ func _village_life_lesson() -> void:
 		amt = 20.0 + _rng.randf() * 40.0
 	c.experience.log_event(kind, amt)
 	# Rare generation pressure: high member activity advances the clan story.
+	#
+	# THROUGH `CultureRegistry.note_birth`, NOT BY HAND. This used to reimplement
+	# the boundary inline — note the birth, check whether it was due, advance the
+	# culture — and in doing so skipped the half that turns the neuronal tree
+	# over. Village life is the generation pressure a real playthrough actually
+	# feels, so the effect was that pending understandings accumulated forever,
+	# nothing ever locked, nothing was ever lost, and the campaign's three
+	# evolution leaps were unreachable in play while the self-tests, which drive
+	# the tree directly, proved them reachable. One boundary, one call site.
 	var culture := CultureRegistry.get_culture(culture_id)
 	if culture != null and culture.live != null and culture.live.applies > 0 \
 			and culture.live.applies % 40 == 0:
-		culture.note_birth(culture.generation + 1)
-		if culture.generation_advance_due():
-			culture.advance_generation()
+		var before := culture.generation
+		CultureRegistry.note_birth(culture_id, culture.generation + 1)
+		if culture.generation > before:
 			culture_taught.emit("%s advanced to generation %d — the fire remembers more." % [
 				layout.get("name", "The village"), culture.generation])
 

@@ -126,7 +126,39 @@ static func note_birth(culture_id: String, child_generation: int) -> void:
 		# is numerous enough to carry. One is automatic and one is brutal, and
 		# they turn over together because they are the same generation.
 		NeuronalTree.for_clan(culture.culture_id).advance_generation(
-			float(culture.member_count))
+			float(living_members(culture.culture_id)))
+
+
+## How many of this clan are alive right now.
+##
+## THE ONE ANSWER, because there were three and they disagreed. The boundary used
+## `culture.member_count`, which `note_birth` only ever increments — a cumulative
+## record of births that no death reduces. So support at a generation change rose
+## forever, pending understandings always survived, and the loss branch that the
+## whole tree is built around could not fire in a real playthrough. Meanwhile the
+## Understandings screen counted the party, the HUD counted the party plus the
+## settlers, and both of them warned the player about a loss that was never going
+## to happen. A warning that does not come true is worse than no warning.
+##
+## Counted from SimulationBudget's registry, which is the only thing that knows
+## the whole population — including colonists on a world nobody is standing on,
+## who are still alive and still this clan's, unless departure forked them onto
+## an id of their own.
+static func living_members(culture_id: String) -> int:
+	var count := 0
+	for uid in SimulationBudget.uids():
+		var node := SimulationBudget.node_for(StringName(uid))
+		if node == null or not is_instance_valid(node):
+			continue
+		if node.get("identity") == null:
+			continue
+		if culture_for(node).culture_id != culture_id:
+			continue
+		var needs: Variant = node.get("needs")
+		if needs != null and needs.is_dead():
+			continue
+		count += 1
+	return count
 
 
 ## Split a culture in two, giving the child everything the parent knows today.

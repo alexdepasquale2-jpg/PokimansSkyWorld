@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**961 assertions pass** across eighteen suites plus a whole-project compile
+**967 assertions pass** across eighteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -471,7 +471,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (961 assertions)
+# the full suite (967 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 
@@ -526,10 +526,12 @@ its environment, saved and reloaded:
   exist without a record of having been paid for, an achievement must not pay
   twice, and a save written before the sell ledger existed must still refund
   something when its modules are sold.
-- `StakesSelfTest` — 30 assertions about whether this game can be lost: neglect
+- `StakesSelfTest` — 36 assertions about whether this game can be lost: neglect
   killing, the tough collapsing before they die, extinction latching so a run
   cannot be reloaded back into life, and the one that the rest exist to make
-  reachable — a clan thinned by death losing understandings it had worked out.
+  reachable — a clan thinned by death losing understandings it had worked out,
+  driven through `CultureRegistry.note_birth` with real registered creatures
+  rather than by calling the tree, because the tree was never the broken part.
 - `NeuronalSelfTest` — 67 assertions over the Ancestors loop end to end:
   discovery paying only once, fear paying every time, prerequisites gating on
   *locked* rather than pending, the generational boundary keeping what a clan can
