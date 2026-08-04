@@ -378,6 +378,58 @@ static func crystallized_sentence(name: String, archetype_id: String) -> String:
 
 # --- The neuronal tree -----------------------------------------------------------------
 
+## What each experience kind sounds like when it is the first time.
+##
+## Every entry is a PAST PARTICIPLE, so one table serves both sentences below:
+## "had never <clause> before" and "has <clause>". Splitting them into two tables
+## guarantees they drift apart, and the drift is invisible until a player reads a
+## line that does not parse.
+##
+## Keyed by the ids in `data/culture/rewards.json`. A test walks that catalog and
+## fails if a kind has no clause, because the fallback — the id with its
+## underscores knocked out — is exactly the register this whole file exists to
+## keep out of the game.
+const DEED_VOICE := {
+	"forage_success": "found food by looking for it",
+	"track_success": "followed something to where it was",
+	"combat_win": "stood in front of something and won",
+	"kill": "killed to eat",
+	"combat_loss": "been beaten and lived",
+	"damage_taken": "been hurt",
+	"near_death_survived": "come back from the edge of dying",
+	"trauma_events": "been broken and kept going",
+	"protect_ally": "taken a blow meant for someone else",
+	"damage_absorbed_for_ally": "bled in another's place",
+	"ally_died_under_protection": "lost someone who was counting on them",
+	"creature_tended": "cared for something that could not care for itself",
+	"creature_calmed": "quieted something that was frightened",
+	"offspring_survived": "raised young that lived",
+	"offspring_sired": "left young behind them",
+	"days_starving": "gone hungry and kept moving",
+	"hazards_endured": "walked into somewhere that could have killed them",
+	"isolation_days": "been alone",
+	"anomaly_investigated": "gone towards the strange thing instead of away",
+	"threat_foreseen": "seen it coming",
+	"biomes_entered": "crossed into country of a kind they had never seen",
+	"distance_travelled": "gone further than any of them had gone",
+}
+
+
+static func deed(kind: String) -> String:
+	return String(DEED_VOICE.get(kind, "done something none of them had done"))
+
+
+## The moment energy is earned — the half of the loop that had no voice at all.
+##
+## A player who is never told what pays cannot aim at it, and a tree that fills
+## without visible cause reads as a timer. `was_first` decides which of the two
+## reasons this is: something nobody had done, or something survived.
+static func energy_sentence(kind: String, was_first: bool) -> String:
+	if was_first:
+		return "None of them had ever %s. It leaves a mark." % deed(kind)
+	return "Somebody has %s. A clan keeps what it comes through." % deed(kind)
+
+
 static func neuron_name(neuron_id: String) -> String:
 	var definition := NeuronalTree.definition(neuron_id)
 	return String(definition.get("display_name", humanise(neuron_id)))

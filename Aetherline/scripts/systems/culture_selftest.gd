@@ -61,7 +61,13 @@ func run(parent: Node) -> Dictionary:
 	_test_tiers()
 	_test_rate_limiting()
 
-	_router.queue_free()
+	# `free`, not `queue_free`. Every suite in the bootstrap runs inside ONE
+	# `_ready`, so a queued free does not happen until the frame ends and this
+	# router stays connected to `experience_logged` through every suite that runs
+	# after it. Two live routers double every reward and every neuronal
+	# announcement — a test double outliving its test, and the failure lands in
+	# somebody else's suite where nobody thinks to look for it.
+	_router.free()
 	_router = null
 	CultureRegistry.reset()
 

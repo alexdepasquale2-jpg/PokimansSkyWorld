@@ -42,6 +42,9 @@ func _ready() -> void:
 		for p in GenomeDB.load_problems:
 			_out("· " + p)
 
+	_section("Every script compiles")
+	_report(_compile_everything())
+
 	_section("Core data model self-test")
 	_report(DataModelSelfTest.new().run())
 
@@ -180,6 +183,57 @@ func _ready() -> void:
 
 	_label.text = "\n".join(_lines)
 	_add_lab_button()
+
+
+## Load every script in the project and check it compiles.
+##
+## THE GAP THIS CLOSES: the self-tests exercise systems, not scenes. `overworld.gd`
+## is the largest script in the project and no suite touches it, so a compile
+## error there — a type inferred from a Variant, an untyped array literal returned
+## from a ternary — shows a clean 800-assertion pass and then fails the moment a
+## player presses New Game. That has now happened often enough to be a pattern
+## rather than an accident.
+##
+## Loading a script compiles it without running anything, so this is safe for
+## scripts that expect a live scene tree. It is not a substitute for playing the
+## game; it is the floor beneath it.
+func _compile_everything() -> Dictionary:
+	var lines: Array[String] = []
+	var failed := 0
+	var paths: Array[String] = []
+	_gather_scripts("res://", paths)
+	paths.sort()
+	for path in paths:
+		# `load()` is NOT the check. A GDScript that fails to parse still comes
+		# back as a non-null resource — the first version of this test passed a
+		# deliberately broken overworld.gd and reported 114/114. `can_instantiate`
+		# is the question actually being asked: did this compile into something
+		# the engine could build.
+		var script := load(path) as GDScript
+		if script != null and script.can_instantiate():
+			lines.append("  [PASS] compiles: " + path)
+		else:
+			failed += 1
+			lines.append("  [FAIL] does not compile: " + path)
+	return {"passed": paths.size() - failed, "failed": failed, "lines": lines}
+
+
+func _gather_scripts(dir_path: String, out: Array[String]) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while not entry.is_empty():
+		var full := dir_path.path_join(entry) if dir_path != "res://" else "res://" + entry
+		if dir.current_is_dir():
+			# `.godot` is the import cache; `addons` is not ours to vouch for.
+			if not entry.begins_with(".") and entry != "addons":
+				_gather_scripts(full, out)
+		elif entry.ends_with(".gd"):
+			out.append(full)
+		entry = dir.get_next()
+	dir.list_dir_end()
 
 
 ## Hand-off into the interactive Phase 1 tool.

@@ -148,10 +148,13 @@ func _feed_the_tree(uid: StringName, kind: String) -> void:
 	# log_event has already recorded this one, so a genuine first shows up as a
 	# first_seen tick equal to now.
 	var first := experience.when_first(kind) == SimulationBudget.current_tick
-	var gained := NeuronalTree.for_creature(node).observe(kind, first)
+	var tree := NeuronalTree.for_creature(node)
+	# Asked before `observe`, which is what records it. Afterwards the answer is
+	# always yes and the discovery is indistinguishable from a repeat.
+	var novel := first and not tree.has_discovered(kind)
+	var gained := tree.observe(kind, first)
 	if gained > 0.0:
-		EventBus.trace("neuronal_energy", {"clan": node.identity.uid, "kind": kind,
-			"gained": gained})
+		EventBus.neuronal_energy_gained.emit(tree.clan_id, kind, gained, novel)
 
 
 # --- Routing ------------------------------------------------------------------

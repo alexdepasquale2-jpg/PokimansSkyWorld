@@ -207,6 +207,13 @@ func _init(id: String = "") -> void:
 ## first-ever occurrence since Phase 1 and is already serialized — the discovery
 ## substrate was built long before there was anything to spend it on.
 ##
+## Has this clan ever done this before? Read-only, and deliberately separate from
+## `observe`, which is destructive — a caller that wants to announce a discovery
+## has to ask BEFORE the discovery is recorded, and there is no way to ask after.
+func has_discovered(kind: String) -> bool:
+	return known_firsts.has(kind)
+
+
 ## Returns the energy granted, so a caller can celebrate it.
 func observe(kind: String, is_first_for_creature: bool) -> float:
 	var gained := 0.0
@@ -264,6 +271,17 @@ func can_reinforce(neuron_id) -> bool:
 	if definition(neuron_id).is_empty() or is_held(neuron_id):
 		return false
 	return prerequisites_met(neuron_id) and energy >= cost_of(neuron_id)
+
+
+## Everything this clan could commit to right now. "Is there anything to do?" is
+## the question the HUD and the event feed both need answered, and asking it by
+## walking the catalog at every call site is how the two end up disagreeing.
+func affordable_ids() -> Array[String]:
+	var out: Array[String] = []
+	for id in ids():
+		if can_reinforce(id):
+			out.append(id)
+	return out
 
 
 func reinforce(neuron_id) -> bool:

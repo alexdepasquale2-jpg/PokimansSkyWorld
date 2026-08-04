@@ -37,6 +37,7 @@ func run(parent: Node) -> Dictionary:
 	_rng.seed = 20260806
 
 	_test_every_drive_has_a_voice()
+	_test_every_deed_has_a_voice()
 	_test_plain_view_has_no_machine_vocabulary(parent)
 	_test_advanced_view_actually_discloses()
 	_test_event_sentences()
@@ -73,6 +74,49 @@ func _test_every_drive_has_a_voice() -> void:
 	# raw id and never to nothing.
 	var fallback := LoreVoice.drive_noun("drive_that_does_not_exist")
 	_check("voice: an unknown drive still says something", not fallback.is_empty())
+
+
+## Every experience kind must be sayable as a thing somebody DID.
+##
+## The same protection as the drive walk above, guarding the half of the neuronal
+## loop that had no voice at all until now: energy was earned on a debug trace,
+## so a player could only find out what feeds the tree by reading the source.
+## Now every kind that can pay has a sentence, and forgetting one fails here
+## instead of shipping "None of them had ever near_death_survived."
+func _test_every_deed_has_a_voice() -> void:
+	var voiceless: Array[String] = []
+	var machine_readable: Array[String] = []
+	for kind in GenomeDB.rewards:
+		var id := String(kind)
+		if not LoreVoice.DEED_VOICE.has(id):
+			voiceless.append(id)
+			continue
+		for was_first in [true, false]:
+			var sentence := LoreVoice.energy_sentence(id, was_first)
+			if sentence.is_empty() or sentence.contains("_"):
+				machine_readable.append(id)
+				break
+
+	_check("voice: every experience kind can be spoken as a deed (%s)"
+		% ("all %d" % GenomeDB.rewards.size() if voiceless.is_empty()
+			else ", ".join(voiceless)), voiceless.is_empty())
+	_check("voice: and none of them leaks an id into the sentence",
+		machine_readable.is_empty())
+
+	# The two reasons energy is earned must not read alike, or the player cannot
+	# tell "nobody has ever done this" from "somebody survived that again".
+	_check("voice: a discovery and a survival read differently",
+		LoreVoice.energy_sentence("forage_success", true)
+			!= LoreVoice.energy_sentence("forage_success", false))
+
+	# And an unrecognised kind must still be a sentence, because the reward
+	# catalog is data and data outruns tables.
+	var unknown := LoreVoice.energy_sentence("kind_that_does_not_exist", true)
+	_check("voice: an unknown deed still narrates",
+		not unknown.is_empty() and not unknown.contains("_"))
+
+	stats.append("  discovery:   %s" % LoreVoice.energy_sentence("anomaly_investigated", true))
+	stats.append("  survival:    %s" % LoreVoice.energy_sentence("near_death_survived", false))
 
 
 # --- The plain view ------------------------------------------------------------------
@@ -144,7 +188,9 @@ func _test_plain_view_has_no_machine_vocabulary(parent: Node) -> void:
 	stats.append("  a creature:   %s" % surfaces["creature blurb"])
 	stats.append("  a shift:      %s" % surfaces["shift"])
 
-	router.queue_free()
+	# Freed now rather than queued: see the note in CultureSelfTest. A router that
+	# outlives its suite doubles the rewards of every suite that follows it.
+	router.free()
 	creature.queue_free()
 
 

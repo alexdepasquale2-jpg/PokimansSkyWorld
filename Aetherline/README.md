@@ -27,9 +27,15 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**709 assertions pass** across fourteen suites. Run them with the command in
-[Running](#running) — note that it names `bootstrap.tscn` explicitly, because
-the main scene is the game now.
+**961 assertions pass** across eighteen suites plus a whole-project compile
+gate. Run them with the command in [Running](#running) — note that it names
+`bootstrap.tscn` explicitly, because the main scene is the game now.
+
+The compile gate is first and is not a formality. The suites exercise *systems*,
+and the largest script in the project — `overworld.gd`, where the game actually
+happens — is touched by none of them, so a compile error there used to show a
+clean pass and then fail on New Game. Every `.gd` file outside `addons/` is now
+loaded and checked before anything else runs.
 
 ---
 
@@ -465,7 +471,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (709 assertions)
+# the full suite (961 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 
@@ -480,6 +486,11 @@ The bootstrap screen prints every autoload's self-report, runs every suite, and
 dumps a full readout of a creature that has been spawned, mutated, marked by
 its environment, saved and reloaded:
 
+- **The compile gate** — 114 assertions, one per `.gd` file in the project: it
+  loads every script and asks whether it compiled into something instantiable.
+  `load()` alone is not the check — a GDScript that fails to parse still comes
+  back non-null, and the first version of this gate passed a deliberately broken
+  `overworld.gd` and reported 114/114.
 - `DataModelSelfTest` — 82 assertions over the core resources, round-tripped
   through real JSON.
 - `CreatureSelfTest` — 94 assertions over the live creature: schema coverage
@@ -496,7 +507,7 @@ its environment, saved and reloaded:
   crystallization → consequences → narration), exclusivity, shattering,
   prerequisites, story templates, and save/load of all of it. Prints the
   narrative it actually produced.
-- `CultureSelfTest` — 70 assertions over the shared network: the analytic
+- `CultureSelfTest` — 88 assertions over the shared network: the analytic
   gradient checked against a numeric one in every layer (the assertion that
   separates "this learns" from "this random-walks"), softmax stability at
   ±900 logits, gradient clipping, NaN rollback, dead-slot inertness, the
@@ -515,9 +526,27 @@ its environment, saved and reloaded:
   exist without a record of having been paid for, an achievement must not pay
   twice, and a save written before the sell ledger existed must still refund
   something when its modules are sold.
+- `StakesSelfTest` — 30 assertions about whether this game can be lost: neglect
+  killing, the tough collapsing before they die, extinction latching so a run
+  cannot be reloaded back into life, and the one that the rest exist to make
+  reachable — a clan thinned by death losing understandings it had worked out.
+- `NeuronalSelfTest` — 67 assertions over the Ancestors loop end to end:
+  discovery paying only once, fear paying every time, prerequisites gating on
+  *locked* rather than pending, the generational boundary keeping what a clan can
+  support and losing the rest cheapest-first, leaps carrying banked surplus
+  forward, and — through the live router rather than by calling the tree — that
+  earning announces itself on the bus at all.
+- `LoreVoiceSelfTest` — 40 assertions that the game can explain itself, pulling
+  in two directions on purpose: the plain view must contain no ids, digits or
+  underscores, the advanced view must contain plenty, and every drive in the
+  catalog and every experience kind in the reward catalog must have a sentence.
+  Adding a drive and forgetting its voice fails the build rather than shipping
+  *"The Vess are becoming more tool_confidence."*
 - `GameplaySelfTest` — 35 assertions over the loop end to end: colony, harvest,
   jump, save.
 - `WorldSelfTest` — 79 assertions over planet derivation and chunk streaming.
+- `NeuronPanel.run_smoke_test` — drives the Understandings screen: it opens,
+  refuses with a reason rather than greying out, and spends energy.
 - `CultureLab.run_smoke_test` — drives the culture bench end to end: teaching
   moves the clan, reset-to-inherited is an exact undo, generations advance,
   priors seed, clans fork.

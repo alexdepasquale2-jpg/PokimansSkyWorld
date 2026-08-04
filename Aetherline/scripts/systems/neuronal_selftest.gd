@@ -31,6 +31,7 @@ func run(parent: Node) -> Dictionary:
 
 	_test_catalog()
 	_test_earning()
+	_test_earning_is_announced(parent)
 	_test_spending_and_gating()
 	_test_the_generational_boundary()
 	_test_leap()
@@ -143,6 +144,94 @@ func _test_earning() -> void:
 	_check("earning: lifetime energy only ever rises",
 		tree.lifetime_energy >= tree.energy)
 	_note("energy from six events", tree.energy)
+
+
+## Earning has to be AUDIBLE, through the path the game actually runs.
+##
+## The loop had a hole exactly here: spending, keeping and losing all announced
+## themselves on the bus, and the thing that paid for them went out on `trace` —
+## a debug channel with no in-game listener. A player could not learn what feeds
+## the tree by playing, only by reading the source, which makes a tree that fills
+## itself look like a timer.
+##
+## Driven through `ExperienceComponent.log_event` and the live router rather than
+## by calling `observe` directly, because the bug was never in `observe`. It was
+## in the wiring, and only the wiring can prove it fixed.
+func _test_earning_is_announced(parent: Node) -> void:
+	NeuronalTree.reset()
+	CultureRegistry.reset(20260810)
+	CultureRegistry.install(20260810)
+	var router := CultureRewardRouter.new()
+	parent.add_child(router)
+
+	var heard: Array[Dictionary] = []
+	var handler := func(clan: String, kind: String, gained: float, was_first: bool):
+		heard.append({"clan": clan, "kind": kind, "gained": gained, "first": was_first})
+	EventBus.neuronal_energy_gained.connect(handler)
+
+	var creature := CreatureFactory.spawn_random(parent, _rng,
+		{"culture_id": "clan_heard", "name": "Sesk"})
+
+	# A plain discovery: `forage_success` pays for novelty and nothing else, so
+	# this isolates the first-time channel. (`anomaly_investigated` would not —
+	# it is also a FEARFUL_KIND, and going towards the strange thing is meant to
+	# keep paying.)
+	creature.experience.log_event("forage_success", 1.0)
+	var found := _announcements(heard, "forage_success")
+
+	_check("announced: a clan-first is announced on the bus", found.size() == 1)
+	if found.size() == 1:
+		_check("announced: as this clan's, not this creature's",
+			String(found[0]["clan"]) == "clan_heard")
+		_check("announced: and flagged as a first, which is what the sentence turns on",
+			bool(found[0]["first"]))
+		_check("announced: with the energy it actually paid",
+			is_equal_approx(float(found[0]["gained"]), NeuronalTree.DISCOVERY_ENERGY))
+
+	# Doing it again pays nothing, so it must also SAY nothing — an announcement
+	# with no energy behind it is the feed crying wolf.
+	creature.experience.log_event("forage_success", 1.0)
+	_check("announced: and a repeat is not announced again",
+		_announcements(heard, "forage_success").size() == 1)
+
+	# Fear pays every time, so it is announced every time. Throttling that is the
+	# presenter's job, not the bus's — see Overworld._on_neuronal_energy.
+	creature.experience.log_event("near_death_survived", 1.0)
+	creature.experience.log_event("near_death_survived", 1.0)
+	var survived := _announcements(heard, "near_death_survived")
+	_check("announced: surviving something announces itself every time (%d)"
+		% survived.size(), survived.size() == 2)
+	if survived.size() == 2:
+		_check("announced: the first time paying for both novelty and fear",
+			bool(survived[0]["first"])
+				and float(survived[0]["gained"]) > float(survived[1]["gained"]))
+		_check("announced: and is not mistaken for a discovery after that",
+			not bool(survived[1]["first"]))
+
+	# Every announcement must be sayable, or the feed prints an id.
+	var unsayable := 0
+	for entry in heard:
+		if LoreVoice.energy_sentence(
+				String(entry["kind"]), bool(entry["first"])).contains("_"):
+			unsayable += 1
+	_check("announced: and every announcement has a sentence", unsayable == 0)
+
+	_note("announcements from four logged events", float(heard.size()))
+
+	EventBus.neuronal_energy_gained.disconnect(handler)
+	creature.queue_free()
+	# See the note in CultureSelfTest: queued frees do not land until the frame
+	# ends, and every suite here runs in one frame.
+	router.free()
+	CultureRegistry.reset()
+
+
+func _announcements(heard: Array[Dictionary], kind: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry in heard:
+		if String(entry["kind"]) == kind:
+			out.append(entry)
+	return out
 
 
 # --- Spending -----------------------------------------------------------------------------

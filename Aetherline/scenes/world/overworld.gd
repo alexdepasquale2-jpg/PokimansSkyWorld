@@ -56,6 +56,12 @@ var _log_lines: Array[String] = []
 var _hud_panel: FxPanel
 var _target_panel: FxPanel
 
+## Presentation throttles for the neuronal feed. Not simulation state, so neither
+## is saved: a reload may repeat one line, which is cheaper than a save format
+## that carries what the player has already read.
+var _last_fear_line: int = -100000
+var _prompted_understanding: bool = false
+
 var _lod_timer: float = 0.0
 var _sense_timer: float = 0.0
 var _atmos_timer: float = 0.0
@@ -113,6 +119,8 @@ func _ready() -> void:
 	EventBus.culture_generation_advanced.connect(_on_generation_advanced)
 	EventBus.culture_forked.connect(_on_culture_forked)
 	EventBus.story_event_fired.connect(_on_story_event)
+	EventBus.neuronal_energy_gained.connect(_on_neuronal_energy)
+	EventBus.neuron_reinforced.connect(_on_neuron_reinforced)
 	EventBus.neurons_locked.connect(_on_neurons_locked)
 	EventBus.neurons_lost.connect(_on_neurons_lost)
 	EventBus.evolution_leap.connect(_on_evolution_leap)
@@ -138,6 +146,8 @@ func _exit_tree() -> void:
 	_unbind(EventBus.culture_generation_advanced, _on_generation_advanced)
 	_unbind(EventBus.culture_forked, _on_culture_forked)
 	_unbind(EventBus.story_event_fired, _on_story_event)
+	_unbind(EventBus.neuronal_energy_gained, _on_neuronal_energy)
+	_unbind(EventBus.neuron_reinforced, _on_neuron_reinforced)
 	_unbind(EventBus.neurons_locked, _on_neurons_locked)
 	_unbind(EventBus.neurons_lost, _on_neurons_lost)
 	_unbind(EventBus.evolution_leap, _on_evolution_leap)
@@ -229,6 +239,51 @@ func _on_story_event(event: Dictionary) -> void:
 	_log("[i]%s[/i]" % text)
 
 
+## Somebody earned the clan something. The loudest thing in the loop that a
+## player can actually cause on purpose.
+##
+## A FIRST is always said, because it happens once ever per kind and it is the
+## sentence that teaches the player what the tree runs on. FEAR is throttled to
+## one line a day here in the presenter rather than on the bus: winning a fight
+## pays every time and should keep paying, but five identical lines a day would
+## train the player to stop reading the feed, and the feed is where every other
+## emergent system speaks.
+func _on_neuronal_energy(clan_id: String, kind: String, gained: float,
+		was_first: bool) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	if not was_first:
+		if float(SimulationBudget.current_tick - _last_fear_line) \
+				< SimulationBudget.TICKS_PER_DAY:
+			return
+		_last_fear_line = SimulationBudget.current_tick
+	var line := LoreVoice.energy_sentence(kind, was_first)
+	_log(("[b]%s[/b]" % line) if was_first else "[i]%s[/i]" % line)
+	if was_first and player != null:
+		ImpactEffect.spawn(self, player.global_position, Color(0.7, 0.95, 1.0), 180.0)
+	_hint_at_understanding(gained)
+
+
+## Spending is provisional, and the feed should say so at the moment it happens
+## rather than letting the player find out at the generation boundary.
+func _on_neuron_reinforced(clan_id: String, neuron_id: String) -> void:
+	if not _is_player_culture(clan_id):
+		return
+	_log(LoreVoice.reinforced_sentence(neuron_id))
+
+
+## Say it once, the first time there is anything to spend. After that the HUD
+## carries it and the feed stays out of the way.
+func _hint_at_understanding(_gained: float) -> void:
+	if _prompted_understanding:
+		return
+	var tree := NeuronalTree.for_clan(_player_clan_id())
+	if not tree.affordable_ids().is_empty():
+		_prompted_understanding = true
+		_log("[i]They have understood enough to change something about "
+			+ "themselves. Press N.[/i]")
+
+
 func _on_neurons_locked(clan_id: String, neuron_ids: Array) -> void:
 	if not _is_player_culture(clan_id):
 		return
@@ -304,6 +359,22 @@ func _on_campaign_ended(_clan_id: String, outcome: int, chronicle: Dictionary) -
 
 
 ## Any culture the player's own creatures belong to.
+## The clan the player is actually travelling with.
+##
+## Read from the party rather than assumed, because `culture_colony` stops being
+## the answer the moment a culture forks — a colony left behind takes a
+## planet-local id, and the HUD and the Understandings screen must follow the
+## people on the ship, not the name they started under. Falls back to the
+## founding id before there is a party to ask.
+func _player_clan_id() -> String:
+	if session != null and session.party != null:
+		for entry in session.party.active:
+			var c: Creature = entry
+			if is_instance_valid(c) and c.identity != null:
+				return CultureRegistry.culture_for(c).culture_id
+	return "culture_colony"
+
+
 func _is_player_culture(culture_id: String) -> bool:
 	if session == null or session.party == null:
 		return false
@@ -717,7 +788,7 @@ func _open_neurons() -> void:
 		_neuron_panel = NeuronPanel.new()
 		_neuron_panel.position = Vector2(150, 50)
 		layer.add_child(_neuron_panel)
-	_neuron_panel.open(session, "culture_colony")
+	_neuron_panel.open(session, _player_clan_id())
 
 
 func _to_menu() -> void:
@@ -1683,10 +1754,24 @@ func _update_info() -> void:
 			arc.leaps_taken(), CampaignArc.EVOLUTION_LEAPS_TO_WIN, living,
 			"  <<< YOUR PEOPLE ARE DYING" if living <= CampaignArc.DIRE_MEMBERS else ""]
 
+	# The neuronal loop's own line, and the only ambient signal that there is
+	# anything to spend. Both halves matter: what is available now, and what is
+	# still provisional — pending understandings are the ones a thin generation
+	# loses, and a player who cannot see the count cannot weigh it.
+	var tree := NeuronalTree.for_clan(_player_clan_id())
+	var mind_line := ""
+	var affordable := tree.affordable_ids().size()
+	if tree.energy >= 1.0 or not tree.pending.is_empty():
+		var at_risk: int = tree.pending.size()
+		var supportable := int(floor(float(living) / NeuronalTree.SUPPORT_PER_PENDING))
+		mind_line = "\nunderstanding: %.0f banked · %d within reach (N) · %d not yet safe%s" % [
+			tree.energy, affordable, at_risk,
+			"  <<< MORE THAN THEY CAN HOLD" if at_risk > supportable else ""]
+
 	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s%s" % [
 		world.planet.display_name, biome_name, pos.x, pos.y,
 		leader_text,
 		session.party.size(), session.party.party_limit(session.ship),
 		session.party.total_caught(),
 		dex["species"], session.ship.salvage, mass, cap, session.jumps_made,
-		culture_line, village_line, arc_line]
+		culture_line, village_line, arc_line + mind_line]
