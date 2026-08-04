@@ -87,6 +87,20 @@ func _ready() -> void:
 	_section("Progression self-test  (economy · legacy · upgrades · A/V hooks)")
 	_report(ProgressionSelfTest.new().run(_creature_root))
 
+	_section("Understandings panel  (progression UI smoke test)")
+	var neuron_session := GameSession.new()
+	_creature_root.add_child(neuron_session)
+	var neuron_panel := NeuronPanel.new()
+	_creature_root.add_child(neuron_panel)
+	var neuron_problems := neuron_panel.run_smoke_test(neuron_session)
+	_out("%d passed, %d failed%s" % [
+		1 if neuron_problems.is_empty() else 0, neuron_problems.size(),
+		"" if neuron_problems.is_empty() else "   <<< ATTENTION"])
+	for problem in neuron_problems:
+		_out("  FAIL · " + problem)
+	neuron_panel.queue_free()
+	neuron_session.queue_free()
+
 	_section("Stakes self-test  (death · decline · extinction · triumph)")
 	var stakes_tests := StakesSelfTest.new()
 	_report(stakes_tests.run(_creature_root))

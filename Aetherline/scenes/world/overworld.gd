@@ -45,6 +45,7 @@ var _star_map
 var _ship_view: ShipView
 var _inventory_panel: InventoryPanel
 var _people_panel: PeoplePanel
+var _neuron_panel: NeuronPanel
 var _service_menu: ServiceMenu
 
 var _info: Label
@@ -323,6 +324,7 @@ func _menu_open() -> bool:
 		or (_ship_view != null and _ship_view.visible) \
 		or (_inventory_panel != null and _inventory_panel.visible) \
 		or (_people_panel != null and _people_panel.visible) \
+		or (_neuron_panel != null and _neuron_panel.visible) \
 		or (_service_menu != null and _service_menu.visible)
 
 
@@ -703,6 +705,21 @@ func _open_people() -> void:
 	_people_panel.open(session)
 
 
+## Where the player decides what their people become.
+func _open_neurons() -> void:
+	if session == null:
+		return
+	if _neuron_panel == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 6
+		layer.name = "NeuronLayer"
+		add_child(layer)
+		_neuron_panel = NeuronPanel.new()
+		_neuron_panel.position = Vector2(150, 50)
+		layer.add_child(_neuron_panel)
+	_neuron_panel.open(session, "culture_colony")
+
+
 func _to_menu() -> void:
 	SaveSystem.save_game(SAVE_SLOT)
 	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
@@ -777,6 +794,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.keycode == KEY_P or event.keycode == KEY_ESCAPE:
 			_party_panel.close()
 		return
+	if _neuron_panel != null and _neuron_panel.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_N:
+			_neuron_panel.close_panel()
+		elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			_neuron_panel.reinforce_selected()
+		elif event.keycode == KEY_X:
+			_neuron_panel.take_leap()
+		return
 	if _people_panel != null and _people_panel.visible:
 		if event.keycode == KEY_ESCAPE or event.keycode == KEY_L:
 			_people_panel.close_panel()
@@ -806,6 +831,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_open_inventory()
 		KEY_L:
 			_open_people()
+		KEY_N:
+			_open_neurons()
 		KEY_M:
 			_to_menu()
 
@@ -1551,7 +1578,7 @@ func _build_ui() -> void:
 	hud_box.add_child(_info)
 
 	var hint := Label.new()
-	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · L your people · M menu"
+	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · L your people · N understandings · M menu"
 	hint.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
 	hint.add_theme_font_size_override("font_size", 11)
 	hud_box.add_child(hint)
