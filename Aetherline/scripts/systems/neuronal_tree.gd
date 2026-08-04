@@ -430,6 +430,11 @@ func survey() -> Array:
 			"state": state,
 			"affordable": state == "available" and energy >= cost_of(id),
 			"description": definition_dict.get("description", ""),
+			# Carried so a view can draw the SHAPE of the tree rather than a
+			# list of it. What unlocks what is the only information a player
+			# needs in order to plan, and it was the one thing the screen did
+			# not show.
+			"prerequisites": definition_dict.get("prerequisites", []).duplicate(),
 		})
 	return out
 

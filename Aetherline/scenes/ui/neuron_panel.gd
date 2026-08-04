@@ -29,23 +29,11 @@ signal closed
 const PANEL_WIDTH := 820
 const MONO_SIZE := 13
 
-const BRANCH_COLOURS := {
-	"perception": Color(0.45, 0.72, 1.0),
-	"intelligence": Color(1.0, 0.78, 0.42),
-	"communication": Color(0.62, 0.92, 0.6),
-	"motricity": Color(0.92, 0.55, 0.78),
-}
-
-const STATE_MARK := {
-	"locked": "●", "pending": "◌", "forgotten": "✕",
-	"available": "○", "closed": "·",
-}
-
 var _session: Node = null
 var _clan_id: String = "culture_colony"
 
 var _stakes: RichTextLabel
-var _list: ItemList
+var _tree_view: NeuronTreeView
 var _detail: RichTextLabel
 var _reinforce_button: Button
 var _cross_button: Button
@@ -93,11 +81,15 @@ func _build() -> void:
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(split)
 
-	_list = ItemList.new()
-	_list.custom_minimum_size = Vector2(360, 0)
-	_list.item_selected.connect(func(_i: int): _refresh_detail())
-	_list.item_activated.connect(func(_i: int): reinforce_selected())
-	split.add_child(_list)
+	# A drawn tree rather than a list, inside a scroller so a deeper catalog
+	# still fits. What unlocks what is the only thing a player can plan against.
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(430, 0)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	split.add_child(scroll)
+	_tree_view = NeuronTreeView.new()
+	_tree_view.picked.connect(func(_id: String): _refresh_detail())
+	scroll.add_child(_tree_view)
 
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -226,43 +218,16 @@ func _refresh_stakes(neuronal: NeuronalTree) -> void:
 
 
 func _refresh_list(neuronal: NeuronalTree) -> void:
-	var previous := _list.get_selected_items()
-	var keep: int = previous[0] if previous.size() > 0 else 0
-	_list.clear()
 	_rows.clear()
-
-	for branch in neuronal.branches():
-		_list.add_item("── %s ──" % String(branch).capitalize())
-		_list.set_item_selectable(_list.item_count - 1, false)
-		_list.set_item_custom_fg_color(_list.item_count - 1,
-			BRANCH_COLOURS.get(branch, Color.WHITE))
-		_rows.append({})
-
-		for entry in neuronal.survey():
-			if String(entry["branch"]) != String(branch):
-				continue
-			var state := String(entry["state"])
-			var affordable: bool = bool(entry["affordable"])
-			var label := "%s %-22s %4d" % [
-				STATE_MARK.get(state, "·"), entry["name"], int(entry["cost"])]
-			_list.add_item(label)
-			var index := _list.item_count - 1
-			_list.set_item_custom_fg_color(index, _colour_for(state, affordable))
-			if state == "closed":
-				_list.set_item_selectable(index, true)   # selectable, so it can explain itself
-			_rows.append(entry)
-
-	if keep >= 0 and keep < _list.item_count and _list.is_item_selectable(keep):
-		_list.select(keep)
-
-
-func _colour_for(state: String, affordable: bool) -> Color:
-	match state:
-		"locked": return Color(0.6, 0.95, 0.65)
-		"pending": return Color(1.0, 0.85, 0.4)
-		"forgotten": return Color(0.85, 0.45, 0.45)
-		"available": return Color(1, 1, 1) if affordable else Color(0.6, 0.62, 0.68)
-		_: return Color(0.42, 0.44, 0.5)
+	var survey := neuronal.survey()
+	for entry in survey:
+		_rows.append(entry)
+	var keep := _tree_view.selected()
+	_tree_view.set_survey(survey)
+	if keep.is_empty():
+		_tree_view.select_first_interesting()
+	else:
+		_tree_view.select(keep)
 
 
 func _refresh_detail() -> void:
@@ -317,13 +282,13 @@ func _refresh_detail() -> void:
 
 
 func _selected_row() -> Dictionary:
-	var selected := _list.get_selected_items()
-	if selected.is_empty():
+	var id := _tree_view.selected()
+	if id.is_empty():
 		return {}
-	var index: int = selected[0]
-	if index < 0 or index >= _rows.size():
-		return {}
-	return _rows[index]
+	for row in _rows:
+		if String(row["id"]) == id:
+			return row
+	return {}
 
 
 ## Living members of the clan — the number that decides how much can be carried.
@@ -361,8 +326,16 @@ func run_smoke_test(session: Node) -> Array[String]:
 	var neuronal := NeuronalTree.for_clan("clan_panel")
 	open(session, "clan_panel")
 
-	if _list.item_count < NeuronalTree.ids().size():
-		problems.append("not every understanding is listed")
+	if _tree_view.node_count() != NeuronalTree.ids().size():
+		problems.append("the tree does not show every understanding (%d of %d)"
+			% [_tree_view.node_count(), NeuronalTree.ids().size()])
+	# The point of drawing it is the dependencies. A tree with no edges is the
+	# list this replaced, wearing a different hat.
+	if _tree_view.edge_count() < NeuronalTree.ids().size() / 2:
+		problems.append("the tree draws almost no prerequisites (%d edges)"
+			% _tree_view.edge_count())
+	if _tree_view.selected().is_empty():
+		problems.append("nothing is selected when the screen opens")
 	if _stakes.text.is_empty():
 		problems.append("the stakes line is blank")
 
@@ -423,8 +396,5 @@ func run_smoke_test(session: Node) -> Array[String]:
 
 
 func _select_first_selectable() -> void:
-	for i in _list.item_count:
-		if _list.is_item_selectable(i):
-			_list.select(i)
-			_refresh_detail()
-			return
+	_tree_view.select_first_interesting()
+	_refresh_detail()
