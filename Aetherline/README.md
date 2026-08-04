@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**1,009 assertions pass** across nineteen suites plus a whole-project compile
+**1,013 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -559,7 +559,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (1,009 assertions)
+# the full suite (1,013 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 

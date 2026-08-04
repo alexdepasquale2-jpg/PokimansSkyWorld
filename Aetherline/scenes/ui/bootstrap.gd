@@ -104,6 +104,17 @@ func _ready() -> void:
 	neuron_panel.queue_free()
 	neuron_session.queue_free()
 
+	_section("HUD  (the screen a player looks at for the whole game)")
+	var hud := HudRoot.new()
+	_creature_root.add_child(hud)
+	var hud_problems := hud.run_smoke_test()
+	_out("%d passed, %d failed%s" % [
+		1 if hud_problems.is_empty() else 0, hud_problems.size(),
+		"" if hud_problems.is_empty() else "   <<< ATTENTION"])
+	for problem in hud_problems:
+		_out("  FAIL · " + problem)
+	hud.free()
+
 	_section("Ending screen  (the two ways a run finishes)")
 	var ending := EndingScreen.new()
 	_creature_root.add_child(ending)

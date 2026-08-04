@@ -6,6 +6,18 @@ class_name Overworld
 ## LOD) and ports phase3on verb handlers onto GameSession / Catch / Combat.
 
 const SAVE_SLOT := "campaign"
+
+## The keys worth naming on screen, and no more.
+##
+## The HUD used to carry all thirteen bindings permanently: "WASD · Q scan ·
+## Space fight · C throw · E interact · I inventory · U ship · J jump · P party ·
+## L your people · N understandings · M menu". A player has learned those inside
+## a minute and then spends the rest of the campaign with a line of text over
+## their world. These are the five that open something they cannot find any other
+## way; the rest are discoverable from the prompt line and the panels themselves.
+const HUD_KEYS: Array[String] = [
+	"WASD move", "E interact", "L your people", "N understandings", "M menu",
+]
 const FAUNA_COUNT := 8
 const FAUNA_SPAWN_RADIUS := 900.0
 const ALLY_RADIUS := 400.0
@@ -51,7 +63,7 @@ var _neuron_panel: NeuronPanel
 var _ending_screen: EndingScreen
 var _service_menu: ServiceMenu
 
-var _info: Label
+var _hud: HudRoot
 var _prompt: Label
 var _target_bar: Label
 var _log_label: RichTextLabel
@@ -69,7 +81,7 @@ var _prompted_understanding: bool = false
 ## frame — see `_refresh_mind_readout`.
 var _mind_timer: float = 0.0
 var _cached_living: int = 0
-var _cached_mind_line: String = ""
+var _cached_affordable: int = 0
 
 var _lod_timer: float = 0.0
 var _sense_timer: float = 0.0
@@ -784,7 +796,7 @@ func _open_inventory() -> void:
 		_inventory_panel = InventoryPanel.new()
 		layer.add_child(_inventory_panel)
 		_inventory_panel.changed.connect(func():
-			if _info != null:
+			if _hud != null:
 				_update_info())
 	if _ship_view != null:
 		_ship_view.visible = false
@@ -1741,46 +1753,13 @@ func _build_ui() -> void:
 	layer.layer = 5
 	add_child(layer)
 
-	_hud_panel = FxPanel.new(Color(0.40, 0.78, 1.0), 0.72)
-	_hud_panel.position = Vector2(12, 12)
-	_hud_panel.custom_minimum_size = Vector2(460, 0)
-	layer.add_child(_hud_panel)
-	var hud_margin := MarginContainer.new()
-	for side in ["left", "top", "right", "bottom"]:
-		hud_margin.add_theme_constant_override("margin_" + side, 12)
-	_hud_panel.add_child(hud_margin)
-	var hud_box := VBoxContainer.new()
-	hud_box.add_theme_constant_override("separation", 4)
-	hud_margin.add_child(hud_box)
-
-	_info = Label.new()
-	_info.add_theme_color_override("font_color", Color(0.90, 0.93, 0.98))
-	_info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	_info.add_theme_constant_override("outline_size", 3)
-	_info.add_theme_font_size_override("font_size", 14)
-	hud_box.add_child(_info)
-
-	var hint := Label.new()
-	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · L your people · N understandings · M menu"
-	hint.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
-	hint.add_theme_font_size_override("font_size", 11)
-	hud_box.add_child(hint)
-
-	_target_panel = FxPanel.new(Color(1.0, 0.55, 0.45), 0.65)
-	_target_panel.position = Vector2(12, 118)
-	_target_panel.custom_minimum_size = Vector2(360, 0)
-	_target_panel.visible = false
-	layer.add_child(_target_panel)
-	var t_margin := MarginContainer.new()
-	for side in ["left", "top", "right", "bottom"]:
-		t_margin.add_theme_constant_override("margin_" + side, 10)
-	_target_panel.add_child(t_margin)
-	_target_bar = Label.new()
-	_target_bar.add_theme_font_size_override("font_size", 16)
-	_target_bar.add_theme_color_override("font_color", Color(1.0, 0.78, 0.72))
-	_target_bar.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	_target_bar.add_theme_constant_override("outline_size", 3)
-	t_margin.add_child(_target_bar)
+	# The HUD is its own component now. It used to be built and formatted inline
+	# here — about 120 lines of Label wiring and one six-line format string —
+	# in the middle of the planet-streaming layer, which is neither where it
+	# belongs nor anywhere anybody would look for it.
+	_hud = HudRoot.new()
+	layer.add_child(_hud)
+	_hud.show_keys(HUD_KEYS)
 
 	_prompt = Label.new()
 	_prompt.add_theme_font_size_override("font_size", 17)
@@ -1824,77 +1803,57 @@ func _log(text: String) -> void:
 	_log_label.text = "\n".join(_log_lines.map(func(l): return "· " + l))
 
 
+## Hand the HUD what it needs. It decides how any of it reads.
+##
+## Every frame, but cheap by construction: the two figures that cost a collection
+## walk (`living_members`, `affordable_ids`) are cached on a timer in
+## `_refresh_mind_readout`, and everything else here is a field read.
 func _update_info() -> void:
-	if world == null or player == null or session == null or _info == null:
+	if world == null or player == null or session == null or _hud == null:
 		return
-	var biome_name := "?"
+
+	var biome_name := ""
 	var biome_id := world.biome_at(player.position)
 	if not biome_id.is_empty():
 		biome_name = String(PlanetGenerator.get_biome(biome_id).get("display_name", biome_id))
-	var leader := session.party.leader()
-	var leader_text := "no one able"
-	var culture_line := ""
-	var colony := CultureRegistry.get_culture("culture_colony")
-	if colony != null:
-		colony.ensure_nets()
-		var report: Array = colony.drive_report()
-		var lean := ""
-		if not report.is_empty() and report[0] is Dictionary:
-			lean = String(report[0].get("drive", ""))
-		culture_line = "\nclan %s · gen %d · %d lessons%s" % [
-			colony.display_name, colony.generation, colony.live.applies if colony.live != null else 0,
-			(" · " + lean) if not lean.is_empty() else ""]
-	var village_line := ""
-	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
-		var d_plaza := player.position.distance_to(settlement_runtime.center())
-		if d_plaza < 520.0:
-			village_line = "\n%s" % settlement_runtime.describe()
-	if leader != null:
-		leader_text = "%s   %d/%d hp" % [leader.display_name(),
-			int(leader.stats.hp), int(leader.stats.max_hp())]
-	var pos := player.position
-	var dex := session.discovery.totals()
-	var mass := session.stock.carried_mass()
-	var cap := session.stock.carry_capacity
-	# The ambition, always on screen. A player who cannot see what they are aiming
-	# at is not playing toward anything, and this run has a destination now.
+	_hud.show_place(world.planet.display_name, biome_name)
+
+	_hud.show_leader(session.party.leader())
+
 	var arc: CampaignArc = session.arc
-	var arc_line := ""
-	if arc != null:
-		arc_line = "\nbloodline: %d/%d crossings · %d alive%s" % [
-			arc.leaps_taken(), CampaignArc.EVOLUTION_LEAPS_TO_WIN, _cached_living,
-			"  <<< YOUR PEOPLE ARE DYING" if _cached_living <= CampaignArc.DIRE_MEMBERS
-				else ""]
+	_hud.show_run(arc.leaps_taken() if arc != null else 0, _cached_living,
+		_clan_line())
 
-	_info.text = "%s · %s · (%.0f, %.0f)\nleading: %s\nparty %d/%d · caught %d · dex %d spp · salvage %.0f · hold %.0f/%.0f · jumps %d%s%s%s" % [
-		world.planet.display_name, biome_name, pos.x, pos.y,
-		leader_text,
-		session.party.size(), session.party.party_limit(session.ship),
-		session.party.total_caught(),
-		dex["species"], session.ship.salvage, mass, cap, session.jumps_made,
-		culture_line, village_line, arc_line + _cached_mind_line]
+	var tree := NeuronalTree.for_clan(_player_clan_id())
+	_hud.show_understanding(tree.energy, _cached_affordable, tree.pending.size(),
+		int(floor(float(_cached_living) / NeuronalTree.SUPPORT_PER_PENDING)))
+
+	# A state, not an event, so it is sticky and it outranks everything else the
+	# HUD can raise. Cleared the moment the clan recovers.
+	if _cached_living > 0 and _cached_living <= CampaignArc.DIRE_MEMBERS:
+		_hud.raise_alarm("Your people are dying out — %s left."
+			% ("one" if _cached_living == 1 else str(_cached_living)), true)
+	else:
+		_hud.clear_sticky_alarm()
 
 
-## The clan's headcount and the neuronal readout, refreshed on a timer.
+## Who the clan are, in the plain register LoreVoice owns. This used to read
+## `clan Survivors · gen 3 · 412 lessons · lean foraging_priority`, which is the
+## machine talking.
+func _clan_line() -> String:
+	var culture := CultureRegistry.get_culture(_player_clan_id())
+	if culture == null:
+		return ""
+	return "%s — %s" % [LoreVoice.clan_name(culture), LoreVoice.disposition(culture)]
+
+
+## The two HUD figures that cost a collection walk each.
 ##
-## `_update_info` runs every frame, and both of these walk collections rather
-## than reading a counter: `living_members` walks the whole simulation registry
-## and `affordable_ids` walks the neuron catalog checking prerequisites. Neither
-## changes fast enough to be worth that per frame, and the LOD governor exists
-## precisely so this project does not do O(population) work sixty times a second.
+## `_update_info` runs every frame; `living_members` walks the whole simulation
+## registry and `affordable_ids` walks the neuron catalog checking prerequisites.
+## Neither changes fast enough to be worth that per frame, and the LOD governor
+## exists precisely so this project does not do O(population) work sixty times a
+## second. Everything else the HUD reads is a field.
 func _refresh_mind_readout() -> void:
 	_cached_living = _living_clan()
-
-	# The only ambient signal that there is anything to spend. Both halves
-	# matter: what is available now, and what is still provisional — pending
-	# understandings are what a thin generation loses, and a player who cannot
-	# see the count cannot weigh it.
-	var tree := NeuronalTree.for_clan(_player_clan_id())
-	_cached_mind_line = ""
-	if tree.energy >= 1.0 or not tree.pending.is_empty():
-		var at_risk: int = tree.pending.size()
-		var supportable := int(
-			floor(float(_cached_living) / NeuronalTree.SUPPORT_PER_PENDING))
-		_cached_mind_line = "\nunderstanding: %.0f banked · %d within reach (N) · %d not yet safe%s" % [
-			tree.energy, tree.affordable_ids().size(), at_risk,
-			"  <<< MORE THAN THEY CAN HOLD" if at_risk > supportable else ""]
+	_cached_affordable = NeuronalTree.for_clan(_player_clan_id()).affordable_ids().size()
