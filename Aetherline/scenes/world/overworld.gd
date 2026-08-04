@@ -44,6 +44,7 @@ var _party_panel: PartyPanel
 var _star_map
 var _ship_view: ShipView
 var _inventory_panel: InventoryPanel
+var _people_panel: PeoplePanel
 var _service_menu: ServiceMenu
 
 var _info: Label
@@ -100,6 +101,17 @@ func _ready() -> void:
 	EventBus.planet_chunk_loaded.connect(_on_chunk_loaded)
 	EventBus.planet_chunk_unloaded.connect(_on_chunk_unloaded)
 	EventBus.archetype_crystallized.connect(_on_crystallized)
+	# The emergent layer announces itself IN PLAY. Until now every one of these
+	# fired into a debug bench or into nothing at all, so a player could run a
+	# whole campaign without ever being told that their bloodline had mutated,
+	# that the world was marking their animals, or that their clan had changed
+	# its mind. The systems were working and silent, which is the same as absent.
+	EventBus.mutation_occurred.connect(_on_mutation)
+	EventBus.epigenetic_mark_gained.connect(_on_mark_gained)
+	EventBus.culture_shifted.connect(_on_culture_shifted)
+	EventBus.culture_generation_advanced.connect(_on_generation_advanced)
+	EventBus.culture_forked.connect(_on_culture_forked)
+	EventBus.story_event_fired.connect(_on_story_event)
 
 	_build_ui()
 	if bool(Engine.get_meta("aetherline_new_campaign", true)):
@@ -112,6 +124,12 @@ func _exit_tree() -> void:
 	_unbind(EventBus.planet_chunk_loaded, _on_chunk_loaded)
 	_unbind(EventBus.planet_chunk_unloaded, _on_chunk_unloaded)
 	_unbind(EventBus.archetype_crystallized, _on_crystallized)
+	_unbind(EventBus.mutation_occurred, _on_mutation)
+	_unbind(EventBus.epigenetic_mark_gained, _on_mark_gained)
+	_unbind(EventBus.culture_shifted, _on_culture_shifted)
+	_unbind(EventBus.culture_generation_advanced, _on_generation_advanced)
+	_unbind(EventBus.culture_forked, _on_culture_forked)
+	_unbind(EventBus.story_event_fired, _on_story_event)
 
 
 func _unbind(source: Signal, handler: Callable) -> void:
@@ -131,6 +149,85 @@ func _on_crystallized(uid: StringName, archetype_id: StringName, _tick: int) -> 
 		return
 
 
+## --- The emergent layer, said out loud ------------------------------------------
+##
+## Every handler below is deliberately quiet about anything the player has no
+## stake in. A herd on the far side of the planet mutating is a true fact and
+## noise; the animal in their party mutating is news. The filter is ownership,
+## not distance.
+
+## Is this one of the player's own creatures?
+func _is_mine(uid: StringName) -> Creature:
+	if session == null or session.party == null:
+		return null
+	for entry in session.party.active:
+		var c: Creature = entry
+		if is_instance_valid(c) and c.identity != null and c.identity.uid == uid:
+			return c
+	return null
+
+
+func _on_mutation(uid: StringName, locus_id: StringName, _old: StringName,
+		_new: StringName) -> void:
+	var c := _is_mine(uid)
+	if c == null:
+		return
+	_log(LoreVoice.mutation_sentence(c.display_name(), String(locus_id)))
+
+
+func _on_mark_gained(uid: StringName, definition_id: StringName, _source: int) -> void:
+	var c := _is_mine(uid)
+	if c == null:
+		return
+	_log(LoreVoice.mark_sentence(c.display_name(), String(definition_id)))
+
+
+## The clan changed its mind about something. Already throttled at the emitter
+## (CultureRewardRouter.SHIFT_INTERVAL), so this cannot become chatter.
+func _on_culture_shifted(culture_id: String, drive_id: String, delta: float) -> void:
+	var culture := CultureRegistry.get_culture(culture_id)
+	if culture == null or not _is_player_culture(culture_id):
+		return
+	_log(LoreVoice.shift_sentence(LoreVoice.clan_name(culture), drive_id, delta))
+
+
+func _on_generation_advanced(culture_id: String, _generation: int, retained: float) -> void:
+	if not _is_player_culture(culture_id):
+		return
+	_log("[b]%s[/b]" % LoreVoice.generation_sentence(
+		CultureRegistry.get_culture(culture_id), retained))
+
+
+func _on_culture_forked(parent_culture_id: String, _child_culture_id: String,
+		reason: String) -> void:
+	var parent := CultureRegistry.get_culture(parent_culture_id)
+	if parent == null:
+		return
+	_log("[b]%s[/b]" % LoreVoice.fork_sentence(LoreVoice.clan_name(parent), reason))
+
+
+## StoryDirector narration. It has been producing real sentences about the
+## player's own animals since Phase 2 and delivering them to the genome lab.
+func _on_story_event(event: Dictionary) -> void:
+	var text := String(event.get("text", ""))
+	if text.is_empty():
+		return
+	_log("[i]%s[/i]" % text)
+
+
+## Any culture the player's own creatures belong to.
+func _is_player_culture(culture_id: String) -> bool:
+	if session == null or session.party == null:
+		return false
+	for entry in session.party.active:
+		var c: Creature = entry
+		if not is_instance_valid(c):
+			continue
+		if CultureRegistry.culture_for(c).culture_id == culture_id:
+			return true
+	return false
+
+
 # --- Campaign --------------------------------------------------------------------
 
 func _menu_open() -> bool:
@@ -138,6 +235,7 @@ func _menu_open() -> bool:
 		or (_star_map != null and _star_map.visible) \
 		or (_ship_view != null and _ship_view.visible) \
 		or (_inventory_panel != null and _inventory_panel.visible) \
+		or (_people_panel != null and _people_panel.visible) \
 		or (_service_menu != null and _service_menu.visible)
 
 
@@ -502,6 +600,22 @@ func _on_settler_recruited(creature: Creature) -> void:
 	ImpactEffect.spawn(self, creature.global_position, Color(0.55, 0.9, 0.65), 90.0)
 
 
+## The screen the whole simulation exists to justify.
+func _open_people() -> void:
+	if session == null:
+		return
+	if _people_panel == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 6
+		layer.name = "PeopleLayer"
+		add_child(layer)
+		_people_panel = PeoplePanel.new()
+		_people_panel.set_anchors_preset(Control.PRESET_CENTER)
+		_people_panel.position = Vector2(180, 70)
+		layer.add_child(_people_panel)
+	_people_panel.open(session)
+
+
 func _to_menu() -> void:
 	SaveSystem.save_game(SAVE_SLOT)
 	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
@@ -576,6 +690,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.keycode == KEY_P or event.keycode == KEY_ESCAPE:
 			_party_panel.close()
 		return
+	if _people_panel != null and _people_panel.visible:
+		if event.keycode == KEY_ESCAPE or event.keycode == KEY_L:
+			_people_panel.close_panel()
+		elif event.keycode == KEY_V:
+			# The one keystroke between "who your people are" and the policy
+			# that makes them that way.
+			_people_panel.toggle_advanced()
+		return
 	match event.keycode:
 		KEY_Q:
 			_scan()
@@ -595,6 +717,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_toggle_ship()
 		KEY_I:
 			_open_inventory()
+		KEY_L:
+			_open_people()
 		KEY_M:
 			_to_menu()
 
@@ -724,25 +848,21 @@ func _scan() -> void:
 			% [discovered, totals["species"], totals["planets"], salvage])
 
 
+## What the player is told when they look at one of their own animals.
+##
+## Was: "clan lin_00000000_0004 · creature · gen 3 · 412 lessons · lean
+## foraging_priority 14%". Every term in that line is a true fact about a running
+## system and not one of them is a sentence. The numbers still exist and are one
+## keystroke away in the People menu; here the game speaks English.
 func _log_culture_summary(c: Creature) -> void:
 	if c == null or c.identity == null:
 		return
 	var culture := CultureRegistry.culture_for(c)
-	culture.ensure_nets()
-	var drives: Array = culture.drive_report()
-	var top := ""
-	if not drives.is_empty() and drives[0] is Dictionary:
-		var first: Dictionary = drives[0]
-		top = "%s %.0f%%" % [String(first.get("drive", "?")), float(first.get("p", 0.0)) * 100.0]
-	var kind := "human" if c.identity.is_human else "creature"
-	var gen := culture.generation
-	var applies := culture.live.applies if culture.live != null else 0
-	_log("  clan %s · %s · gen %d · %d lessons%s" % [
-		culture.display_name if not culture.display_name.is_empty() else culture.culture_id,
-		kind, gen, applies,
-		(" · lean " + top) if not top.is_empty() else ""])
-	if c.ai != null:
-		_log("  doing: %s" % c.ai.state_name().to_lower())
+	_log("  %s" % LoreVoice.clan_headline(culture))
+	_log("  %s" % LoreVoice.clan_history(culture))
+	var becoming := LoreVoice.creature_becoming(c)
+	if not becoming.is_empty():
+		_log("  %s" % becoming)
 
 
 func _log_phenotype_summary(c: Creature, species_name: String) -> void:
@@ -1344,7 +1464,7 @@ func _build_ui() -> void:
 	hud_box.add_child(_info)
 
 	var hint := Label.new()
-	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · M menu"
+	hint.text = "WASD · Q scan · Space fight · C throw · E interact · I inventory · U ship · J jump · P party · L your people · M menu"
 	hint.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
 	hint.add_theme_font_size_override("font_size", 11)
 	hud_box.add_child(hint)

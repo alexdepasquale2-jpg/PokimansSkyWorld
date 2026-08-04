@@ -87,6 +87,15 @@ func _ready() -> void:
 	_section("Progression self-test  (economy · legacy · upgrades · A/V hooks)")
 	_report(ProgressionSelfTest.new().run(_creature_root))
 
+	_section("Lore voice self-test  (can the game explain itself?)")
+	var voice_tests := LoreVoiceSelfTest.new()
+	_report(voice_tests.run(_creature_root))
+	if not voice_tests.stats.is_empty():
+		_out("")
+		_out("  what a player actually reads:")
+		for line in voice_tests.stats:
+			_out(line)
+
 	_section("Ship self-test  (modules · salvage conservation · achievements)")
 	var ship_tests := ShipSelfTest.new()
 	_report(ship_tests.run(_creature_root))
