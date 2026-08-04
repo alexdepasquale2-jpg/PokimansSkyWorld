@@ -320,10 +320,17 @@ static func creature_condition(creature: Node) -> String:
 	var needs: NeedsComponent = creature.needs
 	if needs.health <= 0.0:
 		return "Dead."
+	# INCLUDING THE BODY, not just the needs. The HUD draws its health bar from
+	# `stats.hp_fraction()` so that it agrees with what combat does to a creature,
+	# and this sentence sits directly above that bar — rendering the game showed
+	# "In good condition." over a bar at 30%. A wounded animal whose needs are all
+	# met is not in good condition, and a readout that contradicts the bar beside
+	# it teaches a player to trust neither.
+	var body: float = creature.stats.hp_fraction() if creature.stats != null else 1.0
 	var worst_word := ""
 	var worst := 1.0
 	for pair in [["starving", needs.hunger], ["exhausted", needs.energy],
-			["badly hurt", needs.health]]:
+			["badly hurt", minf(needs.health, body)]]:
 		if float(pair[1]) < worst:
 			worst = float(pair[1])
 			worst_word = String(pair[0])

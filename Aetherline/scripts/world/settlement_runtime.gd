@@ -140,23 +140,18 @@ func describe() -> String:
 	if layout.is_empty():
 		return ""
 	var culture := CultureRegistry.get_culture(culture_id)
-	var lessons := 0
-	var gen := 0
-	var lean := ""
-	if culture != null:
-		culture.ensure_nets()
-		gen = culture.generation
-		lessons = culture.live.applies if culture.live != null else 0
-		var report: Array = culture.drive_report()
-		if not report.is_empty() and report[0] is Dictionary:
-			lean = String(report[0].get("drive", ""))
-	return "%s (%s) · %s · %d folk · clan gen %d · %d lessons%s" % [
+	# THROUGH LoreVoice, like everything else a player reads. This was the last
+	# raw clan readout in the game and it went straight into the event feed:
+	# "Kelwatch Watch (town) · wary · 18 folk · clan gen 0 · 3 lessons · lean
+	# foraging_priority." Rendering the opening minute of a campaign is what
+	# found it — the HUD had been cleaned up and this had not.
+	var who := LoreVoice.clan_name(culture) if culture != null else "folk"
+	var mood := LoreVoice.disposition(culture) if culture != null else ""
+	return "%s, a %s of %d — %s%s" % [
 		layout.get("name", "Settlement"),
-		SettlementGenerator.tier_name(int(layout.get("tier", 0))),
-		String(layout.get("ethos", "?")),
-		_living_count(),
-		gen, lessons,
-		(" · lean " + lean) if not lean.is_empty() else ""]
+		SettlementGenerator.tier_name(int(layout.get("tier", 0))).to_lower(),
+		_living_count(), who,
+		(", %s" % mood) if not mood.is_empty() else ""]
 
 
 func dialogue_flavor(building_entry: Dictionary) -> String:
@@ -189,7 +184,9 @@ func dialogue_flavor(building_entry: Dictionary) -> String:
 		_:
 			lines.append("We are still learning how to stay.")
 	if not lean.is_empty():
-		lines.append("These days the clan leans toward %s." % lean.to_lower())
+		# `drive_noun`, not the raw id. A villager was saying "These days the clan
+		# leans toward foraging_priority." out loud, in dialogue, to the player.
+		lines.append("These days we lean toward %s." % LoreVoice.drive_noun(lean))
 	if culture != null and culture.generation > 0:
 		lines.append("This is generation %d of our fire." % culture.generation)
 	return "%s the %s: \"%s\"" % [name, role, " ".join(lines)]

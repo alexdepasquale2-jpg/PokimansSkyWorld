@@ -80,7 +80,10 @@ func _build() -> void:
 	# minute and covered the world for the rest of the campaign.
 	_keys = Label.new()
 	_keys.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_keys.position = Vector2(14, -30)
+	# Clear of the event feed, which is anchored bottom-left and was covering
+	# this. Two rows of text in the same corner is one row of text.
+	_keys.position = Vector2(14, -14)
+	_keys.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_keys.add_theme_font_size_override("font_size", 11)
 	_keys.add_theme_color_override("font_color", Color(0.50, 0.56, 0.66))
 	_keys.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))

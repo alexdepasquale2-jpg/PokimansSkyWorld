@@ -545,7 +545,8 @@ func _begin_new_campaign() -> void:
 	_log("Cultures learn from what they live. Villages keep their own fire.")
 	if settlement_runtime != null and not settlement_runtime.layout.is_empty():
 		_log("Smoke on the wind: %s." % settlement_runtime.describe())
-	_log("Q scan · Space fight · C throw · E village/ship · J jump · U ship bay")
+	# The key list lives on the HUD now. Logging it here too put a second copy at
+	# the bottom of the screen, where the feed then scrolled it away.
 
 
 func _resume_campaign() -> void:
@@ -1830,7 +1831,14 @@ func _update_info() -> void:
 
 	# A state, not an event, so it is sticky and it outranks everything else the
 	# HUD can raise. Cleared the moment the clan recovers.
-	if _cached_living > 0 and _cached_living <= CampaignArc.DIRE_MEMBERS:
+	#
+	# GATED ON HAVING LOST SOMEBODY. A campaign opens with one human and a
+	# failing ship, so `living <= DIRE_MEMBERS` is true on the very first frame —
+	# rendering the game showed "Your people are dying out — one left." over the
+	# landfall card of a run four seconds old. Dying OUT means having been more
+	# than this and fallen, which is what `peak_members` records.
+	if _cached_living > 0 and _cached_living <= CampaignArc.DIRE_MEMBERS \
+			and arc != null and arc.peak_members > _cached_living:
 		_hud.raise_alarm("Your people are dying out — %s left."
 			% ("one" if _cached_living == 1 else str(_cached_living)), true)
 	else:
