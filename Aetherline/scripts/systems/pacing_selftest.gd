@@ -5,7 +5,7 @@ class_name PacingSelfTest
 ##
 ## EVERY NUMBER IN THE PROGRESSION WAS INVENTED. Three evolution leaps to win.
 ## Six understandings per crossing. Two living members per pending neuron. A
-## generation every forty gradient applications. Eight in-game days from full
+## generation every sixty days. Eight in-game days from full
 ## health to starvation. Not one of them came from watching a campaign run, and
 ## nothing in the project could watch one, because the suites drive systems
 ## directly — `StakesSelfTest` proves the ambition reachable by handing the tree
@@ -13,9 +13,8 @@ class_name PacingSelfTest
 ## a player gets there.
 ##
 ## So this plays one forward. A competent clan, through the real router, real
-## decisions, the real settlement generation rule and a spending policy a
-## reasonable player would follow, for three in-game years. It reports what
-## happened.
+## decisions, the real generational clock and a spending policy a reasonable
+## player would follow, for three in-game years. It reports what happened.
 ##
 ## THE ASSERTIONS AND THE MEASUREMENTS ARE DIFFERENT THINGS and the split is
 ## deliberate. Asserted: the campaign is finishable, generations turn, nothing
@@ -76,6 +75,7 @@ func run(parent: Node) -> Dictionary:
 	_rng.seed = 20260812
 
 	var restore_tick := SimulationBudget.current_tick
+	_test_both_clocks_agree(parent)
 	_play(parent)
 	_report()
 	_test_the_campaign_survives_a_reload()
@@ -84,6 +84,61 @@ func run(parent: Node) -> Dictionary:
 
 	_teardown()
 	return {"passed": _passed, "failed": _failed, "lines": _lines.duplicate()}
+
+
+# --- One clock -----------------------------------------------------------------------
+
+## A clan ages at the same rate whether or not anybody is looking at it.
+##
+## It did not. An unwatched colony aged by DAYS, one generation per lifetime,
+## which is what `age_unattended` is for. A watched one aged by GRADIENT
+## THROUGHPUT, which came out at anywhere from 21 to 169 days depending on how
+## converged the reward baseline happened to be. Leave a colony for three
+## hundred days and it aged once; stay with it and it aged five times. Nothing
+## caught it because the two paths were never compared.
+##
+## The second half of this — that a clan nobody is simulating does not age here
+## at all — is the guard against the opposite mistake. Dormant colonists are
+## still alive and still registered, so counting them as present would age their
+## culture day by day AND hand it the whole absence again on return.
+func _test_both_clocks_agree(parent: Node) -> void:
+	NeuronalTree.reset()
+	CultureRegistry.reset(20260813)
+	CultureRegistry.install(20260813)
+
+	var span := CultureResource.GENERATION_DAYS * 3.0
+	var watched: Array[Creature] = []
+	for _i in 2:
+		var c := CreatureFactory.spawn_random(parent, _rng, {"culture_id": "clan_watched"})
+		c.stats.initialize_vitals()
+		watched.append(c)
+
+	var absent := CultureRegistry.ensure("clan_absent", "The Left Behind")
+	absent.ensure_nets()
+	var dormant := CreatureFactory.spawn_random(parent, _rng,
+		{"culture_id": "clan_absent"})
+	dormant.stats.initialize_vitals()
+	SimulationBudget.set_lod(dormant.identity.uid, AetherTypes.SimLOD.DORMANT)
+
+	for _day in int(span):
+		CultureRegistry.age_simulated(1.0)
+
+	var here := CultureRegistry.get_culture("clan_watched")
+	_check("clock: a watched clan ages three generations in three lifetimes (%d)"
+		% here.generation, here.generation == 3)
+	_check("clock: and a clan nobody is simulating does not age with it",
+		absent.generation == 0)
+
+	# The same span, handed over as an absence.
+	var passed := absent.age_unattended(span)
+	_check("clock: an absence buys exactly the same generations (%d)" % passed,
+		passed == 3 and absent.generation == here.generation)
+
+	for c in watched:
+		c.queue_free()
+	dormant.queue_free()
+	NeuronalTree.reset()
+	CultureRegistry.reset()
 
 
 # --- The run ---------------------------------------------------------------------
@@ -141,14 +196,6 @@ func _live_a_day(day: int) -> void:
 			amount = 20.0 + _rng.randf() * 40.0
 		c.experience.log_event(kind, amount)
 
-		# The settlement's generation rule — the same call village life makes,
-		# not a copy of it. Copying it is what let the level-vs-edge bug exist in
-		# two places at once.
-		if CultureRegistry.press_generation("clan_pacing"):
-			_generations += 1
-			_timeline.append("    day %4d  generation %d · %d locked · %d banked"
-				% [day, _culture.generation, _tree.locked_count(), int(_tree.energy)])
-
 		_spend_like_a_player(day)
 
 	# A player who is on top of it: nobody goes hungry and nobody is worked into
@@ -164,6 +211,15 @@ func _live_a_day(day: int) -> void:
 		c.needs.feed(1.0)
 		c.needs.rest(1.0)
 		c.needs.heal(0.2)
+
+	# The day the clan just lived, through CultureTicker's own call rather than a
+	# copy of it. Copying the boundary rule is what let it be wrong in two places
+	# at once, twice.
+	CultureRegistry.age_simulated(1.0)
+	if _culture.generation > _generations:
+		_generations = _culture.generation
+		_timeline.append("    day %4d  generation %d · %d locked · %d banked"
+			% [day, _culture.generation, _tree.locked_count(), int(_tree.energy)])
 
 	_arc.evaluate(CultureRegistry.living_members("clan_pacing"))
 
@@ -241,8 +297,8 @@ func _report() -> void:
 	stats.append("  a competent clan of %d, three in-game years, no neglect:" % CLAN_SIZE)
 	stats.append("")
 	_note("in-game days to carry the bloodline across", float(days))
-	_note("gradient applications (a generation every %d)"
-		% CultureRegistry.APPLIES_PER_GENERATION, float(_culture.live.applies))
+	_note("gradient applications the clan lived through", float(_culture.live.applies))
+	_note("in-game days per generation", CultureResource.GENERATION_DAYS)
 	_note("energy still banked, unspent", _tree.energy)
 	_note("understandings the catalog offers", float(NeuronalTree.ids().size()))
 	_note("real hours of play, at twenty seconds a day", float(days) * 20.0 / 3600.0)
@@ -280,7 +336,8 @@ func _test_the_campaign_survives_a_reload() -> void:
 	var before := {
 		"generation": _culture.generation,
 		"applies": _culture.live.applies,
-		"watermark": _culture.applies_at_last_generation,
+		"days_lived": _culture.days_lived,
+		"watermark": _culture.days_at_last_generation,
 		"locked": _tree.locked.size(),
 		"forgotten": _tree.forgotten.size(),
 		"leaps": _tree.leaps,
@@ -315,7 +372,8 @@ func _test_the_campaign_survives_a_reload() -> void:
 	# reloaded clan sits on a multiple of the cadence and turns a generation
 	# immediately, losing everything still provisional.
 	_check("reload: and does not turn a generation just for being reloaded",
-		culture.applies_at_last_generation == before["watermark"]
+		is_equal_approx(culture.days_lived, before["days_lived"])
+			and is_equal_approx(culture.days_at_last_generation, before["watermark"])
 			and not CultureRegistry.press_generation("clan_pacing"))
 	_check("reload: what it learned came back bit-for-bit",
 		culture.live.to_blob() == before["weights"])

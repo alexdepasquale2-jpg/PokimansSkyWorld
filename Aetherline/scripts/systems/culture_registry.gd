@@ -129,34 +129,38 @@ static func note_birth(culture_id: String, child_generation: int) -> void:
 			float(living_members(culture.culture_id)))
 
 
-## Gradient applications a clan lives through between generations.
+## A day passed for every clan somebody is actually simulating.
 ##
-## Roughly a generation every forty batches of sixteen experiences. The number is
-## a guess; the *shape* is not — see `press_generation` for what happens when this
-## is asked as a level rather than an edge.
-const APPLIES_PER_GENERATION: int = 40
+## THE COUNTERPART TO `CultureResource.age_unattended`, and the reason the split
+## has to be by simulation band rather than by whether anyone is alive. A clan
+## with somebody in a live band ages here, one day at a time. A clan with nobody
+## does not age at all until the player comes back, at which point `_catch_up`
+## hands it the whole absence in one go. Count a dormant colonist as present and
+## that colony ages twice over for the same nine years.
+static func age_simulated(days: float) -> void:
+	if days <= 0.0:
+		return
+	for entry in _cultures.values():
+		var culture: CultureResource = entry
+		if simulated_members(culture.culture_id) <= 0:
+			continue
+		culture.days_lived += days
+		press_generation(culture.culture_id)
 
 
 ## Living long enough turns a generation over. Returns true if one did.
 ##
-## EDGE-TRIGGERED, AND THAT IS THE ENTIRE POINT. The rule this replaces lived
-## inline in SettlementRuntime and asked `live.applies % 40 == 0` — a level, not
-## an edge. An apply lands only every sixteen accumulated gradients, so that
-## condition stays true across every check in between, and village life checks it
-## once per lesson. Measured over three in-game years of a competent campaign it
-## turned 7,086 generations against an intended two dozen, and the clan kept 3%
-## of everything it worked out: buy an understanding, watch it evaporate before
-## the next lesson. Nothing detected it because no test played a campaign.
-##
-## Asking it here, from the stored watermark, makes double-firing impossible
-## regardless of how often anybody calls this.
+## EDGE-TRIGGERED AND CLOCKED ON DAYS, and both halves of that were learned the
+## hard way — see the note on `CultureResource.days_lived`. Asking it here, from
+## a watermark stored on the culture, makes double-firing impossible however
+## often anybody calls this and whatever they call it from.
 static func press_generation(culture_id: String) -> bool:
 	var culture := ensure(String(culture_id))
 	culture.ensure_nets()
-	var applies: int = culture.live.applies
-	if applies - culture.applies_at_last_generation < APPLIES_PER_GENERATION:
+	if culture.days_lived - culture.days_at_last_generation \
+			< CultureResource.GENERATION_DAYS:
 		return false
-	culture.applies_at_last_generation = applies
+	culture.days_at_last_generation = culture.days_lived
 	var before := culture.generation
 	note_birth(culture.culture_id, culture.generation + 1)
 	return culture.generation > before
@@ -178,6 +182,15 @@ static func press_generation(culture_id: String) -> bool:
 ## who are still alive and still this clan's, unless departure forked them onto
 ## an id of their own.
 static func living_members(culture_id: String) -> int:
+	return _count_members(culture_id, false)
+
+
+## Living members the simulation is actually running — see `age_simulated`.
+static func simulated_members(culture_id: String) -> int:
+	return _count_members(culture_id, true)
+
+
+static func _count_members(culture_id: String, simulated_only: bool) -> int:
 	var count := 0
 	for uid in SimulationBudget.uids():
 		var node := SimulationBudget.node_for(StringName(uid))
@@ -190,6 +203,10 @@ static func living_members(culture_id: String) -> int:
 		var needs: Variant = node.get("needs")
 		if needs != null and needs.is_dead():
 			continue
+		if simulated_only:
+			var lod := SimulationBudget.lod_of(StringName(uid))
+			if lod == AetherTypes.SimLOD.DORMANT or lod == AetherTypes.SimLOD.FROZEN:
+				continue
 		count += 1
 	return count
 

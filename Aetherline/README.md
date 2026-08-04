@@ -27,7 +27,7 @@ headless on 4.5.1-stable.
 | 5 | Colony management + emergent storytelling | **complete** — base builder, research, crafting, colony metrics |
 | 6 | Progression, economy, save polish | **in progress** — stockpile, legacy, save compaction, upgrades; all four now under test |
 
-**991 assertions pass** across nineteen suites plus a whole-project compile
+**994 assertions pass** across nineteen suites plus a whole-project compile
 gate. Run them with the command in [Running](#running) — note that it names
 `bootstrap.tscn` explicitly, because the main scene is the game now.
 
@@ -472,49 +472,69 @@ tree a thousand support and unlimited energy, which says nothing about whether a
 player gets there.
 
 `PacingSelfTest` plays one campaign forward instead. A clan of six, kept fed, for
-three in-game years, through the real router and the real generation rule, buying
-the cheapest thing it can afford and crossing whenever it has earned it. One
-in-game day is 1,200 ticks at 60Hz — twenty real seconds — and village life
-teaches about seven times a day.
+three in-game years, through the real router and the real generational clock,
+buying the cheapest thing it can afford and crossing whenever it has earned it.
+One in-game day is 1,200 ticks at 60Hz — twenty real seconds.
 
 ```
-in-game days to carry the bloodline across              383.00
-gradient applications (a generation every 40)           240.00
-real hours of play, at twenty seconds a day               2.13
+in-game days to carry the bloodline across              360.00
+gradient applications the clan lived through            232.00
+in-game days per generation                              60.00
+real hours of play, at twenty seconds a day               2.00
 generations that turned over                              6.00
-neuronal energy earned in total                        2704.00
+neuronal energy earned in total                        2564.00
 understandings locked into the lineage                   18.00
-understandings lost at a boundary                        14.00
-share of what they worked out that survived               0.56
+understandings lost at a boundary                        15.00
+share of what they worked out that survived               0.55
 
-  day   21  generation 1 · 3 locked · 165 banked
-  day   44  generation 2 · 6 locked · 175 banked
-  day   44  EVOLUTION LEAP 1 · 6 understandings held
-  day   68  generation 3 · 9 locked · 26 banked
-  day  107  generation 4 · 12 locked · 136 banked
-  day  107  EVOLUTION LEAP 2 · 12 understandings held
-  day  214  generation 5 · 15 locked · 597 banked
-  day  383  generation 6 · 18 locked · 1422 banked
-  day  383  EVOLUTION LEAP 3 · 18 understandings held
+  day   59  generation 1 · 3 locked · 429 banked
+  day  119  generation 2 · 6 locked · 671 banked
+  day  120  EVOLUTION LEAP 1 · 6 understandings held
+  day  179  generation 3 · 9 locked · 236 banked
+  day  239  generation 4 · 12 locked · 518 banked
+  day  240  EVOLUTION LEAP 2 · 12 understandings held
+  day  299  generation 5 · 15 locked · 261 banked
+  day  359  generation 6 · 18 locked · 378 banked
+  day  360  EVOLUTION LEAP 3 · 18 understandings held
 ```
 
-**Two things in that table need a decision, and neither is a bug.**
+### What the probe found
 
-*The generation cadence decays badly.* Intervals between generations run 21, 23,
-24, 39, 107, 169 days. Gradient applications slow as the reward baseline
-converges and the per-day caps bind, so the boundary — which is clocked off
-applications — stretches out. The last third of the campaign is 169 days waiting
-for one generation.
+**The boundary was firing on a level, not an edge.** The rule was
+`live.applies % 40 == 0`, checked once per village lesson. An apply lands only
+every sixteen accumulated gradients, so the condition stayed true across every
+check in between. The first run of this probe reported **7,086 generations** and
+a clan keeping **3%** of what it worked out — buy an understanding, watch it
+evaporate before the next lesson. The `degenerate softmax; falling back to
+uniform` warnings the run was throwing were the network being blended and
+drifted seven thousand times.
 
-*Energy has no sink.* Banked energy at each boundary runs 165, 175, 26, 136,
-**597, 1,422**. Once the affordable frontier of a 24-neuron catalog is exhausted,
-the only way to unlock more is to wait for the generation that locks the
-prerequisites. The player spends the late campaign rich and idle. Either the
-catalog wants a deeper tail, or energy wants somewhere else to go, or the
-boundary wants to be clocked off something that does not decay.
+**And it was clocked off the wrong thing.** Edge-triggering fixed the storm but
+not the premise. Generations tied to gradient throughput meant a clan aged
+faster when it was learning hard, so the cadence decayed as the reward baseline
+converged: 21, 23, 24, 39, 107, 169 days apart, the last third of a campaign
+spent waiting with 1,422 unspendable energy banked. Worse, it disagreed with
+`age_unattended` — leave a colony for three hundred days and it aged once; stay
+with it and it aged five times. **The same clan aged at two different rates
+depending on whether anybody was watching.**
 
-The probe is what makes those arguable. Re-run it after any change to the reward
-catalog, the neuron costs, or the boundary rule.
+The clock is lived days now, for both paths, with `GENERATION_DAYS` as the only
+knob and an assertion that a watched clan and an absence buy exactly the same
+generations. The cadence is uniform, the campaign runs two hours, and banked
+energy no longer runs away — most of that problem was the decay, not the
+catalog.
+
+### Still a judgement call
+
+`GENERATION_DAYS` is **60**, chosen to preserve what the old broken clock was
+actually delivering, so that fixing the clock did not silently reprice the
+campaign. It used to be 300, justified as the species' default `max_age_days` —
+a generation is a lifetime, which is the better story. Set it back to 300 and
+the same campaign takes about ten hours. That trade is a design decision, the
+constant is where to make it, and the probe prints what the change did.
+
+Re-run the probe after any change to the reward catalog, the neuron costs, or
+the boundary rule.
 
 ---
 
@@ -527,7 +547,7 @@ main menu. The test harness is a separate scene and has to be named explicitly:
 # once, and after adding any new class_name
 godot --path . --headless --import
 
-# the full suite (991 assertions)
+# the full suite (994 assertions)
 godot --path . --headless res://scenes/ui/bootstrap.tscn --quit-after 2500
 ```
 

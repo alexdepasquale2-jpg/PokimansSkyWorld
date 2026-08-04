@@ -412,17 +412,15 @@ func _village_life_lesson() -> void:
 	if kind == "distance_travelled":
 		amt = 20.0 + _rng.randf() * 40.0
 	c.experience.log_event(kind, amt)
-	# Generation pressure: living long enough advances the clan story.
+	# Generations are NOT pressed from here any more.
 	#
-	# THROUGH `CultureRegistry.press_generation`, NOT BY HAND. This used to
-	# reimplement the boundary inline and got it wrong twice over — it skipped the
-	# half that turns the neuronal tree, and it asked `applies % 40 == 0`, a level
-	# rather than an edge, which fired a generation on every lesson for as long as
-	# `applies` sat on a multiple of forty. One boundary, one call site, one rule.
-	var culture := CultureRegistry.get_culture(culture_id)
-	if culture != null and CultureRegistry.press_generation(culture_id):
-		culture_taught.emit("%s advanced to generation %d — the fire remembers more." % [
-			layout.get("name", "The village"), culture.generation])
+	# This used to reimplement the boundary inline and got it wrong three ways: it
+	# skipped the half that turns the neuronal tree over; it asked
+	# `applies % 40 == 0`, a level rather than an edge, so it fired on every lesson
+	# for as long as `applies` sat on a multiple of forty; and hanging the clock
+	# off village life at all meant a party out in the field never aged. It is a
+	# day counter now, owned by CultureTicker, and the generation is narrated
+	# through LoreVoice like every other thing a player is told.
 
 
 func _deed_line(kind: String, culture: CultureResource) -> String:

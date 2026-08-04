@@ -81,17 +81,31 @@ const MEAN_POLICY_INTERVAL: int = 300
 ## Highest generation ever born into this culture. Consolidation triggers off it.
 @export var high_water_generation: int = 0
 
-## `live.applies` as of the last generation pressed by living activity.
+## In-game days this clan has been simulated for, and the reading at its last
+## generation. Together they are the boundary's clock.
 ##
-## The boundary has to be EDGE-TRIGGERED, and this is what remembers the edge.
-## The rule it replaces asked whether `applies % 40 == 0`, which is a level: an
-## apply only lands every sixteen accumulated gradients, so that condition stays
-## true across many consecutive checks and fired a generation on every one of
-## them. Measured over three in-game years it produced 7,086 generations against
-## an intended two dozen, and a clan kept 3% of what it worked out.
+## THE CLOCK IS LIVED TIME, and it took two wrong answers to get here.
 ##
-## Serialized, or a reload lands back on the same `applies` and fires again.
-@export var applies_at_last_generation: int = 0
+## It was `live.applies % 40 == 0` — a level, not an edge, so the boundary fired
+## on every check while `applies` sat on a multiple of forty: 7,086 generations
+## across three in-game years, and a clan kept 3% of what it worked out.
+##
+## Edge-triggering that fixed the storm but not the premise. Clocking generations
+## off GRADIENT THROUGHPUT meant a clan aged faster when it was learning hard and
+## slower when it was not, so the cadence decayed as the reward baseline
+## converged — measured at 21, 23, 24, 39, 107 and 169 days between generations,
+## the last third of a campaign spent waiting. Worse, it disagreed with
+## `age_unattended`, which ages an unwatched colony by DAYS: the same clan aged
+## at two different rates depending on whether anybody was looking at it.
+##
+## A generation is how long it takes a people to replace itself. That is a fact
+## about time, so both paths now read the same clock and GENERATION_DAYS is the
+## only knob.
+##
+## Serialized, or a reload lands past the interval and turns a generation for
+## nothing, losing everything still provisional.
+@export var days_lived: float = 0.0
+@export var days_at_last_generation: float = 0.0
 
 ## Running reward statistics. Baseline subtraction is not optional: without it
 ## every positive reward pushes every taken action up, and the policy walks
@@ -332,11 +346,22 @@ static func _correlation(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 	return 1.0 if denom <= 0.0 else clampf(cov / denom, -1.0, 1.0)
 
 
-## In-game days a generation takes to turn over, for a clan nobody is watching.
+## In-game days a generation takes to turn over. THE campaign pacing knob.
 ##
-## Matches the species' default `max_age_days` (300 x lifespan baseline 1.0), so
-## a colony left alone for three hundred days has genuinely replaced itself once.
-const GENERATION_DAYS: float = 300.0
+## One clock for watched and unwatched clans alike — see `days_lived`. A day is
+## 1,200 ticks at 60Hz, twenty real seconds, so sixty days is twenty minutes of
+## play and a campaign of three evolution leaps runs a little over two hours.
+## That figure is not a guess: it is what `PacingSelfTest` measured the old
+## throughput-clocked boundary actually delivering, preserved deliberately so
+## that fixing the clock did not silently reprice the campaign.
+##
+## IT USED TO BE 300, justified as the species' default `max_age_days` — a
+## generation is a lifetime. That is the better story and it is still available:
+## set this to 300 and the same campaign takes about ten hours. The tension
+## between the tidy justification and the length of an evening is a design call,
+## and this constant is where to make it. Re-run PacingSelfTest afterwards; it
+## prints what the change did.
+const GENERATION_DAYS: float = 60.0
 
 ## Beyond this many unattended generations, a culture is drifting rather than
 ## living. Left uncapped, a two-thousand-day absence would run seven consecutive
@@ -461,7 +486,8 @@ func to_dict() -> Dictionary:
 		"generation": generation,
 		"member_count": member_count,
 		"high_water_generation": high_water_generation,
-		"applies_at_last_generation": applies_at_last_generation,
+		"days_lived": days_lived,
+		"days_at_last_generation": days_at_last_generation,
 		"reward_baseline": reward_baseline,
 		"reward_variance": reward_variance,
 		"reward_tally": reward_tally.duplicate(),
@@ -494,7 +520,8 @@ static func from_dict(d: Dictionary) -> CultureResource:
 	c.generation = int(d.get("generation", 0))
 	c.member_count = int(d.get("member_count", 0))
 	c.high_water_generation = int(d.get("high_water_generation", 0))
-	c.applies_at_last_generation = int(d.get("applies_at_last_generation", 0))
+	c.days_lived = float(d.get("days_lived", 0.0))
+	c.days_at_last_generation = float(d.get("days_at_last_generation", 0.0))
 	c.reward_baseline = float(d.get("reward_baseline", 0.0))
 	c.reward_variance = float(d.get("reward_variance", 1.0))
 	c.reward_tally = d.get("reward_tally", {}).duplicate()
