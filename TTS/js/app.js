@@ -15,7 +15,8 @@
     settings: 'aloud.settings',
     caps: 'aloud.caps',
     text: 'aloud.text',
-    progress: 'aloud.progress'
+    progress: 'aloud.progress',
+    bridge: 'aloud.bridge'
   };
 
   var DEFAULTS = {
@@ -60,6 +61,10 @@
       saveText: function (t) { write(KEY.text, t); write(KEY.progress, 0); },
       savedProgress: function () { return read(KEY.progress, 0) | 0; },
       saveProgress: function (i) { write(KEY.progress, i | 0); },
+      savedBridge: function () { return read(KEY.bridge, 'http://localhost:8765'); },
+      saveBridge: function (v) { write(KEY.bridge, String(v || '').trim()); },
+      reader: function () { return reader; },
+      setTab: function (name) { setTab(name); },
 
       currentVoice: function () {
         if (!app.settings.voiceURI) return null;
@@ -119,9 +124,11 @@
         buttons[i].setAttribute('aria-selected', String(on));
       }
       $('tab-read').hidden = name !== 'read';
+      $('tab-session').hidden = name !== 'session';
       $('tab-voices').hidden = name !== 'voices';
       $('transport').hidden = name !== 'read';
       if (name === 'voices' && bench) bench.renderVoices();
+      if (name === 'session' && session) session.refresh();
     }
 
     // --- settings sheet ----------------------------------------------------
@@ -209,6 +216,7 @@
 
     var reader = null;
     var bench = null;
+    var session = null;
 
     if (!synth || !Utterance) {
       $('no-speech').hidden = false;
@@ -216,6 +224,7 @@
 
     reader = window.TTS.reader.init(app);
     bench = window.TTS.bench.init(app);
+    session = window.TTS.session.init(app);
 
     var tabButtons = D.querySelectorAll('.tabs button');
     for (var i = 0; i < tabButtons.length; i++) {

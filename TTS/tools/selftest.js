@@ -35,12 +35,13 @@ const sandbox = {
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
-for (const file of ['split.js', 'probes.js']) {
+for (const file of ['split.js', 'probes.js', 'narrate.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', file), 'utf8'), sandbox, { filename: file });
 }
 
 const SPLIT = sandbox.window.TTS.split;
 const PROBES = sandbox.window.TTS.probes;
+const NARRATE = sandbox.window.TTS.narrate;
 
 // --- assertions --------------------------------------------------------------
 
@@ -174,6 +175,101 @@ eq('"No." before a number does not',
   }
   check('chunks reproduce the source exactly', allExact);
   check('chunks partition the source with no gap or overlap', allOrdered);
+}
+
+// --- narration ---------------------------------------------------------------
+
+section('Narration scripts');
+
+const SCRIPT = {
+  version: 1,
+  title: 'test',
+  modes: {
+    dev: {
+      label: 'Development',
+      caveat: 'reconstructed',
+      source: { kind: 'session' },
+      beats: [
+        { kind: 'brief', text: 'Build the thing', tone: 'neutral' },
+        { kind: 'action', text: 'Now I write the splitter.', at: 'Write' },
+        { kind: 'result', text: '61 passed, 0 failed', tone: 'good' },
+        { kind: 'thought', text: 'Green, so the logic holds.', inferred: true, tone: 'good' }
+      ]
+    }
+  }
+};
+
+{
+  const parsed = NARRATE.parseScript(JSON.parse(JSON.stringify(SCRIPT)));
+  eq('a script parses to its modes', parsed.order, ['dev']);
+  eq('beats survive parsing', parsed.modes.dev.beats.length, 4);
+  eq('beat indices are sequential', parsed.modes.dev.beats.map(b => b.index), [0, 1, 2, 3]);
+  eq('the caveat is carried through', parsed.modes.dev.caveat, 'reconstructed');
+  check('a reconstructed beat stays marked', parsed.modes.dev.beats[3].inferred === true);
+
+  eq('kinds are counted', NARRATE.counts(parsed.modes.dev),
+    { brief: 1, action: 1, result: 1, thought: 1 });
+}
+
+// A script from a stranger is the usual case — it must fail loudly, not silently.
+{
+  const rejects = (name, input, fragment) => {
+    let message = '';
+    try { NARRATE.parseScript(input); } catch (e) { message = e.message; }
+    check(name, message.includes(fragment), 'got "' + message + '"');
+  };
+  rejects('invalid JSON is rejected', '{not json', 'not valid JSON');
+  rejects('a script with no modes is rejected', { modes: {} }, 'no modes');
+  rejects('a mode with no beats is rejected', { modes: { a: {} } }, 'no beats');
+  rejects('a mode of empty beats is rejected',
+    { modes: { a: { beats: [{ kind: 'say', text: '   ' }] } } }, 'no readable beats');
+  rejects('a non-object is rejected', 7, 'must be an object');
+}
+
+// Flattening is what lets a narration reuse the ordinary reading path.
+{
+  const parsed = NARRATE.parseScript(JSON.parse(JSON.stringify(SCRIPT)));
+  const mode = parsed.modes.dev;
+  const flat = NARRATE.flatten(mode);
+
+  check('flattening announces the kind of beat', /The brief:/.test(flat.text) && /Result:/.test(flat.text), flat.text.slice(0, 80));
+  check('a reconstruction is announced as one', /Reconstructed:/.test(flat.text));
+  check('announcements can be turned off',
+    !/Result:/.test(NARRATE.flatten(mode, { announce: false }).text));
+
+  eq('every beat gets a range', flat.ranges.length, 4);
+  check('ranges are ordered and contiguous',
+    flat.ranges.every((r, i) => r.start === (i ? flat.ranges[i - 1].end + 2 : 0) && r.end > r.start));
+  check('ranges land inside the text',
+    flat.ranges.every(r => flat.text.slice(r.start, r.end).length === r.end - r.start));
+
+  // The mapping a chunk uses to find its beat.
+  eq('an offset maps to its beat', flat.ranges.map(r => NARRATE.beatAt(flat.ranges, r.start)), [0, 1, 2, 3]);
+  eq('the last character maps to the last beat',
+    NARRATE.beatAt(flat.ranges, flat.text.length - 1), 3);
+  eq('an offset in the gap between beats still maps somewhere',
+    typeof NARRATE.beatAt(flat.ranges, flat.ranges[0].end), 'number');
+
+  // End to end: flatten, segment with the real splitter, tag.
+  const chunks = NARRATE.tag(SPLIT.segment(flat.text, { maxChars: 180 }), flat.ranges, mode.beats);
+  check('every chunk knows its beat',
+    chunks.every(c => typeof c.beat === 'number' && c.beat >= 0 && c.beat < 4));
+  check('every chunk knows its kind',
+    chunks.every(c => ['brief', 'action', 'result', 'thought'].indexOf(c.beatKind) >= 0));
+  check('the first chunk of each beat is flagged',
+    chunks.filter(c => c.beatFirst).length === 4,
+    'got ' + chunks.filter(c => c.beatFirst).length + ' of 4');
+  check('chunk beats never go backwards',
+    chunks.every((c, i) => i === 0 || c.beat >= chunks[i - 1].beat));
+  check('the tagged text still reproduces the flattened text',
+    chunks.map(c => flat.text.slice(c.start, c.end)).join('') === flat.text);
+}
+
+// Delivery differs by kind, or a reconstruction sounds like a record.
+{
+  check('a reconstruction is read slower than an action',
+    NARRATE.kindOf('thought').rate < NARRATE.kindOf('action').rate);
+  check('an unknown kind still has a voice', NARRATE.kindOf('nonsense').rate > 0);
 }
 
 // --- a virtual clock ---------------------------------------------------------

@@ -608,6 +608,140 @@ main {
   color: var(--ink-2);
 }
 
+/* --- narration ------------------------------------------------------------ */
+
+/* Kinds are told apart by hue, so a recorded result never reads as a
+   reconstructed thought. Reconstruction additionally carries a dashed edge —
+   colour alone should not be load-bearing. */
+
+.beats {
+  list-style: none;
+  margin: var(--s-4) 0 var(--s-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.beat {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--s-3);
+}
+
+.beat p { margin: 4px 0 0; font-size: var(--t-sm); line-height: 1.5; }
+.beat.more { color: var(--ink-3); font-size: var(--t-sm); text-align: center; }
+
+.beat-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.beat-head b {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.beat-head i,
+.beat-label i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  opacity: 0.8;
+}
+
+.beat-head em,
+.beat-label em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.beat-brief   { border-left-color: var(--ink); }
+.beat-thought { border-left-color: var(--accent); }
+.beat-action  { border-left-color: var(--ink-3); }
+.beat-result  { border-left-color: var(--warn); }
+.beat-say     { border-left-color: var(--line); }
+.beat-verdict { border-left-color: var(--pass); }
+
+.beat.tone-good .beat-head b { color: var(--pass); }
+.beat.tone-bad  { border-left-color: var(--fail); }
+.beat.tone-bad  .beat-head b { color: var(--fail); }
+.beat.tone-warn .beat-head b { color: var(--warn); }
+
+/* the heading that sits inside the reading pane */
+.beat-label {
+  display: block;
+  margin: var(--s-4) 0 var(--s-1);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  color: var(--ink-3);
+}
+
+.beat-label:first-child { margin-top: 0; }
+
+.beat-label b {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.beat-label.beat-thought b { color: var(--accent); }
+.beat-label.beat-verdict b { color: var(--pass); }
+.beat-label.tone-bad b { color: var(--fail); }
+.beat-label.tone-warn b { color: var(--warn); }
+
+.paste {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
 /* --- settings sheet ------------------------------------------------------- */
 
 .scrim {
@@ -687,7 +821,14 @@ main {
 
 .seg { display: flex; gap: var(--s-2); }
 .seg .btn { flex: 1; }
-.seg .btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-band); color: var(--accent-strong); }
+
+/* Any toggling button, not just the ones in a segmented control — the
+   narration mode row needs the same state and was silently going without it. */
+.btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-band);
+  color: var(--accent-strong);
+}
 
 /* --- misc ----------------------------------------------------------------- */
 
@@ -755,6 +896,7 @@ main {
 
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button type="button" role="tab" data-tab="read" aria-selected="true" aria-controls="tab-read">Read</button>
+      <button type="button" role="tab" data-tab="session" aria-selected="false" aria-controls="tab-session">Session</button>
       <button type="button" role="tab" data-tab="voices" aria-selected="false" aria-controls="tab-voices">Voices</button>
     </nav>
 
@@ -799,6 +941,66 @@ main {
       <div class="pane" id="pane"></div>
 
       <p class="note" id="caps-line"></p>
+    </section>
+
+    <!-- --------------------------------------------------------- session -->
+    <section class="tab-panel" id="tab-session" role="tabpanel" aria-label="Session" hidden>
+
+      <div class="section-head">
+        <h2>Narration</h2>
+        <p class="hint" id="sess-source">nothing loaded yet</p>
+      </div>
+
+      <div class="row" id="sess-modes"></div>
+
+      <p class="hint" id="sess-summary"></p>
+      <p class="note" id="sess-caveat" hidden></p>
+
+      <div class="row">
+        <button type="button" class="btn primary grow" id="sess-play">Read this aloud</button>
+        <button type="button" class="btn" id="sess-download">Save text</button>
+      </div>
+
+      <ul class="beats" id="sess-preview"></ul>
+
+      <div class="section-head">
+        <h2>Live bridge</h2>
+      </div>
+
+      <p class="hint">
+        A browser cannot read a Claude Code transcript off disk, and cannot call
+        GitHub from a <code>file://</code> page. So the link runs the other way:
+        run <code>python3 tools/bridge.py</code> and it watches the session, runs
+        the suites on request, and hands the beats over here.
+      </p>
+
+      <label class="sr-only" for="sess-bridge">Bridge address</label>
+      <input type="url" class="filter" id="sess-bridge" placeholder="http://localhost:8765" inputmode="url">
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-connect">Connect</button>
+        <button type="button" class="btn grow" id="sess-run-tests">Run the suites</button>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="sess-follow">
+        <span>Follow the session, and re-read when it moves on</span>
+      </label>
+
+      <div class="section-head">
+        <h2>Or load one by hand</h2>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-load-file">Open narration.json</button>
+        <input type="file" id="sess-file" accept=".json,application/json" hidden>
+      </div>
+
+      <label class="sr-only" for="sess-paste">Paste a narration script</label>
+      <textarea id="sess-paste" class="paste" placeholder="…or paste the JSON here"></textarea>
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-use-paste">Use pasted script</button>
+      </div>
     </section>
 
     <!-- ---------------------------------------------------------- voices -->
@@ -916,6 +1118,7 @@ main {
 
 </div>
 
+<script>window.TTS=window.TTS||{};window.TTS.NARRATION={"version":1,"title":"Aloud — the making of","generated":"2026-08-07T17:55:31.011Z","modes":{"dev":{"label":"Development","source":{"kind":"session","file":"8e3cd54c-c3e0-5fa2-913e-21b3c1345821.jsonl","branch":"claude/tts-dev-narration-smoke-test-a1q9a2","cwd":"/home/user/PokimansSkyWorld/TTS","model":"claude-opus-5"},"caveat":"The transcript carries 67 thinking blocks and every one is empty — Claude Code strips the text before writing to disk. What follows is reconstructed from the actions and their results, not a record of thought.","beats":[{"kind":"brief","text":"continue","tone":"neutral","speaker":"director"},{"kind":"say","text":"I'll start by understanding the current state of the repository and the task at hand.","tone":"neutral"},{"kind":"action","text":"Now I check repo state and branches.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I list repo root.","tone":"neutral","at":"Bash"},{"kind":"result","text":"nothing to commit, working tree clean","tone":"neutral","at":"check repo state and branches"},{"kind":"action","text":"Now I compare branch to main and list contents.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I search for TTS/narration/smoke references.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read SkyWorld README and file sizes.","tone":"neutral","at":"Bash"},{"kind":"result","text":"ceiling — an established god is not getting any more established. A fully built","tone":"neutral","at":"read SkyWorld README and file sizes"},{"kind":"action","text":"Now I go looking for a tool I need.","tone":"neutral","at":"ToolSearch"},{"kind":"action","text":"Now I inspect Aetherline TTS/narration matches.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I list pull requests on github.","tone":"neutral","at":"mcp__github__list_pull_requests"},{"kind":"action","text":"Now I list issues on github.","tone":"neutral","at":"mcp__github__list_issues"},{"kind":"action","text":"Now I look for a narration/log feed in SkyWorld.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read Aetherline bootstrap test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"_out(\"%d passed, %d failed%s\" % [","tone":"good","at":"read Aetherline bootstrap test harness"},{"kind":"action","text":"Now I check for audio/voice support in SkyWorld.","tone":"neutral","at":"Bash"},{"kind":"result","text":"/bin/bash: line 1: cd: SkyWorld: No such file or directory","tone":"bad","at":"check for audio/voice support in SkyWorld"},{"kind":"thought","text":"Wrong path. Worth fixing before it turns into a wild goose chase.","tone":"warn","inferred":true},{"kind":"action","text":"Now I check for audio/voice support in SkyWorld.","tone":"neutral","at":"Bash"},{"kind":"say","text":"I've dug into the repo state. Here's what I found before asking you to point me: - The branch `claude/tts-dev-narration-smoke-test-a1q9a2` exists locally and on origin but sits **exactly at `main` (652617c)** — no commits, clean tree, no PR, no open issues. So there's no in-progress work to resume; the branch name is the only signal about intent. - The repo holds two projects: **`SkyWorld/`** (vanilla-JS HTML5 game…","tone":"neutral"},{"kind":"action","text":"Now I stop and ask, rather than guess.","tone":"neutral","at":"AskUserQuestion"},{"kind":"say","text":"That reframes it completely — this isn't about the game at all. A standalone mobile TTS tool. Let me pin down what it actually does before I plan it.","tone":"neutral"},{"kind":"action","text":"Now I stop and ask, rather than guess.","tone":"neutral","at":"AskUserQuestion"},{"kind":"say","text":"Good — that settles it. Let me verify the tooling I'd use for the build and headless checks.","tone":"neutral"},{"kind":"action","text":"Now I check node and Playwright availability.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read existing build script convention.","tone":"neutral","at":"Bash"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"result","text":"console.error('build: an external reference survived inlining');","tone":"neutral","at":"read existing build script convention"},{"kind":"action","text":"Now I locate the chromium executable.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I check npm registry reachability.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I check npm registry reachability with exit code.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Node 22, npm reachable, and the Playwright Chromium binary is present (I can drive it directly — no npm install, keeping the repo's zero-dependency convention). Writing the plan.","tone":"neutral"},{"kind":"action","text":"Now I write continue-generic-thompson.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I go looking for a tool I need.","tone":"neutral","at":"ToolSearch"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written. Presenting it for approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written. Presenting it for your approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Plan is written. Presenting it for approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written to `/root/.claude/plans/continue-generic-thompson.md`. Here's the summary before I ask for approval: **Aloud** — a standalone TTS reader + voice bench for mobile, in a new top-level `TTS/` directory, following the zero-dependency structure `SkyWorld/` already uses. The two halves are coupled deliberately: mobile speech engines have real, well-known bugs — Android Chrome truncates utterances at…","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written to `/root/.claude/plans/continue-generic-thompson.md`. Submitting it for approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Plan approved. Let me check the existing harness conventions and load the artifact design guidance before I start writing.","tone":"neutral"},{"kind":"action","text":"Now I read simtest conventions.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I load the artifact-design skill.","tone":"neutral","at":"Skill"},{"kind":"result","text":"ls: cannot access '/home/user/PokimansSkyWorld/package.json': No such file or directory","tone":"bad","at":"read simtest conventions"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"brief","text":"Approach this as the design lead at a small studio known for their versatility, giving every client a visual identity pitched at the treatment the task actually calls for. Make deliberate choices about palette, typography, and layout that are specific to this subject, and avoid templated designs. ## Read the request first Calibrate treatment, not whether to design. A doc deserves the same craft as a landing page — what changes is the treatment that craft is delivered in. Many requests call for…","tone":"neutral","speaker":"director"},{"kind":"say","text":"Plan approved — implementing now. **Design plan** (utility treatment, information-design first): - **Color** — cool neutrals with a cyan bias so they read as chosen, not default grey: light `#EFF2F4` / `#FFF` / ink `#131A1D`; dark `#0E1416` / `#161F22` / ink `#E6EEF0`. One accent, deep teal `#00707F` (light) → `#3FD0E0` (dark), used for live/active state and as a low-alpha band under the sentence being spoken.…","tone":"neutral"},{"kind":"action","text":"Now I write split.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write probes.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write engine.","tone":"neutral","at":"Write"},{"kind":"say","text":"Now the stylesheet, following the design plan.","tone":"neutral"},{"kind":"action","text":"Now I write style (styles).","tone":"neutral","at":"Write"},{"kind":"say","text":"Now the three UI modules.","tone":"neutral"},{"kind":"action","text":"Now I write reader.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write bench.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write app.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write index.","tone":"neutral","at":"Write"},{"kind":"say","text":"Two probes had a race — `pause()` firing `onend` could resolve the trial before the control timers read the result. Rewriting them as explicit sequences.","tone":"neutral"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the build script and the zero-dependency self-test harness.","tone":"neutral"},{"kind":"action","text":"Now I write build (module).","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I write selftest.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I run the self-test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Bench — a missing API","tone":"neutral","at":"run the self-test harness"},{"kind":"thought","text":"That failed. Before changing anything I want to know whether the code is wrong or the expectation is.","tone":"bad","inferred":true},{"kind":"say","text":"Both failures are my expectations, not the code — but the ellipsis one is a genuine improvement worth making: `Wait… no.` is one sentence, and an ellipsis followed by a lowercase word shouldn't break.","tone":"neutral"},{"kind":"action","text":"Now I change split.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I re-run the self-test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Bench — a missing API","tone":"neutral","at":"re-run the self-test harness"},{"kind":"say","text":"`no` was in the abbreviation list (as in \"No. 5\"), so it swallowed the full stop in \"…no.\" — a bad trade, since a sentence ending in \"no.\" is far commoner in prose.","tone":"neutral"},{"kind":"action","text":"Now I change split.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change split.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I re-run the self-test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Bench — a missing API","tone":"neutral","at":"re-run the self-test harness"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"say","text":"61 assertions pass. Now the build and the browser load check.","tone":"neutral"},{"kind":"action","text":"Now I write pagecheck (module).","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I build both outputs and run the page check.","tone":"neutral","at":"Bash"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"action","text":"Now I find what trips the fragment structure check.","tone":"neutral","at":"Bash"},{"kind":"say","text":"`\u003cheader>` was tripping the `\u003chead` guard. Tightening the check.","tone":"neutral"},{"kind":"action","text":"Now I change build (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I build and run the page check.","tone":"neutral","at":"Bash"},{"kind":"result","text":"built dist/artifact.html (90.9 kB)","tone":"neutral","at":"build and run the page check"},{"kind":"say","text":"The page boots clean. Now let me make `pagecheck` actually exercise behaviour, not just boot — driving the real DOM in the browser.","tone":"neutral"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I run the extended page check.","tone":"neutral","at":"Bash"},{"kind":"say","text":"All green. Let me look at it — rendering phone-sized screenshots in both themes.","tone":"neutral"},{"kind":"action","text":"Now I render light and dark screenshots of the reading tab.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Error: ENOENT: no such file or directory, open 'undefined/read-light.html'","tone":"bad","at":"render light and dark screenshots of the reading tab"},{"kind":"thought","text":"Wrong path. Worth fixing before it turns into a wild goose chase.","tone":"warn","inferred":true},{"kind":"action","text":"Now I render light and dark screenshots.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read read-light.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Content looks clipped — I need to check whether that's a real overflow or a screenshot-harness artifact before \"fixing\" anything.","tone":"neutral"},{"kind":"action","text":"Now I measure the actual layout viewport in headless.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Good — `scrollWidth === clientWidth` (485), so there's **no horizontal overflow**; headless just ignored `--window-size` for layout and cropped the PNG. Let me render at a true 390px viewport via an iframe.","tone":"neutral"},{"kind":"action","text":"Now I render true 390px-wide screenshots via iframe.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read shot-light.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Let me measure element geometry rather than infer from a render that may be mid-layout.","tone":"neutral"},{"kind":"action","text":"Now I measure element geometry at 390px viewport.","tone":"neutral","at":"Bash"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"say","text":"`--dump-dom` only dumps the top document. Measuring the page directly instead.","tone":"neutral"},{"kind":"action","text":"Now I measure geometry on the page directly.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Geometry is correct — transport pinned to the bottom (y 740 + h 73 = 813 = viewport), no horizontal overflow. The only real issue is the header eyebrow wrapping at 390px. Let me check the other two views.","tone":"neutral"},{"kind":"action","text":"Now I read shot-dark.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Dark theme resolves — but the textarea looks light against it. Let me verify with computed styles rather than trust the PNG.","tone":"neutral"},{"kind":"action","text":"Now I check computed styles under the dark theme.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Computed styles are correct (textarea is `rgb(14,20,22)`) — the white box was a headless paint artifact. But `color-scheme: normal` is a real finding: native scrollbars, range thumbs and select popups would render light on the dark theme. Fixing that and the header wrap.","tone":"neutral"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I rebuild and re-render screenshots.","tone":"neutral","at":"Bash"},{"kind":"result","text":"built dist/artifact.html (91.3 kB)","tone":"neutral","at":"rebuild and re-render screenshots"},{"kind":"action","text":"Now I read shot-dark.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Dark textarea now correct — that confirms `color-scheme` was the cause — and the header no longer wraps. The iframe crops the fixed transport, so let me screenshot the page directly where geometry already proved it sits flush to the bottom.","tone":"neutral"},{"kind":"action","text":"Now I screenshot pages directly to see the transport.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read direct-bench.png.","tone":"neutral","at":"Read"},{"kind":"action","text":"Now I read direct-light.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Transport renders correctly with \"1 / 9 sentences\" — segmentation ran end to end. Now the README.","tone":"neutral"},{"kind":"action","text":"Now I write README.","tone":"neutral","at":"Write"},{"kind":"say","text":"Full verification pass before committing.","tone":"neutral"},{"kind":"action","text":"Now I run the full verification suite.","tone":"neutral","at":"Bash"},{"kind":"result","text":"61 passed, 0 failed","tone":"good","at":"run the full verification suite"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"action","text":"Now I stage the new tool and review.","tone":"neutral","at":"Bash"},{"kind":"result","text":"14 files changed, 9712 insertions(+)","tone":"neutral","at":"stage the new tool and review"},{"kind":"action","text":"Now I commit the new tool.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I push the branch.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Pushed. Now publishing the artifact so you have a URL you can open on your phone.","tone":"neutral"},{"kind":"action","text":"Now I publish the page.","tone":"neutral","at":"Artifact"},{"kind":"say","text":"Done. **Open on your phone:** https://claude.ai/code/artifact/39e5b4bb-cba0-4205-bd19-09a9be63cac8 Your \"continue\" landed on an empty branch — no commits, no PR, nothing to resume — so what you got is what you then described: a standalone mobile TTS tool, **Aloud**, committed to `TTS/` on `claude/tts-dev-narration-smoke-test-a1q9a2` and published as an artifact. One self-contained 92 kB page, no dependencies, no…","tone":"neutral"},{"kind":"brief","text":"execute the plan","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is already fully executed — that happened after you approved it earlier in this session. Let me verify the state rather than redo the work.","tone":"neutral"},{"kind":"action","text":"Now I verify branch state and pushed commit.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I re-verify tests, build reproducibility, and clean tree.","tone":"neutral","at":"Bash"},{"kind":"result","text":"61 passed, 0 failed","tone":"good","at":"re-verify tests, build reproducibility, and clean tree"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"say","text":"Everything the plan called for is already done and verified — nothing was left to execute. **State confirmed just now:** - Commit `7b98a4f` on `claude/tts-dev-narration-smoke-test-a1q9a2`, and local `HEAD` matches `origin/…` exactly — the push landed. - All 14 files present under `TTS/`. - `selftest.js`: **61 passed, 0 failed**. - `pagecheck.mjs`: **all checks passed** in real Chromium. - Rebuilding produces…","tone":"neutral"},{"kind":"brief","text":"implement the connection between the artifact and the claude code, so that it automatically will with either cc session or github it will read the internal monolog of the developer as they would have been thinking, through development OR test mode, which utilizes agents to run testing and it will get that data and read it as if it was a player. this is all in the plan right? it should be.. implement the full tool.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Straight answer first: **no, this isn't in the plan.** The plan file covers a standalone reader plus voice bench — nothing about connecting to Claude Code, GitHub, agents, or a narration feed. This is new scope. I'll build it, but I'm not going to pretend it was already agreed. One hard constraint I have to check before designing anything: the published artifact runs under a strict CSP that blocks *all* external…","tone":"neutral"},{"kind":"action","text":"Now I load the artifact-capabilities skill.","tone":"neutral","at":"Skill"},{"kind":"brief","text":"Base directory for this skill: /tmp/claude-0/bundled-skills/2.1.224/b49dff7d676d7310ae4c7aecd53fea37/artifact-capabilities # Artifact runtime capabilities A published Artifact page can declare **runtime capabilities** — abilities the claude.ai viewer grants the page at open time — by passing `capabilities: {name: config}` to the Artifact tool. The control plane is the authority on valid names and config shapes. Declaration gestures: **omitting** `capabilities` on a redeploy carries the stored…","tone":"neutral","speaker":"director"},{"kind":"action","text":"Now I go looking for a tool I need.","tone":"neutral","at":"ToolSearch"},{"kind":"action","text":"Now I read the downloads capability type definitions.","tone":"neutral","at":"Bash"},{"kind":"result","text":"* Stable error codes; treat unknown codes as `\"unavailable\"`.","tone":"neutral","at":"read the downloads capability type definitions"},{"kind":"say","text":"Confirmed the constraint, and it changes the design: available capabilities are **`downloads` and `mcp` only**, and **no claude.ai connectors are connected**. Those `mcp__github__*` tools are this session's local MCP server, which the skill explicitly excludes. So the published page **cannot** call GitHub or a CC session — there is no capability that would let it. So the connection has to run the other way…","tone":"neutral"},{"kind":"brief","text":"[Request interrupted by user]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"if that's the case then fuck the artifact we can do html5 or python for pydroid.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Dropping the artifact removes the CSP wall entirely — a local HTML file can talk to the network. Let me verify the two facts the design depends on before building on them.","tone":"neutral"},{"kind":"action","text":"Now I verify GitHub CORS support and local session transcript storage.","tone":"neutral","at":"Bash"},{"kind":"say","text":"The 403 is the sandbox proxy, not GitHub. But the session transcript exists — that's the monologue source. Let me inspect its shape.","tone":"neutral"},{"kind":"action","text":"Now I inspect session transcript structure.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I inspect assistant records and thinking blocks.","tone":"neutral","at":"Bash"},{"kind":"say","text":"52 thinking blocks exist, but the first sample is empty. Let me check whether the monologue text is actually stored or stripped.","tone":"neutral"},{"kind":"action","text":"Now I check whether thinking text is retained.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Decisive finding before I build: **all 53 thinking blocks in the session transcript are empty** — the verbatim reasoning is stripped on write, only signatures remain. So literal internal monologue is not recoverable from disk. What *is* there is the complete truthful record: 97 tool calls with full inputs, their results, 40 assistant messages, prompts, timestamps, branch. So the monologue gets **reconstructed**…","tone":"neutral"},{"kind":"action","text":"Now I write monologue (module).","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I generate narration from session, git and tests.","tone":"neutral","at":"Bash"},{"kind":"say","text":"367 beats generated from real data. Let me check the prose quality.","tone":"neutral"},{"kind":"action","text":"Now I inspect generated narration quality.","tone":"neutral","at":"Bash"},{"kind":"result","text":"[verdict] driving the interface logged no errors.","tone":"neutral","at":"inspect generated narration quality"},{"kind":"say","text":"Test and history modes read well. Dev mode has noise — raw paths and `total 20` don't work spoken. Tightening the result filter.","tone":"neutral"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the player side — the pure narration module first, so it's testable.","tone":"neutral"},{"kind":"action","text":"Now I write narrate.","tone":"neutral","at":"Write"},{"kind":"say","text":"Now wiring narration into the reader, reusing the existing pane and transport rather than building a second playback path.","tone":"neutral"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the Session tab, which owns the sources — baked-in script, file, paste, or a live bridge.","tone":"neutral"},{"kind":"action","text":"Now I write session.","tone":"neutral","at":"Write"},{"kind":"say","text":"Now the bridge — this is where Python earns its place: the page can't read a transcript off disk or call GitHub from `file://`, so a small stdlib-only server does it.","tone":"neutral"},{"kind":"action","text":"Now I write bridge (python).","tone":"neutral","at":"Write"},{"kind":"say","text":"Now wiring the new tab into the page and app.","tone":"neutral"},{"kind":"action","text":"Now I change index.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change index.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change index.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now app.js needs to register the session tab and expose what it needs.","tone":"neutral"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the styles for beats and the new controls.","tone":"neutral"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now bake the narration into the build so the standalone file carries it.","tone":"neutral"},{"kind":"action","text":"Now I change build (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change build (module).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now test coverage for the new module.","tone":"neutral"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I run selftest with new narration tests.","tone":"neutral","at":"Bash"},{"kind":"result","text":"88 passed, 0 failed","tone":"good","at":"run selftest with new narration tests"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"say","text":"88 passing. Regenerating narration with the tightened filter and rebuilding.","tone":"neutral"},{"kind":"action","text":"Now I regenerate narration and rebuild.","tone":"neutral","at":"Bash"},{"kind":"result","text":"built dist/artifact.html (174.3 kB)","tone":"neutral","at":"regenerate narration and rebuild"},{"kind":"say","text":"Still noisy — an `ls -l` line slipped through and a bad inference fired on a README. Tightening both.","tone":"neutral"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I regenerate and inspect improved dev narration.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Two leaks remain — both are *file contents* (a README, a line of code) being read as outcomes. The real rule: only a command produces an outcome; file contents never do.","tone":"neutral"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I restrict result beats to reporting tools and regenerate.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Now verifying the bridge actually works end to end.","tone":"neutral"},{"kind":"action","text":"Now I start the bridge and exercise its endpoints.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I verify static serving, CORS and path traversal guard.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I change bridge (python).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I run page check with session tab coverage.","tone":"neutral","at":"Bash"},{"kind":"say","text":"All 30 checks pass, including the full narration path. Let me look at the Session tab.","tone":"neutral"},{"kind":"action","text":"Now I screenshot the session tab in both themes.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read sess-dark.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"One visual bug: the selected mode button has no pressed state — that styling only existed inside `.seg`. Making it general.","tone":"neutral"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now updating the README to cover the new half.","tone":"neutral"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Full verification pass, then commit.","tone":"neutral"},{"kind":"action","text":"Now I full verification of all suites.","tone":"neutral","at":"Bash"},{"kind":"say","text":"`pkill -f` matched its own command line. Re-running without it.","tone":"neutral"},{"kind":"action","text":"Now I full verification of all suites.","tone":"neutral","at":"Bash"}]},"history":{"label":"Commit history","source":{"kind":"git","branch":"claude/tts-dev-narration-smoke-test-a1q9a2","head":"7b98a4f"},"caveat":"Commit messages are written down rather than inferred, so this mode is the closest thing here to the real reasoning.","beats":[{"kind":"action","text":"On 2026-08-07 I committed: Add Aloud: a mobile TTS reader with a voice bench.","tone":"neutral","at":"7b98a4f"},{"kind":"result","text":"14 files changed.","tone":"neutral","at":"7b98a4f"},{"kind":"thought","text":"A standalone, self-contained page — no dependencies, no network, no build step to use it. Text is read with the voices already on the device and never leaves it. It is two tools because mobile speech engines are broken in ways feature detection cannot see: speechSynthesis is always present, every method exists, and every one returns without complaint. You have to speak something and time it. The reader is built around six measured failures — Android Chrome truncating a single utterance at ~15s, getVoices() empty on the first call, pause() that either does nothing or stops outright, absent…","tone":"neutral","at":"7b98a4f"},{"kind":"action","text":"On 2026-08-07 I committed: Add twenty more systems, two mini-games, and loop work.","tone":"neutral","at":"4e56cf4"},{"kind":"result","text":"23 files changed.","tone":"neutral","at":"4e56cf4"},{"kind":"thought","text":"Second layer of mechanics, each with three or more moving parts, all feeding the existing loop rather than sitting beside it: seasons; daily weather with a forecast; per-plot soil with depletion, recovery and crop rotation; three fertilisers; named villagers with moods and traits; seven assignable roles; eight buildings at three tiers; five creature ailments with causes you can see coming; nine techniques learned by repetition; bloodlines with wild mates, hybrid vigour and a pedigree; the Trial Ring; four caravans; contracts; fourteen relics with slots and fusion; twelve titles; sixteen…","tone":"neutral","at":"4e56cf4"},{"kind":"action","text":"On 2026-08-07 I committed: Add generations, a growing island, and two mini-games.","tone":"neutral","at":"980b634"},{"kind":"result","text":"16 files changed.","tone":"neutral","at":"980b634"},{"kind":"thought","text":"Reframes the game around the spine of Ancestors: The Humankind Odyssey, layered onto the training system that was already here. The line. Learning is cheap and dies with the animal. Praising a chore the creature already knows well also *ingrains* it, and only ingrained behaviour survives a generation leap — so the loop becomes teach, drill, then breed before it dies of old age. Whelps learn at 1.5x and are useless; elders are the reverse. Every few leaps the line permanently changes shape, and those bonuses are the long-run multiplier: a player who trains and breeds is 1.2x ahead of one who…","tone":"neutral","at":"980b634"},{"kind":"action","text":"On 2026-08-07 I committed: Add Skyward Reach: creature-raising farm sim on a floating island.","tone":"neutral","at":"1d0986b"},{"kind":"result","text":"16 files changed.","tone":"neutral","at":"1d0986b"},{"kind":"thought","text":"A self-contained HTML5 game. You are a minor god with one island, three believers and no reputation, climbing a public leaderboard of rival gods. Three systems, deliberately braided: - The creature is taught, never commanded. It picks acts by softmax over learned weights; you get a nine-second window to praise or strike, which multiplies or divides that act's weight and moves its alignment. Needs override training, so a starving beast eats the field it was taught to harvest. The Leash of Learning is a second channel: chores you do by hand bleed into its weights. - Your own actions cost…","tone":"neutral","at":"1d0986b"},{"kind":"action","text":"On 2026-08-03 I committed: Phase 4a: the shared cultural neural network.","tone":"neutral","at":"41940bf"},{"kind":"result","text":"34 files changed.","tone":"neutral","at":"41940bf"},{"kind":"thought","text":"Clans now share one small MLP that learns from what their members live through. A behaviour discovered by four individuals becomes something all forty of them know, and a fraction of it is inherited by the generation after — cultural transmission as a mechanism rather than a scripted system. The Phase 0 seams held. `creature.gd` needed no change to its tick path, `SimulationBudget` needed no change beyond retiring its TODO, and `SaveSystem` needed none at all: the round-robin slices, the experience funnel and the provider registration were already the right shape. Core: - culture_net.gd —…","tone":"neutral","at":"41940bf"},{"kind":"action","text":"On 2026-08-02 I committed: Initial session output p2 finish.","tone":"neutral","at":"35f9cfa"},{"kind":"result","text":"111 files changed.","tone":"neutral","at":"35f9cfa"}]},"test":{"label":"Test run","source":{"kind":"test","at":"2026-08-07T17:55:33.288Z","exit":0},"caveat":"Every verdict here is a real assertion from a real run, not a summary of one.","beats":[{"kind":"brief","text":"Test mode. Run the suites and tell me what happened.","tone":"neutral","speaker":"director"},{"kind":"action","text":"Running the self-test.","tone":"neutral","at":"the self-test"},{"kind":"verdict","text":"three plain sentences.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an abbreviation does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a decimal does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"initials do not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a dotted abbreviation does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an ellipsis trailing into lowercase does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an ellipsis before a capital does end one.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"three dots behave like an ellipsis too.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a closing quote stays with its sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"multiple terminators stay together.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a blank line ends a chunk.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a single newline does not — hard-wrapped text stays whole.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"whitespace only yields nothing.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"empty string yields nothing.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a non-string yields nothing.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"text with no terminator is still one chunk.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"\"no.\" ends a sentence when no number follows.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"\"No.\" before a number does not.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a run-on is chopped into several chunks.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"no chunk exceeds the utterance limit.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"chopping prefers a clause break.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an unbreakable run is still cut.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"the unbreakable run survives intact.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"chunks reproduce the source exactly.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"chunks partition the source with no gap or overlap.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a script parses to its modes.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"beats survive parsing.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"beat indices are sequential.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the caveat is carried through.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a reconstructed beat stays marked.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"kinds are counted.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"invalid JSON is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a script with no modes is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a mode with no beats is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a mode of empty beats is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a non-object is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"flattening announces the kind of beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a reconstruction is announced as one.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"announcements can be turned off.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"every beat gets a range.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"ranges are ordered and contiguous.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"ranges land inside the text.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"an offset maps to its beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the last character maps to the last beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"an offset in the gap between beats still maps somewhere.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"every chunk knows its beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"every chunk knows its kind.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the first chunk of each beat is flagged.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"chunk beats never go backwards.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the tagged text still reproduces the flattened text.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a reconstruction is read slower than an action.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"an unknown kind still has a voice.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"probe \"api\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"voices\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"basic\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"cutoff\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"boundary\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"pauseresume\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"cancel\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"rate\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"queue\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"the healthy engine reports usable capabilities.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"a delayed voice list is still found.","tone":"good","at":"Bench — voices that arrive late"},{"kind":"verdict","text":"the delay is reported.","tone":"good","at":"Bench — voices that arrive late"},{"kind":"verdict","text":"an empty voice list fails.","tone":"good","at":"Bench — no voices at all"},{"kind":"verdict","text":"network-only voices warn.","tone":"good","at":"Bench — no voices at all"},{"kind":"verdict","text":"the warning mentions working offline.","tone":"good","at":"Bench — no voices at all"},{"kind":"verdict","text":"a truncating engine is caught.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"the report names the cause.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"the short phrase still passes on the same engine.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"caps record the truncation.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"an early ending warns rather than misattributing the cause.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"a no-op pause is caught.","tone":"good","at":"Bench — pause() that does nothing"},{"kind":"verdict","text":"the report says pause had no effect.","tone":"good","at":"Bench — pause() that does nothing"},{"kind":"verdict","text":"caps withhold native pause.","tone":"good","at":"Bench — pause() that does nothing"},{"kind":"verdict","text":"a stopping pause is caught.","tone":"good","at":"Bench — pause() that stops instead"},{"kind":"verdict","text":"the report distinguishes it from a no-op.","tone":"good","at":"Bench — pause() that stops instead"},{"kind":"verdict","text":"missing boundary events warn.","tone":"good","at":"Bench — no word boundary events"},{"kind":"verdict","text":"the report explains the fallback.","tone":"good","at":"Bench — no word boundary events"},{"kind":"verdict","text":"caps withhold word highlighting.","tone":"good","at":"Bench — no word boundary events"},{"kind":"verdict","text":"an ignored rate is caught.","tone":"good","at":"Bench — an engine that ignores rate"},{"kind":"verdict","text":"a wedged engine fails instead of hanging.","tone":"good","at":"Bench — an engine that never finishes"},{"kind":"verdict","text":"the report says speech is wedged.","tone":"good","at":"Bench — an engine that never finishes"},{"kind":"verdict","text":"a browser without speechSynthesis fails cleanly.","tone":"good","at":"Bench — a missing API"},{"kind":"verdict","text":"a quick run skips the slow probes.","tone":"good","at":"Bench — the runner"},{"kind":"verdict","text":"a quick run still covers the fast probes.","tone":"good","at":"Bench — the runner"},{"kind":"verdict","text":"every quick probe passed on a healthy engine.","tone":"good","at":"Bench — the runner"},{"kind":"verdict","text":"an abort stops the remaining probes.","tone":"good","at":"Bench — aborting"},{"kind":"result","text":"the self-test: 88 passed, 0 failed.","tone":"good","at":"the self-test"},{"kind":"thought","text":"All of it green — though none of these assertions can hear anything, so this is correctness, not audio.","tone":"good","inferred":true},{"kind":"action","text":"Rebuilding the single-file page.","tone":"neutral","at":"build"},{"kind":"result","text":"The page comes out at 162.1 kB.","tone":"good","at":"build"},{"kind":"action","text":"Running the page check.","tone":"neutral","at":"the page check"},{"kind":"verdict","text":"the page logged no errors.","tone":"good","at":""},{"kind":"verdict","text":"the reader booted and rendered its empty state.","tone":"good","at":""},{"kind":"verdict","text":"the transport rendered.","tone":"good","at":""},{"kind":"verdict","text":"the settings sheet rendered.","tone":"good","at":""},{"kind":"verdict","text":"the voice select was populated by script.","tone":"good","at":""},{"kind":"verdict","text":"the capability note was written by script.","tone":"good","at":""},{"kind":"verdict","text":"the sentence counter was painted.","tone":"good","at":""},{"kind":"verdict","text":"no external references survive.","tone":"good","at":""},{"kind":"verdict","text":"the driver ran without throwing.","tone":"good","at":""},{"kind":"verdict","text":"typed text is segmented into the pane.","tone":"good","at":""},{"kind":"verdict","text":"the pane reproduces the source exactly.","tone":"good","at":""},{"kind":"verdict","text":"tapping a sentence makes it current.","tone":"good","at":""},{"kind":"verdict","text":"the counter tracks the position.","tone":"good","at":""},{"kind":"verdict","text":"switching tabs shows the voices panel.","tone":"good","at":""},{"kind":"verdict","text":"the transport hides outside the reading tab.","tone":"good","at":""},{"kind":"verdict","text":"the settings sheet opens.","tone":"good","at":""},{"kind":"verdict","text":"the settings sheet closes.","tone":"good","at":""},{"kind":"verdict","text":"clearing empties the pane.","tone":"good","at":""},{"kind":"verdict","text":"the session tab opens.","tone":"good","at":""},{"kind":"verdict","text":"a narration is baked into the page.","tone":"good","at":""},{"kind":"verdict","text":"the baked script is announced as built in.","tone":"good","at":""},{"kind":"verdict","text":"every mode gets a button.","tone":"good","at":""},{"kind":"verdict","text":"beats are previewed.","tone":"good","at":""},{"kind":"verdict","text":"playing a narration switches to the reading tab.","tone":"good","at":""},{"kind":"verdict","text":"the narration segments into the pane.","tone":"good","at":""},{"kind":"verdict","text":"beats are labelled in the pane.","tone":"good","at":""},{"kind":"verdict","text":"reconstructed beats are marked as such.","tone":"good","at":""},{"kind":"verdict","text":"the narration announces the kind of beat.","tone":"good","at":""},{"kind":"verdict","text":"driving the interface logged no errors.","tone":"good","at":""},{"kind":"result","text":"the page check: all checks passed.","tone":"good","at":"the page check"},{"kind":"verdict","text":"Everything passed. Segmentation, the probe logic, the wiring and a clean boot are all verified — and not one word of it was spoken out loud, because headless has no voices.","tone":"good","at":"summary"}]}}};</script>
 <script>
 /* Segmentation — text in, speakable chunks out.
  *
@@ -1685,6 +1888,174 @@ main {
 
 </script>
 <script>
+/* Narration scripts — validation, and the turn from beats into a document.
+ *
+ * Pure: no DOM, no speech API. A script is what tools/monologue.mjs writes —
+ * a development record turned into speakable beats. This module checks one is
+ * well formed, flattens a mode into a single string the existing segmenter can
+ * chew on, and maps every chunk back to the beat it came from so the player
+ * can label and colour it.
+ *
+ * The flattening matters: rather than inventing a second playback path, a
+ * narration mode becomes ordinary text with an index beside it, and the reader
+ * plays it with the machinery that already works.
+ */
+(function (window) {
+  'use strict';
+
+  var KINDS = {
+    brief:   { label: 'Brief',   rate: 1.00, pitch: 1.00 },
+    thought: { label: 'Thinking', rate: 0.94, pitch: 0.96 },
+    action:  { label: 'Doing',   rate: 1.06, pitch: 1.00 },
+    result:  { label: 'Result',  rate: 1.00, pitch: 0.98 },
+    say:     { label: 'Saying',  rate: 1.00, pitch: 1.02 },
+    verdict: { label: 'Verdict', rate: 0.96, pitch: 1.00 }
+  };
+
+  function kindOf(kind) { return KINDS[kind] || KINDS.say; }
+
+  /* Throws a message worth showing a person. */
+  function parseScript(input) {
+    var raw = input;
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); }
+      catch (e) { throw new Error('That is not valid JSON: ' + e.message); }
+    }
+    if (!raw || typeof raw !== 'object') throw new Error('A narration script must be an object.');
+    if (!raw.modes || typeof raw.modes !== 'object') throw new Error('No "modes" in this script.');
+
+    var names = Object.keys(raw.modes);
+    if (!names.length) throw new Error('The script has no modes in it.');
+
+    var modes = {};
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      var mode = raw.modes[name];
+      if (!mode || !Array.isArray(mode.beats)) throw new Error('Mode "' + name + '" has no beats.');
+
+      var beats = [];
+      for (var b = 0; b < mode.beats.length; b++) {
+        var raw_b = mode.beats[b];
+        if (!raw_b || typeof raw_b.text !== 'string') continue;
+        var text = raw_b.text.trim();
+        if (!text) continue;
+        beats.push({
+          index: beats.length,
+          kind: KINDS[raw_b.kind] ? raw_b.kind : 'say',
+          text: text,
+          tone: raw_b.tone || 'neutral',
+          at: raw_b.at || '',
+          inferred: !!raw_b.inferred,
+          speaker: raw_b.speaker || ''
+        });
+      }
+      if (!beats.length) throw new Error('Mode "' + name + '" has no readable beats.');
+
+      modes[name] = {
+        name: name,
+        label: mode.label || name,
+        caveat: mode.caveat || '',
+        source: mode.source || {},
+        beats: beats
+      };
+    }
+
+    return {
+      version: raw.version || 1,
+      title: raw.title || 'Narration',
+      generated: raw.generated || '',
+      modes: modes,
+      order: Object.keys(modes)
+    };
+  }
+
+  /* A mode becomes one string plus the offsets each beat occupies in it. */
+  function flatten(mode, opts) {
+    var spoken = !opts || opts.announce !== false;
+    var parts = [];
+    var ranges = [];
+    var at = 0;
+
+    for (var i = 0; i < mode.beats.length; i++) {
+      var b = mode.beats[i];
+
+      // A short spoken label keeps a listener oriented — otherwise a result
+      // and a reconstruction sound identical, which is the one thing this
+      // must not do.
+      var lead = '';
+      if (spoken) {
+        if (b.kind === 'brief') lead = 'The brief: ';
+        else if (b.kind === 'thought') lead = b.inferred ? 'Reconstructed: ' : 'Thinking: ';
+        else if (b.kind === 'result') lead = 'Result: ';
+        else if (b.kind === 'verdict') lead = 'Verdict: ';
+      }
+
+      var text = lead + b.text;
+      if (!/[.!?…]$/.test(text)) text += '.';
+
+      var start = at;
+      parts.push(text);
+      at += text.length;
+      ranges.push({ beat: b.index, start: start, end: at });
+
+      if (i < mode.beats.length - 1) {
+        parts.push('\n\n');
+        at += 2;
+      }
+    }
+
+    return { text: parts.join(''), ranges: ranges };
+  }
+
+  /* Which beat does a source offset belong to? Chunks are produced by
+   * split.segment over the flattened text, so this is how a chunk finds its
+   * beat. Binary search: a long session runs to hundreds of beats. */
+  function beatAt(ranges, offset) {
+    var lo = 0, hi = ranges.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (offset < ranges[mid].start) hi = mid - 1;
+      else if (offset >= ranges[mid].end) lo = mid + 1;
+      else return ranges[mid].beat;
+    }
+    return ranges.length ? ranges[Math.min(lo, ranges.length - 1)].beat : 0;
+  }
+
+  /* Tag each chunk with its beat, so the player can colour and label it and
+   * modulate the voice per kind. */
+  function tag(chunks, ranges, beats) {
+    for (var i = 0; i < chunks.length; i++) {
+      var index = beatAt(ranges, chunks[i].start);
+      chunks[i].beat = index;
+      chunks[i].beatKind = beats[index] ? beats[index].kind : 'say';
+      chunks[i].beatFirst = i === 0 || chunks[i - 1].beat !== index;
+    }
+    return chunks;
+  }
+
+  function counts(mode) {
+    var out = {};
+    for (var i = 0; i < mode.beats.length; i++) {
+      var k = mode.beats[i].kind;
+      out[k] = (out[k] || 0) + 1;
+    }
+    return out;
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.narrate = {
+    KINDS: KINDS,
+    kindOf: kindOf,
+    parseScript: parseScript,
+    flatten: flatten,
+    beatAt: beatAt,
+    tag: tag,
+    counts: counts
+  };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
 /* Playback — turns a list of chunks into speech you can steer.
  *
  * One utterance at a time, never a bulk enqueue. Queueing the whole document
@@ -2029,6 +2400,7 @@ main {
     var chunks = [];
     var spans = [];
     var current = -1;
+    var narration = null;   // {mode, beats, ranges} while playing a narration
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     var engine = window.TTS.engine.create({
@@ -2037,7 +2409,19 @@ main {
       caps: app.caps,
       settings: function () {
         var s = app.settings;
-        return { voice: app.currentVoice(), rate: s.rate, pitch: s.pitch, volume: s.volume };
+        var out = { voice: app.currentVoice(), rate: s.rate, pitch: s.pitch, volume: s.volume };
+
+        // In a narration, the kind of beat shapes the delivery — a
+        // reconstruction is read a little slower than an action, a result a
+        // little flatter. Without this every kind sounds identical, which is
+        // the one thing a reconstructed monologue must not do.
+        var c = chunks[engine.index];
+        if (c && c.beatKind && app.settings.actKinds !== false) {
+          var k = window.TTS.narrate.kindOf(c.beatKind);
+          out.rate = Math.max(0.5, Math.min(2, s.rate * k.rate));
+          out.pitch = Math.max(0, Math.min(2, s.pitch * k.pitch));
+        }
+        return out;
       },
       emit: onEngine
     });
@@ -2059,6 +2443,12 @@ main {
 
       var frag = D.createDocumentFragment();
       for (var i = 0; i < chunks.length; i++) {
+        // In a narration, each beat gets a heading so the eye can tell a
+        // recorded result from a reconstructed thought at a glance.
+        if (chunks[i].beatFirst && narration) {
+          var b = narration.beats[chunks[i].beat];
+          if (b) frag.appendChild(beatLabel(b));
+        }
         var s = D.createElement('span');
         s.className = 'chunk';
         s.setAttribute('data-i', String(i));
@@ -2067,6 +2457,25 @@ main {
         spans.push(s);
       }
       pane.appendChild(frag);
+    }
+
+    function beatLabel(b) {
+      var el = D.createElement('span');
+      el.className = 'beat-label beat-' + b.kind + (b.tone ? ' tone-' + b.tone : '');
+      var name = D.createElement('b');
+      name.textContent = window.TTS.narrate.kindOf(b.kind).label;
+      el.appendChild(name);
+      if (b.inferred) {
+        var tag = D.createElement('i');
+        tag.textContent = 'reconstructed';
+        el.appendChild(tag);
+      }
+      if (b.at) {
+        var at = D.createElement('em');
+        at.textContent = b.at;
+        el.appendChild(at);
+      }
+      return el;
     }
 
     function plainChunk(i) {
@@ -2169,6 +2578,7 @@ main {
 
     function setText(text, opts) {
       chunks = window.TTS.split.segment(text, { maxChars: app.settings.maxChars });
+      if (narration) window.TTS.narrate.tag(chunks, narration.ranges, narration.beats);
       engine.setChunks(chunks);
       renderPane();
 
@@ -2181,9 +2591,22 @@ main {
     }
 
     function textChanged() {
+      narration = null;          // typing replaces a narration with plain text
       setText(ta.value);
       if (saveTimer !== null) clearTimeout(saveTimer);
       saveTimer = setTimeout(function () { app.saveText(ta.value); }, 400);
+    }
+
+    /* Load one mode of a parsed narration script and play it with the
+     * machinery the reader already has. */
+    function loadNarration(mode) {
+      var flat = window.TTS.narrate.flatten(mode);
+      narration = { mode: mode, beats: mode.beats, ranges: flat.ranges };
+      engine.stop();
+      ta.value = flat.text;
+      setText(flat.text);
+      app.saveText(flat.text);
+      return chunks.length;
     }
 
     // --- wiring ------------------------------------------------------------
@@ -2261,6 +2684,8 @@ main {
 
     return {
       engine: engine,
+      loadNarration: loadNarration,
+      play: function (from) { engine.play(from || 0); },
       resegment: function () { setText(ta.value, { resumeAt: engine.index }); },
       stop: function () { engine.stop(); }
     };
@@ -2603,6 +3028,310 @@ main {
 
 </script>
 <script>
+/* The Session tab — where a development record becomes something to listen to.
+ *
+ * Four ways in, in order of how little they ask of you:
+ *
+ *   baked    a narration.json compiled into the page at build time
+ *   bridge   tools/bridge.py on this machine or over the LAN, polled live
+ *   file     open a narration.json by hand
+ *   paste    drop the JSON in
+ *
+ * The bridge is the live one. The page cannot read a session transcript off
+ * disk and cannot call GitHub from a file:// origin, so the connection runs
+ * the other way: a small local server watches the transcript, runs the suites
+ * on request, and hands over beats. When it is running, this tab follows a
+ * session as it happens.
+ */
+(function (window) {
+  'use strict';
+
+  var D = document;
+  function $(id) { return D.getElementById(id); }
+
+  var POLL_MS = 4000;
+
+  function init(app) {
+    var sourceLine = $('sess-source');
+    var modeRow = $('sess-modes');
+    var summary = $('sess-summary');
+    var preview = $('sess-preview');
+    var caveat = $('sess-caveat');
+    var bridgeInput = $('sess-bridge');
+    var followBox = $('sess-follow');
+    var fileInput = $('sess-file');
+    var pasteBox = $('sess-paste');
+
+    var script = null;
+    var currentMode = null;
+    var pollTimer = null;
+    var lastSignature = '';
+
+    // --- loading -----------------------------------------------------------
+
+    function adopt(parsed, whence) {
+      script = parsed;
+      sourceLine.textContent = whence;
+      currentMode = script.order[0];
+      renderModes();
+      selectMode(currentMode);
+    }
+
+    function tryAdopt(raw, whence) {
+      try {
+        adopt(window.TTS.narrate.parseScript(raw), whence);
+        app.toast('Loaded ' + Object.keys(script.modes).length + ' mode(s).');
+        return true;
+      } catch (e) {
+        app.toast(e.message);
+        return false;
+      }
+    }
+
+    function loadBaked() {
+      if (window.TTS.NARRATION) {
+        tryAdopt(window.TTS.NARRATION, 'built into this page');
+        return true;
+      }
+      return false;
+    }
+
+    // --- the bridge --------------------------------------------------------
+
+    function bridgeBase() {
+      var v = (bridgeInput.value || '').trim().replace(/\/+$/, '');
+      return v || '';
+    }
+
+    function fetchBridge(path) {
+      var base = bridgeBase();
+      if (!base) return Promise.reject(new Error('No bridge address.'));
+      if (!window.fetch) return Promise.reject(new Error('This browser has no fetch.'));
+      return window.fetch(base + path, { cache: 'no-store' }).then(function (r) {
+        if (!r.ok) throw new Error('The bridge answered ' + r.status + '.');
+        return r.json();
+      });
+    }
+
+    function connect(quiet) {
+      return fetchBridge('/api/narration').then(function (data) {
+        var signature = JSON.stringify(data && data.generated) + ':' + beatTotal(data);
+        if (signature === lastSignature) return false;
+        lastSignature = signature;
+        var was = currentMode;
+        adopt(window.TTS.narrate.parseScript(data), 'live from ' + bridgeBase());
+        if (was && script.modes[was]) selectMode(was);
+        if (!quiet) app.toast('Connected to the bridge.');
+        return true;
+      }, function (err) {
+        if (!quiet) app.toast(err.message + ' Is tools/bridge.py running?');
+        return false;
+      });
+    }
+
+    function beatTotal(data) {
+      if (!data || !data.modes) return 0;
+      var n = 0;
+      for (var k in data.modes) if (data.modes[k] && data.modes[k].beats) n += data.modes[k].beats.length;
+      return n;
+    }
+
+    function setFollowing(on) {
+      if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null; }
+      if (!on) return;
+      pollTimer = setInterval(function () {
+        connect(true).then(function (changed) {
+          if (changed) app.toast('The session moved on — narration refreshed.');
+        });
+      }, POLL_MS);
+    }
+
+    // --- rendering ---------------------------------------------------------
+
+    function renderModes() {
+      modeRow.textContent = '';
+      if (!script) return;
+
+      for (var i = 0; i < script.order.length; i++) {
+        (function (name) {
+          var mode = script.modes[name];
+          var b = D.createElement('button');
+          b.type = 'button';
+          b.className = 'btn';
+          b.setAttribute('aria-pressed', String(name === currentMode));
+          b.textContent = mode.label + ' (' + mode.beats.length + ')';
+          b.addEventListener('click', function () { selectMode(name); });
+          modeRow.appendChild(b);
+        })(script.order[i]);
+      }
+    }
+
+    function selectMode(name) {
+      if (!script || !script.modes[name]) return;
+      currentMode = name;
+      renderModes();
+
+      var mode = script.modes[name];
+      var tally = window.TTS.narrate.counts(mode);
+      var bits = [];
+      for (var k in tally) bits.push(tally[k] + ' ' + window.TTS.narrate.kindOf(k).label.toLowerCase());
+
+      var src = mode.source || {};
+      var where = src.kind === 'session' ? ('session ' + (src.file || '')) :
+        src.kind === 'git' ? ('git, branch ' + (src.branch || '?')) :
+        src.kind === 'test' ? ('a test run at ' + (src.at || '').slice(0, 19).replace('T', ' ')) : (src.kind || 'unknown');
+
+      summary.textContent = mode.beats.length + ' beats — ' + bits.join(', ') + '. From ' + where + '.';
+
+      caveat.textContent = mode.caveat || '';
+      caveat.hidden = !mode.caveat;
+
+      preview.textContent = '';
+      var upto = Math.min(mode.beats.length, 40);
+      for (var i = 0; i < upto; i++) preview.appendChild(previewRow(mode.beats[i]));
+      if (mode.beats.length > upto) {
+        var more = D.createElement('li');
+        more.className = 'beat more';
+        more.textContent = '…and ' + (mode.beats.length - upto) + ' more.';
+        preview.appendChild(more);
+      }
+    }
+
+    function previewRow(b) {
+      var li = D.createElement('li');
+      li.className = 'beat beat-' + b.kind + ' tone-' + b.tone;
+
+      var head = D.createElement('div');
+      head.className = 'beat-head';
+
+      var kind = D.createElement('b');
+      kind.textContent = window.TTS.narrate.kindOf(b.kind).label;
+      head.appendChild(kind);
+
+      if (b.inferred) {
+        var tag = D.createElement('i');
+        tag.textContent = 'reconstructed';
+        head.appendChild(tag);
+      }
+      if (b.at) {
+        var at = D.createElement('em');
+        at.textContent = b.at;
+        head.appendChild(at);
+      }
+      li.appendChild(head);
+
+      var p = D.createElement('p');
+      p.textContent = b.text;
+      li.appendChild(p);
+      return li;
+    }
+
+    // --- wiring ------------------------------------------------------------
+
+    $('sess-connect').addEventListener('click', function () {
+      connect(false);
+      app.saveBridge(bridgeInput.value);
+    });
+
+    followBox.addEventListener('change', function () {
+      setFollowing(followBox.checked);
+      if (followBox.checked) connect(true);
+    });
+
+    $('sess-run-tests').addEventListener('click', function () {
+      app.toast('Asking the bridge to run the suites…');
+      fetchBridge('/api/run-tests').then(function () {
+        return connect(true);
+      }).then(function () {
+        if (script && script.modes.test) selectMode('test');
+        app.toast('Test run finished.');
+      }, function (err) {
+        app.toast(err.message + ' Is tools/bridge.py running?');
+      });
+    });
+
+    $('sess-play').addEventListener('click', function () {
+      if (!script || !currentMode) { app.toast('Load a narration first.'); return; }
+      var n = app.reader().loadNarration(script.modes[currentMode]);
+      app.setTab('read');
+      app.reader().play(0);
+      app.toast('Reading ' + script.modes[currentMode].label.toLowerCase() + ' — ' + n + ' sentences.');
+    });
+
+    $('sess-load-file').addEventListener('click', function () { fileInput.click(); });
+
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () { tryAdopt(String(fr.result || ''), f.name); };
+      fr.onerror = function () { app.toast('That file could not be read.'); };
+      fr.readAsText(f);
+      fileInput.value = '';
+    });
+
+    $('sess-use-paste').addEventListener('click', function () {
+      var raw = (pasteBox.value || '').trim();
+      if (!raw) { app.toast('Nothing pasted.'); return; }
+      if (tryAdopt(raw, 'pasted')) pasteBox.value = '';
+    });
+
+    $('sess-download').addEventListener('click', function () {
+      if (!script || !currentMode) { app.toast('Load a narration first.'); return; }
+      var mode = script.modes[currentMode];
+      var text = window.TTS.narrate.flatten(mode, { announce: false }).text;
+
+      // The page may have been granted a save; if not, fall back to a blob.
+      var name = 'aloud-' + currentMode + '.txt';
+      if (window.claude && window.claude.downloads) {
+        window.claude.downloads.save({ filename: name, data: text }).then(function () {
+          app.toast('Saved.');
+        }, function (err) {
+          if (err && err.code === 'declined') return;
+          blobSave(name, text);
+        });
+        return;
+      }
+      blobSave(name, text);
+    });
+
+    function blobSave(name, text) {
+      try {
+        var url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        var a = D.createElement('a');
+        a.href = url;
+        a.download = name;
+        D.body.appendChild(a);
+        a.click();
+        D.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        app.toast('Downloaded ' + name + '.');
+      } catch (e) {
+        app.toast('This browser would not save the file.');
+      }
+    }
+
+    // --- go ----------------------------------------------------------------
+
+    bridgeInput.value = app.savedBridge();
+
+    if (!loadBaked()) {
+      sourceLine.textContent = 'nothing loaded yet';
+      summary.textContent = 'Run "node tools/monologue.mjs all" to build one, or start tools/bridge.py and connect.';
+    }
+
+    return {
+      refresh: function () { if (script && currentMode) selectMode(currentMode); },
+      hasScript: function () { return !!script; }
+    };
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.session = { init: init };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
 /* Bootstrap — settings, storage, tabs, the settings sheet, and the glue that
  * lets the bench tell the reader what this device can actually do.
  *
@@ -2620,7 +3349,8 @@ main {
     settings: 'aloud.settings',
     caps: 'aloud.caps',
     text: 'aloud.text',
-    progress: 'aloud.progress'
+    progress: 'aloud.progress',
+    bridge: 'aloud.bridge'
   };
 
   var DEFAULTS = {
@@ -2665,6 +3395,10 @@ main {
       saveText: function (t) { write(KEY.text, t); write(KEY.progress, 0); },
       savedProgress: function () { return read(KEY.progress, 0) | 0; },
       saveProgress: function (i) { write(KEY.progress, i | 0); },
+      savedBridge: function () { return read(KEY.bridge, 'http://localhost:8765'); },
+      saveBridge: function (v) { write(KEY.bridge, String(v || '').trim()); },
+      reader: function () { return reader; },
+      setTab: function (name) { setTab(name); },
 
       currentVoice: function () {
         if (!app.settings.voiceURI) return null;
@@ -2724,9 +3458,11 @@ main {
         buttons[i].setAttribute('aria-selected', String(on));
       }
       $('tab-read').hidden = name !== 'read';
+      $('tab-session').hidden = name !== 'session';
       $('tab-voices').hidden = name !== 'voices';
       $('transport').hidden = name !== 'read';
       if (name === 'voices' && bench) bench.renderVoices();
+      if (name === 'session' && session) session.refresh();
     }
 
     // --- settings sheet ----------------------------------------------------
@@ -2814,6 +3550,7 @@ main {
 
     var reader = null;
     var bench = null;
+    var session = null;
 
     if (!synth || !Utterance) {
       $('no-speech').hidden = false;
@@ -2821,6 +3558,7 @@ main {
 
     reader = window.TTS.reader.init(app);
     bench = window.TTS.bench.init(app);
+    session = window.TTS.session.init(app);
 
     var tabButtons = D.querySelectorAll('.tabs button');
     for (var i = 0; i < tabButtons.length; i++) {

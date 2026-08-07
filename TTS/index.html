@@ -18,6 +18,7 @@
 
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button type="button" role="tab" data-tab="read" aria-selected="true" aria-controls="tab-read">Read</button>
+      <button type="button" role="tab" data-tab="session" aria-selected="false" aria-controls="tab-session">Session</button>
       <button type="button" role="tab" data-tab="voices" aria-selected="false" aria-controls="tab-voices">Voices</button>
     </nav>
 
@@ -62,6 +63,66 @@
       <div class="pane" id="pane"></div>
 
       <p class="note" id="caps-line"></p>
+    </section>
+
+    <!-- --------------------------------------------------------- session -->
+    <section class="tab-panel" id="tab-session" role="tabpanel" aria-label="Session" hidden>
+
+      <div class="section-head">
+        <h2>Narration</h2>
+        <p class="hint" id="sess-source">nothing loaded yet</p>
+      </div>
+
+      <div class="row" id="sess-modes"></div>
+
+      <p class="hint" id="sess-summary"></p>
+      <p class="note" id="sess-caveat" hidden></p>
+
+      <div class="row">
+        <button type="button" class="btn primary grow" id="sess-play">Read this aloud</button>
+        <button type="button" class="btn" id="sess-download">Save text</button>
+      </div>
+
+      <ul class="beats" id="sess-preview"></ul>
+
+      <div class="section-head">
+        <h2>Live bridge</h2>
+      </div>
+
+      <p class="hint">
+        A browser cannot read a Claude Code transcript off disk, and cannot call
+        GitHub from a <code>file://</code> page. So the link runs the other way:
+        run <code>python3 tools/bridge.py</code> and it watches the session, runs
+        the suites on request, and hands the beats over here.
+      </p>
+
+      <label class="sr-only" for="sess-bridge">Bridge address</label>
+      <input type="url" class="filter" id="sess-bridge" placeholder="http://localhost:8765" inputmode="url">
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-connect">Connect</button>
+        <button type="button" class="btn grow" id="sess-run-tests">Run the suites</button>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="sess-follow">
+        <span>Follow the session, and re-read when it moves on</span>
+      </label>
+
+      <div class="section-head">
+        <h2>Or load one by hand</h2>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-load-file">Open narration.json</button>
+        <input type="file" id="sess-file" accept=".json,application/json" hidden>
+      </div>
+
+      <label class="sr-only" for="sess-paste">Paste a narration script</label>
+      <textarea id="sess-paste" class="paste" placeholder="…or paste the JSON here"></textarea>
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-use-paste">Use pasted script</button>
+      </div>
     </section>
 
     <!-- ---------------------------------------------------------- voices -->
@@ -181,9 +242,11 @@
 
 <script src="js/split.js"></script>
 <script src="js/probes.js"></script>
+<script src="js/narrate.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/reader.js"></script>
 <script src="js/bench.js"></script>
+<script src="js/session.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

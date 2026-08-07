@@ -40,6 +40,7 @@
     var chunks = [];
     var spans = [];
     var current = -1;
+    var narration = null;   // {mode, beats, ranges} while playing a narration
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     var engine = window.TTS.engine.create({
@@ -48,7 +49,19 @@
       caps: app.caps,
       settings: function () {
         var s = app.settings;
-        return { voice: app.currentVoice(), rate: s.rate, pitch: s.pitch, volume: s.volume };
+        var out = { voice: app.currentVoice(), rate: s.rate, pitch: s.pitch, volume: s.volume };
+
+        // In a narration, the kind of beat shapes the delivery — a
+        // reconstruction is read a little slower than an action, a result a
+        // little flatter. Without this every kind sounds identical, which is
+        // the one thing a reconstructed monologue must not do.
+        var c = chunks[engine.index];
+        if (c && c.beatKind && app.settings.actKinds !== false) {
+          var k = window.TTS.narrate.kindOf(c.beatKind);
+          out.rate = Math.max(0.5, Math.min(2, s.rate * k.rate));
+          out.pitch = Math.max(0, Math.min(2, s.pitch * k.pitch));
+        }
+        return out;
       },
       emit: onEngine
     });
@@ -70,6 +83,12 @@
 
       var frag = D.createDocumentFragment();
       for (var i = 0; i < chunks.length; i++) {
+        // In a narration, each beat gets a heading so the eye can tell a
+        // recorded result from a reconstructed thought at a glance.
+        if (chunks[i].beatFirst && narration) {
+          var b = narration.beats[chunks[i].beat];
+          if (b) frag.appendChild(beatLabel(b));
+        }
         var s = D.createElement('span');
         s.className = 'chunk';
         s.setAttribute('data-i', String(i));
@@ -78,6 +97,25 @@
         spans.push(s);
       }
       pane.appendChild(frag);
+    }
+
+    function beatLabel(b) {
+      var el = D.createElement('span');
+      el.className = 'beat-label beat-' + b.kind + (b.tone ? ' tone-' + b.tone : '');
+      var name = D.createElement('b');
+      name.textContent = window.TTS.narrate.kindOf(b.kind).label;
+      el.appendChild(name);
+      if (b.inferred) {
+        var tag = D.createElement('i');
+        tag.textContent = 'reconstructed';
+        el.appendChild(tag);
+      }
+      if (b.at) {
+        var at = D.createElement('em');
+        at.textContent = b.at;
+        el.appendChild(at);
+      }
+      return el;
     }
 
     function plainChunk(i) {
@@ -180,6 +218,7 @@
 
     function setText(text, opts) {
       chunks = window.TTS.split.segment(text, { maxChars: app.settings.maxChars });
+      if (narration) window.TTS.narrate.tag(chunks, narration.ranges, narration.beats);
       engine.setChunks(chunks);
       renderPane();
 
@@ -192,9 +231,22 @@
     }
 
     function textChanged() {
+      narration = null;          // typing replaces a narration with plain text
       setText(ta.value);
       if (saveTimer !== null) clearTimeout(saveTimer);
       saveTimer = setTimeout(function () { app.saveText(ta.value); }, 400);
+    }
+
+    /* Load one mode of a parsed narration script and play it with the
+     * machinery the reader already has. */
+    function loadNarration(mode) {
+      var flat = window.TTS.narrate.flatten(mode);
+      narration = { mode: mode, beats: mode.beats, ranges: flat.ranges };
+      engine.stop();
+      ta.value = flat.text;
+      setText(flat.text);
+      app.saveText(flat.text);
+      return chunks.length;
     }
 
     // --- wiring ------------------------------------------------------------
@@ -272,6 +324,8 @@
 
     return {
       engine: engine,
+      loadNarration: loadNarration,
+      play: function (from) { engine.play(from || 0); },
       resegment: function () { setText(ta.value, { resumeAt: engine.index }); },
       stop: function () { engine.stop(); }
     };

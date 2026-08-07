@@ -606,6 +606,140 @@ main {
   color: var(--ink-2);
 }
 
+/* --- narration ------------------------------------------------------------ */
+
+/* Kinds are told apart by hue, so a recorded result never reads as a
+   reconstructed thought. Reconstruction additionally carries a dashed edge —
+   colour alone should not be load-bearing. */
+
+.beats {
+  list-style: none;
+  margin: var(--s-4) 0 var(--s-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.beat {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--s-3);
+}
+
+.beat p { margin: 4px 0 0; font-size: var(--t-sm); line-height: 1.5; }
+.beat.more { color: var(--ink-3); font-size: var(--t-sm); text-align: center; }
+
+.beat-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.beat-head b {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.beat-head i,
+.beat-label i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  opacity: 0.8;
+}
+
+.beat-head em,
+.beat-label em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.beat-brief   { border-left-color: var(--ink); }
+.beat-thought { border-left-color: var(--accent); }
+.beat-action  { border-left-color: var(--ink-3); }
+.beat-result  { border-left-color: var(--warn); }
+.beat-say     { border-left-color: var(--line); }
+.beat-verdict { border-left-color: var(--pass); }
+
+.beat.tone-good .beat-head b { color: var(--pass); }
+.beat.tone-bad  { border-left-color: var(--fail); }
+.beat.tone-bad  .beat-head b { color: var(--fail); }
+.beat.tone-warn .beat-head b { color: var(--warn); }
+
+/* the heading that sits inside the reading pane */
+.beat-label {
+  display: block;
+  margin: var(--s-4) 0 var(--s-1);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  color: var(--ink-3);
+}
+
+.beat-label:first-child { margin-top: 0; }
+
+.beat-label b {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.beat-label.beat-thought b { color: var(--accent); }
+.beat-label.beat-verdict b { color: var(--pass); }
+.beat-label.tone-bad b { color: var(--fail); }
+.beat-label.tone-warn b { color: var(--warn); }
+
+.paste {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
 /* --- settings sheet ------------------------------------------------------- */
 
 .scrim {
@@ -685,7 +819,14 @@ main {
 
 .seg { display: flex; gap: var(--s-2); }
 .seg .btn { flex: 1; }
-.seg .btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-band); color: var(--accent-strong); }
+
+/* Any toggling button, not just the ones in a segmented control — the
+   narration mode row needs the same state and was silently going without it. */
+.btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-band);
+  color: var(--accent-strong);
+}
 
 /* --- misc ----------------------------------------------------------------- */
 

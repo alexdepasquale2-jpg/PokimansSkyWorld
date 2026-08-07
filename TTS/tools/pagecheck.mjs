@@ -152,6 +152,25 @@ window.addEventListener('load', function () {
       document.getElementById('btn-sheet-close').click();
       out.sheetClosed = !document.getElementById('sheet').classList.contains('open');
 
+      // The narration path: a baked script, a mode chosen, read into the pane.
+      document.querySelector('.tabs button[data-tab="session"]').click();
+      out.sessionShown = document.getElementById('tab-session').hidden === false;
+      out.baked = !!(window.TTS && window.TTS.NARRATION);
+      out.modeButtons = q('#sess-modes .btn').length;
+      out.previewBeats = q('#sess-preview .beat').length;
+      out.sourceLine = document.getElementById('sess-source').textContent;
+
+      if (out.modeButtons) {
+        document.getElementById('sess-play').click();
+        out.afterPlayTab = document.getElementById('tab-read').hidden === false;
+        out.narratedChunks = q('#pane .chunk').length;
+        out.beatLabels = q('#pane .beat-label').length;
+        out.reconstructedMarks = q('#pane .beat-label i').length;
+        var first = q('#pane .chunk')[0];
+        out.narrationAnnounces = !!first && /^(The brief|Result|Verdict|Reconstructed|Thinking):/.test(first.textContent.trim());
+        document.getElementById('t-stop').click();
+      }
+
       document.querySelector('.tabs button[data-tab="read"]').click();
       document.getElementById('btn-clear').click();
       out.clearedChunks = q('#pane .chunk').length;
@@ -196,6 +215,21 @@ if (!found) {
   check('the settings sheet opens', probe.sheetOpen === true);
   check('the settings sheet closes', probe.sheetClosed === true);
   check('clearing empties the pane', probe.clearedChunks === 0, 'got ' + probe.clearedChunks);
+
+  check('the session tab opens', probe.sessionShown === true);
+  check('a narration is baked into the page', probe.baked === true,
+    'window.TTS.NARRATION is missing — run "node tools/monologue.mjs all" then rebuild');
+  check('the baked script is announced as built in',
+    /built into this page/.test(probe.sourceLine || ''), 'source read "' + probe.sourceLine + '"');
+  check('every mode gets a button', probe.modeButtons >= 2, 'got ' + probe.modeButtons);
+  check('beats are previewed', probe.previewBeats > 5, 'got ' + probe.previewBeats);
+  check('playing a narration switches to the reading tab', probe.afterPlayTab === true);
+  check('the narration segments into the pane', probe.narratedChunks > 10, 'got ' + probe.narratedChunks);
+  check('beats are labelled in the pane', probe.beatLabels > 5, 'got ' + probe.beatLabels);
+  check('reconstructed beats are marked as such', probe.reconstructedMarks > 0,
+    'no beat carried the "reconstructed" tag — inference would read as record');
+  check('the narration announces the kind of beat', probe.narrationAnnounces === true,
+    'first chunk read "' + (probe.sourceLine || '') + '"');
 }
 
 const drivenNoise = second.stderr.split('\n').filter(line =>
