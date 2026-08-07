@@ -1,7 +1,7 @@
 {
   "version": 1,
   "title": "Aloud — the making of",
-  "generated": "2026-08-07T17:55:31.011Z",
+  "generated": "2026-08-07T18:08:35.705Z",
   "modes": {
     "dev": {
       "label": "Development",
@@ -12,7 +12,7 @@
         "cwd": "/home/user/PokimansSkyWorld/TTS",
         "model": "claude-opus-5"
       },
-      "caveat": "The transcript carries 67 thinking blocks and every one is empty — Claude Code strips the text before writing to disk. What follows is reconstructed from the actions and their results, not a record of thought.",
+      "caveat": "The transcript carries 73 thinking blocks and every one is empty — Claude Code strips the text before writing to disk. What follows is reconstructed from the actions and their results, not a record of thought.",
       "beats": [
         {
           "kind": "brief",
@@ -62,12 +62,6 @@
           "at": "Bash"
         },
         {
-          "kind": "result",
-          "text": "ceiling — an established god is not getting any more established. A fully built",
-          "tone": "neutral",
-          "at": "read SkyWorld README and file sizes"
-        },
-        {
           "kind": "action",
           "text": "Now I go looking for a tool I need.",
           "tone": "neutral",
@@ -104,28 +98,10 @@
           "at": "Bash"
         },
         {
-          "kind": "result",
-          "text": "_out(\"%d passed, %d failed%s\" % [",
-          "tone": "good",
-          "at": "read Aetherline bootstrap test harness"
-        },
-        {
           "kind": "action",
           "text": "Now I check for audio/voice support in SkyWorld.",
           "tone": "neutral",
           "at": "Bash"
-        },
-        {
-          "kind": "result",
-          "text": "/bin/bash: line 1: cd: SkyWorld: No such file or directory",
-          "tone": "bad",
-          "at": "check for audio/voice support in SkyWorld"
-        },
-        {
-          "kind": "thought",
-          "text": "Wrong path. Worth fixing before it turns into a wild goose chase.",
-          "tone": "warn",
-          "inferred": true
         },
         {
           "kind": "action",
@@ -177,12 +153,6 @@
           "text": "Something threw. Read it properly rather than guessing at a fix.",
           "tone": "warn",
           "inferred": true
-        },
-        {
-          "kind": "result",
-          "text": "console.error('build: an external reference survived inlining');",
-          "tone": "neutral",
-          "at": "read existing build script convention"
         },
         {
           "kind": "action",
@@ -362,18 +332,6 @@
           "text": "Now I load the artifact-design skill.",
           "tone": "neutral",
           "at": "Skill"
-        },
-        {
-          "kind": "result",
-          "text": "ls: cannot access '/home/user/PokimansSkyWorld/package.json': No such file or directory",
-          "tone": "bad",
-          "at": "read simtest conventions"
-        },
-        {
-          "kind": "thought",
-          "text": "Something threw. Read it properly rather than guessing at a fix.",
-          "tone": "warn",
-          "inferred": true
         },
         {
           "kind": "brief",
@@ -1010,12 +968,6 @@
           "at": "Bash"
         },
         {
-          "kind": "result",
-          "text": "* Stable error codes; treat unknown codes as `\"unavailable\"`.",
-          "tone": "neutral",
-          "at": "read the downloads capability type definitions"
-        },
-        {
           "kind": "say",
           "text": "Confirmed the constraint, and it changes the design: available capabilities are **`downloads` and `mcp` only**, and **no claude.ai connectors are connected**. Those `mcp__github__*` tools are this session's local MCP server, which the skill explicitly excludes. So the published page **cannot** call GitHub or a CC session — there is no capability that would let it. So the connection has to run the other way…",
           "tone": "neutral"
@@ -1505,6 +1457,295 @@
           "text": "Now I full verification of all suites.",
           "tone": "neutral",
           "at": "Bash"
+        },
+        {
+          "kind": "result",
+          "text": "88 passed, 0 failed",
+          "tone": "good",
+          "at": "full verification of all suites"
+        },
+        {
+          "kind": "thought",
+          "text": "Green. That is the part I can trust; the rest still needs a real device.",
+          "tone": "good",
+          "inferred": true
+        },
+        {
+          "kind": "action",
+          "text": "Now I stage changes and review.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "result",
+          "text": "16 files changed, 5604 insertions(+), 16 deletions(-)",
+          "tone": "neutral",
+          "at": "stage changes and review"
+        },
+        {
+          "kind": "say",
+          "text": "The `.pyc` landed in the wrong path for my cleanup. Removing it and adding an ignore rule.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I drop bytecode from the index and ignore it.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "action",
+          "text": "Now I commit the narration work.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "action",
+          "text": "Now I push the branch.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "action",
+          "text": "Now I send a file over.",
+          "tone": "neutral",
+          "at": "SendUserFile"
+        },
+        {
+          "kind": "say",
+          "text": "Built, verified, committed as `a74b1f6`, pushed. The single file is attached — save it to the phone and open it. **To be clear about the plan:** this wasn't in it. The plan was the reader plus voice bench; this is a second feature on top. **Two findings changed the design, and you should know both:** 1. **The artifact could never have worked.** Available capabilities are `downloads` and `mcp` only, and no claude.ai…",
+          "tone": "neutral"
+        },
+        {
+          "kind": "brief",
+          "text": "let's have it cut out redundant things by merging and summarizing actions, that way it's more direct to the reasoning and thinking reconstruction for a fluent smooth experience",
+          "tone": "neutral",
+          "speaker": "director"
+        },
+        {
+          "kind": "say",
+          "text": "Good call — 133 of 259 dev beats are one-per-tool-call \"Now I…\", which is exactly the grating part when spoken. Let me add a condense pass. Putting it in `narrate.js` so it's testable and can be toggled in the page rather than baked in irreversibly.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change narrate.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change narrate.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "say",
+          "text": "Now the toggle in the Session tab, defaulting to condensed.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change index.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change session.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change session.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change session.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change session.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I wire density setting and preview condensed output.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "say",
+          "text": "Four real problems in that output. Let me fix them.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change narrate.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change narrate.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "say",
+          "text": "Now the verdict-run collapse, which is what makes test mode listenable.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change narrate.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change narrate.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I apply fixes and preview condensed output.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "say",
+          "text": "Dramatic: **test 126 → 10 beats** (\"88 assertions across 14 areas, all passing\"), history 20 → 13. One leak left — `sed -n` behind a `cd` escaped the read-command guard.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change monologue (module).",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "say",
+          "text": "Now test coverage for the condense pass.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change selftest.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I run selftest with condense coverage.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "result",
+          "text": "113 passed, 0 failed",
+          "tone": "good",
+          "at": "run selftest with condense coverage"
+        },
+        {
+          "kind": "thought",
+          "text": "Green. That is the part I can trust; the rest still needs a real device.",
+          "tone": "good",
+          "inferred": true
+        },
+        {
+          "kind": "action",
+          "text": "Now I regenerate, rebuild, verify and preview.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "result",
+          "text": "built dist/artifact.html (180.1 kB)",
+          "tone": "neutral",
+          "at": "regenerate, rebuild, verify and preview"
+        },
+        {
+          "kind": "thought",
+          "text": "Green. That is the part I can trust; the rest still needs a real device.",
+          "tone": "good",
+          "inferred": true
+        },
+        {
+          "kind": "say",
+          "text": "Let me add page-level coverage for the density toggle, then verify and ship.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change pagecheck (module).",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change pagecheck (module).",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I verify density toggle in browser.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "thought",
+          "text": "That failed. Before changing anything I want to know whether the code is wrong or the expectation is.",
+          "tone": "bad",
+          "inferred": true
+        },
+        {
+          "kind": "say",
+          "text": "Template-literal escaping — `\\d` inside the driver's backticks collapsed to `d`. Needs double-escaping.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change pagecheck (module).",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I re-run page check.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "say",
+          "text": "Updating the README, then shipping.",
+          "tone": "neutral"
+        },
+        {
+          "kind": "action",
+          "text": "Now I change README.",
+          "tone": "neutral",
+          "at": "Edit"
+        },
+        {
+          "kind": "action",
+          "text": "Now I update README counts.",
+          "tone": "neutral",
+          "at": "Bash"
+        },
+        {
+          "kind": "action",
+          "text": "Now I full verification.",
+          "tone": "neutral",
+          "at": "Bash"
         }
       ]
     },
@@ -1513,10 +1754,28 @@
       "source": {
         "kind": "git",
         "branch": "claude/tts-dev-narration-smoke-test-a1q9a2",
-        "head": "7b98a4f"
+        "head": "a74b1f6"
       },
       "caveat": "Commit messages are written down rather than inferred, so this mode is the closest thing here to the real reasoning.",
       "beats": [
+        {
+          "kind": "action",
+          "text": "On 2026-08-07 I committed: Narrate a development session through the reader.",
+          "tone": "neutral",
+          "at": "a74b1f6"
+        },
+        {
+          "kind": "result",
+          "text": "16 files changed.",
+          "tone": "neutral",
+          "at": "a74b1f6"
+        },
+        {
+          "kind": "thought",
+          "text": "Adds the Session tab: a development record turned into beats and read out loud, plus a local bridge so a running Claude Code session can be followed live. The connection runs Claude Code -> page, not the other way, and that is forced rather than chosen. A browser cannot read a session transcript off disk, and cannot call the GitHub API from a file:// origin. So tools/bridge.py (standard library only, runs under Pydroid too) watches the record, runs the suites on request, proxies GitHub with the token staying server-side, and serves the app itself; the page polls it. With no bridge, a…",
+          "tone": "neutral",
+          "at": "a74b1f6"
+        },
         {
           "kind": "action",
           "text": "On 2026-08-07 I committed: Add Aloud: a mobile TTS reader with a voice bench.",
@@ -1625,7 +1884,7 @@
       "label": "Test run",
       "source": {
         "kind": "test",
-        "at": "2026-08-07T17:55:33.288Z",
+        "at": "2026-08-07T18:08:36.852Z",
         "exit": 0
       },
       "caveat": "Every verdict here is a real assertion from a real run, not a summary of one.",
@@ -1944,15 +2203,165 @@
         },
         {
           "kind": "verdict",
+          "text": "an action and its result become one beat.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "the fused beat reads as one sentence.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "the fused beat takes the result's tone.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a long run of actions becomes one beat.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "the summary counts by tool in words.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "the merge is recorded.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a short run keeps its detail.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "short runs list what happened.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a run of passing assertions collapses.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "the collapse says how many and where.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a failing assertion is never merged away.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "the failure keeps its own words.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a lone passing assertion is not summarised.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "reasoning beats survive condensing.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a reconstruction stays marked after condensing.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "a non-first-person action is left alone.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "first person is detected.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "third person is not.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "adjacent asides merge.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "they merge in order.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "an adjacent duplicate is dropped.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "indices are resequenced after condensing.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "condensing nothing yields nothing.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "numbers become words for speech.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
+          "text": "large numbers stay numerals.",
+          "tone": "good",
+          "at": "Condensing a narration"
+        },
+        {
+          "kind": "verdict",
           "text": "a reconstruction is read slower than an action.",
           "tone": "good",
-          "at": "Narration scripts"
+          "at": "Condensing a narration"
         },
         {
           "kind": "verdict",
           "text": "an unknown kind still has a voice.",
           "tone": "good",
-          "at": "Narration scripts"
+          "at": "Condensing a narration"
         },
         {
           "kind": "verdict",
@@ -2172,7 +2581,7 @@
         },
         {
           "kind": "result",
-          "text": "the self-test: 88 passed, 0 failed.",
+          "text": "the self-test: 113 passed, 0 failed.",
           "tone": "good",
           "at": "the self-test"
         },
@@ -2190,7 +2599,7 @@
         },
         {
           "kind": "result",
-          "text": "The page comes out at 162.1 kB.",
+          "text": "The page comes out at 180.6 kB.",
           "tone": "good",
           "at": "build"
         },
@@ -2335,6 +2744,18 @@
         {
           "kind": "verdict",
           "text": "beats are previewed.",
+          "tone": "good",
+          "at": ""
+        },
+        {
+          "kind": "verdict",
+          "text": "condensing is the default and cuts the beat count.",
+          "tone": "good",
+          "at": ""
+        },
+        {
+          "kind": "verdict",
+          "text": "the summary says it merged.",
           "tone": "good",
           "at": ""
         },

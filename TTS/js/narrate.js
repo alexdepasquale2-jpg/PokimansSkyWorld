@@ -143,6 +143,221 @@
     return chunks;
   }
 
+  // --- condensing ----------------------------------------------------------
+  //
+  // A raw session is one beat per tool call, and read aloud that becomes
+  // "Now I… Now I… Now I…" for minutes at a stretch. The actions are true but
+  // they are not the interesting part; the reasoning is, and it drowns.
+  //
+  // So: fold each result into the action that caused it, collapse runs of
+  // consecutive actions into one sentence, and merge adjacent asides. Nothing
+  // that carries reasoning — a brief, a thought, a verdict — is ever touched.
+
+  var NUMBER = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+    'eight', 'nine', 'ten', 'eleven', 'twelve'];
+
+  function numberWord(n) { return n < NUMBER.length ? NUMBER[n] : String(n); }
+
+  /* Tool name -> how to count it out loud. */
+  var GROUPS = {
+    Read:  ['reading', 'file', 'files'],
+    Write: ['writing', 'file', 'files'],
+    Edit:  ['making', 'edit', 'edits'],
+    Bash:  ['running', 'command', 'commands'],
+    Grep:  ['running', 'search', 'searches'],
+    Glob:  ['running', 'search', 'searches']
+  };
+
+  var OPENERS = ['Now I', 'Then I', 'Next I', 'After that I'];
+
+  /* "Now I read the harness." -> "read the harness" */
+  function clauseOf(text) {
+    return String(text)
+      .replace(/^\s*(?:Now|Then|Next|After that)?\s*I\s+/i, '')
+      .replace(/\s*\.\s*$/, '')
+      .trim();
+  }
+
+  /* Not every source writes in the first person — the test narrator says
+   * "Running the self-test." Prefixing that with "Now I" produces nonsense, so
+   * only re-open a sentence that was built that way in the first place. */
+  function firstPerson(text) {
+    return /^\s*(?:Now|Then|Next|After that)?\s*I\s+/i.test(String(text));
+  }
+
+  function reopen(text, opener) {
+    return firstPerson(text)
+      ? opener + ' ' + clauseOf(text) + '.'
+      : String(text).replace(/\s*\.\s*$/, '') + '.';
+  }
+
+  function withResult(text, result, opener) {
+    return reopen(text, opener).replace(/\.$/, '') + ' — ' + clauseOf(result) + '.';
+  }
+
+  function joinList(items) {
+    if (items.length <= 1) return items[0] || '';
+    if (items.length === 2) return items[0] + ' and ' + items[1];
+    return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
+  }
+
+  /* One sentence for a run of actions. Short runs keep their detail, because
+   * detail is what makes them worth hearing; long ones become a tally. */
+  function summariseRun(run, opener) {
+    if (run.length <= 3) {
+      var clauses = [];
+      for (var i = 0; i < run.length; i++) {
+        var c = clauseOf(run[i].text);
+        if (c && clauses.indexOf(c) < 0) clauses.push(c);
+      }
+      if (clauses.length === 1) return reopen(run[0].text, opener);
+      return opener + ' ' + joinList(clauses) + '.';
+    }
+
+    var tally = {};
+    var order = [];
+    for (var j = 0; j < run.length; j++) {
+      var key = GROUPS[run[j].at] ? run[j].at : 'other';
+      if (!tally[key]) { tally[key] = 0; order.push(key); }
+      tally[key]++;
+    }
+
+    var phrases = [];
+    for (var k = 0; k < order.length; k++) {
+      var name = order[k];
+      var n = tally[name];
+      var g = GROUPS[name];
+      phrases.push(g
+        ? g[0] + ' ' + numberWord(n) + ' ' + (n === 1 ? g[1] : g[2])
+        : numberWord(n) + ' further ' + (n === 1 ? 'step' : 'steps'));
+    }
+    return opener + ' work through ' + joinList(phrases) + '.';
+  }
+
+  /* "Twelve assertions on segmentation, all passing." — the sections come from
+   * the harness, so the summary says what was covered, not just how many. */
+  function summarisePasses(passes) {
+    var sections = [];
+    for (var i = 0; i < passes.length; i++) {
+      var name = String(passes[i].at || '').trim();
+      if (name && sections.indexOf(name) < 0) sections.push(name);
+    }
+    var count = numberWord(passes.length) + ' assertion' + (passes.length === 1 ? '' : 's');
+
+    if (!sections.length) return count.charAt(0).toUpperCase() + count.slice(1) + ', all passing.';
+    if (sections.length > 3) {
+      return count.charAt(0).toUpperCase() + count.slice(1) +
+        ' across ' + numberWord(sections.length) + ' areas, all passing.';
+    }
+    var lead = count.charAt(0).toUpperCase() + count.slice(1);
+    return lead + ' on ' + joinList(sections.map(function (s) { return s.toLowerCase(); })) + ', all passing.';
+  }
+
+  function condense(beats, opts) {
+    opts = opts || {};
+    var maxRun = opts.maxRun == null ? 3 : opts.maxRun;
+    var out = [];
+    var i = 0;
+    var opener = 0;
+
+    while (i < beats.length) {
+      var b = beats[i];
+
+      // A hundred consecutive passing assertions carry one fact between them.
+      // A failing one carries all of its own, so those are never merged.
+      if (b.kind === 'verdict' && b.tone === 'good') {
+        var passes = [];
+        while (i < beats.length && beats[i].kind === 'verdict' && beats[i].tone === 'good') {
+          passes.push(beats[i]);
+          i++;
+        }
+        if (passes.length >= 3) {
+          out.push({
+            index: passes[0].index,
+            kind: 'verdict',
+            text: summarisePasses(passes),
+            tone: 'good',
+            at: passes.length + ' assertions',
+            inferred: false,
+            speaker: '',
+            merged: passes.length
+          });
+        } else {
+          for (var p = 0; p < passes.length; p++) out.push(passes[p]);
+        }
+        continue;
+      }
+
+      // Reasoning passes through untouched.
+      if (b.kind !== 'action' && b.kind !== 'say' && b.kind !== 'result') {
+        out.push(b);
+        i++;
+        continue;
+      }
+
+      // Several asides in a row are one aside.
+      if (b.kind === 'say') {
+        var says = [];
+        while (i < beats.length && beats[i].kind === 'say') { says.push(beats[i].text); i++; }
+        out.push(Object.assign({}, b, { text: says.join(' ') }));
+        continue;
+      }
+
+      // A result with no action in front of it stands alone.
+      if (b.kind === 'result') { out.push(b); i++; continue; }
+
+      // An action, and the result it produced, are one thought.
+      var run = [];
+      while (i < beats.length && beats[i].kind === 'action') {
+        var action = beats[i];
+        var next = beats[i + 1];
+        i++;
+        if (next && next.kind === 'result') {
+          i++;
+          out.push(Object.assign({}, action, {
+            text: withResult(action.text, next.text, OPENERS[opener++ % OPENERS.length]),
+            tone: next.tone || action.tone,
+            fused: true
+          }));
+          run = [];                       // the fused beat breaks the run
+          break;
+        }
+        run.push(action);
+        if (run.length >= maxRun * 4) break;   // do not let one run eat the session
+      }
+
+      if (run.length) {
+        if (run.length === 1) {
+          out.push(Object.assign({}, run[0], {
+            text: reopen(run[0].text, OPENERS[opener++ % OPENERS.length])
+          }));
+        } else {
+          out.push({
+            index: run[0].index,
+            kind: 'action',
+            text: summariseRun(run, OPENERS[opener++ % OPENERS.length]),
+            tone: 'neutral',
+            at: run.length + ' steps',
+            inferred: false,
+            speaker: '',
+            merged: run.length
+          });
+        }
+      }
+    }
+
+    // Adjacent duplicates read as a stutter.
+    var deduped = [];
+    for (var d = 0; d < out.length; d++) {
+      var prev = deduped[deduped.length - 1];
+      if (prev && prev.text === out[d].text && prev.kind === out[d].kind) continue;
+      deduped.push(out[d]);
+    }
+
+    for (var n = 0; n < deduped.length; n++) deduped[n].index = n;
+    return deduped;
+  }
+
   function counts(mode) {
     var out = {};
     for (var i = 0; i < mode.beats.length; i++) {
@@ -160,6 +375,10 @@
     flatten: flatten,
     beatAt: beatAt,
     tag: tag,
-    counts: counts
+    counts: counts,
+    condense: condense,
+    clauseOf: clauseOf,
+    firstPerson: firstPerson,
+    numberWord: numberWord
   };
 })(typeof window !== 'undefined' ? window : this);

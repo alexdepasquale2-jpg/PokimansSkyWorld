@@ -160,6 +160,20 @@ window.addEventListener('load', function () {
       out.previewBeats = q('#sess-preview .beat').length;
       out.sourceLine = document.getElementById('sess-source').textContent;
 
+      // Condensed is the default; "every step" must show strictly more.
+      out.condensedSummary = document.getElementById('sess-summary').textContent;
+      out.condensedBeats = q('#sess-preview .beat').length;
+      document.querySelector('[data-density="full"]').click();
+      out.fullSummary = document.getElementById('sess-summary').textContent;
+      document.querySelector('[data-density="condensed"]').click();
+
+      // Note the doubled backslash: this whole script lives in a template
+      // literal, where a lone \\d degrades to a literal "d".
+      var readCount = function (s) { var m = /^(\\d+) beats/.exec(s || ''); return m ? +m[1] : -1; };
+      out.condensedCount = readCount(out.condensedSummary);
+      out.fullCount = readCount(out.fullSummary);
+      out.saysMerged = /merged down from/.test(out.condensedSummary);
+
       if (out.modeButtons) {
         document.getElementById('sess-play').click();
         out.afterPlayTab = document.getElementById('tab-read').hidden === false;
@@ -223,6 +237,10 @@ if (!found) {
     /built into this page/.test(probe.sourceLine || ''), 'source read "' + probe.sourceLine + '"');
   check('every mode gets a button', probe.modeButtons >= 2, 'got ' + probe.modeButtons);
   check('beats are previewed', probe.previewBeats > 5, 'got ' + probe.previewBeats);
+  check('condensing is the default and cuts the beat count',
+    probe.condensedCount > 0 && probe.fullCount > probe.condensedCount,
+    'condensed ' + probe.condensedCount + ' vs full ' + probe.fullCount);
+  check('the summary says it merged', probe.saysMerged === true, probe.condensedSummary);
   check('playing a narration switches to the reading tab', probe.afterPlayTab === true);
   check('the narration segments into the pane', probe.narratedChunks > 10, 'got ' + probe.narratedChunks);
   check('beats are labelled in the pane', probe.beatLabels > 5, 'got ' + probe.beatLabels);

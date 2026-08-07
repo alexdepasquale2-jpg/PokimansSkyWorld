@@ -217,7 +217,7 @@ function fromSession(file) {
             // Only a command has an outcome. Read, Grep and Glob return file
             // contents, and a README sentence containing the word "built" is
             // not a result — it just looks like one to a regular expression.
-            const reports = REPORTING_TOOLS[pending.tool] === true;
+            const reports = REPORTING_TOOLS[pending.tool] === true && !pending.reading;
             const line = reports ? firstUseful(body) : '';
             const previous = beats[beats.length - 1];
             const duplicate = previous && previous.kind === 'result' && previous.text === line;
@@ -255,7 +255,18 @@ function fromSession(file) {
         }
         if (block.type === 'tool_use') {
           const label = describeToolUse(block.name, block.input);
-          pendingTool.set(block.id, { label: label, tool: block.name });
+          pendingTool.set(block.id, {
+            label: label,
+            tool: block.name,
+            // `cat file` is a Read wearing Bash's clothes: its output is file
+            // contents, and a README line containing "built" is not a result.
+            // Anchoring this to the start of the command missed the common
+            // `cd somewhere && sed -n …`, so look anywhere — but stand down if
+            // the line also runs something that genuinely reports.
+            reading: block.name === 'Bash' &&
+              /\b(cat|head|tail|less|bat|sed\s+-n)\b/.test(String((block.input || {}).command || '')) &&
+              !/\b(node|npm|git|python3?|pytest|make|curl)\b/.test(String((block.input || {}).command || ''))
+          });
           beats.push(beat('action', 'Now I ' + label + '.', { at: block.name }));
         }
       }

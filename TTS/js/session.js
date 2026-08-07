@@ -136,12 +136,29 @@
       }
     }
 
+    /* The script keeps every beat; condensing is a way of listening to it,
+     * not a way of storing it, so it is applied here and reversible. */
+    function viewOf(name) {
+      var mode = script.modes[name];
+      if (app.settings.density === 'full') return mode;
+      var narrate = window.TTS.narrate;
+      return {
+        name: mode.name,
+        label: mode.label,
+        caveat: mode.caveat,
+        source: mode.source,
+        beats: narrate.condense(mode.beats),
+        raw: mode.beats.length
+      };
+    }
+
     function selectMode(name) {
       if (!script || !script.modes[name]) return;
       currentMode = name;
       renderModes();
+      renderDensity();
 
-      var mode = script.modes[name];
+      var mode = viewOf(name);
       var tally = window.TTS.narrate.counts(mode);
       var bits = [];
       for (var k in tally) bits.push(tally[k] + ' ' + window.TTS.narrate.kindOf(k).label.toLowerCase());
@@ -151,7 +168,9 @@
         src.kind === 'git' ? ('git, branch ' + (src.branch || '?')) :
         src.kind === 'test' ? ('a test run at ' + (src.at || '').slice(0, 19).replace('T', ' ')) : (src.kind || 'unknown');
 
-      summary.textContent = mode.beats.length + ' beats — ' + bits.join(', ') + '. From ' + where + '.';
+      var trimmed = mode.raw && mode.raw > mode.beats.length
+        ? ' (merged down from ' + mode.raw + ')' : '';
+      summary.textContent = mode.beats.length + ' beats' + trimmed + ' — ' + bits.join(', ') + '. From ' + where + '.';
 
       caveat.textContent = mode.caveat || '';
       caveat.hidden = !mode.caveat;
@@ -164,6 +183,14 @@
         more.className = 'beat more';
         more.textContent = '…and ' + (mode.beats.length - upto) + ' more.';
         preview.appendChild(more);
+      }
+    }
+
+    function renderDensity() {
+      var buttons = D.querySelectorAll('[data-density]');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].setAttribute('aria-pressed',
+          String(buttons[i].getAttribute('data-density') === (app.settings.density || 'condensed')));
       }
     }
 
@@ -220,12 +247,24 @@
       });
     });
 
+    var densityButtons = D.querySelectorAll('[data-density]');
+    for (var d = 0; d < densityButtons.length; d++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          app.settings.density = btn.getAttribute('data-density');
+          app.saveSettings();
+          if (currentMode) selectMode(currentMode);
+        });
+      })(densityButtons[d]);
+    }
+
     $('sess-play').addEventListener('click', function () {
       if (!script || !currentMode) { app.toast('Load a narration first.'); return; }
-      var n = app.reader().loadNarration(script.modes[currentMode]);
+      var mode = viewOf(currentMode);
+      var n = app.reader().loadNarration(mode);
       app.setTab('read');
       app.reader().play(0);
-      app.toast('Reading ' + script.modes[currentMode].label.toLowerCase() + ' — ' + n + ' sentences.');
+      app.toast('Reading ' + mode.label.toLowerCase() + ' — ' + n + ' sentences.');
     });
 
     $('sess-load-file').addEventListener('click', function () { fileInput.click(); });
@@ -248,8 +287,7 @@
 
     $('sess-download').addEventListener('click', function () {
       if (!script || !currentMode) { app.toast('Load a narration first.'); return; }
-      var mode = script.modes[currentMode];
-      var text = window.TTS.narrate.flatten(mode, { announce: false }).text;
+      var text = window.TTS.narrate.flatten(viewOf(currentMode), { announce: false }).text;
 
       // The page may have been granted a save; if not, fall back to a blob.
       var name = 'aloud-' + currentMode + '.txt';
