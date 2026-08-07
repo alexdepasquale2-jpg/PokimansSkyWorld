@@ -36,6 +36,8 @@
       if (G.__featAcc > 1.5) { G.__featAcc = 0; SW.sim.checkFeats(G); }
     }
 
+    // Mini-games run on wall-clock time even while the world is paused.
+    SW.sim.tickRealtime(G, dt);
     SW.render.frame(G, dt);
     SW.ui.frame(G, dt);
 

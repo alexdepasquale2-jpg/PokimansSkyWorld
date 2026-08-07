@@ -27,6 +27,14 @@ SkyWorld/
     lineage.js        ages, ingraining, generation leaps, evolutions
     discovery.js      the frontier — features, Insight, terraces, neural web
     minigames.js      the Listening and the Bench
+    content2.js       tables for the second layer of systems
+    boost.js          one aggregator for every multiplier in the game
+    world.js          seasons, weather, soil, villagers, buildings, events, oaths
+    beast.js          illness, techniques, bloodlines, the Trial Ring
+    relics.js         relics, slots, fusion, titles
+    trade.js          caravans, contracts, diplomacy
+    minigames2.js     cloud fishing and chanting
+    prestige.js       ascension
     sim.js            world tick — village, economy, rivals, festivals, feats
     render.js         canvas scene, drawn procedurally
     ui.js             DOM panels, tabs, modals, input
@@ -161,6 +169,84 @@ materials are priced so that buy-and-craft is only a thin margin; the money is
 in the two materials you cannot buy, which is what keeps the Listening worth
 playing.
 
+## The second layer
+
+Twenty further systems, each with three or more moving parts, all feeding the
+same loop rather than sitting beside it.
+
+1. **Seasons.** Four of twelve days each — Greening, High Sun, Falling, The
+   Still — changing growth rate, evaporation, market prices and faith. The
+   Still is a near-standstill you plan around by building and breeding.
+2. **Weather.** Eight kinds rolled daily with season-weighted odds, each with
+   real effects (a downpour waters everything free, a gale rots ripe crops,
+   mist makes the Listening pay more, an auroral night lifts insight and
+   faith). Tomorrow's weather is forecast, so it is a planning input.
+3. **Soil.** Per-plot richness that every harvest depletes and empty ground
+   recovers. Yield runs from 0.55× on dead ground to 1.30× on rich. Sowing a
+   different crop than last time is worth another +22%.
+4. **Fertiliser.** Three kinds at different costs — compost from food, kiln ash
+   from wood (cheaper with a kiln), bone meal from materials.
+5. **Named villagers.** Everyone has a name, a mood that tracks faith and
+   unrest, and sometimes a trait (steady, quick, devout, sour, hungry, clever)
+   that changes what they are worth.
+6. **Roles.** Assign each villager: farmhands water plots unprompted, masons
+   cut building costs, herbalists keep the creature well, acolytes raise prayer
+   and faith, scouts turn up materials, traders improve every price.
+7. **Buildings.** Eight structures at three tiers each, gated on terraces —
+   well, granary, workshop, watchtower, kiln, beast house, cloud dock, trial
+   ring. They render on the island and get taller as they improve.
+8. **Illness.** Five ailments with causes you can see coming — overfeeding,
+   damp, heat, overwork, cruelty — each with its own remedy and a work penalty
+   while it lasts.
+9. **Techniques.** Nine abilities the creature works out by repetition rather
+   than instruction (sprint, double haul, deep dig, sing, restraint, night
+   work, sense, guard, showmanship), with limited slots and partial
+   inheritance down the line.
+10. **Bloodlines.** Wild mates turn up as offers; crossing lineages gives
+    hybrid vigour and a visible second line, staying pure narrows the stock,
+    and a pedigree records the whole thing.
+11. **The Trial Ring.** Best-of-three against rival beasts, scored on the whole
+    line — stats, size, bond, ingrained behaviour, techniques and generations —
+    so breeding is never a penalty. One trial a day.
+12. **Caravans.** Four merchants with rotating stock, standing that improves
+    prices, and the only place to buy skymetal and storm glass.
+13. **Contracts.** Each caravan wants a quantity of a crop by the time it
+    leaves; filling it pays coin, renown and standing, failing costs standing.
+14. **Relics.** Fourteen artefacts across four ranks with limited settings,
+    won from festivals, the ring, rare fish and the hardest crafts. Two of a
+    rank fuse into one of the next, consuming both.
+15. **Titles.** Twelve earned by what you actually did, each with a passive
+    bonus, and you pick which one to wear.
+16. **Events.** Sixteen situations with three real choices each and no obvious
+    right answer, gated by day so they arrive as the island can carry them.
+17. **Oaths.** Three rolling objectives every three days, scaled to your day
+    count, paying renown and insight.
+18. **Diplomacy.** Gifts, public praise, mockery and sending the creature out
+    at night. Allies quietly add standing daily; enemies chip at it; opinions
+    drift back to indifference.
+19. **Cloud fishing.** A three-stage timing game — eight species by terrace and
+    time of day, with rare ones carrying materials and relics.
+20. **Chanting.** Call-and-response with the shrine: six chants, sung back tone
+    by tone, landing at the accuracy you managed.
+
+And **ascension** on top: retire the island past 40,000 renown for points spent
+on eight permanent boons, then begin again on fresh ground.
+
+### The loop
+
+The wider the game got, the easier it became to lose the thread, so:
+
+- **A next-action list** sits on the scene — a live, ranked, five-item list of
+  what is actually waiting on you, each entry a shortcut to the thing itself.
+- **Batch work.** Harvest or water every plot at once for the same focus per
+  plot, without the clicking.
+- **Attention dots** mark any tab with something waiting behind it.
+- **One aggregator.** Every multiplier in the game resolves through
+  `boost.js`, so nine systems compose instead of nine places disagreeing.
+- **Mini-games run on wall-clock time**, not simulation time, so a sweeping
+  marker sweeps instead of teleporting between four positions, and they keep
+  working while the world is paused.
+
 ### The Register
 
 Eleven rival godlings climb their own curves. Nothing rubber-bands — they are
@@ -211,11 +297,19 @@ player examines features, grows neurons, works the bench, approximates a
 mediocre player at the Listening, and breeds when the creature is grown and
 well bonded.
 
-Rough pacing it produces, for an unremarkable strategy: fifth to tenth on the
-Register around day 40, the fourth shrine tier and second terrace by day 90,
-the fifth shrine tier — the pivotal unlock — somewhere between day 130 and 200,
-and first place around day 200 to 250. Playing well is faster; the numbers move
-a lot depending on when the shrine lands.
+Rough pacing it produces, for an unremarkable strategy: tenth on the Register
+around day 60, ninth to twelfth by day 140, and fourth to seventh by day 220,
+still climbing at day 300. The three strategies still separate cleanly at day
+60 — idle finishes last on a few hundred renown, hand-farming reaches ~14,000,
+training and breeding ~20,000, and the gap widens sharply after that as the
+line's evolutions compound.
+
+Two honest caveats. Run-to-run variance is high in the late game — it hinges on
+when the fifth shrine tier lands and which relics turn up — so the numbers above
+move by a factor of two between seeds. And the scripted player is deliberately
+mediocre at the mini-games and picks event choices at random, so it understates
+what a deliberate player achieves. The late game would benefit from real
+playtesting rather than more harness tuning.
 
 ## Controls
 
@@ -227,6 +321,9 @@ a lot depending on when the shrine lands.
 | `space` | pause |
 | `1` `2` `3` | speed 1× / 2× / 4× |
 | click a `?` | walk over and examine it |
+| `C` | cast a line |
+| `6`–`0` | sing the five tones |
+| `space` | strike, while fishing |
 | `P` / `S` | praise / strike |
 | `L` | the Listening |
 | `B` | generation leap |

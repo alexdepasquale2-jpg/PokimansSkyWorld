@@ -146,18 +146,19 @@
     return true;
   }
 
-  /* Modifiers the rest of the sim asks about, all in one place. */
+  /* Kept as the old call surface; every answer now comes from SW.boost so
+   * there is exactly one place that knows what multiplies what. */
   const mods = {
-    thirst: g => (g.effects.thirst ? 0.75 : 1),
-    growth: g => (g.effects.growth ? 1.15 : 1),
-    eat: g => (g.effects.granary ? 0.85 : 1),
-    prayer: g => (g.effects.prayer ? 1.25 : 1),
-    yield: g => (1 + SW.lineage.bonus(g, 'yield')) * (g.neurons.husbandry ? 1.25 : 1),
-    focusRegen: g => (g.neurons.stamina ? 1.4 : 1),
-    learn: g => (g.neurons.patience ? 1.3 : 1),
-    forget: g => (g.neurons.memory ? 0.5 : 1),
-    renown: g => (1 + SW.lineage.bonus(g, 'renown')) * (g.neurons.devotion ? 1.3 : 1),
-    craft: g => (g.neurons.craftsman ? 1.6 : 1)
+    thirst: g => SW.boost.thirst(g),
+    growth: g => SW.boost.get(g, 'growth'),
+    eat: g => SW.boost.foodUse(g),
+    prayer: g => SW.boost.get(g, 'prayer'),
+    yield: g => SW.boost.get(g, 'yield'),
+    focusRegen: g => SW.boost.get(g, 'focus'),
+    learn: g => SW.boost.get(g, 'learn'),
+    forget: g => SW.boost.forget(g),
+    renown: g => SW.boost.get(g, 'renown'),
+    craft: g => SW.boost.get(g, 'craft')
   };
 
   SW.discovery = {

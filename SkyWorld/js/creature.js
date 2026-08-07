@@ -94,6 +94,10 @@
       m *= 1 + clamp(c.diligence / 100, -0.7, 1) * 0.9;
     }
     if (actId === 'perform') m *= 1 + c.stats.grace / 30;
+    if (actId === 'graze' && SW.beast.hasTech(g, 'graze_x')) m *= 0.35;
+    // At night an untrained beast winds down; a night worker does not.
+    const night = (g.dayTick / C.TICKS_PER_DAY) > 0.72;
+    if (night && a.useful && !SW.beast.hasTech(g, 'nightwork')) m *= 0.55;
 
     switch (c.leash) {
       case 'compassion':
@@ -155,7 +159,7 @@
       }
       case 'harvest': {
         const p = g.plots.find(p => p.i === target.i);
-        const r = F.harvest(g, p, 0.85 + c.stats.strength / 40);
+        const r = F.harvest(g, p, (0.85 + c.stats.strength / 40) * (SW.beast.hasTech(g, 'haul') ? 1.35 : 1));
         ok = !!r;
         if (ok) { pop(g, '🧺+' + r.amount, 'good'); emit(g, `${name} brings in ${r.amount} ${r.crop.name}.`); }
         break;
@@ -174,7 +178,13 @@
         break;
       }
       case 'forage': {
-        const n = 1 + Math.floor(c.stats.strength / 7);
+        let n = 1 + Math.floor(c.stats.strength / 7);
+        if (SW.beast.hasTech(g, 'haul')) n *= 2;
+        if (SW.beast.hasTech(g, 'dig') && chance(0.35)) {
+          const m = SW.core.pick(g.ring >= 2 ? ['fibre', 'clay', 'resin', 'bone', 'glass'] : ['fibre', 'clay']);
+          g.mats[m] = (g.mats[m] | 0) + 1;
+          pop(g, C.MATERIALS[m].glyph, 'good');
+        }
         g.res.wood += n;
         pop(g, '🪵+' + n, 'good');
         emit(g, `${name} drags ${n} wood back from the treeline.`);
@@ -193,13 +203,13 @@
       }
       case 'play': {
         c.mood = clamp(c.mood + 9, 0, 100);
-        g.village.faith = clamp(g.village.faith + 0.9, 0, 100);
+        g.village.faith = clamp(g.village.faith + 0.9 * (SW.beast.hasTech(g, 'sing') ? 2.2 : 1), 0, 100);
         pop(g, '🎈', 'good');
         emit(g, `${name} plays with the village children.`);
         break;
       }
       case 'perform': {
-        const gain = 1 + c.stats.grace / 5 + c.bond / 40;
+        const gain = (1 + c.stats.grace / 5 + c.bond / 40) * (SW.beast.hasTech(g, 'show') ? 2 : 1);
         g.res.renown += gain;
         g.village.faith = clamp(g.village.faith + 0.6, 0, 100);
         c.mood = clamp(c.mood + 6, 0, 100);
@@ -248,6 +258,7 @@
 
     if (!ok) return false;
     SW.discovery.firstTime(g, 'act:' + actId, 2, `watching it ${a.name}`);
+    SW.beast.onAct(g, actId);
 
     // Cost, drift, and slow physical growth.
     c.vigor = clamp(c.vigor - a.vigor, 0, 100);
@@ -266,7 +277,7 @@
   function beginAct(g) {
     const c = g.creature;
     const chosen = chooseAct(g);
-    const quick = 1 / ((0.8 + c.stats.cunning / 45) * traits(g).speed);
+    const quick = 1 / ((0.8 + c.stats.cunning / 45) * traits(g).speed * SW.beast.workFactor(g));
     c.act = {
       id: chosen.id,
       anchor: chosen.target,

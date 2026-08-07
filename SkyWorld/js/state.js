@@ -17,7 +17,10 @@
       crop: null,
       growth: 0,      // ticks accumulated
       water: 0,       // 0..100
-      rot: 0          // wither pressure 0..100
+      rot: 0,         // wither pressure 0..100
+      soil: 100,      // richness; every harvest takes some out
+      last: null,     // last crop sown here, for rotation
+      rotated: false
     };
   }
 
@@ -43,6 +46,10 @@
       age: 0,          // days lived
       gen: 1,          // which generation of the line this is
       ingrained: {},   // actId -> 0..1, the only thing that outlives the animal
+      ailment: null,   // current illness id
+      ailDays: 0,
+      techniques: {},  // techId -> repetitions done
+      hybrid: null,    // second lineage, if it is a cross
       // transient-ish, but persisted so a reload doesn't eat a pending praise
       act: null,       // { id, tick, target, resolved }
       actCooldown: 0,
@@ -106,6 +113,45 @@
       listen: null,
       listenAt: -9999,
 
+      // weather and season
+      weather: { today: 'clear', tomorrow: 'clear' },
+      // ground
+      // people and structures
+      people: [],            // named villagers with roles and traits
+      buildings: {},         // buildingId -> tier
+      // trade and standing
+      caravan: null,
+      nextCaravan: 4,
+      merchantRep: {},
+      diplo: {},
+      // relics, titles
+      relics: {},            // relicId -> day found
+      equipped: [],
+      title: 'none',
+      titlesSeen: {},
+      // techniques
+      equippedTech: [],
+      mate: null,
+      mateOffer: null,
+      pedigree: [],
+      inbreeding: 0,
+      // events and oaths
+      event: null,
+      eventSeen: {},
+      eventLog: [],
+      oaths: [],
+      oathDay: 0,
+      // second wave of mini-games
+      fishing: null,
+      chant: null,
+      fish: {},
+      // arena
+      arenaChallenge: false,
+      arenaResult: null,
+      grandeurBonus: 0,
+      // ascension
+      prestige: { points: 0, boons: {}, runs: 0, best: 0, bestDay: 0 },
+
       creature: newCreature(lineageId, creatureName),
 
       rivals: rivals,
@@ -115,7 +161,8 @@
       festival: { nextDay: 5, index: 0, lastResult: null },
       log: [],
       chatter: [],
-      stats: { harvests: 0, sold: 0, coinEarned: 0, miracles: 0, festivals: 0, festivalWins: 0, days: 0 },
+      stats: { harvests: 0, sold: 0, coinEarned: 0, miracles: 0, festivals: 0, festivalWins: 0, days: 0,
+               fished: 0, chants: 0, arenaWins: 0, arenaLosses: 0, praisedTotal: 0, choresTotal: 0 },
       fx: [],
       __savedAt: Date.now()
     };
@@ -125,6 +172,10 @@
   function startGame(lineageId, creatureName, godName) {
     const g = newGame(lineageId, creatureName, godName);
     SW.discovery.spawnRing(g, 0);
+    g.weather.today = SW.world.rollWeather(g);
+    g.weather.tomorrow = SW.world.rollWeather(g);
+    SW.world.syncPeople(g);
+    SW.world.rollOaths(g);
     return g;
   }
 
@@ -150,7 +201,11 @@
     const slots = C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)].plots;
     for (let i = g.plots.length + g.lockedPlots.length; i < slots; i++) g.lockedPlots.push(makePlot(i));
     for (let r = 0; r <= (g.ring | 0); r++) SW.discovery.spawnRing(g, r);
-    g.listen = null;
+    g.listen = null; g.fishing = null; g.chant = null;
+    for (const p of g.plots.concat(g.lockedPlots)) if (p.soil === undefined) p.soil = 100;
+    if (!g.weather || !g.weather.today) g.weather = { today: 'clear', tomorrow: 'clear' };
+    SW.world.syncPeople(g);
+    if (!g.oaths || !g.oaths.length) SW.world.rollOaths(g);
     g.fx = [];
     return g;
   }

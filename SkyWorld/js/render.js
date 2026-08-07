@@ -5,6 +5,7 @@
 (function (SW) {
   'use strict';
   const C = SW.content;
+  const C2 = SW.content2;
   const Cr = SW.creature;
   const { clamp, lerp, hashNoise } = SW.core;
 
@@ -348,7 +349,12 @@
       plotPath(c);
       let soil;
       if (p.state === 'raw') soil = '#6f8a56';
-      else soil = mix('#6b4c33', '#3a2a1c', clamp(p.water / 100, 0, 1) * 0.55);
+      else {
+        // Rich ground is dark; worked-out ground goes pale and grey.
+        const q = SW.world.soilOf(p) / 100;
+        soil = mix('#8c7f6a', '#6b4c33', q);
+        soil = mix(soil, '#3a2a1c', clamp(p.water / 100, 0, 1) * 0.45);
+      }
       ctx.fillStyle = mix(soil, '#101828', 1 - amb);
       ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,0.25)';
@@ -486,6 +492,37 @@
       ctx.fillStyle = mix('#e8c6a0', '#201c30', 1 - amb);
       ctx.beginPath(); ctx.arc(x, y - 10.5 - bob, 2.6, 0, 7); ctx.fill();
     }
+  }
+
+  /* Structures ring the island between the farm and the village. Each tier
+   * makes them taller, so a built-up island reads as built up from a glance. */
+  function drawBuildings(g, sky) {
+    const amb = sky.amb;
+    const ids = Object.keys(g.buildings || {});
+    ids.forEach((id, i) => {
+      const b = C2.BUILDINGS[id];
+      if (!b) return;
+      const tier = g.buildings[id];
+      const ang = -2.35 + (i / Math.max(1, ids.length)) * 2.1;
+      const dist = 0.62 + (i % 2) * 0.12;
+      const p = featurePoint(ang, dist);
+      const h = (14 + tier * 7);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, 14, 5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = mix('#a89b84', '#1e1c2c', 1 - amb);
+      ctx.fillRect(p.x - 10, p.y - h, 20, h);
+      ctx.fillStyle = mix('#7d6a52', '#151322', 1 - amb);
+      ctx.beginPath();
+      ctx.moveTo(p.x - 13, p.y - h);
+      ctx.lineTo(p.x, p.y - h - 9);
+      ctx.lineTo(p.x + 13, p.y - h);
+      ctx.closePath(); ctx.fill();
+      ctx.font = '11px ' + UI_FONT;
+      ctx.textAlign = 'center';
+      ctx.fillText(b.glyph, p.x, p.y - h + 12);
+      ctx.restore();
+    });
   }
 
   function drawShrine(g, sky) {
@@ -817,6 +854,7 @@
   // --- effects -----------------------------------------------------------
   function drawFx(g, dt) {
     const c = g.creature;
+    let bannerRow = 0;
     for (let i = g.fx.length - 1; i >= 0; i--) {
       const f = g.fx[i];
       f.t += dt;
@@ -885,6 +923,60 @@
     }
   }
 
+  /* Weather is a standing condition, not a one-off effect, so it is painted
+   * every frame rather than pushed as an fx. */
+  function drawWeather(g, vw) {
+    const w = C2.WEATHER[(g.weather && g.weather.today) || 'clear'];
+    if (!w || w.id === 'clear') return;
+    const W2 = vw.x1 - vw.x0, H2 = vw.y1 - vw.y0;
+    ctx.save();
+    switch (w.id) {
+      case 'downpour':
+        ctx.globalAlpha = 0.34; ctx.strokeStyle = '#bcd8f5'; ctx.lineWidth = 1.1;
+        for (let n = 0; n < 190; n++) {
+          const rx = vw.x0 + ((n * 61 + time * 700) % W2);
+          const ry = vw.y0 + ((n * 137 + time * 1000) % H2);
+          ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 3, ry + 14); ctx.stroke();
+        }
+        break;
+      case 'mist':
+        ctx.globalAlpha = 0.22; ctx.fillStyle = '#cfe0f0';
+        for (let n = 0; n < 5; n++) {
+          const bx = vw.x0 - 200 + ((n * 260 + time * 22) % (W2 + 400));
+          cloud(bx, ISLAND.cy - 40 + Math.sin(n) * 60, 150);
+        }
+        break;
+      case 'gale':
+        ctx.globalAlpha = 0.30; ctx.strokeStyle = '#dce8f5'; ctx.lineWidth = 1.6;
+        for (let n = 0; n < 40; n++) {
+          const rx = vw.x0 + ((n * 137 + time * 1500) % W2);
+          const ry = vw.y0 + ((n * 211) % H2);
+          ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + 46, ry + 5); ctx.stroke();
+        }
+        break;
+      case 'drought':
+      case 'swelter':
+        ctx.globalAlpha = w.id === 'swelter' ? 0.16 : 0.11;
+        ctx.fillStyle = w.id === 'swelter' ? '#ff9a5a' : '#e0c58a';
+        ctx.fillRect(vw.x0, vw.y0, W2, H2);
+        break;
+      case 'auroral': {
+        const grad = ctx.createLinearGradient(0, vw.y0, 0, ISLAND.cy);
+        grad.addColorStop(0, 'rgba(126,231,200,0.00)');
+        grad.addColorStop(0.5, `rgba(140,220,255,${0.16 + 0.08 * Math.sin(time * 0.8)})`);
+        grad.addColorStop(1, 'rgba(210,168,255,0.00)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(vw.x0, vw.y0, W2, H2 * 0.7);
+        break;
+      }
+      case 'hush':
+        ctx.globalAlpha = 0.24; ctx.fillStyle = '#131a2e';
+        ctx.fillRect(vw.x0, vw.y0, W2, H2);
+        break;
+    }
+    ctx.restore();
+  }
+
   // --- overlay HUD on canvas --------------------------------------------
   function drawSceneLabels(g, sky) {
     ctx.save();
@@ -894,6 +986,14 @@
     ctx.fillText('WOODLAND', WOOD.x, WOOD.y + 46);
     ctx.fillText('VILLAGE · ' + g.village.villagers, VILLAGE.x, VILLAGE.y + 62);
     ctx.fillText(C.SHRINE_TIERS[g.shrine].name.toUpperCase(), SHRINE.x, SHRINE.y + 66);
+    const season = SW.boost.seasonOf(g), weather = SW.boost.weatherOf(g);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = '600 12px ' + UI_FONT;
+    ctx.fillText(`${season.glyph} ${season.name}   ${weather.glyph} ${weather.name}`, W - 16, 24);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '600 10px ' + UI_FONT;
+    ctx.fillText(`tomorrow ${C2.WEATHER[(g.weather && g.weather.tomorrow) || 'clear'].name.toLowerCase()}`, W - 16, 40);
     ctx.restore();
   }
 
@@ -927,6 +1027,7 @@
     drawTrees(sky);
     drawPlots(g, sky);
     drawFeatures(g, sky);
+    drawBuildings(g, sky);
     drawShrine(g, sky);
     drawHuts(g, sky);
     drawVillagers(g, sky);
@@ -934,6 +1035,7 @@
     drawCreature(g, sky);
     drawSceneLabels(g, sky);
     drawListen(g);
+    drawWeather(g, vw);
     drawFx(g, dt);
 
     ctx.restore();

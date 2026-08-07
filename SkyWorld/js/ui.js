@@ -8,12 +8,50 @@
   const Ln = SW.lineage;
   const D = SW.discovery;
   const M = SW.minigames;
+  const C2 = SW.content2;
+  const W = SW.world;
+  const B = SW.beast;
+  const R = SW.relics;
+  const T = SW.trade;
+  const M2 = SW.mini2;
+  const P = SW.prestige;
   const { clamp, fmt, titleCase } = SW.core;
 
   let G = null;
   let tab = 'farm';
   let lastFestivalShown = -1;
   let benchA = null, benchB = null;
+  let relicPick = [];
+
+  /* Every entry in the next-action list is a shortcut to the thing itself. */
+  function doTodo(g, act) {
+    if (act.startsWith('tab:')) { setTab(act.slice(4)); return; }
+    switch (act) {
+      case 'openevent': showEvent(g); break;
+      case 'judge': Cr.praise(g); break;
+      case 'breed': if (SW.lineage.canBreed(g)) SW.lineage.breed(g, false); break;
+      case 'listen': M.startListen(g); break;
+      case 'harvestall': batch(g, 'harvest'); break;
+      case 'waterall': batch(g, 'water'); break;
+    }
+  }
+
+  /* Batch work: the single biggest quality-of-life win once the farm is wide.
+   * Costs the same focus per plot, just without the clicking. */
+  function batch(g, what) {
+    let n = 0;
+    const list = what === 'harvest' ? F.ripePlots(g)
+      : g.plots.filter(p => p.crop && p.water < 90).sort((a, b) => a.water - b.water);
+    for (const p of list) {
+      const before = g.res.focus;
+      if (what === 'harvest') S.playerHarvest(g, p); else S.playerWater(g, p);
+      if (g.res.focus === before) break;   // ran out of focus
+      n++;
+    }
+    if (n) log(g, what === 'harvest' ? `You bring in ${n} plots.` : `You water ${n} plots.`, 'good');
+    else log(g, 'Not enough focus.', 'warn');
+    return n;
+  }
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -172,6 +210,7 @@
       case 'village': setHTML(body, tabVillage(g)); break;
       case 'powers': setHTML(body, tabPowers(g)); break;
       case 'frontier': setHTML(body, tabFrontier(g)); break;
+      case 'beast': setHTML(body, tabBeast(g)); break;
       case 'bench': setHTML(body, tabBench(g)); break;
       case 'register': setHTML(body, tabRegister(g)); break;
       case 'feats': setHTML(body, tabFeats(g)); break;
@@ -187,7 +226,7 @@
         <span class="pr-i">${p.i + 1}</span>
         <span class="pr-state">${crop ? crop.glyph + ' ' + esc(crop.name) : p.state === 'tilled' ? 'tilled soil' : 'wild ground'}</span>
         <span class="pr-prog ${p.state === 'ripe' ? 'ripe' : ''}">${prog}</span>
-        <span class="pr-water">${p.crop ? '💧' + Math.round(p.water) : ''}</span>
+        <span class="pr-water">${p.crop ? '💧' + Math.round(p.water) : '🟫' + Math.round(W.soilOf(p))}</span>
       </div>`;
     }).join('');
     return `
@@ -199,6 +238,12 @@
           ⛏️ Break new ground <span class="cost">${cost.wood}🪵 ${cost.coin}🪙</span>
         </button>
       </div>
+      <div class="section-label">Soil — ${Math.round(g.plots.reduce((a, p) => a + W.soilOf(p), 0) / Math.max(1, g.plots.length))}% average</div>
+      <p class="hint">Every harvest takes something out of the ground; empty ground recovers on its own. Sowing a <b>different</b> crop than last time is worth +${Math.round(C2.SOIL.rotationBonus * 100)}% yield.</p>
+      <div class="btnrow wrap">
+        ${C2.FERTILISER_LIST.map(f => `<button class="chip" data-fert="${f.id}" title="${esc(f.blurb)}">${f.glyph} ${esc(f.name)} <i>+${f.soil} · ${costLabel(f.cost)}</i></button>`).join('')}
+      </div>
+      <p class="tiny">Applies to the selected plot, or the poorest one if none is selected.</p>
       <div class="section-label">Seed bag</div>
       <div class="seedbag">
         ${C.CROP_LIST.map(cr => `<span class="chip ${(g.seeds[cr.id] | 0) ? '' : 'dim'}">${cr.glyph} ${g.seeds[cr.id] | 0}</span>`).join('')}
@@ -241,7 +286,34 @@
           <span class="mk-lock">or send the creature foraging</span>
         </div>
       </div>
+      ${Object.keys(g.fish).some(k => g.fish[k] > 0) ? `<div class="section-label">The catch</div>
+        ${C2.FISH.filter(f => (g.fish[f.id] | 0) > 0).map(f => `<div class="wrow">
+          <span>${f.glyph}</span>
+          <span><b>${esc(f.name)}</b> ×${g.fish[f.id]}<i>${esc(f.blurb)}</i></span>
+          <span><button class="mini" data-sellfish="${f.id}">sell <i>${fmt(f.coin)}</i></button>
+                <button class="mini" data-eatfish="${f.id}">mill <i>+${f.feed}</i></button></span>
+        </div>`).join('')}` : ''}
+      ${caravanBlock(g)}
       <p class="tiny">Lifetime: ${fmt(g.stats.harvests)} harvested · ${fmt(g.stats.sold)} sold · ${fmt(g.stats.coinEarned)} coin earned.</p>`;
+  }
+
+  function caravanBlock(g) {
+    if (!g.caravan) {
+      const inDays = Math.max(0, (g.nextCaravan || 0) - g.day);
+      return `<div class="section-label">Caravans</div><p class="hint">Nothing at the rim${inDays ? ` — something is due in about ${inDays} day${inDays === 1 ? '' : 's'}` : ''}. A Cloud Dock brings them more often.</p>`;
+    }
+    const m = T.caravanDef(g);
+    const ct = g.caravan.contract;
+    const stock = Object.keys(g.caravan.stock).filter(k => g.caravan.stock[k] > 0);
+    return `<div class="section-label">${m.glyph} ${esc(m.name)} — leaves day ${g.caravan.until}</div>
+      <p class="hint">${esc(m.blurb)} Standing with them: <b>${T.merchantRep(g, m.id)}</b> (tier ${T.repTier(T.merchantRep(g, m.id))}).</p>
+      ${ct ? `<div class="terrace">
+        <div class="terrace-head">📜 ${ct.need} ${esc(C.CROPS[ct.crop].name)} <span>${ct.got}/${ct.need}</span></div>
+        <p>Pays ${fmt(Math.round(ct.coin * T.payout(g, m.id)))} coin and ${ct.renown} renown. Leaving it unfilled costs you standing.</p>
+        <div class="btnrow"><button class="btn hot" data-act="deliver" ${(g.stock[ct.crop] | 0) ? '' : 'disabled'}>Hand over what you have</button></div>
+      </div>` : '<p class="hint">Contract filled. Nothing more they want.</p>'}
+      ${stock.length ? `<div class="btnrow wrap">${stock.map(k => `<button class="chip" data-carbuy="${k}">${C.MATERIALS[k].glyph} ×${g.caravan.stock[k]} <i>${fmt(T.matPrice(g, k))}🪙</i></button>`).join('')}</div>`
+        : '<p class="hint">The cart is empty.</p>'}`;
   }
 
   function tabVillage(g) {
@@ -261,9 +333,28 @@
         ${C.CROP_LIST.map(cr => `<button class="chip" data-mill="${cr.id}" ${(g.stock[cr.id] | 0) ? '' : 'disabled'}>${cr.glyph} mill 1 <i>+${cr.feed}</i></button>`).join('')}
         <button class="chip" data-mill-all="1">mill everything</button>
       </div>
+      <div class="section-label">The people — ${(g.people || []).length}</div>
+      <div>${(g.people || []).slice(0, 24).map(p => `<div class="person">
+        <span>${esc(p.name)}${p.trait ? ` <span class="trait">· ${esc(C2.VILLAGER_TRAITS.find(t => t.id === p.trait).name.toLowerCase())}</span>` : ''}</span>
+        <select data-role="${esc(p.name)}">
+          ${C2.ROLE_LIST.map(r => `<option value="${r.id}" ${p.role === r.id ? 'selected' : ''}>${r.glyph} ${esc(r.name)}</option>`).join('')}
+        </select>
+      </div>`).join('')}</div>
       <div class="section-label">Build</div>
       <div class="btnrow">
-        <button class="btn" data-act="hut">🛖 Raise a hut <span class="cost">${hc.wood}🪵 ${hc.coin}🪙</span></button>
+        <button class="btn" data-act="hut" ${g.village.huts >= SW.discovery.hutCap(g) ? 'disabled' : ''}>🛖 Raise a hut <span class="cost">${hc.wood}🪵 ${hc.coin}🪙 · ${g.village.huts}/${SW.discovery.hutCap(g)}</span></button>
+      </div>
+      <div class="web">
+        ${C2.BUILDING_LIST.map(b => {
+          const why = W.canBuild(g, b.id);
+          const tier = SW.boost.buildingTier(g, b.id);
+          const cost = W.buildingCost(g, b.id);
+          return `<button class="neuron ${tier ? 'owned' : why ? 'locked' : ''}" data-build="${b.id}" ${why ? 'disabled' : ''}>
+            <span>${b.glyph}</span>
+            <span><b>${esc(b.name)}${tier ? ' ' + 'I'.repeat(tier) : ''}</b><i>${esc(why || b.blurb)}</i></span>
+            <span class="cost">${why ? '—' : fmt(cost.wood) + '🪵 ' + fmt(cost.coin) + '🪙'}</span>
+          </button>`;
+        }).join('')}
       </div>
       <div class="section-label">Shrine — ${esc(C.SHRINE_TIERS[g.shrine].name)} (grandeur ${S.grandeur(g)})</div>
       ${next ? `<div class="btnrow">
@@ -285,7 +376,88 @@
           </button>`;
         }).join('')}
       </div>
-      <p class="tiny">${g.stats.miracles} miracles worked.</p>`;
+      <div class="section-label">Chants${M2.chantUnlocked(g) ? '' : ' — needs a Standing Ring'}</div>
+      <p class="hint">The shrine sings a sequence and you sing it back. Get it all and the effect lands whole; fumble it and you get part of one.</p>
+      <div class="miracles">
+        ${C2.CHANTS.map(ch => {
+          const locked = !M2.chantUnlocked(g) || (g.ring | 0) < ch.ring;
+          const poor = g.res.prayer < ch.prayer;
+          return `<button class="miracle ${locked || poor ? 'off' : ''}" data-chant="${ch.id}" ${locked || poor || M2.busy(g) ? 'disabled' : ''}>
+            <span class="mi-glyph">${ch.glyph}</span>
+            <span class="mi-body"><b>${esc(ch.name)}</b><i>${esc(locked ? 'Requires ' + C.RINGS[ch.ring].name : ch.blurb)} · ${ch.len} tones</i></span>
+            <span class="mi-cost">${ch.prayer}🙏</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <p class="tiny">${g.stats.miracles} miracles worked, ${g.stats.chants || 0} chants sung.</p>`;
+  }
+
+  /* ---- the beast: what it can do, what is wrong with it, and the ring ---- */
+  function tabBeast(g) {
+    const c = g.creature;
+    const ail = c.ailment ? C2.AILMENTS[c.ailment] : null;
+    const rem = ail ? C2.REMEDIES[ail.remedy] : null;
+    const slots = B.techSlots(g);
+    const eq = g.equippedTech || [];
+    const opps = B.arenaOpponents(g);
+    const power = Math.round(B.beastPower(g));
+    const hasRing = SW.boost.buildingTier(g, 'arena') > 0;
+
+    const techRows = C2.TECHNIQUE_LIST.map(t => {
+      const r = B.reps(g, t.id), known = B.techKnown(g, t.id), on = eq.includes(t.id);
+      return `<button class="neuron ${on ? 'owned' : known ? '' : 'locked'}" data-tech="${t.id}" ${known ? '' : 'disabled'}>
+        <span>${t.glyph}</span>
+        <span><b>${esc(t.name)}</b><i>${esc(t.blurb)}</i></span>
+        <span class="cost">${known ? (on ? 'set' : 'idle') : r + '/' + t.reps}</span>
+      </button>`;
+    }).join('');
+
+    return `
+      ${ail ? `<div class="terrace" style="border-color:#6f2f36">
+        <div class="terrace-head">${ail.glyph} ${esc(ail.name)} <span>day ${Math.floor(c.ailDays || 0)}</span></div>
+        <p>${esc(ail.blurb)} It is working at ${Math.round(ail.work * 100)}% and losing condition.</p>
+        <div class="btnrow"><button class="btn hot" data-act="cure">${rem.glyph} ${esc(rem.name)}
+          <span class="cost">${costLabel(rem.cost)}</span></button></div>
+      </div>` : `<p class="hint">Nothing wrong with it. Illness comes from overfeeding, damp, heat, overwork and cruelty — all of which you control.</p>`}
+
+      <div class="section-label">Techniques — ${eq.length}/${slots} set</div>
+      <p class="hint">It works these out by repetition, not by being told. Set the ones you want it using.</p>
+      <div class="web">${techRows}</div>
+
+      <div class="section-label">Bloodline</div>
+      ${g.mateOffer ? `<div class="terrace">
+        <div class="terrace-head">🐾 ${esc(g.mateOffer.name)}</div>
+        <p>💪 ${g.mateOffer.strength} · 🧠 ${g.mateOffer.cunning} · ✨ ${g.mateOffer.grace}${g.mateOffer.lineage !== c.lineage ? ' — a different line, which is worth more.' : ''}</p>
+        <div class="btnrow">
+          <button class="btn" data-act="mateyes">Take it in</button>
+          <button class="btn" data-act="mateno">Drive it off</button>
+        </div>
+      </div>` : g.mate ? `<p class="hint">${esc(g.mate.name)} is waiting. The next whelp carries both lines.</p>`
+        : '<p class="hint">No mate. Whelps will be pure line — steady, and narrower every time.</p>'}
+      ${g.pedigree && g.pedigree.length ? `<div>${g.pedigree.slice(0, 6).map(p =>
+        `<div class="wrow"><span>${p.hybrid ? '🧬' : '🐾'}</span><span><b>Gen ${p.gen}</b><i>out of ${esc(p.mate)}, day ${p.day}</i></span><span></span></div>`).join('')}</div>` : ''}
+      ${g.inbreeding >= 3 ? '<p class="tiny" style="color:var(--warn)">The line is getting narrow. Bring in outside blood.</p>' : ''}
+
+      <div class="section-label">The Trial Ring — power ${fmt(power)}</div>
+      ${!hasRing ? '<p class="hint">You have nowhere to hold a trial. Build a Trial Ring on the second terrace.</p>' : `
+        ${g.arenaResult ? `<div class="fest-result"><b>${esc(g.arenaResult.opponent)}, day ${g.arenaResult.day}</b> — ${g.arenaResult.won ? 'won' : 'lost'}
+          <div class="fest-field">${g.arenaResult.rounds.map(r => `<span class="${r.won ? 'you' : ''}">${fmt(r.mine)} v ${fmt(r.theirs)}</span>`).join('')}</div></div>` : ''}
+        <p class="hint">Three rounds, best of three. It costs the creature 28 vigour whatever happens.</p>
+        ${opps.slice(0, 5).map((o, i) => `<div class="diplo">
+          <span>${esc(o.name)}</span>
+          <span class="op ${o.power < power ? 'warm' : 'cold'}">${fmt(Math.round(o.power))}</span>
+          <button class="mini" data-fight="${i}" ${c.vigor >= 30 ? '' : 'disabled'}>fight</button>
+        </div>`).join('')}`}`;
+  }
+
+  function costLabel(cost) {
+    const bits = [];
+    if (cost.food) bits.push(cost.food + '🥣');
+    if (cost.wood) bits.push(cost.wood + '🪵');
+    if (cost.prayer) bits.push(cost.prayer + '🙏');
+    if (cost.mats) for (const k in cost.mats) bits.push(cost.mats[k] + C.MATERIALS[k].glyph);
+    if (cost.coin) bits.push(fmt(cost.coin) + '🪙');
+    return bits.join(' ');
   }
 
   function tabFrontier(g) {
@@ -320,6 +492,12 @@
           🔊 Listen <span class="cost">${M.LISTEN_FOCUS} focus</span></button></div>
       </div>
 
+      <div class="terrace">
+        <div class="terrace-head">🎣 Cloud Fishing <span>${M2.fishingUnlocked(g) ? 'ready' : 'not yet known'}</span></div>
+        <p>Drop a line off the rim. Three timing windows, each narrower than the last — clear more and something bigger comes up. Rare fish carry storm glass, skymetal, and occasionally something older.</p>
+        <div class="btnrow"><button class="btn" data-act="fish" ${M2.fishingUnlocked(g) && !M2.busy(g) && g.res.focus >= M2.CAST_FOCUS ? '' : 'disabled'}>
+          🎣 Cast <span class="cost">${M2.CAST_FOCUS} focus</span></button></div>
+      </div>
       <div class="section-label">The ground — ${Object.keys(g.discovered).length} examined, ${unknown} not</div>
       <p class="hint">Unknown things show as <b>?</b> out on the island. Click one to walk over and examine it${D.examineCost(g) ? ` (${D.examineCost(g)} focus)` : ' (free — you have Long Sight)'}.</p>
       <div>${rows || '<p class="hint">Nothing left out there.</p>'}</div>
@@ -396,6 +574,16 @@
           <td class="rg-renown">${fmt(r.renown)}</td>
         </tr>`).join('')}
       </table>
+      <div class="section-label">Dealing with them directly</div>
+      <p class="hint">Allies quietly add to your standing each day; enemies chip at it. Opinions drift back to indifference on their own.</p>
+      <div>${g.rivals.map(r => {
+        const op = T.opinion(g, r.name);
+        return `<div class="diplo">
+          <span>${esc(r.name)}</span>
+          <span class="op ${T.opinionWord(op)}">${T.opinionWord(op)}</span>
+          <span>${C2.DIPLO_ACTIONS.map(a => `<button class="mini" data-diplo="${a.id}" data-rival="${esc(r.name)}" title="${esc(a.blurb)}">${a.glyph}</button>`).join('')}</span>
+        </div>`;
+      }).join('')}</div>
       <div class="section-label">What they are saying</div>
       <div class="chatter">
         ${g.chatter.length ? g.chatter.slice(0, 14).map(ch => `<div class="ch ${ch.rel}"><i>day ${ch.day}</i> ${esc(ch.text)}</div>`).join('')
@@ -416,7 +604,47 @@
       <span class="ft-renown">+${f.renown}</span>
     </div>`;
     const trophies = g.trophies.slice(-12).reverse();
-    return `<p class="hint">${earned.length} of ${C.FEATS.length} feats. Renown is the only thing anyone up here actually counts.</p>
+    const av = R.available(g);
+    const owned = R.owned(g);
+    return `
+      <div class="section-label">Oaths — reroll every 3 days</div>
+      ${(g.oaths || []).map(o => `<div class="oath ${o.done ? 'done' : ''}">
+        <span>${o.done ? '★ ' : ''}${esc(o.name)}</span>
+        <span class="oath-bar"><i style="width:${(W.oathProgress(g, o) * 100).toFixed(0)}%"></i></span>
+        <span class="ft-renown">+${o.renown}</span>
+      </div>`).join('')}
+
+      <div class="section-label">Relics — ${owned.length}/${C2.RELIC_LIST.length} · ${(g.equipped || []).length}/${R.slots(g)} set</div>
+      <p class="hint">Only what is set does anything. Two of the same rank can be fused into one of the next rank up, and both are consumed.</p>
+      <div class="relicgrid">
+        ${owned.length ? owned.map(r => `<button class="relicchip r${r.rank} ${R.isEquipped(g, r.id) ? 'on' : ''}" data-relic="${r.id}" title="${esc(r.blurb)}">${r.glyph} ${esc(r.name)}</button>`).join('')
+          : '<span class="hint">None yet. Win festivals, take the ring, land something big, or make the hardest things at the bench.</span>'}
+      </div>
+      ${owned.length >= 2 ? `<div class="btnrow"><button class="btn" data-act="fuse">🔥 Fuse the two selected</button></div>
+        <p class="tiny">Select exactly two of the same rank, then fuse.</p>` : ''}
+
+      <div class="section-label">Titles</div>
+      <div class="relicgrid">
+        ${av.map(t => `<button class="relicchip ${g.title === t.id ? 'on' : ''}" data-title="${t.id}">${esc(t.name)}</button>`).join('')}
+      </div>
+
+      <div class="section-label">Ascension</div>
+      <div class="terrace">
+        <div class="terrace-head">✧ Let the island go <span>${P.canAscend(g) ? '+' + P.pointsFor(g) + ' points' : fmt(C2.ASCEND_MIN_RENOWN - g.res.renown) + ' renown to go'}</span></div>
+        <p>Begin again on fresh ground, carrying only the boons you have bought. Run ${(g.prestige.runs | 0) + 1}. Best so far: ${fmt(g.prestige.best || 0)} renown.</p>
+        <div class="btnrow"><button class="btn ${P.canAscend(g) ? 'hot' : ''}" data-act="ascend" ${P.canAscend(g) ? '' : 'disabled'}>✧ Ascend</button></div>
+      </div>
+      <div class="web">
+        ${C2.BOONS.map(b => {
+          const has = g.prestige.boons[b.id];
+          return `<button class="neuron ${has ? 'owned' : P.unspent(g) >= b.cost ? '' : 'locked'}" data-boon="${b.id}" ${has ? 'disabled' : ''}>
+            <span>${b.glyph}</span><span><b>${esc(b.name)}</b><i>${esc(b.blurb)}</i></span>
+            <span class="cost">${has ? '✓' : b.cost + '✧'}</span></button>`;
+        }).join('')}
+      </div>
+      <p class="tiny">${P.unspent(g)} of ${g.prestige.points | 0} ascension points unspent.</p>
+
+      <div class="section-label">Feats — ${earned.length} of ${C.FEATS.length}</div>
       ${trophies.length ? `<div class="section-label">Trophy shelf</div><div class="trophies">
         ${trophies.map(t => `<span class="trophy p${t.place}" title="${esc(t.name)} — day ${t.day}">${t.place === 1 ? '🥇' : t.place === 2 ? '🥈' : '🥉'} ${esc(t.name.replace('The ', ''))}</span>`).join('')}
       </div>` : ''}
@@ -464,6 +692,117 @@
     $('judge-what').innerHTML = `${a.icon} ${esc(c.name)} just chose to <b>${esc(a.name)}</b>`;
     const left = 1 - c.pending.t / Cr.PRAISE_WINDOW;
     $('judge-fill').style.width = (clamp(left, 0, 1) * 100) + '%';
+  }
+
+  /* The two timing games get their own overlay: they need to be clickable and
+   * they need to read clearly, which is easier in DOM than on the canvas.
+   *
+   * The structure is built once per game and only the moving parts are then
+   * animated. Rebuilding the markup every frame — which is what the panels do
+   * — would destroy and recreate the Strike button sixty times a second, and
+   * a button that is detached mid-press cannot be pressed.
+   */
+  let playKey = '';
+
+  function renderPlay(g) {
+    const el = $('play');
+    const key = g.fishing ? 'fish:' + g.fishing.stage : g.chant ? 'chant:' + g.chant.id : '';
+    if (key !== playKey) {
+      playKey = key;
+      el.innerHTML = key ? (g.fishing ? fishingMarkup(g) : chantMarkup(g)) : '';
+      el._last = null;
+      el.classList.toggle('on', !!key);
+    }
+    if (!key) return;
+    if (g.fishing) {
+      const f = g.fishing;
+      const mark = el.querySelector('.fishmark');
+      const btn = el.querySelector('.play-btn');
+      const sub = el.querySelector('.play-sub');
+      if (mark) mark.style.left = (f.pos * 100).toFixed(2) + '%';
+      if (btn) btn.disabled = !!f.result;
+      if (sub) sub.textContent = f.result
+        ? (f.result === 'full' ? 'Landed it.' : f.result === 'partial' ? 'It slipped, but something came up.' : 'Gone.')
+        : `Stage ${f.stage + 1} of ${M2.STAGES}`;
+    } else if (g.chant) {
+      const ch = g.chant;
+      el.querySelectorAll('.tonepad').forEach((pad, i) => {
+        pad.classList.toggle('lit', ch.lit === i);
+        pad.disabled = ch.phase !== 'input';
+      });
+      el.querySelectorAll('.chant-steps i').forEach((dot, i) => {
+        const given = ch.input[i];
+        dot.className = given === undefined ? '' : given === ch.seq[i] ? 'ok' : 'bad';
+      });
+      const sub = el.querySelector('.play-sub');
+      if (sub) sub.textContent = ch.phase === 'show' ? 'listen' : ch.phase === 'input' ? 'sing it back' : 'done';
+    }
+  }
+
+  function fishingMarkup(g) {
+    const f = g.fishing;
+    return `<div class="play-title">🎣 Cloud Fishing <span class="play-sub"></span></div>
+      <div class="fishbar">
+        <div class="fishzone" style="left:${(f.zone * 100).toFixed(1)}%;width:${(f.zoneW * 100).toFixed(1)}%"></div>
+        <div class="fishmark" style="left:0%"></div>
+      </div>
+      <button class="btn hot play-btn" data-act="strike">Strike <kbd>Space</kbd></button>`;
+  }
+
+  function chantMarkup(g) {
+    const ch = g.chant;
+    const def = C2.CHANTS.find(x => x.id === ch.id);
+    return `<div class="play-title">${def.glyph} ${esc(def.name)} <span class="play-sub"></span></div>
+      <div class="tonepads">
+        ${C2.CHANT_TONES.map((t, i) => `<button class="tonepad" data-tone="${i}" disabled>${t}</button>`).join('')}
+      </div>
+      <div class="chant-steps">${ch.seq.map(() => '<i></i>').join('')}</div>
+      <p class="tiny" style="text-align:center;margin-top:6px">Keys 6–0 play the tones.</p>`;
+  }
+
+  /* What to do next. The loop got wide enough that a player can lose the
+   * thread, so the scene carries a short live list of the things that are
+   * actually waiting on them, each one a shortcut to the thing itself. */
+  function renderTodo(g) {
+    const items = [];
+    const add = (icon, text, tone, act) => items.push({ icon, text, tone, act });
+
+    if (g.event) add('❗', W.eventDef(g).title, 'urgent', 'openevent');
+    if (g.creature.pending) add(C.ACTS[g.creature.pending.act].icon, 'Judge it — praise or strike', 'good', 'judge');
+    if (g.creature.ailment) add(C2.AILMENTS[g.creature.ailment].glyph, `${g.creature.name} is ill`, 'urgent', 'tab:beast');
+    if (g.mateOffer) add('🐾', 'A mate is waiting on an answer', 'good', 'tab:beast');
+    if (g.village.food < 25) add('🥣', 'The granary is nearly empty', 'urgent', 'tab:village');
+    if (g.village.unrest > 60) add('🔥', 'The village is close to walking out', 'urgent', 'tab:village');
+    const ripe = F.ripePlots(g).length;
+    if (ripe >= 3) add('🧺', `${ripe} plots are ripe`, 'good', 'harvestall');
+    const dry = g.plots.filter(p => p.crop && p.water < 25).length;
+    if (dry >= 3) add('💧', `${dry} plots are drying out`, '', 'waterall');
+    if (SW.lineage.lifeProgress(g) > 0.86 && SW.lineage.canBreed(g)) add('🧬', 'It is old — breed before you lose the work', 'urgent', 'breed');
+    if (g.caravan && g.caravan.contract && (g.stock[g.caravan.contract.crop] | 0) >= g.caravan.contract.need - g.caravan.contract.got) {
+      add('📜', 'A contract can be filled now', 'good', 'tab:market');
+    }
+    if (D.unknownCount(g) && g.res.focus >= D.examineCost(g) + 6 && g.day > 2) {
+      add('❓', `${D.unknownCount(g)} unknown things on the island`, '', 'tab:frontier');
+    }
+    if (M.listenReady(g) && g.res.focus > M.LISTEN_FOCUS + 4) add('🔊', 'The Listening is ready', '', 'listen');
+    if (g.arenaChallenge) add('🏟️', 'A challenge is waiting', 'good', 'tab:beast');
+
+    setHTML($('todo'), items.slice(0, 5).map(i =>
+      `<button class="todo-item ${i.tone}" data-todo="${i.act}"><i>${i.icon}</i>${esc(i.text)}</button>`).join(''));
+  }
+
+  function showEvent(g) {
+    const def = W.eventDef(g);
+    if (!def) return;
+    showModal(`
+      <h1>${esc(def.title)}</h1>
+      <p class="lede">${esc(def.text)}</p>
+      ${def.choices.map((c, i) => `<button class="btn evt-choice" data-choice="${i}">
+        <b>${esc(c.label)}</b><i>${esc(c.note)}</i></button>`).join('')}
+    `);
+    $('modal').querySelectorAll('[data-choice]').forEach(b => {
+      b.onclick = () => { W.resolveEvent(G, +b.dataset.choice); hideModal(); dirty.panel = true; };
+    });
   }
 
   // --- log ---------------------------------------------------------------
@@ -670,6 +1009,30 @@
     if (d.sell) { const gain = F.sell(G, d.sell, +d.n); if (gain) log(G, `Sold for ${fmt(gain)} coin.`); }
     else if (d.buy) { const n = F.buySeed(G, d.buy, +d.n); log(G, n ? `Bought ${n} ${C.CROPS[d.buy].name} seed.` : 'Not enough coin.', n ? 'info' : 'warn'); }
     else if (d.wood) { const n = F.buyWood(G, +d.wood); log(G, n ? `${n} timber delivered.` : 'Not enough coin.', n ? 'info' : 'warn'); }
+    else if (d.tech) B.equipTech(G, d.tech);
+    else if (d.fight !== undefined) B.fight(G, +d.fight);
+    else if (d.build) W.build(G, d.build);
+    else if (d.chant) M2.startChant(G, d.chant);
+    else if (d.tone !== undefined) M2.chantInput(G, +d.tone);
+    else if (d.sellfish) { const c = M2.sellFish(G, d.sellfish, 999); if (c) log(G, `Sold the catch for ${fmt(c)} coin.`, 'good'); }
+    else if (d.eatfish) { const f = M2.eatFish(G, d.eatfish, 999); if (f) log(G, `${f} food into the granary.`, 'good'); }
+    else if (d.carbuy) T.buyFromCaravan(G, d.carbuy, 3);
+    else if (d.diplo) T.diplomacy(G, d.rival, d.diplo);
+    else if (d.boon) P.buyBoon(G, d.boon);
+    else if (d.title) R.setTitle(G, d.title);
+    else if (d.relic) {
+      // Click toggles equip; two of a rank selected with shift are the fuse pair.
+      if (relicPick.includes(d.relic)) relicPick = relicPick.filter(x => x !== d.relic);
+      else relicPick = [...relicPick, d.relic].slice(-2);
+      R.equip(G, d.relic);
+    }
+    else if (d.fert) {
+      const sel = G.plots.find(p => p.i === SW.render.getSelected());
+      const target = sel || G.plots.slice().sort((a, b) => W.soilOf(a) - W.soilOf(b))[0];
+      if (target) W.fertilise(G, target, d.fert);
+    }
+    else if (d.role) { W.assign(G, d.role, e.target.value); }
+    else if (d.todo) doTodo(G, d.todo);
     else if (d.mill) { const f = F.mill(G, d.mill, 1); if (f) log(G, `Milled into ${f} food.`); }
     else if (d.millAll !== undefined) {
       let total = 0;
@@ -705,6 +1068,20 @@
           if (benchA && benchB) { M.combine(G, benchA, benchB); benchA = null; benchB = null; }
           break;
         case 'benchclear': benchA = null; benchB = null; break;
+        case 'cure': B.cure(G); break;
+        case 'mateyes': B.acceptMate(G); break;
+        case 'mateno': B.refuseMate(G); break;
+        case 'deliver': T.deliverContract(G); break;
+        case 'fish': M2.startFishing(G); break;
+        case 'strike': M2.strike(G); break;
+        case 'fuse': if (relicPick.length === 2) { R.fuse(G, relicPick[0], relicPick[1]); relicPick = []; } else log(G, 'Pick exactly two of the same rank.', 'warn'); break;
+        case 'ascend':
+          if (P.canAscend(G) && confirm('Let this island go and begin again?')) {
+            const n = P.ascend(G);
+            if (n) SW.main.replace(n);
+          }
+          break;
+        case 'openevent': showEvent(G); break;
       }
     }
     dirty.panel = true; dirty.card = true;
@@ -718,7 +1095,12 @@
     const k = e.key.toLowerCase();
     if (k === 'p') { Cr.praise(G); renderCard(G); }
     else if (k === 's') { Cr.scold(G); renderCard(G); }
-    else if (k === ' ') { e.preventDefault(); SW.main.togglePause(); }
+    else if (k === ' ') {
+      e.preventDefault();
+      if (G.fishing) M2.strike(G); else SW.main.togglePause();
+    }
+    else if (G.chant && '67890'.includes(k)) M2.chantInput(G, '67890'.indexOf(k));
+    else if (k === 'c' && G.fishing === null) M2.startFishing(G);
     else if (k === '1') SW.main.setSpeed(1);
     else if (k === '2') SW.main.setSpeed(2);
     else if (k === '3') SW.main.setSpeed(4);
@@ -735,6 +1117,9 @@
     // pointerdown, not click: these containers are rebuilt several times a
     // second and a click needs mousedown+mouseup on the same live element.
     $('panel-body').addEventListener('pointerdown', onPanelClick);
+    $('panel-body').addEventListener('change', onPanelClick);
+    $('play').addEventListener('pointerdown', onPanelClick);
+    $('todo').addEventListener('pointerdown', onPanelClick);
     $('card').addEventListener('pointerdown', onPanelClick);
     $('actionbar').addEventListener('pointerdown', onPanelClick);
     $('stage').addEventListener('mousemove', onCanvasMove);
@@ -752,19 +1137,39 @@
     renderLog(G);
   }
 
-  function setGame(g) { G = g; lastFestivalShown = g.festival.index; }
+  /* A dot on any tab with something waiting behind it. */
+  function nudgeTabs(g) {
+    const want = {
+      farm: F.ripePlots(g).length > 0,
+      market: !!(g.caravan && g.caravan.contract),
+      village: g.village.food < 25 || g.village.unrest > 60 || (g.people || []).some(p => p.role === 'idle'),
+      powers: false,
+      frontier: D.unknownCount(g) > 0 && g.res.focus >= D.examineCost(g) + 6,
+      bench: M.benchUnlocked(g) && M.matCount(g) >= 2,
+      beast: !!g.creature.ailment || !!g.mateOffer || !!g.arenaChallenge,
+      register: false,
+      feats: (g.oaths || []).some(o => !o.done && W.oathProgress(g, o) >= 1) || SW.prestige.canAscend(g)
+    };
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('nudge', !!want[b.dataset.tab]));
+  }
+
+  function setGame(g) { G = g; lastFestivalShown = g.festival.index; relicPick = []; playKey = ''; }
 
   let acc = 0;
   function frame(g, dt) {
     G = g;
     acc += dt;
     renderJudge(g);
+    renderPlay(g);
+    if (g.event && !$('modal').classList.contains('on')) showEvent(g);
     if (acc > 0.2) {
       acc = 0;
       renderTop(g);
       renderCard(g);
       renderPanel(g);
       renderActionBar(g);
+      renderTodo(g);
+      nudgeTabs(g);
       if (dirty.log) { renderLog(g); dirty.log = false; }
       document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('on', +b.dataset.speed === g.speed && !g.paused));
       $('btn-pause').textContent = g.paused ? '▶' : '❚❚';

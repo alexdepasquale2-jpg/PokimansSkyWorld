@@ -42,7 +42,7 @@
 
   function startListen(g) {
     if (!listenUnlocked(g)) { SW.ui.log(g, 'You do not know how to listen yet.', 'warn'); return false; }
-    if (g.listen) return false;
+    if (g.listen || g.fishing || g.chant) return false;
     if (listenCooldown(g) > 0) {
       SW.ui.log(g, `Too soon. The island is still ringing (${Math.ceil(listenCooldown(g))}s).`, 'warn');
       return false;
@@ -94,7 +94,7 @@
       case 'insight': {
         // The only repeatable source of Insight in the game, so it has to be
         // worth stopping work for — and worth more the further out you build.
-        const n = Math.max(1, Math.round((2 + g.ring * 2) * D.insightMul(g)));
+        const n = Math.max(1, Math.round((2 + g.ring * 2) * D.insightMul(g) * SW.boost.get(g, 'listen')));
         g.insight += n; t.insight += n;
         break;
       }
@@ -104,7 +104,7 @@
         break;
       }
       case 'coin': {
-        const n = Math.round(55 * (1 + g.day * 0.06) * (1 + g.ring * 0.5));
+        const n = Math.round(55 * (1 + g.day * 0.06) * (1 + g.ring * 0.5) * SW.boost.get(g, 'listen') * SW.boost.get(g, 'coin'));
         g.res.coin += n; t.coin += n;
         break;
       }
@@ -215,6 +215,8 @@
       g.recipes[r.id] = g.day;
       const ins = Math.max(1, Math.round(r.insight * D.insightMul(g)));
       g.insight += ins;
+      // The hardest pairings turn up something older than the materials.
+      if (r.coin >= 1400 && chance(0.28)) SW.relics.grant(g);
       SW.ui.log(g, `${r.glyph} ${r.name}. You had not made one before. +${ins} insight, +${fmt(value)} coin.`, 'great');
       g.fx.push({ at: 'banner', text: r.glyph + ' ' + r.name, life: 3.5, t: 0 });
     } else {

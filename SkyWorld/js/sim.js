@@ -3,6 +3,7 @@
 (function (SW) {
   'use strict';
   const C = SW.content;
+  const C2 = SW.content2;
   const F = SW.farm;
   const Cr = SW.creature;
   const { clamp, hashNoise, chance, pick, fmt } = SW.core;
@@ -22,7 +23,7 @@
     const cur = rankOf(g);
     return C.RANKS[Math.min(cur.id + 1, C.RANKS.length - 1)] === cur ? null : C.RANKS[cur.id + 1];
   }
-  const grandeur = g => C.SHRINE_TIERS[g.shrine].grandeur;
+  const grandeur = g => C.SHRINE_TIERS[g.shrine].grandeur + (g.grandeurBonus || 0);
 
   // --- player actions ----------------------------------------------------
   function spend(g, focus) {
@@ -181,7 +182,7 @@
   // --- world tick --------------------------------------------------------
   function tickVillage(g, dt) {
     const v = g.village;
-    const eaten = v.villagers * 0.085 * SW.discovery.mods.eat(g) * dt;
+    const eaten = (v.villagers + SW.world.extraEaters(g)) * 0.085 * SW.boost.foodUse(g) * dt;
     if (v.food >= eaten) {
       v.food -= eaten;
       v.faith = clamp(v.faith + 0.028 * dt, 0, 100);
@@ -195,25 +196,26 @@
     // full granary, neighbours who stayed — less whatever they are afraid of.
     // A people who fear you do not also love you, so the two paths compete
     // instead of stacking.
-    const pull = clamp(18 + Math.min(grandeur(g) * 1.8, 46) + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
-      - v.awe * 0.62 - v.unrest * 0.45, 0, 100);
+    const pull = clamp((18 + Math.min(grandeur(g) * 1.8, 46) + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
+      - v.awe * 0.62 - v.unrest * 0.45) * SW.boost.get(g, 'faith'), 0, 100);
     if (g.effects.awe) v.awe = Math.max(v.awe, 14);      // the monolith never stops looming
     v.faith += (pull - v.faith) * 0.0022 * dt;
     v.faith = clamp(v.faith, 0, 100);
-    v.awe = clamp(v.awe - 0.022 * dt, 0, 100);
+    v.awe = clamp(v.awe - 0.022 / SW.boost.get(g, 'awe') * dt, 0, 100);
     // Living under a terror is exhausting, but only once it is genuinely a
     // terror. Below that, fear is just respect and costs nothing.
-    v.unrest = clamp(v.unrest + Math.max(0, v.awe - 45) * 0.005 * dt, 0, 100);
+    v.unrest = clamp(v.unrest + Math.max(0, v.awe - 45) * 0.005 * SW.boost.unrest(g) * dt, 0, 100);
 
     // Prayer: love gives it freely, terror gives it grudgingly.
-    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.05) * SW.discovery.mods.prayer(g);
+    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.05)
+      * (SW.boost.get(g, 'prayer') + SW.world.devoutBonus(g));
     g.res.prayer += rate * dt;
 
     // Standing compounds. A congregation is worth what it feels about you,
     // multiplied by how far away your shrine can be seen. Neither half alone
     // gets you up the Register — this is the engine the whole grind feeds.
     const devotion = v.villagers * (v.faith + v.awe) / 100;
-    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * SW.discovery.mods.renown(g) * dt;
+    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * SW.boost.get(g, 'renown') * dt;
   }
 
   function checkFeats(g) {
@@ -234,14 +236,14 @@
   // ~70 days and then levels off for good: an established god is not getting
   // any more established. A fully built island out-earns even the fastest of
   // them, which is what makes first place reachable instead of a treadmill.
-  const RIVAL_MAX_GAIN = 1400;
+  const RIVAL_MAX_GAIN = 1900;
 
   function tickRivals(g) {
     // Rivals climb their own curve and never chase you. Nothing rubber-bands,
     // which is the whole reason passing one of them means anything.
     for (const r of g.rivals) {
       const n = hashNoise(r.seed, g.day);
-      const curve = Math.min(25 + 4.5 * Math.pow(g.day, 1.15), RIVAL_MAX_GAIN);
+      const curve = Math.min(25 + 7 * Math.pow(g.day, 1.15), RIVAL_MAX_GAIN);
       let gain = r.pace * curve * (0.72 + n * 0.62);
       if (hashNoise(r.seed + 5, g.day) < r.spike * 0.25) gain *= 2.2;    // a good week
       r.renown += gain;
@@ -317,6 +319,8 @@
     SW.discovery.firstTime(g, 'fest:' + cat.id, 4, `entering ${cat.name}`);
     if (place === 1) g.stats.festivalWins++;
     if (place <= 3) g.trophies.push({ fest: cat.id, name: cat.name, place, day: g.day });
+    // A podium finish is one of the few reliable ways to come by a relic.
+    if (place === 1 ? chance(0.55) : (place <= 3 && chance(0.2))) SW.relics.grant(g);
 
     g.festival.lastResult = { cat: cat.id, name: cat.name, place, score: Math.round(mine), payout, day: g.day, field: field.slice(0, 5).map(f => ({ name: f.name, score: Math.round(f.score), you: !!f.you })) };
     g.festival.index++;
@@ -353,6 +357,10 @@
       SW.ui.log(g, 'A family leaves in the night. Word of that travels too.', 'bad');
     }
 
+    SW.world.newDay(g);
+    SW.trade.newDay(g);
+    SW.relics.checkTitles(g);
+
     const before = rankOf(g).id;
     checkFeats(g);
     if (g.day >= g.festival.nextDay) runFestival(g);
@@ -369,18 +377,28 @@
   function tick(g, dt) {
     g.tick += dt;
     g.dayTick += dt;
-    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * SW.discovery.mods.focusRegen(g) * dt, 0, g.res.focusMax);
+    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * SW.boost.get(g, 'focus') * dt, 0, g.res.focusMax);
 
     F.tickPlots(g, dt);
     Cr.tick(g, dt);
     SW.lineage.tick(g, dt);
-    SW.minigames.tick(g, dt);
+    SW.beast.tick(g, dt);
+    SW.world.tick(g, dt);
     tickVillage(g, dt);
 
     while (g.dayTick >= C.TICKS_PER_DAY) {
       g.dayTick -= C.TICKS_PER_DAY;
       newDay(g);
     }
+  }
+
+  /* The mini-games are played, not simulated: they need real frame time, not
+   * one update per game-second, or a sweeping marker teleports between four
+   * positions and a 0.4-second tone is unhittable. Driven from the render loop
+   * and unaffected by game speed or pause. */
+  function tickRealtime(g, dt) {
+    SW.minigames.tick(g, dt);
+    SW.mini2.tick(g, dt);
   }
 
   /* Catch-up when the tab has been closed. Coarse but honest: the same rules,
@@ -417,7 +435,7 @@
   function festivalPar(g, cat) { return cat.par(g.day); }
 
   SW.sim = {
-    COST, rankOf, nextRank, grandeur, tick, newDay, runOffline, festivalPar,
+    COST, rankOf, nextRank, grandeur, tick, tickRealtime, newDay, runOffline, festivalPar,
     playerTill, playerSow, playerWater, playerHarvest, playerForage,
     hutCost, plotCost, buildHut, clearPlot, upgradeShrine, castMiracle,
     standings, checkFeats, festivalScore, runFestival

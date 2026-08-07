@@ -223,8 +223,9 @@ aside::-webkit-scrollbar-thumb, #log::-webkit-scrollbar-thumb { background: #263
 .hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
 
 /* ---------- right panel ---------- */
-.tabs { display: grid; grid-template-columns: repeat(8, 1fr); border-bottom: 1px solid var(--line); flex: 0 0 auto; }
-.tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 10px 0; font-size: 15px; opacity: 0.55; }
+.tabs { display: grid; grid-template-columns: repeat(9, 1fr); border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 10px 0; font-size: 14px; opacity: 0.55; position: relative; }
+.tab.nudge::after { content: ''; position: absolute; top: 6px; right: 22%; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
 .tab:hover { opacity: 0.85; background: rgba(255,255,255,0.03); }
 .tab.on { opacity: 1; border-bottom-color: var(--gold); background: rgba(231,198,106,0.07); }
 #panel-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; }
@@ -455,6 +456,84 @@ tr.you .rg-place { color: var(--gold); }
 .recipe i { font-style: normal; color: var(--dimmer); font-size: 10.5px; }
 .recipe .val { color: var(--gold); font-variant-numeric: tabular-nums; }
 
+
+/* ---------- what to do next ---------- */
+#todo {
+  position: absolute; left: 12px; top: 12px; max-width: 300px;
+  display: flex; flex-direction: column; gap: 5px;
+  pointer-events: none;
+}
+.todo-item {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(10,13,22,0.82); border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 7px; padding: 6px 10px; font-size: 11.5px;
+  backdrop-filter: blur(5px); cursor: pointer; text-align: left; color: var(--ink);
+}
+.todo-item:hover { border-color: var(--gold); background: rgba(20,26,40,0.92); }
+.todo-item.urgent { border-left-color: var(--bad); }
+.todo-item.good { border-left-color: var(--good); }
+.todo-item i { font-style: normal; font-size: 13px; }
+
+/* ---------- mini-game overlay ---------- */
+#play {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: 74px; width: min(440px, 92%);
+  background: rgba(12,15,26,0.93); border: 1px solid var(--gold);
+  border-radius: var(--radius); padding: 12px 14px;
+  display: none; box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+}
+#play.on { display: block; }
+.play-title { font-family: var(--serif); font-size: 14px; text-align: center; margin-bottom: 9px; }
+.play-title span { color: var(--dim); font-family: var(--sans); font-size: 11px; }
+.fishbar {
+  position: relative; height: 26px; border-radius: 6px;
+  background: linear-gradient(90deg,#141b2c,#1d2740,#141b2c);
+  border: 1px solid var(--line); overflow: hidden; cursor: pointer;
+}
+.fishzone { position: absolute; top: 0; bottom: 0; background: rgba(126,231,135,0.30); border-left: 1px solid #7ee787; border-right: 1px solid #7ee787; }
+.fishmark { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.play-btn { width: 100%; margin-top: 9px; }
+.tonepads { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.tonepad {
+  aspect-ratio: 1; border-radius: 10px; font-size: 22px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  display: grid; place-items: center; transition: background 0.08s, border-color 0.08s;
+}
+.tonepad.lit { background: rgba(231,198,106,0.4); border-color: var(--gold); }
+.tonepad:disabled { opacity: 0.75; cursor: default; }
+.chant-steps { display: flex; gap: 4px; justify-content: center; margin-top: 8px; }
+.chant-steps i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.14); }
+.chant-steps i.ok { background: var(--good); }
+.chant-steps i.bad { background: var(--bad); }
+
+/* ---------- second-layer panels ---------- */
+.wrow { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; font-size: 11.5px; padding: 4px 0; border-top: 1px solid var(--line-soft); }
+.wrow b { font-size: 12px; }
+.wrow i { font-style: normal; color: var(--dimmer); font-size: 10.5px; }
+.person { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: 11.5px; padding: 4px 0; border-top: 1px solid var(--line-soft); }
+.person select { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); border-radius: 6px; font-size: 11px; padding: 3px 5px; }
+.person .trait { color: var(--dimmer); font-size: 10px; }
+.oath { display: grid; grid-template-columns: 1fr 56px 40px; gap: 7px; align-items: center; font-size: 11.5px; padding: 4px 0; }
+.oath.done { opacity: 0.55; }
+.oath-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.oath-bar i { display: block; height: 100%; background: var(--gold); }
+.relicgrid { display: flex; flex-wrap: wrap; gap: 5px; }
+.relicchip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px;
+}
+.relicchip.on { border-color: var(--gold); background: rgba(231,198,106,0.15); }
+.relicchip.r3 { border-left: 3px solid #d2a8ff; }
+.relicchip.r4 { border-left: 3px solid var(--gold); }
+.evt-choice { width: 100%; text-align: left; margin-top: 6px; }
+.evt-choice i { font-style: normal; display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
+.diplo { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; font-size: 11.5px; padding: 3px 0; }
+.op { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2); }
+.op.warm { color: #8ff0a4; } .op.allied { color: #8ff0a4; background: rgba(126,231,135,0.16); }
+.op.cold { color: #f5b7b7; } .op.hostile { color: #ff8f8f; background: rgba(255,143,143,0.14); }
+
 </style>
 </head>
 <body>
@@ -504,6 +583,7 @@ tr.you .rg-place { color: var(--gold); }
 
     <section id="stage">
       <canvas id="scene"></canvas>
+      <div id="todo"></div>
 
       <div id="judge">
         <div id="judge-what"></div>
@@ -514,6 +594,7 @@ tr.you .rg-place { color: var(--gold); }
         </div>
       </div>
 
+      <div id="play"></div>
       <div id="actionbar"></div>
     </section>
 
@@ -525,6 +606,7 @@ tr.you .rg-place { color: var(--gold); }
         <button class="tab" data-tab="powers">✨</button>
         <button class="tab" data-tab="frontier">🧭</button>
         <button class="tab" data-tab="bench">⚒️</button>
+        <button class="tab" data-tab="beast">🐾</button>
         <button class="tab" data-tab="register">📜</button>
         <button class="tab" data-tab="feats">🏆</button>
       </nav>
@@ -1017,6 +1099,389 @@ tr.you .rg-place { color: var(--gold); }
 
 </script>
 <script>
+/* Skyward Reach — content tables for the second layer of systems.
+ * Kept separate from content.js purely for size. No logic here either.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+
+  /* 1. SEASONS ---------------------------------------------------------- */
+  const SEASON_LEN = 12;   // days each
+  const SEASONS = [
+    { id: 'greening', name: 'Greening', glyph: '🌱', tint: '#8fd18a',
+      growth: 1.15, thirst: 0.95, feed: 1.0, faith: 1.0,
+      blurb: 'Everything comes up at once. Sow wide.' },
+    { id: 'high', name: 'High Sun', glyph: '☀️', tint: '#f0cf72',
+      growth: 1.0, thirst: 1.35, feed: 1.0, faith: 1.05,
+      blurb: 'Long days, hard ground. Water or lose it.' },
+    { id: 'falling', name: 'Falling', glyph: '🍂', tint: '#d99a5f',
+      growth: 0.9, thirst: 0.85, feed: 1.25, faith: 1.0,
+      blurb: 'Yields are heavy and the market is generous.' },
+    { id: 'still', name: 'The Still', glyph: '❄️', tint: '#9fc4e0',
+      growth: 0.62, thirst: 0.55, feed: 0.85, faith: 0.9,
+      blurb: 'Almost nothing grows. Build, breed, and get through it.' }
+  ];
+
+  /* 2. WEATHER ----------------------------------------------------------- */
+  const WEATHER = {
+    clear:    { id: 'clear',    name: 'Clear',      glyph: '🌤️', weight: 30, growth: 1.0,  thirst: 1.0,  mood: 0,   blurb: 'Nothing in the way.' },
+    downpour: { id: 'downpour', name: 'Downpour',   glyph: '🌧️', weight: 14, growth: 1.1,  thirst: 0,    mood: -2,  water: 100, blurb: 'Every plot drinks for free.' },
+    drought:  { id: 'drought',  name: 'Dry Wind',   glyph: '🏜️', weight: 11, growth: 0.8,  thirst: 2.0,  mood: -4,  blurb: 'The soil gives up its water twice as fast.' },
+    gale:     { id: 'gale',     name: 'Gale',       glyph: '🌪️', weight: 9,  growth: 0.85, thirst: 1.2,  mood: -8,  rot: 1.6, blurb: 'Ripe crops are torn about. Bring them in.' },
+    mist:     { id: 'mist',     name: 'Cloud Mist', glyph: '🌫️', weight: 12, growth: 1.05, thirst: 0.5,  mood: 2,   listen: 1.5, blurb: 'Sound carries strangely. The Listening pays more.' },
+    swelter:  { id: 'swelter',  name: 'Swelter',    glyph: '🔥', weight: 8,  growth: 1.2,  thirst: 1.8,  mood: -6,  vigor: 0.7, blurb: 'Growth races; the creature wilts.' },
+    auroral:  { id: 'auroral',  name: 'Auroral',    glyph: '🌈', weight: 6,  growth: 1.15, thirst: 0.9,  mood: 8,   insight: 1.6, faith: 1.25, blurb: 'The sky is showing off. Insight and faith come easier.' },
+    hush:     { id: 'hush',     name: 'The Hush',   glyph: '🌑', weight: 5,  growth: 0.9,  thirst: 0.8,  mood: -3,  awe: 1.5, prayer: 1.4, blurb: 'Nobody speaks above a whisper. Prayer floods in.' }
+  };
+  const WEATHER_LIST = Object.values(WEATHER);
+
+  /* 3. SOIL -------------------------------------------------------------- */
+  const SOIL = {
+    max: 100,
+    drainPerHarvest: 5,       // each harvest takes it out of the ground
+    rotationBonus: 0.22,      // sowing a different crop than last time
+    yieldAt: q => 0.55 + (q / 100) * 0.75,   // 0.55x at dead soil, 1.30x at rich
+    fallowRecovery: 0.10      // per tick while a plot sits empty
+  };
+  const FERTILISERS = {
+    compost: { id: 'compost', name: 'Compost',      glyph: '🟤', soil: 26, cost: { food: 40 },  blurb: 'Spoiled crop and village waste, turned over.' },
+    ash:     { id: 'ash',     name: 'Kiln ash',     glyph: '🌫️', soil: 46, cost: { wood: 20 },  blurb: 'Burnt clean. Harsh, but it works fast. A kiln makes it cheaper still.' },
+    bonemeal:{ id: 'bonemeal',name: 'Bone meal',    glyph: '🦴', soil: 70, cost: { mats: { bone: 2 } }, blurb: 'Ground fine. The ground remembers it for a long while.' }
+  };
+  const FERTILISER_LIST = Object.values(FERTILISERS);
+
+  /* 4. AILMENTS ---------------------------------------------------------- */
+  const AILMENTS = {
+    bloat:   { id: 'bloat',   name: 'Bloat',      glyph: '🫧', blurb: 'It ate too much, too fast, and now it will not move.',
+               cause: 'overfeeding', vigor: -0.35, mood: -0.15, work: 0.55, remedy: 'purgative' },
+    rotlung: { id: 'rotlung', name: 'Rot-lung',   glyph: '🫁', blurb: 'Wet air got into it. You can hear it breathing from the shrine.',
+               cause: 'damp', vigor: -0.5, mood: -0.25, work: 0.4, remedy: 'steam' },
+    sunsick: { id: 'sunsick', name: 'Sun-sick',   glyph: '🥵', blurb: 'It has been out in the swelter too long.',
+               cause: 'heat', vigor: -0.45, mood: -0.3, work: 0.5, remedy: 'coolwrap' },
+    lameness:{ id: 'lameness',name: 'Lameness',   glyph: '🦴', blurb: 'Something in the foreleg went while it was working.',
+               cause: 'overwork', vigor: -0.2, mood: -0.2, work: 0.35, remedy: 'splint' },
+    despair: { id: 'despair', name: 'Despair',    glyph: '🌧️', blurb: 'You struck it too many times. It has stopped trying.',
+               cause: 'cruelty', vigor: -0.15, mood: -0.5, work: 0.45, remedy: 'kindness' }
+  };
+  const AILMENT_LIST = Object.values(AILMENTS);
+  const REMEDIES = {
+    purgative: { id: 'purgative', name: 'Purgative mash', glyph: '🥣', cost: { food: 30 } },
+    steam:     { id: 'steam',     name: 'Steam tent',     glyph: '♨️', cost: { wood: 30 } },
+    coolwrap:  { id: 'coolwrap',  name: 'Cool wrap',      glyph: '🧊', cost: { mats: { fibre: 2 } } },
+    splint:    { id: 'splint',    name: 'Splint',         glyph: '🦯', cost: { wood: 18, mats: { fibre: 1 } } },
+    kindness:  { id: 'kindness',  name: 'Nothing but time', glyph: '💗', cost: { prayer: 30 } }
+  };
+
+  /* 5. VILLAGERS & ROLES ------------------------------------------------- */
+  const ROLES = {
+    idle:      { id: 'idle',      name: 'Unassigned', glyph: '🧍', blurb: 'Eats, prays, does no particular job.' },
+    farmhand:  { id: 'farmhand',  name: 'Farmhand',   glyph: '🌾', blurb: 'Waters a plot now and then without being asked.' },
+    mason:     { id: 'mason',     name: 'Mason',      glyph: '🧱', blurb: 'Building and terrace costs drop.' },
+    herbalist: { id: 'herbalist', name: 'Herbalist',  glyph: '🌿', blurb: 'The creature falls ill less, and recovers faster.' },
+    acolyte:   { id: 'acolyte',   name: 'Acolyte',    glyph: '🕯️', blurb: 'Prayer and faith accrue faster.' },
+    scout:     { id: 'scout',     name: 'Scout',      glyph: '🧭', blurb: 'Finds materials, and sometimes marks something unknown.' },
+    trader:    { id: 'trader',    name: 'Trader',     glyph: '⚖️', blurb: 'Better prices at market and with caravans.' }
+  };
+  const ROLE_LIST = Object.values(ROLES);
+  const VILLAGER_NAMES = [
+    'Bel', 'Corrin', 'Dala', 'Emmer', 'Fenn', 'Gray', 'Halt', 'Isk', 'Jorun', 'Kest',
+    'Lune', 'Marrow', 'Nen', 'Ostry', 'Pell', 'Quill', 'Rook', 'Sable', 'Tem', 'Undin',
+    'Vess', 'Wren', 'Yarrow', 'Zeb', 'Aud', 'Brill', 'Cass', 'Dorn', 'Elm', 'Fay'
+  ];
+  const VILLAGER_TRAITS = [
+    { id: 'steady',  name: 'Steady',   glyph: '🪨', blurb: 'Never leaves, whatever happens.' },
+    { id: 'quick',   name: 'Quick',    glyph: '⚡', blurb: 'Does the job half again as well.' },
+    { id: 'devout',  name: 'Devout',   glyph: '🙏', blurb: 'Prays for two.' },
+    { id: 'sour',    name: 'Sour',     glyph: '🍋', blurb: 'Spreads unrest. Useful nowhere.' },
+    { id: 'hungry',  name: 'Hungry',   glyph: '🍽️', blurb: 'Eats double.' },
+    { id: 'clever',  name: 'Clever',   glyph: '💡', blurb: 'Turns up insight now and then.' }
+  ];
+
+  /* 6. BUILDINGS --------------------------------------------------------- */
+  const BUILDINGS = {
+    well:      { id: 'well',      name: 'Well',        glyph: '🪣', ring: 0, wood: 40,  coin: 300,   mats: {},
+                 blurb: 'Plots dry out a quarter slower.', tiers: 3, effect: 'water' },
+    granary:   { id: 'granary',   name: 'Granary',     glyph: '🏚️', ring: 0, wood: 60,  coin: 500,   mats: {},
+                 blurb: 'Food spoils less and the village eats more evenly.', tiers: 3, effect: 'food' },
+    workshop:  { id: 'workshop',  name: 'Workshop',    glyph: '⚒️', ring: 1, wood: 140, coin: 2400,  mats: { clay: 3 },
+                 blurb: 'Bench work costs less focus and sells for more.', tiers: 3, effect: 'craft' },
+    watchtower:{ id: 'watchtower',name: 'Watchtower',  glyph: '🗼', ring: 1, wood: 190, coin: 3200,  mats: { fibre: 3 },
+                 blurb: 'You see further. Unknown ground reveals itself over time.', tiers: 3, effect: 'scout' },
+    kiln:      { id: 'kiln',      name: 'Kiln',        glyph: '🔥', ring: 1, wood: 160, coin: 2800,  mats: { clay: 4 },
+                 blurb: 'Makes kiln ash, and fires bricks cheaply.', tiers: 3, effect: 'kiln' },
+    infirmary: { id: 'infirmary', name: 'Beast House', glyph: '🏡', ring: 1, wood: 210, coin: 3600,  mats: { fibre: 4 },
+                 blurb: 'The creature sleeps warm. Illness is rarer and shorter.', tiers: 3, effect: 'care' },
+    dock:      { id: 'dock',      name: 'Cloud Dock',  glyph: '⛵', ring: 2, wood: 420, coin: 11000, mats: { metal: 2 },
+                 blurb: 'Caravans call more often and carry better stock.', tiers: 3, effect: 'trade' },
+    arena:     { id: 'arena',     name: 'Trial Ring',  glyph: '🏟️', ring: 2, wood: 520, coin: 15000, mats: { bone: 3 },
+                 blurb: 'Somewhere for your beast to be measured against theirs.', tiers: 3, effect: 'arena' }
+  };
+  const BUILDING_LIST = Object.values(BUILDINGS);
+
+  /* 7. CARAVANS & TRADE -------------------------------------------------- */
+  const MERCHANTS = [
+    { id: 'ossuary', name: 'The Ossuary Cart', glyph: '🦴', tone: 'grim',
+      buys: ['duskberry', 'aetherbloom'], sells: ['bone', 'glass'],
+      blurb: 'Sells what it digs up. Does not explain where.' },
+    { id: 'greenhand', name: 'Greenhand & Daughters', glyph: '🌿', tone: 'warm',
+      buys: ['sunwheat', 'glimmerroot'], sells: ['fibre', 'resin'],
+      blurb: 'Four generations of seed factors. They like a full granary.' },
+    { id: 'skyforge', name: 'The Skyforge Barge', glyph: '⚙️', tone: 'blunt',
+      buys: ['aetherbloom'], sells: ['metal', 'glass'],
+      blurb: 'Comes rarely, carries the only skymetal you can buy.' },
+    { id: 'pilgrims', name: 'The Pilgrim Train', glyph: '🕯️', tone: 'devout',
+      buys: ['glimmerroot', 'duskberry'], sells: ['clay', 'fibre'],
+      blurb: 'They are not really here to trade. They came to look at your shrine.' }
+  ];
+  const CONTRACT_KINDS = [
+    { id: 'deliver', name: 'Deliver' },
+    { id: 'craft',   name: 'Supply' },
+    { id: 'faith',   name: 'Impress' }
+  ];
+
+  /* 8. RELICS ------------------------------------------------------------ */
+  const RELICS = {
+    sunstone:   { id: 'sunstone',   name: 'Sunstone',        glyph: '🟡', rank: 1, effect: 'growth',  power: 0.14, blurb: 'Warm to the touch, always. Crops come on faster.' },
+    rainpearl:  { id: 'rainpearl',  name: 'Rain Pearl',      glyph: '🔵', rank: 1, effect: 'thirst',  power: 0.20, blurb: 'The soil around it stays dark.' },
+    boneflute:  { id: 'boneflute',  name: 'Bone Flute',      glyph: '🎼', rank: 1, effect: 'bond',    power: 0.9,  blurb: 'The creature comes when it hears this.' },
+    graveltooth:{ id: 'graveltooth',name: 'Gravel Tooth',    glyph: '🦷', rank: 2, effect: 'yield',   power: 0.16, blurb: 'Chewed by something enormous, a long time ago.' },
+    hushbell:   { id: 'hushbell',   name: 'Hush Bell',       glyph: '🔔', rank: 2, effect: 'prayer',  power: 0.25, blurb: 'It has no clapper and it rings anyway.' },
+    stormglass: { id: 'stormglass', name: 'Storm Lens',      glyph: '🔮', rank: 2, effect: 'insight', power: 0.30, blurb: 'Hold it up and the unknown looks nearer.' },
+    ironcollar: { id: 'ironcollar', name: 'Iron Collar',     glyph: '⛓️', rank: 2, effect: 'work',    power: 0.20, blurb: 'It works harder wearing this. It also likes you less.' },
+    seedark:    { id: 'seedark',    name: 'Seed Ark',        glyph: '🧬', rank: 3, effect: 'herit',   power: 0.25, blurb: 'The line carries further through this.' },
+    goldleaf:   { id: 'goldleaf',   name: 'Gold Leaf',       glyph: '🍃', rank: 3, effect: 'coin',    power: 0.25, blurb: 'Everything you sell is looked at more kindly.' },
+    kingscrest: { id: 'kingscrest', name: "King's Crest",    glyph: '👑', rank: 3, effect: 'renown',  power: 0.22, blurb: 'Worn by somebody who mattered. Now by you.' },
+    quietstone: { id: 'quietstone', name: 'Quiet Stone',     glyph: '🪨', rank: 3, effect: 'unrest',  power: 0.40, blurb: 'People settle near it and stop arguing.' },
+    longeye:    { id: 'longeye',    name: 'Long Eye',        glyph: '👁️', rank: 4, effect: 'focus',   power: 0.30, blurb: 'You get more done in a day than you should.' },
+    heartwood:  { id: 'heartwood',  name: 'Heartwood Core',  glyph: '🪵', rank: 4, effect: 'life',    power: 0.25, blurb: 'The creature lives noticeably longer.' },
+    skyanchor:  { id: 'skyanchor',  name: 'Sky Anchor',      glyph: '⚓', rank: 4, effect: 'all',     power: 0.10, blurb: 'The island stops drifting. Everything steadies.' }
+  };
+  const RELIC_LIST = Object.values(RELICS);
+
+  /* 9. TECHNIQUES -------------------------------------------------------- */
+  const TECHNIQUES = {
+    sprint:   { id: 'sprint',   name: 'Sprint',        glyph: '💨', reps: 25, stat: 'cunning', blurb: 'Crosses the island faster. More chores per day.' },
+    haul:     { id: 'haul',     name: 'Double Haul',   glyph: '🎒', reps: 30, stat: 'strength', blurb: 'Brings back two loads where it brought one.' },
+    dig:      { id: 'dig',      name: 'Deep Dig',      glyph: '🕳️', reps: 28, stat: 'strength', blurb: 'Turns up materials while foraging.' },
+    sing:     { id: 'sing',     name: 'Sing',          glyph: '🎵', reps: 22, stat: 'grace',   blurb: 'Villagers stop what they are doing. Faith rises.' },
+    graze_x:  { id: 'graze_x',  name: 'Restraint',     glyph: '🚫', reps: 35, stat: 'cunning', blurb: 'It has learned not to eat your field. Mostly.' },
+    nightwork:{ id: 'nightwork',name: 'Night Work',    glyph: '🌙', reps: 32, stat: 'strength', blurb: 'It keeps working after dark.' },
+    sense:    { id: 'sense',    name: 'Sense',         glyph: '👃', reps: 26, stat: 'cunning', blurb: 'It finds unknown ground for you.' },
+    guard:    { id: 'guard',    name: 'Guard',         glyph: '🛡️', reps: 30, stat: 'strength', blurb: 'Rivals think twice about raiding you.' },
+    show:     { id: 'show',     name: 'Showmanship',   glyph: '🎪', reps: 34, stat: 'grace',   blurb: 'Performances and trials both go far better.' }
+  };
+  const TECHNIQUE_LIST = Object.values(TECHNIQUES);
+  const TECH_SLOTS_BASE = 2;
+
+  /* 10. EVENTS ----------------------------------------------------------- */
+  const EVENTS = [
+    { id: 'stranger', title: 'A stranger at the edge', weight: 10, min: 4,
+      text: 'Someone has climbed up out of the cloud and is standing at the rim, not coming closer.',
+      choices: [
+        { label: 'Let them stay', effect: { villagers: 1, food: -30 }, note: 'One more mouth, one more pair of hands.' },
+        { label: 'Send them down', effect: { awe: 4, faith: -3 }, note: 'The village watches you do it.' },
+        { label: 'Ask what they saw', effect: { insight: 6 }, note: 'They describe islands you have not heard of.' }
+      ] },
+    { id: 'blight', title: 'Something in the soil', weight: 9, min: 8,
+      text: 'Leaves are curling on their stems and the smell is wrong.',
+      choices: [
+        { label: 'Burn the affected plots', effect: { burnPlots: 2, wood: -20 }, note: 'Brutal, and it works.' },
+        { label: 'Ride it out', effect: { soilAll: -18 }, note: 'The ground will be poorer for a while.' },
+        { label: 'Pray over it', effect: { prayer: -40, faith: 4 }, note: 'It costs prayer and they love you for it.' }
+      ] },
+    { id: 'egg', title: 'An egg in the woodland', weight: 7, min: 12,
+      text: 'Not one of yours. Warm, though.',
+      choices: [
+        { label: 'Bring it in', effect: { relicRoll: 1 }, note: 'Whatever was inside is long gone. What is left is worth keeping.' },
+        { label: 'Leave it', effect: { faith: 3, mood: 5 }, note: 'The creature seems relieved.' },
+        { label: 'Feed it to the beast', effect: { hunger: 40, kind: -8 }, note: 'It does not hesitate.' }
+      ] },
+    { id: 'pilgrims', title: 'Pilgrims below', weight: 9, min: 10,
+      text: 'A knot of people on a lower island, looking up at your shrine and arguing.',
+      choices: [
+        { label: 'Show them a miracle', effect: { prayer: -50, faith: 8, renownMul: 0.02 }, note: 'Word of it travels a long way.' },
+        { label: 'Ignore them', effect: {}, note: 'They drift off eventually.' },
+        { label: 'Frighten them off', effect: { awe: 8, faith: -5 }, note: 'They will tell that story too.' }
+      ] },
+    { id: 'raid', title: 'Something took the granary', weight: 8, min: 14,
+      text: 'The door is off its hinges and a third of the food is gone.',
+      choices: [
+        { label: 'Set the beast to guard', effect: { techReps: 'guard', vigorCost: 20 }, note: 'It sleeps by the door from now on.' },
+        { label: 'Rebuild and move on', effect: { wood: -40, food: -60 }, note: 'Nothing else to be done.' },
+        { label: 'Blame a rival, loudly', effect: { diplo: -12, renown: 40 }, note: 'It might even be true.' }
+      ] },
+    { id: 'windfall', title: 'A wreck on the rocks', weight: 8, min: 6,
+      text: 'Something came apart in the night and the pieces washed up against your island.',
+      choices: [
+        { label: 'Strip it for timber', effect: { wood: 120 }, note: 'Good dry wood.' },
+        { label: 'Look for survivors', effect: { villagers: 1, faith: 5 }, note: 'One, half-drowned and grateful.' },
+        { label: 'Salvage the fittings', effect: { mats: { metal: 2, glass: 2 } }, note: 'Better than timber, if you can use it.' }
+      ] },
+    { id: 'sickness', title: 'A cough going round', weight: 8, min: 16,
+      text: 'It started with one of the children and now half the huts have it.',
+      choices: [
+        { label: 'Spend prayer on them', effect: { prayer: -60, faith: 8 }, note: 'They recover in days.' },
+        { label: 'Quarantine the sick', effect: { unrest: 10, faith: -2 }, note: 'Cold, and effective.' },
+        { label: 'Do nothing', effect: { villagers: -1, faith: -8, unrest: 12 }, note: 'One does not get up again.' }
+      ] },
+    { id: 'challenge', title: 'A rival sends a challenge', weight: 8, min: 20,
+      text: 'A folded card, delivered by someone who will not meet your eye. Beast against beast.',
+      choices: [
+        { label: 'Accept', effect: { arena: 1 }, note: 'The Trial Ring, at once.' },
+        { label: 'Decline politely', effect: { diplo: 6, renown: -30 }, note: 'They respect the manners, not the answer.' },
+        { label: 'Send the card back torn', effect: { diplo: -15, awe: 6 }, note: 'That is an answer too.' }
+      ] },
+    { id: 'seedcache', title: 'A cache under a stone', weight: 7, min: 8,
+      text: 'Somebody buried seed here and never came back for it.',
+      choices: [
+        { label: 'Plant all of it', effect: { seedsAll: 6 }, note: 'A windfall for the season.' },
+        { label: 'Sell it on', effect: { coinMul: 0.06 }, note: 'Seed is always wanted.' },
+        { label: 'Study it', effect: { insight: 10 }, note: 'These are not varieties you know.' }
+      ] },
+    { id: 'aurora', title: 'The sky opens', weight: 6, min: 18,
+      text: 'For most of one night the whole cloud deck lights up from underneath.',
+      choices: [
+        { label: 'Hold a rite', effect: { prayer: -40, faith: 10, renownMul: 0.03 }, note: 'Everyone will remember where they were.' },
+        { label: 'Watch it with the beast', effect: { bond: 10, mood: 20 }, note: 'It does not look away once.' },
+        { label: 'Work through it', effect: { insight: 14 }, note: 'You learn more in that one night than in a month.' }
+      ] },
+    { id: 'oldbeast', title: 'Bones in the new ground', weight: 7, min: 22,
+      text: 'The terrace works have turned up a skeleton of something in your creature\'s line, but bigger.',
+      choices: [
+        { label: 'Reassemble it at the shrine', effect: { grandeurTemp: 1, awe: 6, renown: 120 }, note: 'It looms.' },
+        { label: 'Grind it for meal', effect: { mats: { bone: 5 } }, note: 'Practical.' },
+        { label: 'Bury it properly', effect: { faith: 8, insight: 8 }, note: 'The village insists, and they are not wrong.' }
+      ] },
+    { id: 'thief', title: 'Somebody has been at the stores', weight: 7, min: 24,
+      text: 'The count is short and it has been short for a while.',
+      choices: [
+        { label: 'Find them and exile them', effect: { villagers: -1, unrest: -15, awe: 4 }, note: 'The rest work harder.' },
+        { label: 'Say nothing, fix the lock', effect: { wood: -20, unrest: 5 }, note: 'They know that you know.' },
+        { label: 'Forgive it publicly', effect: { faith: 10, food: -50 }, note: 'A risk, and it lands.' }
+      ] },
+    { id: 'inspector', title: 'The Register sends an assessor', weight: 6, min: 26,
+      text: 'A small person with a very long list wants to walk your island.',
+      choices: [
+        { label: 'Show them everything', effect: { renownMul: 0.05 }, note: 'Accurate, and it helps.' },
+        { label: 'Show them the good parts', effect: { renown: 100, diplo: -6 }, note: 'They notice, but they write it down anyway.' },
+        { label: 'Refuse entry', effect: { awe: 10, renownMul: -0.02 }, note: 'That goes in the entry too.' }
+      ] },
+    { id: 'orphan', title: 'A whelp not of your line', weight: 6, min: 30,
+      text: 'It has been living in the woodland for some time and it is not afraid of you.',
+      choices: [
+        { label: 'Take it in as a mate', effect: { mate: 1 }, note: 'New blood for the line.' },
+        { label: 'Drive it off', effect: { kind: -6, awe: 3 }, note: 'Your creature watches it go.' },
+        { label: 'Let it stay wild', effect: { faith: 4, insight: 5 }, note: 'It keeps its distance and eats the pests.' }
+      ] },
+    { id: 'drought', title: 'The springs are down', weight: 7, min: 15,
+      text: 'What comes up is a trickle, and it tastes of stone.',
+      choices: [
+        { label: 'Ration the water', effect: { waterAll: -30, unrest: 8 }, note: 'Everything suffers a little.' },
+        { label: 'Buy water from below', effect: { coinMul: -0.10 }, note: 'Expensive and immediate.' },
+        { label: 'Send the beast to dig', effect: { techReps: 'dig', vigorCost: 30, waterAll: 40 }, note: 'It finds something.' }
+      ] },
+    { id: 'gift', title: 'An unmarked gift', weight: 6, min: 12,
+      text: 'A crate at the rim with no note and nobody nearby.',
+      choices: [
+        { label: 'Open it', effect: { relicRoll: 1 }, note: 'Somebody wanted you to have this.' },
+        { label: 'Push it off the edge', effect: { awe: 5 }, note: 'You are not curious enough to risk it.' },
+        { label: 'Give it to the village', effect: { faith: 9, coinMul: 0.02 }, note: 'They divide it fairly, more or less.' }
+      ] }
+  ];
+
+  /* 11. TITLES ----------------------------------------------------------- */
+  const TITLES = [
+    { id: 'none',      name: '—',                  need: g => true,                             blurb: 'No title at all.' },
+    { id: 'grower',    name: 'the Grower',         need: g => g.stats.harvests >= 300,          bonus: { yield: 0.06 } },
+    { id: 'patient',   name: 'the Patient',        need: g => (g.gens | 0) >= 4,                bonus: { herit: 0.10 } },
+    { id: 'openhand',  name: 'the Open-Handed',    need: g => g.village.faith >= 85,            bonus: { prayer: 0.12 } },
+    { id: 'dreadful',  name: 'the Dreadful',       need: g => g.village.awe >= 70,              bonus: { awe: 0.15 } },
+    { id: 'curious',   name: 'the Curious',        need: g => Object.keys(g.discovered).length >= 10, bonus: { insight: 0.15 } },
+    { id: 'builder',   name: 'the Builder',        need: g => (g.ring | 0) >= 2,                bonus: { buildCost: -0.10 } },
+    { id: 'crowned',   name: 'the Crowned',        need: g => g.stats.festivalWins >= 3,        bonus: { renown: 0.08 } },
+    { id: 'unbroken',  name: 'the Unbroken',       need: g => g.day >= 100,                     bonus: { focus: 0.10 } },
+    { id: 'wright',    name: 'the Wright',         need: g => Object.keys(g.recipes).length >= 10, bonus: { craft: 0.15 } },
+    { id: 'ancient',   name: 'of the Long Line',   need: g => (g.evo | 0) >= 3,                 bonus: { all: 0.05 } },
+    { id: 'ascendant', name: 'Ascendant',          need: g => g.lastStanding === 1,             bonus: { renown: 0.12 } }
+  ];
+
+  /* 12. FISH (mini-game) ------------------------------------------------- */
+  const FISH = [
+    { id: 'mote',     name: 'Cloud Mote',    glyph: '🐟', rarity: 1, coin: 30,   feed: 8,  ring: 0, blurb: 'Barely a fish. Barely anything.' },
+    { id: 'skimmer',  name: 'Skimmer',       glyph: '🐠', rarity: 1, coin: 60,   feed: 12, ring: 0, blurb: 'Rides the updraught in shoals.' },
+    { id: 'lantern',  name: 'Lanternfish',   glyph: '🎏', rarity: 2, coin: 150,  feed: 18, ring: 0, night: true, blurb: 'Only rises after dark.' },
+    { id: 'thorn',    name: 'Thornback',     glyph: '🐡', rarity: 2, coin: 240,  feed: 22, ring: 1, blurb: 'Fights the whole way up.' },
+    { id: 'glasseye', name: 'Glass-Eye',     glyph: '🐳', rarity: 3, coin: 520,  feed: 30, ring: 1, mat: 'glass', blurb: 'Its eyes are worth more than the rest of it.' },
+    { id: 'drifter',  name: 'Grey Drifter',  glyph: '🦈', rarity: 3, coin: 900,  feed: 40, ring: 2, blurb: 'Big enough to feed the village for a day.' },
+    { id: 'ironjaw',  name: 'Ironjaw',       glyph: '🦭', rarity: 4, coin: 1900, feed: 50, ring: 2, mat: 'metal', blurb: 'There is skymetal in its teeth.' },
+    { id: 'skywhale', name: 'Sky Calf',      glyph: '🐋', rarity: 5, coin: 5200, feed: 90, ring: 3, blurb: 'You should not have been able to land this.' }
+  ];
+
+  /* 13. CHANTS (mini-game) ----------------------------------------------- */
+  const CHANTS = [
+    { id: 'growth',  name: 'Chant of Greening', glyph: '🌿', len: 4, prayer: 25, ring: 0,
+      blurb: 'Every growing plot jumps forward.' },
+    { id: 'calm',    name: 'Chant of Stillness',glyph: '🕊️', len: 4, prayer: 30, ring: 0,
+      blurb: 'Unrest falls away and the creature settles.' },
+    { id: 'plenty',  name: 'Chant of Plenty',   glyph: '🌾', len: 5, prayer: 45, ring: 1,
+      blurb: 'The granary fills and faith rises.' },
+    { id: 'fear',    name: 'Chant of the Deep', glyph: '💀', len: 5, prayer: 50, ring: 1,
+      blurb: 'Awe floods in. They will not sleep well.' },
+    { id: 'insight', name: 'Chant of Seeing',   glyph: '👁️', len: 6, prayer: 70, ring: 2,
+      blurb: 'The unknown gives a little of itself up.' },
+    { id: 'renewal', name: 'Chant of Renewal',  glyph: '♻️', len: 6, prayer: 90, ring: 2,
+      blurb: 'Soil across the whole island comes back to life.' }
+  ];
+  const CHANT_TONES = ['◆', '●', '▲', '■', '★'];
+
+  /* 14. PRESTIGE --------------------------------------------------------- */
+  const ASCEND_MIN_RENOWN = 40000;
+  const BOONS = [
+    { id: 'seedstock',  name: 'Kept Seed',       glyph: '🌾', cost: 1, blurb: 'Begin with 40 of every seed you had unlocked.' },
+    { id: 'inheritance',name: 'Inheritance',     glyph: '🪙', cost: 1, blurb: 'Begin with 2,000 coin and 150 wood.' },
+    { id: 'memory',     name: 'Ancestral Memory',glyph: '🧠', cost: 2, blurb: 'The new line begins with half the ingraining of the old.' },
+    { id: 'earlyweb',   name: 'Old Instincts',   glyph: '🕸️', cost: 2, blurb: 'Keep the first four neurons you had grown.' },
+    { id: 'wideeye',    name: 'Wide Eye',        glyph: '👁️', cost: 2, blurb: 'Insight from every source is a third higher, permanently.' },
+    { id: 'greenthumb', name: 'Green Thumb',     glyph: '🌱', cost: 3, blurb: 'Yields are a quarter higher, permanently.' },
+    { id: 'longline',   name: 'The Longer Line', glyph: '🧬', cost: 3, blurb: 'Start at the evolution tier you reached, minus one.' },
+    { id: 'standing',   name: 'Standing Order',  glyph: '📜', cost: 4, blurb: 'Renown accrues 40% faster, permanently.' }
+  ];
+
+  /* 15. DIPLOMACY -------------------------------------------------------- */
+  const DIPLO_ACTIONS = [
+    { id: 'gift',    name: 'Send a gift',    glyph: '🎁', coin: g => 400 + g.day * 30, opinion: 14,
+      blurb: 'Crude, effective, and everybody knows what it is.' },
+    { id: 'praise',  name: 'Praise them publicly', glyph: '📣', renown: g => 60, opinion: 9,
+      blurb: 'Costs you a little standing and buys a lot of goodwill.' },
+    { id: 'mock',    name: 'Mock them',      glyph: '😂', opinion: -18, renown: g => -20, awe: 3,
+      blurb: 'Satisfying. The Register notices the noise.' },
+    { id: 'sabotage',name: 'Send the beast by night', glyph: '🌑', opinion: -30, vigor: 25,
+      blurb: 'Steals a slice of their standing, if it is not caught.' }
+  ];
+
+  /* 16. OATHS (rolling objectives) --------------------------------------- */
+  const OATH_TEMPLATES = [
+    { id: 'harvest', name: 'Bring in {n} crops',       kind: 'harvests', base: 30, scale: 4,  renown: 40, insight: 2 },
+    { id: 'sell',    name: 'Sell {n} goods',           kind: 'sold',     base: 25, scale: 3,  renown: 35, insight: 2 },
+    { id: 'praise',  name: 'Praise the creature {n} times', kind: 'praised', base: 6, scale: 0.5, renown: 45, insight: 3 },
+    { id: 'craft',   name: 'Make {n} things at the bench', kind: 'crafted', base: 4, scale: 0.4, renown: 50, insight: 3 },
+    { id: 'examine', name: 'Examine {n} unknown things',kind: 'found',    base: 1,  scale: 0.08, renown: 60, insight: 4 },
+    { id: 'fish',    name: 'Land {n} fish',            kind: 'fished',   base: 5,  scale: 0.5, renown: 45, insight: 3 },
+    { id: 'chores',  name: 'Have the creature do {n} chores', kind: 'chores', base: 20, scale: 2, renown: 55, insight: 3 }
+  ];
+
+  SW.content2 = {
+    SEASON_LEN, SEASONS, WEATHER, WEATHER_LIST, SOIL, FERTILISERS, FERTILISER_LIST,
+    AILMENTS, AILMENT_LIST, REMEDIES, ROLES, ROLE_LIST, VILLAGER_NAMES, VILLAGER_TRAITS,
+    BUILDINGS, BUILDING_LIST, MERCHANTS, CONTRACT_KINDS, RELICS, RELIC_LIST,
+    TECHNIQUES, TECHNIQUE_LIST, TECH_SLOTS_BASE, EVENTS, TITLES, FISH, CHANTS, CHANT_TONES,
+    ASCEND_MIN_RENOWN, BOONS, DIPLO_ACTIONS, OATH_TEMPLATES
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
 /* Skyward Reach — game state shape, new-game construction, save migration. */
 (function (SW) {
   'use strict';
@@ -1036,7 +1501,10 @@ tr.you .rg-place { color: var(--gold); }
       crop: null,
       growth: 0,      // ticks accumulated
       water: 0,       // 0..100
-      rot: 0          // wither pressure 0..100
+      rot: 0,         // wither pressure 0..100
+      soil: 100,      // richness; every harvest takes some out
+      last: null,     // last crop sown here, for rotation
+      rotated: false
     };
   }
 
@@ -1062,6 +1530,10 @@ tr.you .rg-place { color: var(--gold); }
       age: 0,          // days lived
       gen: 1,          // which generation of the line this is
       ingrained: {},   // actId -> 0..1, the only thing that outlives the animal
+      ailment: null,   // current illness id
+      ailDays: 0,
+      techniques: {},  // techId -> repetitions done
+      hybrid: null,    // second lineage, if it is a cross
       // transient-ish, but persisted so a reload doesn't eat a pending praise
       act: null,       // { id, tick, target, resolved }
       actCooldown: 0,
@@ -1125,6 +1597,45 @@ tr.you .rg-place { color: var(--gold); }
       listen: null,
       listenAt: -9999,
 
+      // weather and season
+      weather: { today: 'clear', tomorrow: 'clear' },
+      // ground
+      // people and structures
+      people: [],            // named villagers with roles and traits
+      buildings: {},         // buildingId -> tier
+      // trade and standing
+      caravan: null,
+      nextCaravan: 4,
+      merchantRep: {},
+      diplo: {},
+      // relics, titles
+      relics: {},            // relicId -> day found
+      equipped: [],
+      title: 'none',
+      titlesSeen: {},
+      // techniques
+      equippedTech: [],
+      mate: null,
+      mateOffer: null,
+      pedigree: [],
+      inbreeding: 0,
+      // events and oaths
+      event: null,
+      eventSeen: {},
+      eventLog: [],
+      oaths: [],
+      oathDay: 0,
+      // second wave of mini-games
+      fishing: null,
+      chant: null,
+      fish: {},
+      // arena
+      arenaChallenge: false,
+      arenaResult: null,
+      grandeurBonus: 0,
+      // ascension
+      prestige: { points: 0, boons: {}, runs: 0, best: 0, bestDay: 0 },
+
       creature: newCreature(lineageId, creatureName),
 
       rivals: rivals,
@@ -1134,7 +1645,8 @@ tr.you .rg-place { color: var(--gold); }
       festival: { nextDay: 5, index: 0, lastResult: null },
       log: [],
       chatter: [],
-      stats: { harvests: 0, sold: 0, coinEarned: 0, miracles: 0, festivals: 0, festivalWins: 0, days: 0 },
+      stats: { harvests: 0, sold: 0, coinEarned: 0, miracles: 0, festivals: 0, festivalWins: 0, days: 0,
+               fished: 0, chants: 0, arenaWins: 0, arenaLosses: 0, praisedTotal: 0, choresTotal: 0 },
       fx: [],
       __savedAt: Date.now()
     };
@@ -1144,6 +1656,10 @@ tr.you .rg-place { color: var(--gold); }
   function startGame(lineageId, creatureName, godName) {
     const g = newGame(lineageId, creatureName, godName);
     SW.discovery.spawnRing(g, 0);
+    g.weather.today = SW.world.rollWeather(g);
+    g.weather.tomorrow = SW.world.rollWeather(g);
+    SW.world.syncPeople(g);
+    SW.world.rollOaths(g);
     return g;
   }
 
@@ -1169,7 +1685,11 @@ tr.you .rg-place { color: var(--gold); }
     const slots = C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)].plots;
     for (let i = g.plots.length + g.lockedPlots.length; i < slots; i++) g.lockedPlots.push(makePlot(i));
     for (let r = 0; r <= (g.ring | 0); r++) SW.discovery.spawnRing(g, r);
-    g.listen = null;
+    g.listen = null; g.fishing = null; g.chant = null;
+    for (const p of g.plots.concat(g.lockedPlots)) if (p.soil === undefined) p.soil = 100;
+    if (!g.weather || !g.weather.today) g.weather = { today: 'clear', tomorrow: 'clear' };
+    SW.world.syncPeople(g);
+    if (!g.oaths || !g.oaths.length) SW.world.rollOaths(g);
     g.fx = [];
     return g;
   }
@@ -1186,6 +1706,7 @@ tr.you .rg-place { color: var(--gold); }
 (function (SW) {
   'use strict';
   const C = SW.content;
+  const C2 = SW.content2;
   const { clamp, chance } = SW.core;
 
   // --- queries -----------------------------------------------------------
@@ -1242,6 +1763,9 @@ tr.you .rg-place { color: var(--gold); }
     if (!plot || plot.state !== 'tilled') return false;
     if ((g.seeds[cropId] | 0) <= 0) return false;
     g.seeds[cropId]--;
+    // Sowing something different from last time is worth a real bonus.
+    plot.rotated = !!(plot.last && plot.last !== cropId);
+    plot.last = cropId;
     plot.state = 'growing';
     plot.crop = cropId;
     plot.growth = 0;
@@ -1264,7 +1788,10 @@ tr.you .rg-place { color: var(--gold); }
     if (!plot || plot.state !== 'ripe') return null;
     const crop = C.CROPS[plot.crop];
     const spoil = plot.rot > 55 ? 0.5 : 1;
-    const amount = Math.max(1, Math.round(crop.yield * (bonus || 1) * spoil * SW.discovery.mods.yield(g)));
+    const amount = Math.max(1, Math.round(
+      crop.yield * (bonus || 1) * spoil * SW.discovery.mods.yield(g) * SW.world.soilYield(g, plot)));
+    // Every harvest takes something out of the ground.
+    plot.soil = clamp(SW.world.soilOf(plot) - C2.SOIL.drainPerHarvest, 0, C2.SOIL.max);
     g.stock[crop.id] = (g.stock[crop.id] | 0) + amount;
     g.stats.harvests += amount;
     SW.discovery.firstTime(g, 'crop:' + crop.id, 3, `bringing in ${crop.name}`);
@@ -1293,15 +1820,15 @@ tr.you .rg-place { color: var(--gold); }
     for (const p of g.plots) {
       if (p.state === 'growing' || p.state === 'ripe') {
         const crop = C.CROPS[p.crop];
-        p.water = clamp(p.water - crop.thirst * SW.discovery.mods.thirst(g) * dt, 0, 100);
+        p.water = clamp(p.water - crop.thirst * SW.boost.thirst(g) * dt, 0, 100);
         if (p.state === 'growing') {
           // Dry soil stalls growth rather than stopping it dead.
-          const rate = (p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1) * SW.discovery.mods.growth(g);
+          const rate = (p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1) * SW.boost.get(g, 'growth');
           p.growth += rate * dt;
           if (p.growth >= crop.growTicks) { p.state = 'ripe'; p.growth = crop.growTicks; }
         } else {
           // Ripe crops left in the field start to go over.
-          p.rot = clamp(p.rot + 0.55 * dt, 0, 100);
+          p.rot = clamp(p.rot + 0.55 * SW.boost.get(g, 'rotUp') * dt, 0, 100);
         }
         if (p.water <= 0) p.rot = clamp(p.rot + 0.8 * dt, 0, 100);
         if (p.rot >= 100 && chance(0.05 * dt)) {
@@ -1328,7 +1855,7 @@ tr.you .rg-place { color: var(--gold); }
     const have = g.stock[cropId] | 0;
     const n = Math.min(have, count);
     if (n <= 0) return 0;
-    const gain = price(g, cropId) * n;
+    const gain = Math.round(price(g, cropId) * n * SW.boost.get(g, 'coin'));
     g.stock[cropId] -= n;
     g.res.coin += gain;
     g.stats.sold += n;
@@ -1478,6 +2005,10 @@ tr.you .rg-place { color: var(--gold); }
       m *= 1 + clamp(c.diligence / 100, -0.7, 1) * 0.9;
     }
     if (actId === 'perform') m *= 1 + c.stats.grace / 30;
+    if (actId === 'graze' && SW.beast.hasTech(g, 'graze_x')) m *= 0.35;
+    // At night an untrained beast winds down; a night worker does not.
+    const night = (g.dayTick / C.TICKS_PER_DAY) > 0.72;
+    if (night && a.useful && !SW.beast.hasTech(g, 'nightwork')) m *= 0.55;
 
     switch (c.leash) {
       case 'compassion':
@@ -1539,7 +2070,7 @@ tr.you .rg-place { color: var(--gold); }
       }
       case 'harvest': {
         const p = g.plots.find(p => p.i === target.i);
-        const r = F.harvest(g, p, 0.85 + c.stats.strength / 40);
+        const r = F.harvest(g, p, (0.85 + c.stats.strength / 40) * (SW.beast.hasTech(g, 'haul') ? 1.35 : 1));
         ok = !!r;
         if (ok) { pop(g, '🧺+' + r.amount, 'good'); emit(g, `${name} brings in ${r.amount} ${r.crop.name}.`); }
         break;
@@ -1558,7 +2089,13 @@ tr.you .rg-place { color: var(--gold); }
         break;
       }
       case 'forage': {
-        const n = 1 + Math.floor(c.stats.strength / 7);
+        let n = 1 + Math.floor(c.stats.strength / 7);
+        if (SW.beast.hasTech(g, 'haul')) n *= 2;
+        if (SW.beast.hasTech(g, 'dig') && chance(0.35)) {
+          const m = SW.core.pick(g.ring >= 2 ? ['fibre', 'clay', 'resin', 'bone', 'glass'] : ['fibre', 'clay']);
+          g.mats[m] = (g.mats[m] | 0) + 1;
+          pop(g, C.MATERIALS[m].glyph, 'good');
+        }
         g.res.wood += n;
         pop(g, '🪵+' + n, 'good');
         emit(g, `${name} drags ${n} wood back from the treeline.`);
@@ -1577,13 +2114,13 @@ tr.you .rg-place { color: var(--gold); }
       }
       case 'play': {
         c.mood = clamp(c.mood + 9, 0, 100);
-        g.village.faith = clamp(g.village.faith + 0.9, 0, 100);
+        g.village.faith = clamp(g.village.faith + 0.9 * (SW.beast.hasTech(g, 'sing') ? 2.2 : 1), 0, 100);
         pop(g, '🎈', 'good');
         emit(g, `${name} plays with the village children.`);
         break;
       }
       case 'perform': {
-        const gain = 1 + c.stats.grace / 5 + c.bond / 40;
+        const gain = (1 + c.stats.grace / 5 + c.bond / 40) * (SW.beast.hasTech(g, 'show') ? 2 : 1);
         g.res.renown += gain;
         g.village.faith = clamp(g.village.faith + 0.6, 0, 100);
         c.mood = clamp(c.mood + 6, 0, 100);
@@ -1632,6 +2169,7 @@ tr.you .rg-place { color: var(--gold); }
 
     if (!ok) return false;
     SW.discovery.firstTime(g, 'act:' + actId, 2, `watching it ${a.name}`);
+    SW.beast.onAct(g, actId);
 
     // Cost, drift, and slow physical growth.
     c.vigor = clamp(c.vigor - a.vigor, 0, 100);
@@ -1650,7 +2188,7 @@ tr.you .rg-place { color: var(--gold); }
   function beginAct(g) {
     const c = g.creature;
     const chosen = chooseAct(g);
-    const quick = 1 / ((0.8 + c.stats.cunning / 45) * traits(g).speed);
+    const quick = 1 / ((0.8 + c.stats.cunning / 45) * traits(g).speed * SW.beast.workFactor(g));
     c.act = {
       id: chosen.id,
       anchor: chosen.target,
@@ -1847,7 +2385,7 @@ tr.you .rg-place { color: var(--gold); }
 
   // --- age ---------------------------------------------------------------
   function lifespan(g) {
-    return C.LIFESPAN * (g.neurons && g.neurons.lineage ? 1.15 : 1);
+    return C.LIFESPAN * SW.boost.get(g, 'life');
   }
 
   function ageOf(g) {
@@ -1937,7 +2475,7 @@ tr.you .rg-place { color: var(--gold); }
   function breed(g, natural) {
     const parent = g.creature;
     const L = C.LINEAGES[parent.lineage];
-    const heritable = (g.neurons && g.neurons.lineage ? 0.62 : 0.38) * (natural ? 0.45 : 1);
+    const heritable = 0.38 * SW.boost.get(g, 'herit') * (natural ? 0.45 : 1);
     const carryIngrained = (g.neurons && g.neurons.lineage ? 0.5 : 0.32) * (natural ? 0.5 : 1);
 
     const child = SW.state.newCreature(parent.lineage, parent.name);
@@ -1966,7 +2504,18 @@ tr.you .rg-place { color: var(--gold); }
     child.name = parent.name;
     child.x = parent.x; child.y = parent.y; child.tx = parent.x; child.ty = parent.y;
 
+    // Technique repetitions are muscle memory; some of it carries, scaled by
+    // the same heritability that governs behaviour.
+    child.techniques = {};
+    for (const t in (parent.techniques || {})) {
+      child.techniques[t] = Math.floor(parent.techniques[t] * clamp(heritable * 1.4, 0.2, 0.95));
+    }
+    SW.beast.applyMate(g, child);
+    // Lifetime counters survive the animal even though the animal does not.
+    g.stats.praisedTotal = (g.stats.praisedTotal || 0) + parent.praised;
+    g.stats.choresTotal = (g.stats.choresTotal || 0) + parent.chores;
     g.creature = child;
+    g.equippedTech = [];
     g.gens = (g.gens || 0) + 1;
 
     const reward = Math.round(90 * Math.pow(g.gens, 1.25));
@@ -2176,18 +2725,19 @@ tr.you .rg-place { color: var(--gold); }
     return true;
   }
 
-  /* Modifiers the rest of the sim asks about, all in one place. */
+  /* Kept as the old call surface; every answer now comes from SW.boost so
+   * there is exactly one place that knows what multiplies what. */
   const mods = {
-    thirst: g => (g.effects.thirst ? 0.75 : 1),
-    growth: g => (g.effects.growth ? 1.15 : 1),
-    eat: g => (g.effects.granary ? 0.85 : 1),
-    prayer: g => (g.effects.prayer ? 1.25 : 1),
-    yield: g => (1 + SW.lineage.bonus(g, 'yield')) * (g.neurons.husbandry ? 1.25 : 1),
-    focusRegen: g => (g.neurons.stamina ? 1.4 : 1),
-    learn: g => (g.neurons.patience ? 1.3 : 1),
-    forget: g => (g.neurons.memory ? 0.5 : 1),
-    renown: g => (1 + SW.lineage.bonus(g, 'renown')) * (g.neurons.devotion ? 1.3 : 1),
-    craft: g => (g.neurons.craftsman ? 1.6 : 1)
+    thirst: g => SW.boost.thirst(g),
+    growth: g => SW.boost.get(g, 'growth'),
+    eat: g => SW.boost.foodUse(g),
+    prayer: g => SW.boost.get(g, 'prayer'),
+    yield: g => SW.boost.get(g, 'yield'),
+    focusRegen: g => SW.boost.get(g, 'focus'),
+    learn: g => SW.boost.get(g, 'learn'),
+    forget: g => SW.boost.forget(g),
+    renown: g => SW.boost.get(g, 'renown'),
+    craft: g => SW.boost.get(g, 'craft')
   };
 
   SW.discovery = {
@@ -2242,7 +2792,7 @@ tr.you .rg-place { color: var(--gold); }
 
   function startListen(g) {
     if (!listenUnlocked(g)) { SW.ui.log(g, 'You do not know how to listen yet.', 'warn'); return false; }
-    if (g.listen) return false;
+    if (g.listen || g.fishing || g.chant) return false;
     if (listenCooldown(g) > 0) {
       SW.ui.log(g, `Too soon. The island is still ringing (${Math.ceil(listenCooldown(g))}s).`, 'warn');
       return false;
@@ -2294,7 +2844,7 @@ tr.you .rg-place { color: var(--gold); }
       case 'insight': {
         // The only repeatable source of Insight in the game, so it has to be
         // worth stopping work for — and worth more the further out you build.
-        const n = Math.max(1, Math.round((2 + g.ring * 2) * D.insightMul(g)));
+        const n = Math.max(1, Math.round((2 + g.ring * 2) * D.insightMul(g) * SW.boost.get(g, 'listen')));
         g.insight += n; t.insight += n;
         break;
       }
@@ -2304,7 +2854,7 @@ tr.you .rg-place { color: var(--gold); }
         break;
       }
       case 'coin': {
-        const n = Math.round(55 * (1 + g.day * 0.06) * (1 + g.ring * 0.5));
+        const n = Math.round(55 * (1 + g.day * 0.06) * (1 + g.ring * 0.5) * SW.boost.get(g, 'listen') * SW.boost.get(g, 'coin'));
         g.res.coin += n; t.coin += n;
         break;
       }
@@ -2415,6 +2965,8 @@ tr.you .rg-place { color: var(--gold); }
       g.recipes[r.id] = g.day;
       const ins = Math.max(1, Math.round(r.insight * D.insightMul(g)));
       g.insight += ins;
+      // The hardest pairings turn up something older than the materials.
+      if (r.coin >= 1400 && chance(0.28)) SW.relics.grant(g);
       SW.ui.log(g, `${r.glyph} ${r.name}. You had not made one before. +${ins} insight, +${fmt(value)} coin.`, 'great');
       g.fx.push({ at: 'banner', text: r.glyph + ' ' + r.name, life: 3.5, t: 0 });
     } else {
@@ -2448,11 +3000,1370 @@ tr.you .rg-place { color: var(--gold); }
 
 </script>
 <script>
+/* Skyward Reach — one place that answers "how much of X do I get".
+ *
+ * Nine systems now multiply the same handful of numbers. Rather than scatter
+ * `if (neuron) ... if (relic) ...` through the simulation, every source
+ * registers here and the rest of the game asks a single question.
+ *
+ * Keys are multipliers around 1.0 unless noted.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp } = SW.core;
+
+  /* Relic effect id -> boost key. */
+  const RELIC_KEY = {
+    growth: 'growth', thirst: 'thirstDown', bond: 'bond', yield: 'yield',
+    prayer: 'prayer', insight: 'insight', work: 'work', herit: 'herit',
+    coin: 'coin', renown: 'renown', unrest: 'unrestDown', focus: 'focus',
+    life: 'life', all: 'all'
+  };
+
+  const seasonOf = g => C2.SEASONS[Math.floor(((g.day - 1) % (C2.SEASON_LEN * C2.SEASONS.length)) / C2.SEASON_LEN)];
+  const weatherOf = g => C2.WEATHER[(g.weather && g.weather.today) || 'clear'];
+
+  function titleOf(g) {
+    return C2.TITLES.find(t => t.id === (g.title || 'none')) || C2.TITLES[0];
+  }
+
+  function buildingTier(g, id) { return (g.buildings && g.buildings[id]) | 0; }
+
+  function roleCount(g, roleId) {
+    if (!g.people) return 0;
+    let n = 0;
+    for (const p of g.people) if (p.role === roleId) n += (p.trait === 'quick' ? 1.5 : 1);
+    return n;
+  }
+
+  /* The big one. Every multiplier in the game resolves through here. */
+  function get(g, key) {
+    let m = 1;
+    const season = seasonOf(g), weather = weatherOf(g);
+
+    // --- island features (permanent, from examining the ground)
+    if (key === 'thirstDown' && g.effects.thirst) m *= 1.25;
+    if (key === 'growth' && g.effects.growth) m *= 1.15;
+    if (key === 'foodDown' && g.effects.granary) m *= 1.18;
+    if (key === 'prayer' && g.effects.prayer) m *= 1.25;
+
+    // --- neurons
+    const n = g.neurons || {};
+    if (key === 'yield' && n.husbandry) m *= 1.25;
+    if (key === 'focus' && n.stamina) m *= 1.4;
+    if (key === 'learn' && n.patience) m *= 1.3;
+    if (key === 'forgetDown' && n.memory) m *= 2;
+    if (key === 'herit' && n.lineage) m *= 1.5;
+    if (key === 'life' && n.lineage) m *= 1.15;
+    if (key === 'renown' && n.devotion) m *= 1.3;
+    if (key === 'craft' && n.craftsman) m *= 1.6;
+    if (key === 'insight' && n.sight) m *= 1.4;
+    if (key === 'buildCostDown' && n.frontier) m *= 1.49;
+
+    // --- the line's evolutions
+    const evoKey = { yield: 'yield', insight: 'insight', renown: 'renown', work: 'speed', life: 'life' }[key];
+    if (evoKey) m *= 1 + SW.lineage.bonus(g, evoKey);
+
+    // --- season and weather
+    if (key === 'growth') m *= season.growth * weather.growth;
+    if (key === 'thirstUp') m *= season.thirst * weather.thirst;
+    if (key === 'coin') m *= season.feed;
+    if (key === 'faith') m *= season.faith * (weather.faith || 1);
+    if (key === 'awe') m *= weather.awe || 1;
+    if (key === 'prayer') m *= weather.prayer || 1;
+    if (key === 'insight') m *= weather.insight || 1;
+    if (key === 'listen') m *= weather.listen || 1;
+    if (key === 'rotUp') m *= weather.rot || 1;
+    if (key === 'vigor') m *= weather.vigor || 1;
+
+    // --- buildings
+    if (key === 'thirstDown') m *= 1 + buildingTier(g, 'well') * 0.12;
+    if (key === 'foodDown') m *= 1 + buildingTier(g, 'granary') * 0.10;
+    if (key === 'craft') m *= 1 + buildingTier(g, 'workshop') * 0.18;
+    if (key === 'insight') m *= 1 + buildingTier(g, 'watchtower') * 0.10;
+    if (key === 'careUp') m *= 1 + buildingTier(g, 'infirmary') * 0.34;
+    if (key === 'trade') m *= 1 + buildingTier(g, 'dock') * 0.22;
+
+    // --- villager roles
+    if (key === 'buildCostDown') m *= 1 + roleCount(g, 'mason') * 0.05;
+    if (key === 'careUp') m *= 1 + roleCount(g, 'herbalist') * 0.20;
+    if (key === 'prayer') m *= 1 + roleCount(g, 'acolyte') * 0.08;
+    if (key === 'faith') m *= 1 + roleCount(g, 'acolyte') * 0.05;
+    if (key === 'coin') m *= 1 + roleCount(g, 'trader') * 0.06;
+    if (key === 'trade') m *= 1 + roleCount(g, 'trader') * 0.10;
+
+    // --- equipped relics
+    if (g.equipped) {
+      for (const id of g.equipped) {
+        const r = C2.RELICS[id];
+        if (!r) continue;
+        if (r.effect === 'all') m *= 1 + r.power;
+        else if (RELIC_KEY[r.effect] === key) m *= 1 + r.power;
+      }
+    }
+
+    // --- title
+    const t = titleOf(g);
+    if (t.bonus) {
+      if (t.bonus.all) m *= 1 + t.bonus.all;
+      if (t.bonus[key] !== undefined) m *= 1 + t.bonus[key];
+      if (key === 'buildCostDown' && t.bonus.buildCost) m *= 1 - t.bonus.buildCost;
+    }
+
+    // --- prestige boons, which outlive everything
+    const b = (g.prestige && g.prestige.boons) || {};
+    if (key === 'insight' && b.wideeye) m *= 1.33;
+    if (key === 'yield' && b.greenthumb) m *= 1.25;
+    if (key === 'renown' && b.standing) m *= 1.4;
+
+    return m;
+  }
+
+  /* Thirst and food are "lower is better", so they get their own reducers. */
+  const thirst = g => get(g, 'thirstUp') / get(g, 'thirstDown');
+  const foodUse = g => 1 / get(g, 'foodDown');
+  const forget = g => 1 / get(g, 'forgetDown');
+  const buildCost = g => 1 / get(g, 'buildCostDown');
+  const unrest = g => 1 / get(g, 'unrestDown');
+
+  SW.boost = { get, seasonOf, weatherOf, titleOf, buildingTier, roleCount, thirst, foodUse, forget, buildCost, unrest };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — weather, soil, villagers, buildings and island events.
+ * The layer between the sky and the ground.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp, rnd, rndInt, pick, chance, fmt, hashNoise } = SW.core;
+
+  /* ----------------------------------------------------------- 1. weather */
+  function rollWeather(g) {
+    // The Still suppresses violent weather; auroral nights are rarer early.
+    const season = SW.boost.seasonOf(g);
+    let total = 0;
+    const opts = C2.WEATHER_LIST.map(w => {
+      let wt = w.weight;
+      if (season.id === 'still' && (w.id === 'swelter' || w.id === 'drought')) wt *= 0.2;
+      if (season.id === 'high' && (w.id === 'drought' || w.id === 'swelter')) wt *= 2.2;
+      if (season.id === 'greening' && w.id === 'downpour') wt *= 1.8;
+      if (w.id === 'auroral' && g.day < 12) wt *= 0.25;
+      total += wt;
+      return { w, wt };
+    });
+    let r = Math.random() * total;
+    for (const o of opts) { r -= o.wt; if (r <= 0) return o.w.id; }
+    return 'clear';
+  }
+
+  function advanceWeather(g) {
+    if (!g.weather) g.weather = { today: 'clear', tomorrow: rollWeather(g) };
+    g.weather.today = g.weather.tomorrow;
+    g.weather.tomorrow = rollWeather(g);
+    const w = C2.WEATHER[g.weather.today];
+    // Downpour fills every plot; a gale rips at ripe ones.
+    if (w.water) for (const p of g.plots) if (p.crop) p.water = 100;
+    SW.ui.log(g, `${w.glyph} ${w.name}. ${w.blurb}`, w.id === 'auroral' ? 'great' : 'info');
+    if (w.mood) g.creature.mood = clamp(g.creature.mood + w.mood, 0, 100);
+  }
+
+  function seasonProgress(g) {
+    return ((g.day - 1) % C2.SEASON_LEN) / C2.SEASON_LEN;
+  }
+  function daysToSeasonEnd(g) {
+    return C2.SEASON_LEN - ((g.day - 1) % C2.SEASON_LEN);
+  }
+
+  /* -------------------------------------------------------------- 2. soil */
+  function soilOf(p) { return p.soil === undefined ? 100 : clamp(p.soil, 0, C2.SOIL.max); }
+
+  function soilYield(g, p) {
+    let m = C2.SOIL.yieldAt(soilOf(p));
+    if (p.rotated) m += C2.SOIL.rotationBonus;
+    return m;
+  }
+
+  function fertilise(g, p, id) {
+    const f = C2.FERTILISERS[id];
+    if (!f) return false;
+    if (soilOf(p) >= C2.SOIL.max - 1) { SW.ui.log(g, 'That ground is already as rich as it gets.', 'warn'); return false; }
+    const cost = f.cost;
+    if (cost.food && g.village.food < cost.food) return fail(g, 'Not enough food in the granary.');
+    // A kiln burns the ash for you, so it costs less wood.
+    const woodCost = id === 'ash' ? Math.ceil(cost.wood * (1 - SW.boost.buildingTier(g, 'kiln') * 0.22)) : cost.wood;
+    if (cost.wood && g.res.wood < woodCost) return fail(g, 'Not enough wood.');
+    if (cost.mats) for (const k in cost.mats) if ((g.mats[k] | 0) < cost.mats[k]) return fail(g, `Not enough ${C.MATERIALS[k].name.toLowerCase()}.`);
+    if (cost.food) g.village.food -= cost.food;
+    if (cost.wood) g.res.wood -= woodCost;
+    if (cost.mats) for (const k in cost.mats) g.mats[k] -= cost.mats[k];
+    p.soil = clamp(soilOf(p) + f.soil, 0, C2.SOIL.max);
+    SW.ui.log(g, `${f.glyph} ${f.name} worked into plot ${p.i + 1}. Soil at ${Math.round(p.soil)}%.`, 'good');
+    return true;
+  }
+
+  function fail(g, msg) { SW.ui.log(g, msg, 'warn'); return false; }
+
+  function tickSoil(g, dt) {
+    for (const p of g.plots) {
+      if (p.soil === undefined) p.soil = 100;
+      // Ground left empty comes back on its own; a granary means there is
+      // waste to turn back into it, so it recovers everywhere.
+      const idle = (p.state === 'raw' || p.state === 'tilled') ? 1 : 0.22;
+      const rate = C2.SOIL.fallowRecovery * idle * (1 + SW.boost.buildingTier(g, 'granary') * 0.35);
+      p.soil = clamp(p.soil + rate * dt, 0, C2.SOIL.max);
+    }
+  }
+
+  /* --------------------------------------------------- 3. named villagers */
+  function makePerson(g) {
+    const used = new Set((g.people || []).map(p => p.name));
+    const pool = C2.VILLAGER_NAMES.filter(n => !used.has(n));
+    const name = pool.length ? pick(pool) : 'Newcomer ' + ((g.people || []).length + 1);
+    const trait = chance(0.45) ? pick(C2.VILLAGER_TRAITS).id : null;
+    return { name, role: 'idle', trait, mood: 60, since: g.day };
+  }
+
+  /* Keep the named roster in step with the headcount the village sim tracks. */
+  function syncPeople(g) {
+    if (!g.people) g.people = [];
+    while (g.people.length < g.village.villagers) g.people.push(makePerson(g));
+    while (g.people.length > g.village.villagers) {
+      // whoever is unhappiest leaves first
+      let worst = 0;
+      for (let i = 1; i < g.people.length; i++) if (g.people[i].mood < g.people[worst].mood) worst = i;
+      g.people.splice(worst, 1);
+    }
+  }
+
+  function assign(g, name, role) {
+    const p = g.people.find(x => x.name === name);
+    if (!p) return false;
+    p.role = role;
+    return true;
+  }
+
+  function tickPeople(g, dt) {
+    if (!g.people) return;
+    const v = g.village;
+    for (const p of g.people) {
+      const target = clamp(v.faith * 0.7 + 30 - v.unrest * 0.5 + (p.trait === 'sour' ? -15 : 0), 0, 100);
+      p.mood += (target - p.mood) * 0.004 * dt;
+    }
+    // Farmhands quietly water things; scouts turn up materials; the clever
+    // occasionally work something out.
+    const hands = SW.boost.roleCount(g, 'farmhand');
+    if (hands > 0 && chance(0.012 * hands * dt)) {
+      const dry = SW.farm.thirstiest(g);
+      if (dry) { SW.farm.water(g, dry); }
+    }
+    const scouts = SW.boost.roleCount(g, 'scout');
+    if (scouts > 0 && chance(0.006 * scouts * dt)) {
+      const m = pick(['fibre', 'clay']);
+      g.mats[m] = (g.mats[m] | 0) + 1;
+    }
+    const clever = g.people.filter(p => p.trait === 'clever').length;
+    if (clever > 0 && chance(0.0018 * clever * dt)) g.insight += 1;
+  }
+
+  const extraEaters = g => (g.people || []).filter(p => p.trait === 'hungry').length;
+  const devoutBonus = g => (g.people || []).filter(p => p.trait === 'devout').length * 0.04;
+
+  /* --------------------------------------------------------- 4. buildings */
+  function buildingCost(g, id) {
+    const b = C2.BUILDINGS[id];
+    const tier = SW.boost.buildingTier(g, id);
+    const scale = Math.pow(2.6, tier);
+    const off = SW.boost.buildCost(g);
+    const mats = {};
+    for (const k in b.mats) mats[k] = Math.ceil(b.mats[k] * (tier + 1));
+    return {
+      wood: Math.ceil(b.wood * scale * off),
+      coin: Math.ceil(b.coin * scale * off),
+      mats: mats,
+      tier: tier + 1
+    };
+  }
+
+  function canBuild(g, id) {
+    const b = C2.BUILDINGS[id];
+    if (!b) return 'no such building';
+    if (SW.boost.buildingTier(g, id) >= b.tiers) return 'already at its final tier';
+    if ((b.ring || 0) > (g.ring | 0)) return `needs ${C.RINGS[b.ring].name}`;
+    return null;
+  }
+
+  function build(g, id) {
+    const why = canBuild(g, id);
+    if (why) return fail(g, 'You cannot build that — ' + why + '.');
+    const b = C2.BUILDINGS[id];
+    const cost = buildingCost(g, id);
+    if (g.res.wood < cost.wood || g.res.coin < cost.coin) return fail(g, 'Not enough wood and coin.');
+    for (const k in cost.mats) if ((g.mats[k] | 0) < cost.mats[k]) return fail(g, `Not enough ${C.MATERIALS[k].name.toLowerCase()}.`);
+    g.res.wood -= cost.wood; g.res.coin -= cost.coin;
+    for (const k in cost.mats) g.mats[k] -= cost.mats[k];
+    g.buildings[id] = cost.tier;
+    SW.discovery.firstTime(g, 'built:' + id, 4, `raising a ${b.name.toLowerCase()}`);
+    SW.ui.log(g, `${b.glyph} ${b.name} ${cost.tier > 1 ? 'improved to tier ' + cost.tier : 'built'}. ${b.blurb}`, 'great');
+    return true;
+  }
+
+  /* The watchtower gradually reveals the ground you have not walked. */
+  function tickWatchtower(g, dt) {
+    const tier = SW.boost.buildingTier(g, 'watchtower');
+    if (!tier) return;
+    if (!chance(0.0012 * tier * dt)) return;
+    const hidden = g.features.filter(f => !f.found && f.ring <= g.ring);
+    if (!hidden.length) return;
+    const inst = pick(hidden);
+    const def = C.FEATURES.find(f => f.id === inst.fid);
+    SW.ui.log(g, `From the watchtower you make out ${def.name} out on the ${C.RINGS[inst.ring].name.toLowerCase()}.`, 'info');
+    inst.marked = true;
+  }
+
+  /* ------------------------------------------------------------ 5. events */
+  function maybeEvent(g) {
+    if (g.event) return;
+    const pool = C2.EVENTS.filter(e => g.day >= (e.min || 0) && !(g.eventSeen && g.eventSeen[e.id] && chance(0.6)));
+    if (!pool.length) return;
+    let total = 0;
+    for (const e of pool) total += e.weight;
+    let r = Math.random() * total;
+    for (const e of pool) { r -= e.weight; if (r <= 0) { g.event = { id: e.id, day: g.day }; return; } }
+  }
+
+  function eventDef(g) {
+    return g.event ? C2.EVENTS.find(e => e.id === g.event.id) : null;
+  }
+
+  function resolveEvent(g, choiceIndex) {
+    const def = eventDef(g);
+    if (!def) return false;
+    const ch = def.choices[choiceIndex];
+    if (!ch) return false;
+    applyEffect(g, ch.effect || {});
+    if (!g.eventSeen) g.eventSeen = {};
+    g.eventSeen[def.id] = g.day;
+    g.eventLog.unshift({ day: g.day, title: def.title, choice: ch.label, note: ch.note });
+    if (g.eventLog.length > 40) g.eventLog.length = 40;
+    SW.ui.log(g, `${def.title} — ${ch.label}. ${ch.note}`, 'great');
+    g.event = null;
+    return true;
+  }
+
+  function applyEffect(g, e) {
+    const v = g.village, c = g.creature;
+    if (e.villagers) { v.villagers = Math.max(0, v.villagers + e.villagers); syncPeople(g); }
+    if (e.food) v.food = Math.max(0, v.food + e.food);
+    if (e.faith) v.faith = clamp(v.faith + e.faith, 0, 100);
+    if (e.awe) v.awe = clamp(v.awe + e.awe, 0, 100);
+    if (e.unrest) v.unrest = clamp(v.unrest + e.unrest, 0, 100);
+    if (e.wood) g.res.wood = Math.max(0, g.res.wood + e.wood);
+    if (e.prayer) g.res.prayer = Math.max(0, g.res.prayer + e.prayer);
+    if (e.insight) g.insight += e.insight;
+    if (e.renown) g.res.renown = Math.max(0, g.res.renown + e.renown);
+    // Scaled by the day rather than by what you already have: a percentage of
+    // a late-game total is an absurd swing from a single click.
+    if (e.renownMul) g.res.renown = Math.max(0, g.res.renown + e.renownMul * (400 + g.day * 40));
+    if (e.coinMul) g.res.coin = Math.max(0, g.res.coin + e.coinMul * (2000 + g.day * 500));
+    if (e.bond) c.bond = clamp(c.bond + e.bond, 0, 100);
+    if (e.mood) c.mood = clamp(c.mood + e.mood, 0, 100);
+    if (e.hunger) c.hunger = clamp(c.hunger + e.hunger, 0, 130);
+    if (e.kind) c.kind = clamp(c.kind + e.kind, -100, 100);
+    if (e.vigorCost) c.vigor = clamp(c.vigor - e.vigorCost, 0, 100);
+    if (e.mats) for (const k in e.mats) g.mats[k] = (g.mats[k] | 0) + e.mats[k];
+    if (e.seedsAll) for (const cr of C.CROP_LIST) g.seeds[cr.id] = (g.seeds[cr.id] | 0) + e.seedsAll;
+    if (e.soilAll) for (const p of g.plots) p.soil = clamp(soilOf(p) + e.soilAll, 0, C2.SOIL.max);
+    if (e.waterAll) for (const p of g.plots) p.water = clamp(p.water + e.waterAll, 0, 100);
+    if (e.burnPlots) {
+      let n = e.burnPlots;
+      for (const p of g.plots) { if (n <= 0) break; if (p.crop) { p.state = 'tilled'; p.crop = null; p.growth = 0; n--; } }
+    }
+    if (e.techReps) SW.beast.trainTechnique(g, e.techReps, 8);
+    if (e.relicRoll) SW.relics.grant(g);
+    if (e.diplo) for (const r of g.rivals) g.diplo[r.name] = clamp((g.diplo[r.name] || 0) + e.diplo, -100, 100);
+    if (e.mate) g.mateOffer = SW.beast.rollMate(g);
+    if (e.arena) g.arenaChallenge = true;
+    if (e.grandeurTemp) g.grandeurBonus = (g.grandeurBonus || 0) + 12;
+  }
+
+  /* ------------------------------------------------------------- 6. oaths */
+  function counterValue(g, kind) {
+    switch (kind) {
+      case 'harvests': return g.stats.harvests;
+      case 'sold': return g.stats.sold;
+      case 'praised': return g.creature.praised + (g.stats.praisedTotal || 0);
+      case 'crafted': return Object.values(g.crafted).reduce((a, b) => a + b, 0);
+      case 'found': return Object.keys(g.discovered).length;
+      case 'fished': return g.stats.fished || 0;
+      case 'chores': return g.creature.chores + (g.stats.choresTotal || 0);
+      default: return 0;
+    }
+  }
+
+  function rollOaths(g) {
+    g.oaths = [];
+    const pool = [...C2.OATH_TEMPLATES];
+    for (let i = 0; i < 3 && pool.length; i++) {
+      const t = pool.splice(rndInt(0, pool.length - 1), 1)[0];
+      const need = Math.max(1, Math.round(t.base + t.scale * g.day));
+      g.oaths.push({
+        id: t.id, kind: t.kind, need,
+        from: counterValue(g, t.kind),
+        name: t.name.replace('{n}', need),
+        renown: Math.round(t.renown * (1 + g.day * 0.04)),
+        insight: t.insight, done: false
+      });
+    }
+    g.oathDay = g.day;
+  }
+
+  function oathProgress(g, o) {
+    return clamp((counterValue(g, o.kind) - o.from) / o.need, 0, 1);
+  }
+
+  function checkOaths(g) {
+    if (!g.oaths) return;
+    for (const o of g.oaths) {
+      if (o.done) continue;
+      if (oathProgress(g, o) >= 1) {
+        o.done = true;
+        g.res.renown += o.renown;
+        g.insight += o.insight;
+        SW.ui.log(g, `Oath kept — ${o.name}. +${o.renown} renown, +${o.insight} insight.`, 'great');
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------- 7. tick  */
+  function tick(g, dt) {
+    tickSoil(g, dt);
+    tickPeople(g, dt);
+    tickWatchtower(g, dt);
+    checkOaths(g);
+  }
+
+  function newDay(g) {
+    advanceWeather(g);
+    syncPeople(g);
+    if (!g.oathDay || g.day - g.oathDay >= 3) rollOaths(g);
+    if (chance(0.16)) maybeEvent(g);
+    if (g.grandeurBonus) g.grandeurBonus = Math.max(0, g.grandeurBonus - 0.4);
+  }
+
+  SW.world = {
+    rollWeather, advanceWeather, seasonProgress, daysToSeasonEnd,
+    soilOf, soilYield, fertilise, tickSoil,
+    makePerson, syncPeople, assign, extraEaters, devoutBonus,
+    buildingCost, canBuild, build,
+    maybeEvent, eventDef, resolveEvent, applyEffect,
+    rollOaths, oathProgress, checkOaths, counterValue,
+    tick, newDay
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — the creature beyond training: illness, techniques,
+ * bloodlines, and the Trial Ring. */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp, rnd, rndInt, pick, chance, fmt, hashNoise } = SW.core;
+
+  const fail = (g, m) => { SW.ui.log(g, m, 'warn'); return false; };
+
+  /* --------------------------------------------------------- 1. illness  */
+  /* Each ailment has a cause you can actually see coming, which is the point:
+   * a creature that gets sick is a creature you mismanaged. */
+  function illnessRisk(g, id) {
+    const c = g.creature, w = SW.boost.weatherOf(g);
+    const care = SW.boost.get(g, 'careUp');
+    let r = 0;
+    switch (id) {
+      case 'bloat':    r = c.hunger > 118 ? 0.0016 : 0; break;
+      case 'rotlung':  r = (w.id === 'downpour' || w.id === 'mist') ? 0.0009 : 0.0001; break;
+      case 'sunsick':  r = (w.id === 'swelter' || w.id === 'drought') ? 0.0011 : 0.0001; break;
+      case 'lameness': r = c.vigor < 12 ? 0.0014 : 0; break;
+      case 'despair':  r = (c.mood < 18 && c.scolded > c.praised) ? 0.0013 : 0; break;
+    }
+    return r / care;
+  }
+
+  function tickIllness(g, dt) {
+    const c = g.creature;
+    if (c.ailment) {
+      const a = C2.AILMENTS[c.ailment];
+      c.ailDays = (c.ailDays || 0) + dt / C.TICKS_PER_DAY;
+      c.vigor = clamp(c.vigor + a.vigor * dt * 0.1, 0, 100);
+      c.mood = clamp(c.mood + a.mood * dt * 0.1, 0, 100);
+      // It shakes some off on its own, faster with a beast house and a herbalist.
+      const selfHeal = 0.0008 * SW.boost.get(g, 'careUp') * dt;
+      if (chance(selfHeal)) {
+        SW.ui.log(g, `${c.name} has thrown off the ${a.name.toLowerCase()}.`, 'good');
+        c.ailment = null; c.ailDays = 0;
+      }
+      return;
+    }
+    for (const id in C2.AILMENTS) {
+      if (chance(illnessRisk(g, id) * dt)) {
+        c.ailment = id; c.ailDays = 0;
+        const a = C2.AILMENTS[id];
+        SW.ui.log(g, `${c.name} has come down with ${a.name.toLowerCase()}. ${a.blurb}`, 'bad');
+        g.fx.push({ at: 'banner', text: a.glyph + ' ' + a.name.toUpperCase(), life: 4, t: 0 });
+        return;
+      }
+    }
+  }
+
+  function cure(g) {
+    const c = g.creature;
+    if (!c.ailment) return fail(g, 'Nothing wrong with it.');
+    const a = C2.AILMENTS[c.ailment];
+    const r = C2.REMEDIES[a.remedy];
+    const cost = r.cost;
+    if (cost.food && g.village.food < cost.food) return fail(g, 'Not enough food.');
+    if (cost.wood && g.res.wood < cost.wood) return fail(g, 'Not enough wood.');
+    if (cost.prayer && g.res.prayer < cost.prayer) return fail(g, 'Not enough prayer.');
+    if (cost.mats) for (const k in cost.mats) if ((g.mats[k] | 0) < cost.mats[k]) return fail(g, 'Missing materials.');
+    if (cost.food) g.village.food -= cost.food;
+    if (cost.wood) g.res.wood -= cost.wood;
+    if (cost.prayer) g.res.prayer -= cost.prayer;
+    if (cost.mats) for (const k in cost.mats) g.mats[k] -= cost.mats[k];
+    c.ailment = null; c.ailDays = 0;
+    c.bond = clamp(c.bond + 3, 0, 100);
+    SW.ui.log(g, `${r.glyph} ${r.name}. ${c.name} is itself again, and remembers who fixed it.`, 'great');
+    return true;
+  }
+
+  /* How much of its work an ill creature actually manages. */
+  function workFactor(g) {
+    const c = g.creature;
+    let m = SW.boost.get(g, 'work');
+    if (c.ailment) m *= C2.AILMENTS[c.ailment].work;
+    if (hasTech(g, 'sprint')) m *= 1.2;
+    return m;
+  }
+
+  /* ------------------------------------------------------ 2. techniques  */
+  const reps = (g, id) => (g.creature.techniques && g.creature.techniques[id]) | 0;
+  const hasTech = (g, id) => (g.equippedTech || []).includes(id) && reps(g, id) >= C2.TECHNIQUES[id].reps;
+  const techKnown = (g, id) => reps(g, id) >= C2.TECHNIQUES[id].reps;
+
+  function techSlots(g) {
+    return C2.TECH_SLOTS_BASE + Math.floor((g.evo | 0) / 2) + (SW.boost.buildingTier(g, 'arena') > 0 ? 1 : 0);
+  }
+
+  function trainTechnique(g, id, n) {
+    if (!C2.TECHNIQUES[id]) return;
+    const c = g.creature;
+    if (!c.techniques) c.techniques = {};
+    const before = techKnown(g, id);
+    c.techniques[id] = reps(g, id) + (n || 1);
+    if (!before && techKnown(g, id)) {
+      const t = C2.TECHNIQUES[id];
+      SW.ui.log(g, `${c.name} has worked out how to ${t.name.toLowerCase()}. ${t.blurb}`, 'great');
+      g.fx.push({ at: 'banner', text: t.glyph + ' ' + t.name.toUpperCase(), life: 4, t: 0 });
+      SW.discovery.firstTime(g, 'tech:' + id, 5, `seeing it learn ${t.name.toLowerCase()}`);
+    }
+  }
+
+  /* Which acts drill which techniques. */
+  const ACT_TECH = {
+    forage: ['haul', 'dig'], harvest: ['haul'], water: ['sprint'], sow: ['sprint'],
+    till: ['dig'], play: ['sing'], perform: ['sing', 'show'], tithe: ['sing'],
+    terrorize: ['guard'], rest: ['nightwork']
+  };
+
+  function onAct(g, actId) {
+    const list = ACT_TECH[actId];
+    if (list) for (const t of list) if (chance(0.5)) trainTechnique(g, t, 1);
+    // Working at night is its own lesson.
+    const night = (g.dayTick / C.TICKS_PER_DAY) > 0.72;
+    if (night && actId !== 'rest') trainTechnique(g, 'nightwork', 1);
+  }
+
+  function equipTech(g, id) {
+    if (!techKnown(g, id)) return fail(g, 'It does not know that yet.');
+    if (!g.equippedTech) g.equippedTech = [];
+    const i = g.equippedTech.indexOf(id);
+    if (i >= 0) { g.equippedTech.splice(i, 1); return true; }
+    if (g.equippedTech.length >= techSlots(g)) return fail(g, 'No room. Set something else down first.');
+    g.equippedTech.push(id);
+    return true;
+  }
+
+  /* ------------------------------------------------------ 3. bloodlines  */
+  function rollMate(g) {
+    const lin = pick(C.LINEAGE_LIST);
+    const q = 0.6 + Math.random() * 0.9;
+    return {
+      lineage: lin.id,
+      name: pick(['Wild', 'Grey', 'Thorn', 'Ash', 'Bramble', 'Pale', 'Fen']) + ' ' + lin.name,
+      strength: Math.round(lin.base.strength * q * 10) / 10,
+      cunning: Math.round(lin.base.cunning * q * 10) / 10,
+      grace: Math.round(lin.base.grace * q * 10) / 10,
+      vigour: q,
+      day: g.day
+    };
+  }
+
+  function acceptMate(g) {
+    if (!g.mateOffer) return false;
+    g.mate = g.mateOffer;
+    g.mateOffer = null;
+    SW.ui.log(g, `${g.mate.name} stays. The next whelp will carry both lines.`, 'good');
+    return true;
+  }
+  function refuseMate(g) { g.mateOffer = null; return true; }
+
+  /* Called by lineage.breed to blend in the mate, then consume it. */
+  function applyMate(g, child) {
+    const m = g.mate;
+    if (!m) { g.pedigree = g.pedigree || []; return; }
+    child.stats.strength = (child.stats.strength + m.strength) / 2 * 1.06;
+    child.stats.cunning = (child.stats.cunning + m.cunning) / 2 * 1.06;
+    child.stats.grace = (child.stats.grace + m.grace) / 2 * 1.06;
+    // Hybrid vigour: a different lineage is worth more than the same one.
+    if (m.lineage !== child.lineage) {
+      child.hybrid = m.lineage;
+      for (const k of ['strength', 'cunning', 'grace']) child.stats[k] *= 1.08;
+      SW.ui.log(g, `The whelp is a cross — ${C.LINEAGES[child.lineage].name} out of ${C.LINEAGES[m.lineage].name}. It is stronger for it.`, 'great');
+    } else {
+      g.inbreeding = (g.inbreeding || 0) + 1;
+      if (g.inbreeding >= 3) {
+        for (const k of ['strength', 'cunning', 'grace']) child.stats[k] *= 0.94;
+        SW.ui.log(g, 'The line is getting narrow. The whelp is a little weaker than it should be.', 'warn');
+      }
+    }
+    g.pedigree = g.pedigree || [];
+    g.pedigree.unshift({ gen: child.gen, mate: m.name, day: g.day, hybrid: !!child.hybrid });
+    if (g.pedigree.length > 30) g.pedigree.length = 30;
+    g.mate = null;
+  }
+
+  /* ---------------------------------------------------------- 4. arena   */
+  /* What the ring is actually measuring. A freshly bred whelp has poor stats
+   * by design, so the trial has to see the whole line behind it — what it was
+   * born knowing, what it has worked out, and how many generations of work sit
+   * underneath. Otherwise breeding, the central loop, would be a penalty. */
+  function beastPower(g) {
+    const c = g.creature;
+    let p = (c.stats.strength * 1.4 + c.stats.cunning * 1.1 + c.stats.grace * 0.9)
+      * (0.6 + c.size * 0.5) * (0.55 + c.vigor / 140) * (0.7 + c.bond / 200);
+    if (hasTech(g, 'show')) p *= 1.25;
+    if (hasTech(g, 'guard')) p *= 1.15;
+    if (hasTech(g, 'sprint')) p *= 1.1;
+    if (c.ailment) p *= 0.6;
+    p *= 1 + (g.evo | 0) * 0.18;
+
+    let ingrained = 0;
+    for (const id of C.TRAINABLE) ingrained += SW.lineage.ingrainedOf(g, id);
+    let known = 0;
+    for (const id in C2.TECHNIQUES) if (techKnown(g, id)) known++;
+    return p + ingrained * 30 + known * 12 + (g.gens | 0) * 3;
+  }
+
+  function arenaOpponents(g) {
+    return g.rivals.map((r, i) => ({
+      name: r.name,
+      power: (20 + Math.pow(g.day, 1.0) * 1.9) * r.pace * (0.7 + hashNoise(r.seed + 91, Math.floor(g.day / 3)) * 0.7),
+      index: i
+    })).sort((a, b) => a.power - b.power);
+  }
+
+  /* Three rounds, each a noisy comparison. Best of three takes it. */
+  function fight(g, opponentIndex) {
+    if (!SW.boost.buildingTier(g, 'arena')) return fail(g, 'You have nowhere to hold a trial.');
+    const c = g.creature;
+    if (c.vigor < 30) return fail(g, 'It is in no state to fight.');
+    // One trial a day. The ring is an event, not a renown tap.
+    if (g.arenaDay === g.day) return fail(g, 'It has already fought today.');
+    g.arenaDay = g.day;
+    const opp = arenaOpponents(g)[opponentIndex];
+    if (!opp) return false;
+    c.vigor = clamp(c.vigor - 28, 0, 100);
+    const mine = beastPower(g);
+    const rounds = [];
+    let wins = 0;
+    for (let i = 0; i < 3; i++) {
+      const a = mine * rnd(0.7, 1.35);
+      const b = opp.power * rnd(0.7, 1.35);
+      const won = a >= b;
+      if (won) wins++;
+      rounds.push({ mine: Math.round(a), theirs: Math.round(b), won });
+    }
+    const won = wins >= 2;
+    const stake = Math.round(90 + g.day * 6);
+    if (won) {
+      g.res.renown += stake;
+      g.stats.arenaWins = (g.stats.arenaWins || 0) + 1;
+      c.bond = clamp(c.bond + 4, 0, 100);
+      // A gentle champion is loved for it; a vicious one is feared. Winning
+      // should not quietly turn a faith empire into a terror one.
+      if (c.kind >= 0) g.village.faith = clamp(g.village.faith + 1.5, 0, 100);
+      else g.village.awe = clamp(g.village.awe + 1.5, 0, 100);
+      trainTechnique(g, 'show', 4);
+      if (chance(0.18)) SW.relics.grant(g);
+      SW.ui.log(g, `Trial won against ${opp.name}, ${wins}–${3 - wins}. +${stake} renown.`, 'great');
+    } else {
+      g.res.renown = Math.max(0, g.res.renown - Math.round(stake * 0.3));
+      c.mood = clamp(c.mood - 10, 0, 100);
+      g.stats.arenaLosses = (g.stats.arenaLosses || 0) + 1;
+      SW.ui.log(g, `Beaten by ${opp.name}, ${wins}–${3 - wins}. It limps off.`, 'bad');
+    }
+    g.diplo[opp.name] = clamp((g.diplo[opp.name] || 0) + (won ? -8 : 4), -100, 100);
+    g.arenaResult = { opponent: opp.name, rounds, won, stake, day: g.day };
+    g.arenaChallenge = false;
+    SW.discovery.firstTime(g, 'arena', 6, 'putting it in the ring');
+    return true;
+  }
+
+  function tick(g, dt) {
+    tickIllness(g, dt);
+  }
+
+  SW.beast = {
+    illnessRisk, tickIllness, cure, workFactor,
+    reps, hasTech, techKnown, techSlots, trainTechnique, onAct, equipTech,
+    rollMate, acceptMate, refuseMate, applyMate,
+    beastPower, arenaOpponents, fight, tick
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — relics, the slots they go in, and the titles you earn. */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp, pick, chance, fmt } = SW.core;
+
+  const fail = (g, m) => { SW.ui.log(g, m, 'warn'); return false; };
+
+  /* Slots open up with the shrine — a bigger shrine is somewhere to keep
+   * things, and somewhere for people to see that you have them. */
+  function slots(g) {
+    return 1 + Math.floor((g.shrine | 0) / 2) + ((g.ring | 0) >= 2 ? 1 : 0);
+  }
+
+  const owned = g => C2.RELIC_LIST.filter(r => g.relics[r.id]);
+  const isEquipped = (g, id) => (g.equipped || []).includes(id);
+
+  /* Relic tier is gated on standing, so the good ones cannot turn up on day 3. */
+  function grant(g, forceRank) {
+    const rank = forceRank || (1 + Math.min(3, Math.floor(SW.sim.rankOf(g).id / 1.4)));
+    const pool = C2.RELIC_LIST.filter(r => r.rank <= rank && !g.relics[r.id]);
+    if (!pool.length) {
+      // Nothing new to find; convert into insight instead so it is never a dud.
+      g.insight += 12;
+      SW.ui.log(g, 'Another relic, and you already own its like. You study it apart instead. +12 insight.', 'good');
+      return null;
+    }
+    const r = pick(pool);
+    g.relics[r.id] = g.day;
+    SW.ui.log(g, `${r.glyph} ${r.name}. ${r.blurb}`, 'great');
+    g.fx.push({ at: 'banner', text: r.glyph + ' ' + r.name, life: 4.5, t: 0 });
+    SW.discovery.firstTime(g, 'relic', 6, 'holding a relic');
+    // First one goes on automatically, so its effect is never invisible.
+    if ((g.equipped || []).length < slots(g)) equip(g, r.id);
+    return r;
+  }
+
+  function equip(g, id) {
+    if (!g.relics[id]) return false;
+    if (!g.equipped) g.equipped = [];
+    const i = g.equipped.indexOf(id);
+    if (i >= 0) { g.equipped.splice(i, 1); return true; }
+    if (g.equipped.length >= slots(g)) return fail(g, 'No free setting. Take one out first.');
+    g.equipped.push(id);
+    return true;
+  }
+
+  /* Two relics of the same rank fuse into one of the next rank up. The cost is
+   * that you lose both, which makes it a real decision rather than a menu. */
+  function canFuse(g, a, b) {
+    if (!a || !b || a === b) return false;
+    if (!g.relics[a] || !g.relics[b]) return false;
+    if (C2.RELICS[a].rank !== C2.RELICS[b].rank) return false;
+    return C2.RELIC_LIST.some(r => r.rank === C2.RELICS[a].rank + 1 && !g.relics[r.id]);
+  }
+
+  function fuse(g, a, b) {
+    if (!canFuse(g, a, b)) return fail(g, 'Those two will not fuse.');
+    const rank = C2.RELICS[a].rank + 1;
+    delete g.relics[a]; delete g.relics[b];
+    g.equipped = (g.equipped || []).filter(x => x !== a && x !== b);
+    SW.ui.log(g, `${C2.RELICS[a].name} and ${C2.RELICS[b].name} go into the fire together.`, 'info');
+    grant(g, rank);
+    return true;
+  }
+
+  /* ------------------------------------------------------------- titles  */
+  function available(g) {
+    return C2.TITLES.filter(t => { try { return t.need(g); } catch (e) { return false; } });
+  }
+
+  function setTitle(g, id) {
+    const t = C2.TITLES.find(x => x.id === id);
+    if (!t) return false;
+    try { if (!t.need(g)) return fail(g, 'You have not earned that.'); } catch (e) { return false; }
+    g.title = id;
+    SW.ui.log(g, id === 'none' ? 'You go by no title.' : `You are ${g.godName}, ${t.name}.`, 'good');
+    return true;
+  }
+
+  function checkTitles(g) {
+    const av = available(g);
+    if (!g.titlesSeen) g.titlesSeen = {};
+    for (const t of av) {
+      if (t.id === 'none' || g.titlesSeen[t.id]) continue;
+      g.titlesSeen[t.id] = g.day;
+      SW.ui.log(g, `A title is yours to take if you want it: ${t.name}.`, 'good');
+      SW.discovery.firstTime(g, 'title:' + t.id, 4, 'earning a title');
+    }
+  }
+
+  SW.relics = { slots, owned, isEquipped, grant, equip, canFuse, fuse, available, setTitle, checkTitles };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — caravans, contracts, and what the other gods think of you. */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp, rnd, rndInt, pick, chance, fmt } = SW.core;
+
+  const fail = (g, m) => { SW.ui.log(g, m, 'warn'); return false; };
+
+  /* ---------------------------------------------------------- caravans   */
+  const VISIT_EVERY = 6;   // days, roughly; the dock shortens it
+
+  function merchantRep(g, id) { return (g.merchantRep && g.merchantRep[id]) | 0; }
+
+  function repTier(rep) { return rep >= 60 ? 3 : rep >= 30 ? 2 : rep >= 10 ? 1 : 0; }
+
+  /* Prices improve as a merchant comes to trust you; the dock and traders help. */
+  function markup(g, id) {
+    return 1 / (1 + repTier(merchantRep(g, id)) * 0.09) / SW.boost.get(g, 'trade');
+  }
+  function payout(g, id) {
+    return (1 + repTier(merchantRep(g, id)) * 0.11) * SW.boost.get(g, 'trade') * SW.boost.get(g, 'coin');
+  }
+
+  function rollCaravan(g) {
+    const m = pick(C2.MERCHANTS);
+    const tier = repTier(merchantRep(g, m.id));
+    const stock = {};
+    for (const mat of m.sells) {
+      // Rare stock only opens up once they know you.
+      const rare = mat === 'metal' || mat === 'glass';
+      if (rare && tier < 1) continue;
+      stock[mat] = rndInt(2, 4 + tier * 2);
+    }
+    const wants = pick(m.buys.filter(b => SW.sim.rankOf(g).id >= C.CROPS[b].rank)) || m.buys[0];
+    const need = Math.max(4, Math.round((6 + g.day * 0.5) * rnd(0.7, 1.3)));
+    g.caravan = {
+      id: m.id, until: g.day + 3, stock,
+      contract: {
+        kind: 'deliver', crop: wants, need, got: 0,
+        coin: Math.round(C.CROPS[wants].price * need * 2.4 * (1 + tier * 0.15)),
+        renown: Math.round(30 + g.day * 3),
+        rep: 12
+      }
+    };
+    SW.ui.log(g, `${m.glyph} ${m.name} has tied up at the rim. ${m.blurb}`, 'good');
+    SW.discovery.firstTime(g, 'caravan', 5, 'trading with a caravan');
+  }
+
+  function caravanDef(g) {
+    return g.caravan ? C2.MERCHANTS.find(m => m.id === g.caravan.id) : null;
+  }
+
+  function matPrice(g, mat) {
+    const base = C.MATERIALS[mat].buy || (mat === 'glass' ? 520 : 900);
+    return Math.max(1, Math.round(base * 1.25 * markup(g, g.caravan.id)));
+  }
+
+  function buyFromCaravan(g, mat, n) {
+    if (!g.caravan) return false;
+    const have = g.caravan.stock[mat] | 0;
+    const price = matPrice(g, mat);
+    const want = Math.min(n, have, Math.floor(g.res.coin / price));
+    if (want <= 0) return fail(g, have ? 'Not enough coin.' : 'They have none left.');
+    g.res.coin -= price * want;
+    g.caravan.stock[mat] -= want;
+    g.mats[mat] = (g.mats[mat] | 0) + want;
+    g.merchantRep[g.caravan.id] = merchantRep(g, g.caravan.id) + want;
+    SW.ui.log(g, `Bought ${want} ${C.MATERIALS[mat].name.toLowerCase()} off the cart.`, 'info');
+    return true;
+  }
+
+  function deliverContract(g) {
+    if (!g.caravan) return false;
+    const ct = g.caravan.contract;
+    const held = g.stock[ct.crop] | 0;
+    const give = Math.min(held, ct.need - ct.got);
+    if (give <= 0) return fail(g, `You have no ${C.CROPS[ct.crop].name} to hand over.`);
+    g.stock[ct.crop] -= give;
+    ct.got += give;
+    if (ct.got >= ct.need) {
+      const coin = Math.round(ct.coin * payout(g, g.caravan.id));
+      g.res.coin += coin;
+      g.stats.coinEarned += coin;
+      g.res.renown += ct.renown;
+      g.merchantRep[g.caravan.id] = merchantRep(g, g.caravan.id) + ct.rep;
+      SW.ui.log(g, `Contract filled — ${ct.need} ${C.CROPS[ct.crop].name}. +${fmt(coin)} coin, +${ct.renown} renown.`, 'great');
+      SW.discovery.firstTime(g, 'contract', 6, 'filling a contract');
+      g.caravan.contract = null;
+    } else {
+      SW.ui.log(g, `${ct.got}/${ct.need} delivered.`, 'info');
+    }
+    return true;
+  }
+
+  function tickCaravan(g) {
+    const gap = Math.max(3, VISIT_EVERY - SW.boost.buildingTier(g, 'dock'));
+    if (g.caravan && g.day > g.caravan.until) {
+      const m = caravanDef(g);
+      if (g.caravan.contract) {
+        g.merchantRep[g.caravan.id] = merchantRep(g, g.caravan.id) - 6;
+        SW.ui.log(g, `${m.name} casts off with the contract unfilled. They remember that.`, 'warn');
+      } else {
+        SW.ui.log(g, `${m.name} casts off.`, 'info');
+      }
+      g.caravan = null;
+      g.nextCaravan = g.day + gap;
+    }
+    if (!g.caravan && g.day >= (g.nextCaravan || 0)) rollCaravan(g);
+  }
+
+  /* --------------------------------------------------------- diplomacy   */
+  function opinion(g, name) { return (g.diplo && g.diplo[name]) | 0; }
+  function opinionWord(v) {
+    return v >= 55 ? 'allied' : v >= 20 ? 'warm' : v > -20 ? 'neutral' : v > -55 ? 'cold' : 'hostile';
+  }
+
+  function diplomacy(g, rivalName, actionId) {
+    const a = C2.DIPLO_ACTIONS.find(x => x.id === actionId);
+    const rival = g.rivals.find(r => r.name === rivalName);
+    if (!a || !rival) return false;
+    if (a.coin) {
+      const c = a.coin(g);
+      if (g.res.coin < c) return fail(g, 'Not enough coin for that.');
+      g.res.coin -= c;
+    }
+    if (a.renown) g.res.renown = Math.max(0, g.res.renown + a.renown(g));
+    if (a.awe) g.village.awe = clamp(g.village.awe + a.awe, 0, 100);
+    if (a.vigor) {
+      if (g.creature.vigor < a.vigor) return fail(g, 'The creature is too tired for that.');
+      g.creature.vigor -= a.vigor;
+      // Sabotage: steal standing, unless they see it coming.
+      const caught = chance(0.35 - (SW.beast.hasTech(g, 'guard') ? 0.15 : 0));
+      if (caught) {
+        g.res.renown = Math.max(0, g.res.renown - 120);
+        SW.ui.log(g, `${rivalName} catches your creature at it. Everyone hears.`, 'bad');
+      } else {
+        const took = Math.min(rival.renown * 0.03, 600 + g.day * 8);
+        rival.renown -= took;
+        g.res.renown += took * 0.5;
+        SW.ui.log(g, `Something of ${rivalName}'s standing goes missing in the night. +${fmt(took * 0.5)} renown.`, 'good');
+      }
+    }
+    g.diplo[rivalName] = clamp(opinion(g, rivalName) + a.opinion, -100, 100);
+    if (!a.vigor) SW.ui.log(g, `${a.glyph} ${a.name} — ${rivalName} is now ${opinionWord(opinion(g, rivalName))}.`, 'info');
+    SW.discovery.firstTime(g, 'diplo', 4, 'dealing with a rival directly');
+    return true;
+  }
+
+  /* Allies drag you up the curve a little; enemies chip at you. */
+  function tickDiplomacy(g) {
+    for (const r of g.rivals) {
+      const v = opinion(g, r.name);
+      if (v >= 55) g.res.renown += 12 + g.day * 0.4;
+      else if (v <= -55 && chance(0.10)) {
+        const loss = Math.round(40 + g.day * 2);
+        g.res.renown = Math.max(0, g.res.renown - loss);
+        SW.ui.log(g, `${r.name} says something damaging about you, and it sticks. −${loss} renown.`, 'bad');
+      }
+      // Opinions decay toward indifference.
+      if (v !== 0) g.diplo[r.name] = v - Math.sign(v) * Math.min(Math.abs(v), 0.6);
+    }
+  }
+
+  function newDay(g) {
+    tickCaravan(g);
+    tickDiplomacy(g);
+  }
+
+  SW.trade = {
+    merchantRep, repTier, markup, payout, rollCaravan, caravanDef, matPrice,
+    buyFromCaravan, deliverContract, tickCaravan,
+    opinion, opinionWord, diplomacy, tickDiplomacy, newDay
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — two more things you play rather than manage.
+ *
+ * Cloud fishing: a three-stage timing game. Each stage you stop a sweeping
+ * marker inside a window that gets narrower and faster; clear more stages and
+ * something bigger comes up.
+ *
+ * Chanting: call and response. The shrine sings a sequence of tones, you sing
+ * it back. Get it all and the miracle lands at full strength; fumble it and
+ * you get part of one.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp, rnd, rndInt, pick, chance, fmt } = SW.core;
+
+  const fail = (g, m) => { SW.ui.log(g, m, 'warn'); return false; };
+
+  /* ------------------------------------------------------------ fishing  */
+  const CAST_FOCUS = 5;
+  const STAGES = 3;
+
+  function fishingUnlocked(g) { return (g.ring | 0) >= 0 && !!g.neurons.listening; }
+
+  function startFishing(g) {
+    if (!fishingUnlocked(g)) return fail(g, 'You would not know what to listen for. Grow The Listening first.');
+    if (g.fishing || g.listen || g.chant) return false;
+    if (g.res.focus < CAST_FOCUS) return fail(g, 'Not enough focus to cast.');
+    g.res.focus -= CAST_FOCUS;
+    g.fishing = newStage(g, 0);
+    SW.ui.log(g, 'You drop a line off the rim into open cloud.', 'info');
+    return true;
+  }
+
+  function newStage(g, stage) {
+    const tight = 1 - stage * 0.26;
+    return {
+      stage,
+      pos: 0, dir: 1,
+      speed: 0.85 + stage * 0.38 + Math.min(g.day, 60) * 0.004,
+      zone: rnd(0.12, 0.88 - 0.20 * tight),
+      zoneW: 0.22 * tight,
+      t: 0, result: null, cleared: stage
+    };
+  }
+
+  function tickFishing(g, dt) {
+    const f = g.fishing;
+    if (!f) return;
+    if (f.result) {
+      f.t += dt;
+      if (f.t > 1.4) finishFishing(g);
+      return;
+    }
+    f.pos += f.dir * f.speed * dt;
+    if (f.pos >= 1) { f.pos = 1; f.dir = -1; }
+    if (f.pos <= 0) { f.pos = 0; f.dir = 1; }
+    f.t += dt;
+    // Give up after a while so a forgotten line does not sit forever.
+    if (f.t > 14) { f.result = 'lost'; f.t = 0; }
+  }
+
+  /* The click. Inside the window advances a stage; outside ends the cast. */
+  function strike(g) {
+    const f = g.fishing;
+    if (!f || f.result) return false;
+    const hit = f.pos >= f.zone && f.pos <= f.zone + f.zoneW;
+    if (!hit) {
+      f.result = f.stage === 0 ? 'lost' : 'partial';
+      f.t = 0;
+      return true;
+    }
+    if (f.stage + 1 >= STAGES) {
+      f.result = 'full';
+      f.cleared = STAGES;
+      f.t = 0;
+      return true;
+    }
+    const next = newStage(g, f.stage + 1);
+    next.cleared = f.stage + 1;
+    g.fishing = next;
+    g.fx.push({ at: 'banner', text: '✔ ' + (f.stage + 1) + '/' + STAGES, life: 1.1, t: 0 });
+    return true;
+  }
+
+  function pickFish(g, cleared) {
+    const night = (g.dayTick / C.TICKS_PER_DAY) > 0.72;
+    const pool = C2.FISH.filter(fh => fh.ring <= (g.ring | 0) && (!fh.night || night));
+    if (!pool.length) return C2.FISH[0];
+    // More stages cleared shifts the draw toward the rare end.
+    const target = 1 + cleared * 1.3 + (chance(0.15) ? 1 : 0);
+    let best = pool[0];
+    for (const fh of pool) {
+      if (fh.rarity <= target && fh.rarity >= best.rarity) best = fh;
+    }
+    // A small chance at something well above your level, which is the hook.
+    if (cleared >= STAGES && chance(0.14)) {
+      const big = pool.filter(fh => fh.rarity > best.rarity);
+      if (big.length) best = pick(big);
+    }
+    return best;
+  }
+
+  function finishFishing(g) {
+    const f = g.fishing;
+    g.fishing = null;
+    if (f.result === 'lost' && f.cleared === 0) {
+      SW.ui.log(g, 'The line goes slack. Nothing.', 'warn');
+      return;
+    }
+    const fish = pickFish(g, f.cleared);
+    g.fish[fish.id] = (g.fish[fish.id] | 0) + 1;
+    g.stats.fished = (g.stats.fished || 0) + 1;
+    if (fish.mat) g.mats[fish.mat] = (g.mats[fish.mat] | 0) + 1;
+    SW.discovery.firstTime(g, 'fish:' + fish.id, 3, `landing a ${fish.name.toLowerCase()}`);
+    SW.ui.log(g, `${fish.glyph} ${fish.name}. ${fish.blurb}`, fish.rarity >= 3 ? 'great' : 'good');
+    if (fish.rarity >= 4) {
+      g.fx.push({ at: 'banner', text: fish.glyph + ' ' + fish.name, life: 4, t: 0 });
+      if (chance(0.22)) SW.relics.grant(g);   // something was inside it
+    }
+    SW.beast.trainTechnique(g, 'sense', 1);
+  }
+
+  function sellFish(g, id, n) {
+    const fh = C2.FISH.find(x => x.id === id);
+    const have = g.fish[id] | 0;
+    const want = Math.min(n, have);
+    if (want <= 0) return 0;
+    g.fish[id] -= want;
+    const coin = Math.round(fh.coin * want * SW.boost.get(g, 'coin'));
+    g.res.coin += coin;
+    g.stats.coinEarned += coin;
+    return coin;
+  }
+
+  function eatFish(g, id, n) {
+    const fh = C2.FISH.find(x => x.id === id);
+    const have = g.fish[id] | 0;
+    const want = Math.min(n, have);
+    if (want <= 0) return 0;
+    g.fish[id] -= want;
+    g.village.food += fh.feed * want;
+    return fh.feed * want;
+  }
+
+  /* ----------------------------------------------------------- chanting  */
+  function chantUnlocked(g) { return (g.shrine | 0) >= 2; }
+
+  function startChant(g, id) {
+    const ch = C2.CHANTS.find(x => x.id === id);
+    if (!ch) return false;
+    if (!chantUnlocked(g)) return fail(g, 'You need a shrine worth chanting at.');
+    if ((g.ring | 0) < ch.ring) return fail(g, `That one belongs to ${C.RINGS[ch.ring].name}.`);
+    if (g.chant || g.listen || g.fishing) return false;
+    if (g.res.prayer < ch.prayer) return fail(g, 'Not enough prayer.');
+    g.res.prayer -= ch.prayer;
+    const seq = [];
+    for (let i = 0; i < ch.len; i++) seq.push(rndInt(0, C2.CHANT_TONES.length - 1));
+    g.chant = { id, seq, input: [], phase: 'show', shown: 0, t: 0, lit: -1 };
+    return true;
+  }
+
+  const SHOW_ON = 0.42, SHOW_OFF = 0.20;
+
+  function tickChant(g, dt) {
+    const ch = g.chant;
+    if (!ch) return;
+    ch.t += dt;
+    if (ch.phase === 'show') {
+      const step = SHOW_ON + SHOW_OFF;
+      const i = Math.floor(ch.t / step);
+      if (i >= ch.seq.length) { ch.phase = 'input'; ch.lit = -1; ch.t = 0; return; }
+      ch.lit = (ch.t - i * step) < SHOW_ON ? ch.seq[i] : -1;
+    } else if (ch.phase === 'input') {
+      if (ch.t > 3.5 + ch.seq.length * 1.3) resolveChant(g);
+    } else if (ch.phase === 'done') {
+      if (ch.t > 1.2) g.chant = null;
+    }
+  }
+
+  function chantInput(g, tone) {
+    const ch = g.chant;
+    if (!ch || ch.phase !== 'input') return false;
+    ch.input.push(tone);
+    ch.lit = tone;
+    ch.flash = 0.18;
+    if (ch.input.length >= ch.seq.length) resolveChant(g);
+    return true;
+  }
+
+  function resolveChant(g) {
+    const ch = g.chant;
+    const def = C2.CHANTS.find(x => x.id === ch.id);
+    let right = 0;
+    for (let i = 0; i < ch.seq.length; i++) if (ch.input[i] === ch.seq[i]) right++;
+    const acc = right / ch.seq.length;
+    ch.phase = 'done';
+    ch.t = 0;
+    ch.acc = acc;
+    applyChant(g, def, acc);
+  }
+
+  function applyChant(g, def, acc) {
+    if (acc <= 0.34) {
+      SW.ui.log(g, `The ${def.name} falls apart in your mouth. The prayer is spent regardless.`, 'bad');
+      return;
+    }
+    const p = acc;
+    switch (def.id) {
+      case 'growth':
+        for (const pl of g.plots) if (pl.state === 'growing') {
+          pl.growth += C.CROPS[pl.crop].growTicks * 0.35 * p;
+          if (pl.growth >= C.CROPS[pl.crop].growTicks) { pl.state = 'ripe'; pl.growth = C.CROPS[pl.crop].growTicks; }
+        }
+        g.fx.push({ at: 'sky', kind: 'shine', life: 2, t: 0 });
+        break;
+      case 'calm':
+        g.village.unrest = clamp(g.village.unrest - 45 * p, 0, 100);
+        g.creature.mood = clamp(g.creature.mood + 30 * p, 0, 100);
+        break;
+      case 'plenty':
+        g.village.food += 130 * p;
+        g.village.faith = clamp(g.village.faith + 7 * p, 0, 100);
+        break;
+      case 'fear':
+        g.village.awe = clamp(g.village.awe + 26 * p, 0, 100);
+        g.village.faith = clamp(g.village.faith - 6 * p, 0, 100);
+        g.fx.push({ at: 'sky', kind: 'storm', life: 3, t: 0 });
+        break;
+      case 'insight':
+        g.insight += Math.round(14 * p * SW.boost.get(g, 'insight'));
+        break;
+      case 'renewal':
+        for (const pl of g.plots) pl.soil = clamp(SW.world.soilOf(pl) + 55 * p, 0, C2.SOIL.max);
+        break;
+    }
+    const word = acc >= 0.999 ? 'perfectly' : acc >= 0.7 ? 'well enough' : 'badly';
+    SW.ui.log(g, `${def.glyph} ${def.name}, sung ${word}. ${def.blurb}`, acc >= 0.999 ? 'great' : 'good');
+    g.stats.chants = (g.stats.chants || 0) + 1;
+    SW.discovery.firstTime(g, 'chant:' + def.id, 5, `singing the ${def.name}`);
+    if (acc >= 0.999) SW.discovery.firstTime(g, 'chantperfect', 8, 'singing one without a mistake');
+  }
+
+  function tick(g, dt) {
+    tickFishing(g, dt);
+    tickChant(g, dt);
+  }
+
+  const busy = g => !!(g.listen || g.fishing || g.chant);
+
+  SW.mini2 = {
+    CAST_FOCUS, STAGES, fishingUnlocked, startFishing, tickFishing, strike, finishFishing,
+    sellFish, eatFish, chantUnlocked, startChant, tickChant, chantInput, tick, busy
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — Ascension.
+ *
+ * Let the island go and begin again on a fresh one, carrying only what you
+ * chose to carry. The point of a grind game is the second run being faster
+ * than the first for reasons you picked.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content, C2 = SW.content2;
+  const { clamp, fmt } = SW.core;
+
+  const fail = (g, m) => { SW.ui.log(g, m, 'warn'); return false; };
+
+  function canAscend(g) {
+    return g.res.renown >= C2.ASCEND_MIN_RENOWN;
+  }
+
+  /* Points earned by this run, on a curve so a much longer run is worth more
+   * but not proportionally so. */
+  function pointsFor(g) {
+    if (!canAscend(g)) return 0;
+    return Math.max(1, Math.floor(Math.pow(g.res.renown / C2.ASCEND_MIN_RENOWN, 0.62) * 3));
+  }
+
+  function spent(g) {
+    let n = 0;
+    for (const id in (g.prestige.boons || {})) {
+      const b = C2.BOONS.find(x => x.id === id);
+      if (b) n += b.cost;
+    }
+    return n;
+  }
+  const unspent = g => (g.prestige.points | 0) - spent(g);
+
+  function buyBoon(g, id) {
+    const b = C2.BOONS.find(x => x.id === id);
+    if (!b) return false;
+    if (g.prestige.boons[id]) return fail(g, 'You already carry that.');
+    if (unspent(g) < b.cost) return fail(g, 'Not enough ascension points.');
+    g.prestige.boons[id] = true;
+    SW.ui.log(g, `${b.glyph} ${b.name}. ${b.blurb}`, 'great');
+    return true;
+  }
+
+  /* Build the next island. Everything not covered by a boon is gone. */
+  function ascend(g) {
+    if (!canAscend(g)) return fail(g, `You need ${fmt(C2.ASCEND_MIN_RENOWN)} renown before anyone would let you start again.`);
+    const gained = pointsFor(g);
+    const carried = {
+      points: (g.prestige.points | 0) + gained,
+      boons: g.prestige.boons || {},
+      runs: (g.prestige.runs | 0) + 1,
+      best: Math.max(g.prestige.best | 0, Math.floor(g.res.renown)),
+      bestDay: g.prestige.best > g.res.renown ? g.prestige.bestDay : g.day
+    };
+    const keptSeeds = carried.boons.seedstock;
+    const keptEvo = carried.boons.longline ? Math.max(0, (g.evo | 0) - 1) : 0;
+    const keptIngrained = carried.boons.memory ? g.creature.ingrained : null;
+    const keptNeurons = carried.boons.earlyweb
+      ? Object.keys(g.neurons).slice(0, 4).reduce((o, k) => (o[k] = 1, o), {})
+      : {};
+    const lineage = g.creature.lineage;
+    const name = g.creature.name;
+    const godName = g.godName;
+
+    const n = SW.state.startGame(lineage, name, godName);
+    n.prestige = carried;
+    n.evo = keptEvo;
+    if (keptIngrained) {
+      n.creature.ingrained = {};
+      for (const k in keptIngrained) n.creature.ingrained[k] = keptIngrained[k] * 0.5;
+      // Ingrained behaviour implies some of the weight came with it.
+      for (const k in n.creature.ingrained) {
+        const inst = (C.LINEAGES[lineage].instinct[k] || 1);
+        n.creature.weights[k] = clamp(inst + (SW.creature.W_MAX - inst) * n.creature.ingrained[k] * 0.3,
+          SW.creature.W_MIN, SW.creature.W_MAX);
+      }
+    }
+    n.neurons = keptNeurons;
+    if (keptNeurons.attention) n.res.focusMax += 10;
+    if (carried.boons.inheritance) { n.res.coin += 2000; n.res.wood += 150; }
+    if (keptSeeds) for (const cr of C.CROP_LIST) n.seeds[cr.id] = 40;
+
+    SW.ui.log(n, `You let the island go. ${carried.runs === 1 ? 'The first' : 'Another'} one is already forming under your feet. +${gained} ascension point${gained === 1 ? '' : 's'}.`, 'great');
+    n.fx.push({ at: 'banner', text: '✧ ASCENSION ' + carried.runs, life: 6, t: 0 });
+    return n;
+  }
+
+  SW.prestige = { canAscend, pointsFor, spent, unspent, buyBoon, ascend };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
 /* Skyward Reach — the world tick: village, economy, rivals, festivals, feats,
  * plus every action the player themself can take. */
 (function (SW) {
   'use strict';
   const C = SW.content;
+  const C2 = SW.content2;
   const F = SW.farm;
   const Cr = SW.creature;
   const { clamp, hashNoise, chance, pick, fmt } = SW.core;
@@ -2472,7 +4383,7 @@ tr.you .rg-place { color: var(--gold); }
     const cur = rankOf(g);
     return C.RANKS[Math.min(cur.id + 1, C.RANKS.length - 1)] === cur ? null : C.RANKS[cur.id + 1];
   }
-  const grandeur = g => C.SHRINE_TIERS[g.shrine].grandeur;
+  const grandeur = g => C.SHRINE_TIERS[g.shrine].grandeur + (g.grandeurBonus || 0);
 
   // --- player actions ----------------------------------------------------
   function spend(g, focus) {
@@ -2631,7 +4542,7 @@ tr.you .rg-place { color: var(--gold); }
   // --- world tick --------------------------------------------------------
   function tickVillage(g, dt) {
     const v = g.village;
-    const eaten = v.villagers * 0.085 * SW.discovery.mods.eat(g) * dt;
+    const eaten = (v.villagers + SW.world.extraEaters(g)) * 0.085 * SW.boost.foodUse(g) * dt;
     if (v.food >= eaten) {
       v.food -= eaten;
       v.faith = clamp(v.faith + 0.028 * dt, 0, 100);
@@ -2645,25 +4556,26 @@ tr.you .rg-place { color: var(--gold); }
     // full granary, neighbours who stayed — less whatever they are afraid of.
     // A people who fear you do not also love you, so the two paths compete
     // instead of stacking.
-    const pull = clamp(18 + Math.min(grandeur(g) * 1.8, 46) + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
-      - v.awe * 0.62 - v.unrest * 0.45, 0, 100);
+    const pull = clamp((18 + Math.min(grandeur(g) * 1.8, 46) + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
+      - v.awe * 0.62 - v.unrest * 0.45) * SW.boost.get(g, 'faith'), 0, 100);
     if (g.effects.awe) v.awe = Math.max(v.awe, 14);      // the monolith never stops looming
     v.faith += (pull - v.faith) * 0.0022 * dt;
     v.faith = clamp(v.faith, 0, 100);
-    v.awe = clamp(v.awe - 0.022 * dt, 0, 100);
+    v.awe = clamp(v.awe - 0.022 / SW.boost.get(g, 'awe') * dt, 0, 100);
     // Living under a terror is exhausting, but only once it is genuinely a
     // terror. Below that, fear is just respect and costs nothing.
-    v.unrest = clamp(v.unrest + Math.max(0, v.awe - 45) * 0.005 * dt, 0, 100);
+    v.unrest = clamp(v.unrest + Math.max(0, v.awe - 45) * 0.005 * SW.boost.unrest(g) * dt, 0, 100);
 
     // Prayer: love gives it freely, terror gives it grudgingly.
-    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.05) * SW.discovery.mods.prayer(g);
+    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.05)
+      * (SW.boost.get(g, 'prayer') + SW.world.devoutBonus(g));
     g.res.prayer += rate * dt;
 
     // Standing compounds. A congregation is worth what it feels about you,
     // multiplied by how far away your shrine can be seen. Neither half alone
     // gets you up the Register — this is the engine the whole grind feeds.
     const devotion = v.villagers * (v.faith + v.awe) / 100;
-    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * SW.discovery.mods.renown(g) * dt;
+    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * SW.boost.get(g, 'renown') * dt;
   }
 
   function checkFeats(g) {
@@ -2684,14 +4596,14 @@ tr.you .rg-place { color: var(--gold); }
   // ~70 days and then levels off for good: an established god is not getting
   // any more established. A fully built island out-earns even the fastest of
   // them, which is what makes first place reachable instead of a treadmill.
-  const RIVAL_MAX_GAIN = 1400;
+  const RIVAL_MAX_GAIN = 1900;
 
   function tickRivals(g) {
     // Rivals climb their own curve and never chase you. Nothing rubber-bands,
     // which is the whole reason passing one of them means anything.
     for (const r of g.rivals) {
       const n = hashNoise(r.seed, g.day);
-      const curve = Math.min(25 + 4.5 * Math.pow(g.day, 1.15), RIVAL_MAX_GAIN);
+      const curve = Math.min(25 + 7 * Math.pow(g.day, 1.15), RIVAL_MAX_GAIN);
       let gain = r.pace * curve * (0.72 + n * 0.62);
       if (hashNoise(r.seed + 5, g.day) < r.spike * 0.25) gain *= 2.2;    // a good week
       r.renown += gain;
@@ -2767,6 +4679,8 @@ tr.you .rg-place { color: var(--gold); }
     SW.discovery.firstTime(g, 'fest:' + cat.id, 4, `entering ${cat.name}`);
     if (place === 1) g.stats.festivalWins++;
     if (place <= 3) g.trophies.push({ fest: cat.id, name: cat.name, place, day: g.day });
+    // A podium finish is one of the few reliable ways to come by a relic.
+    if (place === 1 ? chance(0.55) : (place <= 3 && chance(0.2))) SW.relics.grant(g);
 
     g.festival.lastResult = { cat: cat.id, name: cat.name, place, score: Math.round(mine), payout, day: g.day, field: field.slice(0, 5).map(f => ({ name: f.name, score: Math.round(f.score), you: !!f.you })) };
     g.festival.index++;
@@ -2803,6 +4717,10 @@ tr.you .rg-place { color: var(--gold); }
       SW.ui.log(g, 'A family leaves in the night. Word of that travels too.', 'bad');
     }
 
+    SW.world.newDay(g);
+    SW.trade.newDay(g);
+    SW.relics.checkTitles(g);
+
     const before = rankOf(g).id;
     checkFeats(g);
     if (g.day >= g.festival.nextDay) runFestival(g);
@@ -2819,18 +4737,28 @@ tr.you .rg-place { color: var(--gold); }
   function tick(g, dt) {
     g.tick += dt;
     g.dayTick += dt;
-    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * SW.discovery.mods.focusRegen(g) * dt, 0, g.res.focusMax);
+    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * SW.boost.get(g, 'focus') * dt, 0, g.res.focusMax);
 
     F.tickPlots(g, dt);
     Cr.tick(g, dt);
     SW.lineage.tick(g, dt);
-    SW.minigames.tick(g, dt);
+    SW.beast.tick(g, dt);
+    SW.world.tick(g, dt);
     tickVillage(g, dt);
 
     while (g.dayTick >= C.TICKS_PER_DAY) {
       g.dayTick -= C.TICKS_PER_DAY;
       newDay(g);
     }
+  }
+
+  /* The mini-games are played, not simulated: they need real frame time, not
+   * one update per game-second, or a sweeping marker teleports between four
+   * positions and a 0.4-second tone is unhittable. Driven from the render loop
+   * and unaffected by game speed or pause. */
+  function tickRealtime(g, dt) {
+    SW.minigames.tick(g, dt);
+    SW.mini2.tick(g, dt);
   }
 
   /* Catch-up when the tab has been closed. Coarse but honest: the same rules,
@@ -2867,7 +4795,7 @@ tr.you .rg-place { color: var(--gold); }
   function festivalPar(g, cat) { return cat.par(g.day); }
 
   SW.sim = {
-    COST, rankOf, nextRank, grandeur, tick, newDay, runOffline, festivalPar,
+    COST, rankOf, nextRank, grandeur, tick, tickRealtime, newDay, runOffline, festivalPar,
     playerTill, playerSow, playerWater, playerHarvest, playerForage,
     hutCost, plotCost, buildHut, clearPlot, upgradeShrine, castMiracle,
     standings, checkFeats, festivalScore, runFestival
@@ -2883,6 +4811,7 @@ tr.you .rg-place { color: var(--gold); }
 (function (SW) {
   'use strict';
   const C = SW.content;
+  const C2 = SW.content2;
   const Cr = SW.creature;
   const { clamp, lerp, hashNoise } = SW.core;
 
@@ -3226,7 +5155,12 @@ tr.you .rg-place { color: var(--gold); }
       plotPath(c);
       let soil;
       if (p.state === 'raw') soil = '#6f8a56';
-      else soil = mix('#6b4c33', '#3a2a1c', clamp(p.water / 100, 0, 1) * 0.55);
+      else {
+        // Rich ground is dark; worked-out ground goes pale and grey.
+        const q = SW.world.soilOf(p) / 100;
+        soil = mix('#8c7f6a', '#6b4c33', q);
+        soil = mix(soil, '#3a2a1c', clamp(p.water / 100, 0, 1) * 0.45);
+      }
       ctx.fillStyle = mix(soil, '#101828', 1 - amb);
       ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,0.25)';
@@ -3364,6 +5298,37 @@ tr.you .rg-place { color: var(--gold); }
       ctx.fillStyle = mix('#e8c6a0', '#201c30', 1 - amb);
       ctx.beginPath(); ctx.arc(x, y - 10.5 - bob, 2.6, 0, 7); ctx.fill();
     }
+  }
+
+  /* Structures ring the island between the farm and the village. Each tier
+   * makes them taller, so a built-up island reads as built up from a glance. */
+  function drawBuildings(g, sky) {
+    const amb = sky.amb;
+    const ids = Object.keys(g.buildings || {});
+    ids.forEach((id, i) => {
+      const b = C2.BUILDINGS[id];
+      if (!b) return;
+      const tier = g.buildings[id];
+      const ang = -2.35 + (i / Math.max(1, ids.length)) * 2.1;
+      const dist = 0.62 + (i % 2) * 0.12;
+      const p = featurePoint(ang, dist);
+      const h = (14 + tier * 7);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, 14, 5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = mix('#a89b84', '#1e1c2c', 1 - amb);
+      ctx.fillRect(p.x - 10, p.y - h, 20, h);
+      ctx.fillStyle = mix('#7d6a52', '#151322', 1 - amb);
+      ctx.beginPath();
+      ctx.moveTo(p.x - 13, p.y - h);
+      ctx.lineTo(p.x, p.y - h - 9);
+      ctx.lineTo(p.x + 13, p.y - h);
+      ctx.closePath(); ctx.fill();
+      ctx.font = '11px ' + UI_FONT;
+      ctx.textAlign = 'center';
+      ctx.fillText(b.glyph, p.x, p.y - h + 12);
+      ctx.restore();
+    });
   }
 
   function drawShrine(g, sky) {
@@ -3695,6 +5660,7 @@ tr.you .rg-place { color: var(--gold); }
   // --- effects -----------------------------------------------------------
   function drawFx(g, dt) {
     const c = g.creature;
+    let bannerRow = 0;
     for (let i = g.fx.length - 1; i >= 0; i--) {
       const f = g.fx[i];
       f.t += dt;
@@ -3763,6 +5729,60 @@ tr.you .rg-place { color: var(--gold); }
     }
   }
 
+  /* Weather is a standing condition, not a one-off effect, so it is painted
+   * every frame rather than pushed as an fx. */
+  function drawWeather(g, vw) {
+    const w = C2.WEATHER[(g.weather && g.weather.today) || 'clear'];
+    if (!w || w.id === 'clear') return;
+    const W2 = vw.x1 - vw.x0, H2 = vw.y1 - vw.y0;
+    ctx.save();
+    switch (w.id) {
+      case 'downpour':
+        ctx.globalAlpha = 0.34; ctx.strokeStyle = '#bcd8f5'; ctx.lineWidth = 1.1;
+        for (let n = 0; n < 190; n++) {
+          const rx = vw.x0 + ((n * 61 + time * 700) % W2);
+          const ry = vw.y0 + ((n * 137 + time * 1000) % H2);
+          ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 3, ry + 14); ctx.stroke();
+        }
+        break;
+      case 'mist':
+        ctx.globalAlpha = 0.22; ctx.fillStyle = '#cfe0f0';
+        for (let n = 0; n < 5; n++) {
+          const bx = vw.x0 - 200 + ((n * 260 + time * 22) % (W2 + 400));
+          cloud(bx, ISLAND.cy - 40 + Math.sin(n) * 60, 150);
+        }
+        break;
+      case 'gale':
+        ctx.globalAlpha = 0.30; ctx.strokeStyle = '#dce8f5'; ctx.lineWidth = 1.6;
+        for (let n = 0; n < 40; n++) {
+          const rx = vw.x0 + ((n * 137 + time * 1500) % W2);
+          const ry = vw.y0 + ((n * 211) % H2);
+          ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + 46, ry + 5); ctx.stroke();
+        }
+        break;
+      case 'drought':
+      case 'swelter':
+        ctx.globalAlpha = w.id === 'swelter' ? 0.16 : 0.11;
+        ctx.fillStyle = w.id === 'swelter' ? '#ff9a5a' : '#e0c58a';
+        ctx.fillRect(vw.x0, vw.y0, W2, H2);
+        break;
+      case 'auroral': {
+        const grad = ctx.createLinearGradient(0, vw.y0, 0, ISLAND.cy);
+        grad.addColorStop(0, 'rgba(126,231,200,0.00)');
+        grad.addColorStop(0.5, `rgba(140,220,255,${0.16 + 0.08 * Math.sin(time * 0.8)})`);
+        grad.addColorStop(1, 'rgba(210,168,255,0.00)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(vw.x0, vw.y0, W2, H2 * 0.7);
+        break;
+      }
+      case 'hush':
+        ctx.globalAlpha = 0.24; ctx.fillStyle = '#131a2e';
+        ctx.fillRect(vw.x0, vw.y0, W2, H2);
+        break;
+    }
+    ctx.restore();
+  }
+
   // --- overlay HUD on canvas --------------------------------------------
   function drawSceneLabels(g, sky) {
     ctx.save();
@@ -3772,6 +5792,14 @@ tr.you .rg-place { color: var(--gold); }
     ctx.fillText('WOODLAND', WOOD.x, WOOD.y + 46);
     ctx.fillText('VILLAGE · ' + g.village.villagers, VILLAGE.x, VILLAGE.y + 62);
     ctx.fillText(C.SHRINE_TIERS[g.shrine].name.toUpperCase(), SHRINE.x, SHRINE.y + 66);
+    const season = SW.boost.seasonOf(g), weather = SW.boost.weatherOf(g);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = '600 12px ' + UI_FONT;
+    ctx.fillText(`${season.glyph} ${season.name}   ${weather.glyph} ${weather.name}`, W - 16, 24);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '600 10px ' + UI_FONT;
+    ctx.fillText(`tomorrow ${C2.WEATHER[(g.weather && g.weather.tomorrow) || 'clear'].name.toLowerCase()}`, W - 16, 40);
     ctx.restore();
   }
 
@@ -3805,6 +5833,7 @@ tr.you .rg-place { color: var(--gold); }
     drawTrees(sky);
     drawPlots(g, sky);
     drawFeatures(g, sky);
+    drawBuildings(g, sky);
     drawShrine(g, sky);
     drawHuts(g, sky);
     drawVillagers(g, sky);
@@ -3812,6 +5841,7 @@ tr.you .rg-place { color: var(--gold); }
     drawCreature(g, sky);
     drawSceneLabels(g, sky);
     drawListen(g);
+    drawWeather(g, vw);
     drawFx(g, dt);
 
     ctx.restore();
@@ -3872,12 +5902,50 @@ tr.you .rg-place { color: var(--gold); }
   const Ln = SW.lineage;
   const D = SW.discovery;
   const M = SW.minigames;
+  const C2 = SW.content2;
+  const W = SW.world;
+  const B = SW.beast;
+  const R = SW.relics;
+  const T = SW.trade;
+  const M2 = SW.mini2;
+  const P = SW.prestige;
   const { clamp, fmt, titleCase } = SW.core;
 
   let G = null;
   let tab = 'farm';
   let lastFestivalShown = -1;
   let benchA = null, benchB = null;
+  let relicPick = [];
+
+  /* Every entry in the next-action list is a shortcut to the thing itself. */
+  function doTodo(g, act) {
+    if (act.startsWith('tab:')) { setTab(act.slice(4)); return; }
+    switch (act) {
+      case 'openevent': showEvent(g); break;
+      case 'judge': Cr.praise(g); break;
+      case 'breed': if (SW.lineage.canBreed(g)) SW.lineage.breed(g, false); break;
+      case 'listen': M.startListen(g); break;
+      case 'harvestall': batch(g, 'harvest'); break;
+      case 'waterall': batch(g, 'water'); break;
+    }
+  }
+
+  /* Batch work: the single biggest quality-of-life win once the farm is wide.
+   * Costs the same focus per plot, just without the clicking. */
+  function batch(g, what) {
+    let n = 0;
+    const list = what === 'harvest' ? F.ripePlots(g)
+      : g.plots.filter(p => p.crop && p.water < 90).sort((a, b) => a.water - b.water);
+    for (const p of list) {
+      const before = g.res.focus;
+      if (what === 'harvest') S.playerHarvest(g, p); else S.playerWater(g, p);
+      if (g.res.focus === before) break;   // ran out of focus
+      n++;
+    }
+    if (n) log(g, what === 'harvest' ? `You bring in ${n} plots.` : `You water ${n} plots.`, 'good');
+    else log(g, 'Not enough focus.', 'warn');
+    return n;
+  }
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -4036,6 +6104,7 @@ tr.you .rg-place { color: var(--gold); }
       case 'village': setHTML(body, tabVillage(g)); break;
       case 'powers': setHTML(body, tabPowers(g)); break;
       case 'frontier': setHTML(body, tabFrontier(g)); break;
+      case 'beast': setHTML(body, tabBeast(g)); break;
       case 'bench': setHTML(body, tabBench(g)); break;
       case 'register': setHTML(body, tabRegister(g)); break;
       case 'feats': setHTML(body, tabFeats(g)); break;
@@ -4051,7 +6120,7 @@ tr.you .rg-place { color: var(--gold); }
         <span class="pr-i">${p.i + 1}</span>
         <span class="pr-state">${crop ? crop.glyph + ' ' + esc(crop.name) : p.state === 'tilled' ? 'tilled soil' : 'wild ground'}</span>
         <span class="pr-prog ${p.state === 'ripe' ? 'ripe' : ''}">${prog}</span>
-        <span class="pr-water">${p.crop ? '💧' + Math.round(p.water) : ''}</span>
+        <span class="pr-water">${p.crop ? '💧' + Math.round(p.water) : '🟫' + Math.round(W.soilOf(p))}</span>
       </div>`;
     }).join('');
     return `
@@ -4063,6 +6132,12 @@ tr.you .rg-place { color: var(--gold); }
           ⛏️ Break new ground <span class="cost">${cost.wood}🪵 ${cost.coin}🪙</span>
         </button>
       </div>
+      <div class="section-label">Soil — ${Math.round(g.plots.reduce((a, p) => a + W.soilOf(p), 0) / Math.max(1, g.plots.length))}% average</div>
+      <p class="hint">Every harvest takes something out of the ground; empty ground recovers on its own. Sowing a <b>different</b> crop than last time is worth +${Math.round(C2.SOIL.rotationBonus * 100)}% yield.</p>
+      <div class="btnrow wrap">
+        ${C2.FERTILISER_LIST.map(f => `<button class="chip" data-fert="${f.id}" title="${esc(f.blurb)}">${f.glyph} ${esc(f.name)} <i>+${f.soil} · ${costLabel(f.cost)}</i></button>`).join('')}
+      </div>
+      <p class="tiny">Applies to the selected plot, or the poorest one if none is selected.</p>
       <div class="section-label">Seed bag</div>
       <div class="seedbag">
         ${C.CROP_LIST.map(cr => `<span class="chip ${(g.seeds[cr.id] | 0) ? '' : 'dim'}">${cr.glyph} ${g.seeds[cr.id] | 0}</span>`).join('')}
@@ -4105,7 +6180,34 @@ tr.you .rg-place { color: var(--gold); }
           <span class="mk-lock">or send the creature foraging</span>
         </div>
       </div>
+      ${Object.keys(g.fish).some(k => g.fish[k] > 0) ? `<div class="section-label">The catch</div>
+        ${C2.FISH.filter(f => (g.fish[f.id] | 0) > 0).map(f => `<div class="wrow">
+          <span>${f.glyph}</span>
+          <span><b>${esc(f.name)}</b> ×${g.fish[f.id]}<i>${esc(f.blurb)}</i></span>
+          <span><button class="mini" data-sellfish="${f.id}">sell <i>${fmt(f.coin)}</i></button>
+                <button class="mini" data-eatfish="${f.id}">mill <i>+${f.feed}</i></button></span>
+        </div>`).join('')}` : ''}
+      ${caravanBlock(g)}
       <p class="tiny">Lifetime: ${fmt(g.stats.harvests)} harvested · ${fmt(g.stats.sold)} sold · ${fmt(g.stats.coinEarned)} coin earned.</p>`;
+  }
+
+  function caravanBlock(g) {
+    if (!g.caravan) {
+      const inDays = Math.max(0, (g.nextCaravan || 0) - g.day);
+      return `<div class="section-label">Caravans</div><p class="hint">Nothing at the rim${inDays ? ` — something is due in about ${inDays} day${inDays === 1 ? '' : 's'}` : ''}. A Cloud Dock brings them more often.</p>`;
+    }
+    const m = T.caravanDef(g);
+    const ct = g.caravan.contract;
+    const stock = Object.keys(g.caravan.stock).filter(k => g.caravan.stock[k] > 0);
+    return `<div class="section-label">${m.glyph} ${esc(m.name)} — leaves day ${g.caravan.until}</div>
+      <p class="hint">${esc(m.blurb)} Standing with them: <b>${T.merchantRep(g, m.id)}</b> (tier ${T.repTier(T.merchantRep(g, m.id))}).</p>
+      ${ct ? `<div class="terrace">
+        <div class="terrace-head">📜 ${ct.need} ${esc(C.CROPS[ct.crop].name)} <span>${ct.got}/${ct.need}</span></div>
+        <p>Pays ${fmt(Math.round(ct.coin * T.payout(g, m.id)))} coin and ${ct.renown} renown. Leaving it unfilled costs you standing.</p>
+        <div class="btnrow"><button class="btn hot" data-act="deliver" ${(g.stock[ct.crop] | 0) ? '' : 'disabled'}>Hand over what you have</button></div>
+      </div>` : '<p class="hint">Contract filled. Nothing more they want.</p>'}
+      ${stock.length ? `<div class="btnrow wrap">${stock.map(k => `<button class="chip" data-carbuy="${k}">${C.MATERIALS[k].glyph} ×${g.caravan.stock[k]} <i>${fmt(T.matPrice(g, k))}🪙</i></button>`).join('')}</div>`
+        : '<p class="hint">The cart is empty.</p>'}`;
   }
 
   function tabVillage(g) {
@@ -4125,9 +6227,28 @@ tr.you .rg-place { color: var(--gold); }
         ${C.CROP_LIST.map(cr => `<button class="chip" data-mill="${cr.id}" ${(g.stock[cr.id] | 0) ? '' : 'disabled'}>${cr.glyph} mill 1 <i>+${cr.feed}</i></button>`).join('')}
         <button class="chip" data-mill-all="1">mill everything</button>
       </div>
+      <div class="section-label">The people — ${(g.people || []).length}</div>
+      <div>${(g.people || []).slice(0, 24).map(p => `<div class="person">
+        <span>${esc(p.name)}${p.trait ? ` <span class="trait">· ${esc(C2.VILLAGER_TRAITS.find(t => t.id === p.trait).name.toLowerCase())}</span>` : ''}</span>
+        <select data-role="${esc(p.name)}">
+          ${C2.ROLE_LIST.map(r => `<option value="${r.id}" ${p.role === r.id ? 'selected' : ''}>${r.glyph} ${esc(r.name)}</option>`).join('')}
+        </select>
+      </div>`).join('')}</div>
       <div class="section-label">Build</div>
       <div class="btnrow">
-        <button class="btn" data-act="hut">🛖 Raise a hut <span class="cost">${hc.wood}🪵 ${hc.coin}🪙</span></button>
+        <button class="btn" data-act="hut" ${g.village.huts >= SW.discovery.hutCap(g) ? 'disabled' : ''}>🛖 Raise a hut <span class="cost">${hc.wood}🪵 ${hc.coin}🪙 · ${g.village.huts}/${SW.discovery.hutCap(g)}</span></button>
+      </div>
+      <div class="web">
+        ${C2.BUILDING_LIST.map(b => {
+          const why = W.canBuild(g, b.id);
+          const tier = SW.boost.buildingTier(g, b.id);
+          const cost = W.buildingCost(g, b.id);
+          return `<button class="neuron ${tier ? 'owned' : why ? 'locked' : ''}" data-build="${b.id}" ${why ? 'disabled' : ''}>
+            <span>${b.glyph}</span>
+            <span><b>${esc(b.name)}${tier ? ' ' + 'I'.repeat(tier) : ''}</b><i>${esc(why || b.blurb)}</i></span>
+            <span class="cost">${why ? '—' : fmt(cost.wood) + '🪵 ' + fmt(cost.coin) + '🪙'}</span>
+          </button>`;
+        }).join('')}
       </div>
       <div class="section-label">Shrine — ${esc(C.SHRINE_TIERS[g.shrine].name)} (grandeur ${S.grandeur(g)})</div>
       ${next ? `<div class="btnrow">
@@ -4149,7 +6270,88 @@ tr.you .rg-place { color: var(--gold); }
           </button>`;
         }).join('')}
       </div>
-      <p class="tiny">${g.stats.miracles} miracles worked.</p>`;
+      <div class="section-label">Chants${M2.chantUnlocked(g) ? '' : ' — needs a Standing Ring'}</div>
+      <p class="hint">The shrine sings a sequence and you sing it back. Get it all and the effect lands whole; fumble it and you get part of one.</p>
+      <div class="miracles">
+        ${C2.CHANTS.map(ch => {
+          const locked = !M2.chantUnlocked(g) || (g.ring | 0) < ch.ring;
+          const poor = g.res.prayer < ch.prayer;
+          return `<button class="miracle ${locked || poor ? 'off' : ''}" data-chant="${ch.id}" ${locked || poor || M2.busy(g) ? 'disabled' : ''}>
+            <span class="mi-glyph">${ch.glyph}</span>
+            <span class="mi-body"><b>${esc(ch.name)}</b><i>${esc(locked ? 'Requires ' + C.RINGS[ch.ring].name : ch.blurb)} · ${ch.len} tones</i></span>
+            <span class="mi-cost">${ch.prayer}🙏</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <p class="tiny">${g.stats.miracles} miracles worked, ${g.stats.chants || 0} chants sung.</p>`;
+  }
+
+  /* ---- the beast: what it can do, what is wrong with it, and the ring ---- */
+  function tabBeast(g) {
+    const c = g.creature;
+    const ail = c.ailment ? C2.AILMENTS[c.ailment] : null;
+    const rem = ail ? C2.REMEDIES[ail.remedy] : null;
+    const slots = B.techSlots(g);
+    const eq = g.equippedTech || [];
+    const opps = B.arenaOpponents(g);
+    const power = Math.round(B.beastPower(g));
+    const hasRing = SW.boost.buildingTier(g, 'arena') > 0;
+
+    const techRows = C2.TECHNIQUE_LIST.map(t => {
+      const r = B.reps(g, t.id), known = B.techKnown(g, t.id), on = eq.includes(t.id);
+      return `<button class="neuron ${on ? 'owned' : known ? '' : 'locked'}" data-tech="${t.id}" ${known ? '' : 'disabled'}>
+        <span>${t.glyph}</span>
+        <span><b>${esc(t.name)}</b><i>${esc(t.blurb)}</i></span>
+        <span class="cost">${known ? (on ? 'set' : 'idle') : r + '/' + t.reps}</span>
+      </button>`;
+    }).join('');
+
+    return `
+      ${ail ? `<div class="terrace" style="border-color:#6f2f36">
+        <div class="terrace-head">${ail.glyph} ${esc(ail.name)} <span>day ${Math.floor(c.ailDays || 0)}</span></div>
+        <p>${esc(ail.blurb)} It is working at ${Math.round(ail.work * 100)}% and losing condition.</p>
+        <div class="btnrow"><button class="btn hot" data-act="cure">${rem.glyph} ${esc(rem.name)}
+          <span class="cost">${costLabel(rem.cost)}</span></button></div>
+      </div>` : `<p class="hint">Nothing wrong with it. Illness comes from overfeeding, damp, heat, overwork and cruelty — all of which you control.</p>`}
+
+      <div class="section-label">Techniques — ${eq.length}/${slots} set</div>
+      <p class="hint">It works these out by repetition, not by being told. Set the ones you want it using.</p>
+      <div class="web">${techRows}</div>
+
+      <div class="section-label">Bloodline</div>
+      ${g.mateOffer ? `<div class="terrace">
+        <div class="terrace-head">🐾 ${esc(g.mateOffer.name)}</div>
+        <p>💪 ${g.mateOffer.strength} · 🧠 ${g.mateOffer.cunning} · ✨ ${g.mateOffer.grace}${g.mateOffer.lineage !== c.lineage ? ' — a different line, which is worth more.' : ''}</p>
+        <div class="btnrow">
+          <button class="btn" data-act="mateyes">Take it in</button>
+          <button class="btn" data-act="mateno">Drive it off</button>
+        </div>
+      </div>` : g.mate ? `<p class="hint">${esc(g.mate.name)} is waiting. The next whelp carries both lines.</p>`
+        : '<p class="hint">No mate. Whelps will be pure line — steady, and narrower every time.</p>'}
+      ${g.pedigree && g.pedigree.length ? `<div>${g.pedigree.slice(0, 6).map(p =>
+        `<div class="wrow"><span>${p.hybrid ? '🧬' : '🐾'}</span><span><b>Gen ${p.gen}</b><i>out of ${esc(p.mate)}, day ${p.day}</i></span><span></span></div>`).join('')}</div>` : ''}
+      ${g.inbreeding >= 3 ? '<p class="tiny" style="color:var(--warn)">The line is getting narrow. Bring in outside blood.</p>' : ''}
+
+      <div class="section-label">The Trial Ring — power ${fmt(power)}</div>
+      ${!hasRing ? '<p class="hint">You have nowhere to hold a trial. Build a Trial Ring on the second terrace.</p>' : `
+        ${g.arenaResult ? `<div class="fest-result"><b>${esc(g.arenaResult.opponent)}, day ${g.arenaResult.day}</b> — ${g.arenaResult.won ? 'won' : 'lost'}
+          <div class="fest-field">${g.arenaResult.rounds.map(r => `<span class="${r.won ? 'you' : ''}">${fmt(r.mine)} v ${fmt(r.theirs)}</span>`).join('')}</div></div>` : ''}
+        <p class="hint">Three rounds, best of three. It costs the creature 28 vigour whatever happens.</p>
+        ${opps.slice(0, 5).map((o, i) => `<div class="diplo">
+          <span>${esc(o.name)}</span>
+          <span class="op ${o.power < power ? 'warm' : 'cold'}">${fmt(Math.round(o.power))}</span>
+          <button class="mini" data-fight="${i}" ${c.vigor >= 30 ? '' : 'disabled'}>fight</button>
+        </div>`).join('')}`}`;
+  }
+
+  function costLabel(cost) {
+    const bits = [];
+    if (cost.food) bits.push(cost.food + '🥣');
+    if (cost.wood) bits.push(cost.wood + '🪵');
+    if (cost.prayer) bits.push(cost.prayer + '🙏');
+    if (cost.mats) for (const k in cost.mats) bits.push(cost.mats[k] + C.MATERIALS[k].glyph);
+    if (cost.coin) bits.push(fmt(cost.coin) + '🪙');
+    return bits.join(' ');
   }
 
   function tabFrontier(g) {
@@ -4184,6 +6386,12 @@ tr.you .rg-place { color: var(--gold); }
           🔊 Listen <span class="cost">${M.LISTEN_FOCUS} focus</span></button></div>
       </div>
 
+      <div class="terrace">
+        <div class="terrace-head">🎣 Cloud Fishing <span>${M2.fishingUnlocked(g) ? 'ready' : 'not yet known'}</span></div>
+        <p>Drop a line off the rim. Three timing windows, each narrower than the last — clear more and something bigger comes up. Rare fish carry storm glass, skymetal, and occasionally something older.</p>
+        <div class="btnrow"><button class="btn" data-act="fish" ${M2.fishingUnlocked(g) && !M2.busy(g) && g.res.focus >= M2.CAST_FOCUS ? '' : 'disabled'}>
+          🎣 Cast <span class="cost">${M2.CAST_FOCUS} focus</span></button></div>
+      </div>
       <div class="section-label">The ground — ${Object.keys(g.discovered).length} examined, ${unknown} not</div>
       <p class="hint">Unknown things show as <b>?</b> out on the island. Click one to walk over and examine it${D.examineCost(g) ? ` (${D.examineCost(g)} focus)` : ' (free — you have Long Sight)'}.</p>
       <div>${rows || '<p class="hint">Nothing left out there.</p>'}</div>
@@ -4260,6 +6468,16 @@ tr.you .rg-place { color: var(--gold); }
           <td class="rg-renown">${fmt(r.renown)}</td>
         </tr>`).join('')}
       </table>
+      <div class="section-label">Dealing with them directly</div>
+      <p class="hint">Allies quietly add to your standing each day; enemies chip at it. Opinions drift back to indifference on their own.</p>
+      <div>${g.rivals.map(r => {
+        const op = T.opinion(g, r.name);
+        return `<div class="diplo">
+          <span>${esc(r.name)}</span>
+          <span class="op ${T.opinionWord(op)}">${T.opinionWord(op)}</span>
+          <span>${C2.DIPLO_ACTIONS.map(a => `<button class="mini" data-diplo="${a.id}" data-rival="${esc(r.name)}" title="${esc(a.blurb)}">${a.glyph}</button>`).join('')}</span>
+        </div>`;
+      }).join('')}</div>
       <div class="section-label">What they are saying</div>
       <div class="chatter">
         ${g.chatter.length ? g.chatter.slice(0, 14).map(ch => `<div class="ch ${ch.rel}"><i>day ${ch.day}</i> ${esc(ch.text)}</div>`).join('')
@@ -4280,7 +6498,47 @@ tr.you .rg-place { color: var(--gold); }
       <span class="ft-renown">+${f.renown}</span>
     </div>`;
     const trophies = g.trophies.slice(-12).reverse();
-    return `<p class="hint">${earned.length} of ${C.FEATS.length} feats. Renown is the only thing anyone up here actually counts.</p>
+    const av = R.available(g);
+    const owned = R.owned(g);
+    return `
+      <div class="section-label">Oaths — reroll every 3 days</div>
+      ${(g.oaths || []).map(o => `<div class="oath ${o.done ? 'done' : ''}">
+        <span>${o.done ? '★ ' : ''}${esc(o.name)}</span>
+        <span class="oath-bar"><i style="width:${(W.oathProgress(g, o) * 100).toFixed(0)}%"></i></span>
+        <span class="ft-renown">+${o.renown}</span>
+      </div>`).join('')}
+
+      <div class="section-label">Relics — ${owned.length}/${C2.RELIC_LIST.length} · ${(g.equipped || []).length}/${R.slots(g)} set</div>
+      <p class="hint">Only what is set does anything. Two of the same rank can be fused into one of the next rank up, and both are consumed.</p>
+      <div class="relicgrid">
+        ${owned.length ? owned.map(r => `<button class="relicchip r${r.rank} ${R.isEquipped(g, r.id) ? 'on' : ''}" data-relic="${r.id}" title="${esc(r.blurb)}">${r.glyph} ${esc(r.name)}</button>`).join('')
+          : '<span class="hint">None yet. Win festivals, take the ring, land something big, or make the hardest things at the bench.</span>'}
+      </div>
+      ${owned.length >= 2 ? `<div class="btnrow"><button class="btn" data-act="fuse">🔥 Fuse the two selected</button></div>
+        <p class="tiny">Select exactly two of the same rank, then fuse.</p>` : ''}
+
+      <div class="section-label">Titles</div>
+      <div class="relicgrid">
+        ${av.map(t => `<button class="relicchip ${g.title === t.id ? 'on' : ''}" data-title="${t.id}">${esc(t.name)}</button>`).join('')}
+      </div>
+
+      <div class="section-label">Ascension</div>
+      <div class="terrace">
+        <div class="terrace-head">✧ Let the island go <span>${P.canAscend(g) ? '+' + P.pointsFor(g) + ' points' : fmt(C2.ASCEND_MIN_RENOWN - g.res.renown) + ' renown to go'}</span></div>
+        <p>Begin again on fresh ground, carrying only the boons you have bought. Run ${(g.prestige.runs | 0) + 1}. Best so far: ${fmt(g.prestige.best || 0)} renown.</p>
+        <div class="btnrow"><button class="btn ${P.canAscend(g) ? 'hot' : ''}" data-act="ascend" ${P.canAscend(g) ? '' : 'disabled'}>✧ Ascend</button></div>
+      </div>
+      <div class="web">
+        ${C2.BOONS.map(b => {
+          const has = g.prestige.boons[b.id];
+          return `<button class="neuron ${has ? 'owned' : P.unspent(g) >= b.cost ? '' : 'locked'}" data-boon="${b.id}" ${has ? 'disabled' : ''}>
+            <span>${b.glyph}</span><span><b>${esc(b.name)}</b><i>${esc(b.blurb)}</i></span>
+            <span class="cost">${has ? '✓' : b.cost + '✧'}</span></button>`;
+        }).join('')}
+      </div>
+      <p class="tiny">${P.unspent(g)} of ${g.prestige.points | 0} ascension points unspent.</p>
+
+      <div class="section-label">Feats — ${earned.length} of ${C.FEATS.length}</div>
       ${trophies.length ? `<div class="section-label">Trophy shelf</div><div class="trophies">
         ${trophies.map(t => `<span class="trophy p${t.place}" title="${esc(t.name)} — day ${t.day}">${t.place === 1 ? '🥇' : t.place === 2 ? '🥈' : '🥉'} ${esc(t.name.replace('The ', ''))}</span>`).join('')}
       </div>` : ''}
@@ -4328,6 +6586,117 @@ tr.you .rg-place { color: var(--gold); }
     $('judge-what').innerHTML = `${a.icon} ${esc(c.name)} just chose to <b>${esc(a.name)}</b>`;
     const left = 1 - c.pending.t / Cr.PRAISE_WINDOW;
     $('judge-fill').style.width = (clamp(left, 0, 1) * 100) + '%';
+  }
+
+  /* The two timing games get their own overlay: they need to be clickable and
+   * they need to read clearly, which is easier in DOM than on the canvas.
+   *
+   * The structure is built once per game and only the moving parts are then
+   * animated. Rebuilding the markup every frame — which is what the panels do
+   * — would destroy and recreate the Strike button sixty times a second, and
+   * a button that is detached mid-press cannot be pressed.
+   */
+  let playKey = '';
+
+  function renderPlay(g) {
+    const el = $('play');
+    const key = g.fishing ? 'fish:' + g.fishing.stage : g.chant ? 'chant:' + g.chant.id : '';
+    if (key !== playKey) {
+      playKey = key;
+      el.innerHTML = key ? (g.fishing ? fishingMarkup(g) : chantMarkup(g)) : '';
+      el._last = null;
+      el.classList.toggle('on', !!key);
+    }
+    if (!key) return;
+    if (g.fishing) {
+      const f = g.fishing;
+      const mark = el.querySelector('.fishmark');
+      const btn = el.querySelector('.play-btn');
+      const sub = el.querySelector('.play-sub');
+      if (mark) mark.style.left = (f.pos * 100).toFixed(2) + '%';
+      if (btn) btn.disabled = !!f.result;
+      if (sub) sub.textContent = f.result
+        ? (f.result === 'full' ? 'Landed it.' : f.result === 'partial' ? 'It slipped, but something came up.' : 'Gone.')
+        : `Stage ${f.stage + 1} of ${M2.STAGES}`;
+    } else if (g.chant) {
+      const ch = g.chant;
+      el.querySelectorAll('.tonepad').forEach((pad, i) => {
+        pad.classList.toggle('lit', ch.lit === i);
+        pad.disabled = ch.phase !== 'input';
+      });
+      el.querySelectorAll('.chant-steps i').forEach((dot, i) => {
+        const given = ch.input[i];
+        dot.className = given === undefined ? '' : given === ch.seq[i] ? 'ok' : 'bad';
+      });
+      const sub = el.querySelector('.play-sub');
+      if (sub) sub.textContent = ch.phase === 'show' ? 'listen' : ch.phase === 'input' ? 'sing it back' : 'done';
+    }
+  }
+
+  function fishingMarkup(g) {
+    const f = g.fishing;
+    return `<div class="play-title">🎣 Cloud Fishing <span class="play-sub"></span></div>
+      <div class="fishbar">
+        <div class="fishzone" style="left:${(f.zone * 100).toFixed(1)}%;width:${(f.zoneW * 100).toFixed(1)}%"></div>
+        <div class="fishmark" style="left:0%"></div>
+      </div>
+      <button class="btn hot play-btn" data-act="strike">Strike <kbd>Space</kbd></button>`;
+  }
+
+  function chantMarkup(g) {
+    const ch = g.chant;
+    const def = C2.CHANTS.find(x => x.id === ch.id);
+    return `<div class="play-title">${def.glyph} ${esc(def.name)} <span class="play-sub"></span></div>
+      <div class="tonepads">
+        ${C2.CHANT_TONES.map((t, i) => `<button class="tonepad" data-tone="${i}" disabled>${t}</button>`).join('')}
+      </div>
+      <div class="chant-steps">${ch.seq.map(() => '<i></i>').join('')}</div>
+      <p class="tiny" style="text-align:center;margin-top:6px">Keys 6–0 play the tones.</p>`;
+  }
+
+  /* What to do next. The loop got wide enough that a player can lose the
+   * thread, so the scene carries a short live list of the things that are
+   * actually waiting on them, each one a shortcut to the thing itself. */
+  function renderTodo(g) {
+    const items = [];
+    const add = (icon, text, tone, act) => items.push({ icon, text, tone, act });
+
+    if (g.event) add('❗', W.eventDef(g).title, 'urgent', 'openevent');
+    if (g.creature.pending) add(C.ACTS[g.creature.pending.act].icon, 'Judge it — praise or strike', 'good', 'judge');
+    if (g.creature.ailment) add(C2.AILMENTS[g.creature.ailment].glyph, `${g.creature.name} is ill`, 'urgent', 'tab:beast');
+    if (g.mateOffer) add('🐾', 'A mate is waiting on an answer', 'good', 'tab:beast');
+    if (g.village.food < 25) add('🥣', 'The granary is nearly empty', 'urgent', 'tab:village');
+    if (g.village.unrest > 60) add('🔥', 'The village is close to walking out', 'urgent', 'tab:village');
+    const ripe = F.ripePlots(g).length;
+    if (ripe >= 3) add('🧺', `${ripe} plots are ripe`, 'good', 'harvestall');
+    const dry = g.plots.filter(p => p.crop && p.water < 25).length;
+    if (dry >= 3) add('💧', `${dry} plots are drying out`, '', 'waterall');
+    if (SW.lineage.lifeProgress(g) > 0.86 && SW.lineage.canBreed(g)) add('🧬', 'It is old — breed before you lose the work', 'urgent', 'breed');
+    if (g.caravan && g.caravan.contract && (g.stock[g.caravan.contract.crop] | 0) >= g.caravan.contract.need - g.caravan.contract.got) {
+      add('📜', 'A contract can be filled now', 'good', 'tab:market');
+    }
+    if (D.unknownCount(g) && g.res.focus >= D.examineCost(g) + 6 && g.day > 2) {
+      add('❓', `${D.unknownCount(g)} unknown things on the island`, '', 'tab:frontier');
+    }
+    if (M.listenReady(g) && g.res.focus > M.LISTEN_FOCUS + 4) add('🔊', 'The Listening is ready', '', 'listen');
+    if (g.arenaChallenge) add('🏟️', 'A challenge is waiting', 'good', 'tab:beast');
+
+    setHTML($('todo'), items.slice(0, 5).map(i =>
+      `<button class="todo-item ${i.tone}" data-todo="${i.act}"><i>${i.icon}</i>${esc(i.text)}</button>`).join(''));
+  }
+
+  function showEvent(g) {
+    const def = W.eventDef(g);
+    if (!def) return;
+    showModal(`
+      <h1>${esc(def.title)}</h1>
+      <p class="lede">${esc(def.text)}</p>
+      ${def.choices.map((c, i) => `<button class="btn evt-choice" data-choice="${i}">
+        <b>${esc(c.label)}</b><i>${esc(c.note)}</i></button>`).join('')}
+    `);
+    $('modal').querySelectorAll('[data-choice]').forEach(b => {
+      b.onclick = () => { W.resolveEvent(G, +b.dataset.choice); hideModal(); dirty.panel = true; };
+    });
   }
 
   // --- log ---------------------------------------------------------------
@@ -4534,6 +6903,30 @@ tr.you .rg-place { color: var(--gold); }
     if (d.sell) { const gain = F.sell(G, d.sell, +d.n); if (gain) log(G, `Sold for ${fmt(gain)} coin.`); }
     else if (d.buy) { const n = F.buySeed(G, d.buy, +d.n); log(G, n ? `Bought ${n} ${C.CROPS[d.buy].name} seed.` : 'Not enough coin.', n ? 'info' : 'warn'); }
     else if (d.wood) { const n = F.buyWood(G, +d.wood); log(G, n ? `${n} timber delivered.` : 'Not enough coin.', n ? 'info' : 'warn'); }
+    else if (d.tech) B.equipTech(G, d.tech);
+    else if (d.fight !== undefined) B.fight(G, +d.fight);
+    else if (d.build) W.build(G, d.build);
+    else if (d.chant) M2.startChant(G, d.chant);
+    else if (d.tone !== undefined) M2.chantInput(G, +d.tone);
+    else if (d.sellfish) { const c = M2.sellFish(G, d.sellfish, 999); if (c) log(G, `Sold the catch for ${fmt(c)} coin.`, 'good'); }
+    else if (d.eatfish) { const f = M2.eatFish(G, d.eatfish, 999); if (f) log(G, `${f} food into the granary.`, 'good'); }
+    else if (d.carbuy) T.buyFromCaravan(G, d.carbuy, 3);
+    else if (d.diplo) T.diplomacy(G, d.rival, d.diplo);
+    else if (d.boon) P.buyBoon(G, d.boon);
+    else if (d.title) R.setTitle(G, d.title);
+    else if (d.relic) {
+      // Click toggles equip; two of a rank selected with shift are the fuse pair.
+      if (relicPick.includes(d.relic)) relicPick = relicPick.filter(x => x !== d.relic);
+      else relicPick = [...relicPick, d.relic].slice(-2);
+      R.equip(G, d.relic);
+    }
+    else if (d.fert) {
+      const sel = G.plots.find(p => p.i === SW.render.getSelected());
+      const target = sel || G.plots.slice().sort((a, b) => W.soilOf(a) - W.soilOf(b))[0];
+      if (target) W.fertilise(G, target, d.fert);
+    }
+    else if (d.role) { W.assign(G, d.role, e.target.value); }
+    else if (d.todo) doTodo(G, d.todo);
     else if (d.mill) { const f = F.mill(G, d.mill, 1); if (f) log(G, `Milled into ${f} food.`); }
     else if (d.millAll !== undefined) {
       let total = 0;
@@ -4569,6 +6962,20 @@ tr.you .rg-place { color: var(--gold); }
           if (benchA && benchB) { M.combine(G, benchA, benchB); benchA = null; benchB = null; }
           break;
         case 'benchclear': benchA = null; benchB = null; break;
+        case 'cure': B.cure(G); break;
+        case 'mateyes': B.acceptMate(G); break;
+        case 'mateno': B.refuseMate(G); break;
+        case 'deliver': T.deliverContract(G); break;
+        case 'fish': M2.startFishing(G); break;
+        case 'strike': M2.strike(G); break;
+        case 'fuse': if (relicPick.length === 2) { R.fuse(G, relicPick[0], relicPick[1]); relicPick = []; } else log(G, 'Pick exactly two of the same rank.', 'warn'); break;
+        case 'ascend':
+          if (P.canAscend(G) && confirm('Let this island go and begin again?')) {
+            const n = P.ascend(G);
+            if (n) SW.main.replace(n);
+          }
+          break;
+        case 'openevent': showEvent(G); break;
       }
     }
     dirty.panel = true; dirty.card = true;
@@ -4582,7 +6989,12 @@ tr.you .rg-place { color: var(--gold); }
     const k = e.key.toLowerCase();
     if (k === 'p') { Cr.praise(G); renderCard(G); }
     else if (k === 's') { Cr.scold(G); renderCard(G); }
-    else if (k === ' ') { e.preventDefault(); SW.main.togglePause(); }
+    else if (k === ' ') {
+      e.preventDefault();
+      if (G.fishing) M2.strike(G); else SW.main.togglePause();
+    }
+    else if (G.chant && '67890'.includes(k)) M2.chantInput(G, '67890'.indexOf(k));
+    else if (k === 'c' && G.fishing === null) M2.startFishing(G);
     else if (k === '1') SW.main.setSpeed(1);
     else if (k === '2') SW.main.setSpeed(2);
     else if (k === '3') SW.main.setSpeed(4);
@@ -4599,6 +7011,9 @@ tr.you .rg-place { color: var(--gold); }
     // pointerdown, not click: these containers are rebuilt several times a
     // second and a click needs mousedown+mouseup on the same live element.
     $('panel-body').addEventListener('pointerdown', onPanelClick);
+    $('panel-body').addEventListener('change', onPanelClick);
+    $('play').addEventListener('pointerdown', onPanelClick);
+    $('todo').addEventListener('pointerdown', onPanelClick);
     $('card').addEventListener('pointerdown', onPanelClick);
     $('actionbar').addEventListener('pointerdown', onPanelClick);
     $('stage').addEventListener('mousemove', onCanvasMove);
@@ -4616,19 +7031,39 @@ tr.you .rg-place { color: var(--gold); }
     renderLog(G);
   }
 
-  function setGame(g) { G = g; lastFestivalShown = g.festival.index; }
+  /* A dot on any tab with something waiting behind it. */
+  function nudgeTabs(g) {
+    const want = {
+      farm: F.ripePlots(g).length > 0,
+      market: !!(g.caravan && g.caravan.contract),
+      village: g.village.food < 25 || g.village.unrest > 60 || (g.people || []).some(p => p.role === 'idle'),
+      powers: false,
+      frontier: D.unknownCount(g) > 0 && g.res.focus >= D.examineCost(g) + 6,
+      bench: M.benchUnlocked(g) && M.matCount(g) >= 2,
+      beast: !!g.creature.ailment || !!g.mateOffer || !!g.arenaChallenge,
+      register: false,
+      feats: (g.oaths || []).some(o => !o.done && W.oathProgress(g, o) >= 1) || SW.prestige.canAscend(g)
+    };
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('nudge', !!want[b.dataset.tab]));
+  }
+
+  function setGame(g) { G = g; lastFestivalShown = g.festival.index; relicPick = []; playKey = ''; }
 
   let acc = 0;
   function frame(g, dt) {
     G = g;
     acc += dt;
     renderJudge(g);
+    renderPlay(g);
+    if (g.event && !$('modal').classList.contains('on')) showEvent(g);
     if (acc > 0.2) {
       acc = 0;
       renderTop(g);
       renderCard(g);
       renderPanel(g);
       renderActionBar(g);
+      renderTodo(g);
+      nudgeTabs(g);
       if (dirty.log) { renderLog(g); dirty.log = false; }
       document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('on', +b.dataset.speed === g.speed && !g.paused));
       $('btn-pause').textContent = g.paused ? '▶' : '❚❚';
@@ -4682,6 +7117,8 @@ tr.you .rg-place { color: var(--gold); }
       if (G.__featAcc > 1.5) { G.__featAcc = 0; SW.sim.checkFeats(G); }
     }
 
+    // Mini-games run on wall-clock time even while the world is paused.
+    SW.sim.tickRealtime(G, dt);
     SW.render.frame(G, dt);
     SW.ui.frame(G, dt);
 

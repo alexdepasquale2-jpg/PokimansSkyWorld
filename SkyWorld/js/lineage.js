@@ -13,7 +13,7 @@
 
   // --- age ---------------------------------------------------------------
   function lifespan(g) {
-    return C.LIFESPAN * (g.neurons && g.neurons.lineage ? 1.15 : 1);
+    return C.LIFESPAN * SW.boost.get(g, 'life');
   }
 
   function ageOf(g) {
@@ -103,7 +103,7 @@
   function breed(g, natural) {
     const parent = g.creature;
     const L = C.LINEAGES[parent.lineage];
-    const heritable = (g.neurons && g.neurons.lineage ? 0.62 : 0.38) * (natural ? 0.45 : 1);
+    const heritable = 0.38 * SW.boost.get(g, 'herit') * (natural ? 0.45 : 1);
     const carryIngrained = (g.neurons && g.neurons.lineage ? 0.5 : 0.32) * (natural ? 0.5 : 1);
 
     const child = SW.state.newCreature(parent.lineage, parent.name);
@@ -132,7 +132,18 @@
     child.name = parent.name;
     child.x = parent.x; child.y = parent.y; child.tx = parent.x; child.ty = parent.y;
 
+    // Technique repetitions are muscle memory; some of it carries, scaled by
+    // the same heritability that governs behaviour.
+    child.techniques = {};
+    for (const t in (parent.techniques || {})) {
+      child.techniques[t] = Math.floor(parent.techniques[t] * clamp(heritable * 1.4, 0.2, 0.95));
+    }
+    SW.beast.applyMate(g, child);
+    // Lifetime counters survive the animal even though the animal does not.
+    g.stats.praisedTotal = (g.stats.praisedTotal || 0) + parent.praised;
+    g.stats.choresTotal = (g.stats.choresTotal || 0) + parent.chores;
     g.creature = child;
+    g.equippedTech = [];
     g.gens = (g.gens || 0) + 1;
 
     const reward = Math.round(90 * Math.pow(g.gens, 1.25));
