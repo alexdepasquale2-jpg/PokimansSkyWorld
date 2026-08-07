@@ -94,9 +94,13 @@
 
   function buildHut(g) {
     const c = hutCost(g);
+    if (g.village.huts >= SW.discovery.hutCap(g)) {
+      return fail(g, 'There is no more room on this terrace. Build the island outward first.');
+    }
     if (g.res.wood < c.wood || g.res.coin < c.coin) return fail(g, 'You cannot afford another hut.');
     g.res.wood -= c.wood; g.res.coin -= c.coin;
     g.village.huts++;
+    SW.discovery.firstTime(g, 'build:hut', 3, 'raising a hut');
     SW.ui.log(g, 'A new hut goes up. Somewhere below, someone hears about it.', 'good');
     return true;
   }
@@ -107,6 +111,7 @@
     if (g.res.wood < c.wood || g.res.coin < c.coin) return fail(g, 'Not enough wood and coin.');
     g.res.wood -= c.wood; g.res.coin -= c.coin;
     g.plots.push(g.lockedPlots.shift());
+    SW.discovery.firstTime(g, 'build:plot', 3, 'breaking new ground');
     SW.ui.log(g, 'New ground, cleared and claimed.', 'good');
     return true;
   }
@@ -115,9 +120,11 @@
     const next = C.SHRINE_TIERS[g.shrine + 1];
     if (!next) return fail(g, 'The shrine is already everything it can be.');
     if (rankOf(g).id < next.rank) return fail(g, `You must stand at ${C.RANKS[next.rank].name} before the stones will hold.`);
+    if ((next.ring || 0) > (g.ring | 0)) return fail(g, `${C.RINGS[next.ring].name} has to exist before there is ground to put it on.`);
     if (g.res.wood < next.wood || g.res.coin < next.coin) return fail(g, 'Not enough wood and coin.');
     g.res.wood -= next.wood; g.res.coin -= next.coin;
     g.shrine++;
+    SW.discovery.firstTime(g, 'shrine:' + g.shrine, 5, `raising the ${next.name}`);
     g.village.faith = clamp(g.village.faith + 6, 0, 100);
     SW.ui.log(g, `The shrine rises. It is a ${next.name} now, and it can be seen from other islands.`, 'great');
     return true;
@@ -131,6 +138,7 @@
     if (g.res.prayer < m.cost) return fail(g, 'Not enough prayer.');
     g.res.prayer -= m.cost;
     g.stats.miracles++;
+    SW.discovery.firstTime(g, 'miracle:' + id, 3, `working the ${m.name}`);
     switch (id) {
       case 'rain':
         for (const p of g.plots) if (p.crop) { p.water = 100; p.rot = Math.max(0, p.rot - 30); }
@@ -173,7 +181,7 @@
   // --- world tick --------------------------------------------------------
   function tickVillage(g, dt) {
     const v = g.village;
-    const eaten = v.villagers * 0.085 * dt;
+    const eaten = v.villagers * 0.085 * SW.discovery.mods.eat(g) * dt;
     if (v.food >= eaten) {
       v.food -= eaten;
       v.faith = clamp(v.faith + 0.028 * dt, 0, 100);
@@ -187,24 +195,25 @@
     // full granary, neighbours who stayed — less whatever they are afraid of.
     // A people who fear you do not also love you, so the two paths compete
     // instead of stacking.
-    const pull = clamp(18 + grandeur(g) * 1.8 + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
+    const pull = clamp(18 + Math.min(grandeur(g) * 1.8, 46) + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
       - v.awe * 0.62 - v.unrest * 0.45, 0, 100);
+    if (g.effects.awe) v.awe = Math.max(v.awe, 14);      // the monolith never stops looming
     v.faith += (pull - v.faith) * 0.0022 * dt;
     v.faith = clamp(v.faith, 0, 100);
     v.awe = clamp(v.awe - 0.022 * dt, 0, 100);
-    // Living under a terror is exhausting. Awe keeps unrest topped up on its
-    // own, so a fear empire steadily bleeds the villagers it multiplies.
-    v.unrest = clamp(v.unrest + v.awe * 0.0042 * dt, 0, 100);
+    // Living under a terror is exhausting, but only once it is genuinely a
+    // terror. Below that, fear is just respect and costs nothing.
+    v.unrest = clamp(v.unrest + Math.max(0, v.awe - 45) * 0.005 * dt, 0, 100);
 
     // Prayer: love gives it freely, terror gives it grudgingly.
-    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.03);
+    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.05) * SW.discovery.mods.prayer(g);
     g.res.prayer += rate * dt;
 
     // Standing compounds. A congregation is worth what it feels about you,
     // multiplied by how far away your shrine can be seen. Neither half alone
     // gets you up the Register — this is the engine the whole grind feeds.
     const devotion = v.villagers * (v.faith + v.awe) / 100;
-    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * dt;
+    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * SW.discovery.mods.renown(g) * dt;
   }
 
   function checkFeats(g) {
@@ -225,7 +234,7 @@
   // ~70 days and then levels off for good: an established god is not getting
   // any more established. A fully built island out-earns even the fastest of
   // them, which is what makes first place reachable instead of a treadmill.
-  const RIVAL_MAX_GAIN = 650;
+  const RIVAL_MAX_GAIN = 1400;
 
   function tickRivals(g) {
     // Rivals climb their own curve and never chase you. Nothing rubber-bands,
@@ -305,6 +314,7 @@
       : Math.round(8 + g.day);
     g.res.renown += payout;
     g.stats.festivals++;
+    SW.discovery.firstTime(g, 'fest:' + cat.id, 4, `entering ${cat.name}`);
     if (place === 1) g.stats.festivalWins++;
     if (place <= 3) g.trophies.push({ fest: cat.id, name: cat.name, place, day: g.day });
 
@@ -324,6 +334,10 @@
     g.day++;
     g.stats.days++;
     F.rollPrices(g);
+    if (g.effects.seeds) {
+      const best = C.CROP_LIST.filter(c => rankOf(g).id >= c.rank).pop();
+      if (best) g.seeds[best.id] = (g.seeds[best.id] | 0) + 2;
+    }
     tickRivals(g);
     tickChatter(g);
 
@@ -346,6 +360,7 @@
     const after = rankOf(g).id;
     if (after > before) {
       const rk = C.RANKS[after];
+      SW.discovery.firstTime(g, 'rank:' + rk.id, 6, `being called ${rk.name}`);
       SW.ui.log(g, `The Register lists you as ${rk.name}. ${rk.unlock || ''}`, 'great');
       g.fx.push({ at: 'banner', text: 'RANK · ' + rk.name, life: 5, t: 0 });
     }
@@ -354,10 +369,12 @@
   function tick(g, dt) {
     g.tick += dt;
     g.dayTick += dt;
-    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * dt, 0, g.res.focusMax);
+    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * SW.discovery.mods.focusRegen(g) * dt, 0, g.res.focusMax);
 
     F.tickPlots(g, dt);
     Cr.tick(g, dt);
+    SW.lineage.tick(g, dt);
+    SW.minigames.tick(g, dt);
     tickVillage(g, dt);
 
     while (g.dayTick >= C.TICKS_PER_DAY) {

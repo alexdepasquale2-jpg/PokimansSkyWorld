@@ -82,7 +82,7 @@
     } else {
       SW.render.attach(document.getElementById('scene'));
       SW.ui.showHatch((lineage, beastName, godName) => {
-        const g = SW.state.newGame(lineage, beastName, godName);
+        const g = SW.state.startGame(lineage, beastName, godName);
         SW.ui.log(g, `The egg opens. ${beastName} looks at you and waits to be told what it is.`, 'great');
         SW.ui.log(g, 'Click a plot to work it. Praise or strike the creature after it acts — that is how it learns.', 'info');
         begin(g);

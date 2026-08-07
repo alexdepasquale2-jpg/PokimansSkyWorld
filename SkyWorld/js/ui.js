@@ -5,11 +5,15 @@
   const F = SW.farm;
   const Cr = SW.creature;
   const S = SW.sim;
+  const Ln = SW.lineage;
+  const D = SW.discovery;
+  const M = SW.minigames;
   const { clamp, fmt, titleCase } = SW.core;
 
   let G = null;
   let tab = 'farm';
   let lastFestivalShown = -1;
+  let benchA = null, benchB = null;
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -56,6 +60,7 @@
     $('res-wood').textContent = fmt(g.res.wood);
     $('res-prayer').textContent = fmt(g.res.prayer);
     $('res-renown').textContent = fmt(g.res.renown);
+    $('res-insight').textContent = fmt(g.insight);
     $('res-focus').textContent = Math.floor(g.res.focus) + '/' + g.res.focusMax;
     $('focus-fill').style.width = (g.res.focus / g.res.focusMax * 100) + '%';
     $('hud-day').textContent = 'Day ' + g.day;
@@ -86,6 +91,21 @@
     }).join('');
 
     const doing = c.act ? `${C.ACTS[c.act.id].icon} ${c.act.phase === 'travel' ? 'heading off to ' : ''}${C.ACTS[c.act.id].name}` : 'thinking';
+    const age = Ln.ageOf(g);
+    const evo = Ln.evolutionOf(g);
+    const life = Ln.lifeProgress(g);
+    const blocker = Ln.breedBlocker(g);
+    const ingrainRows = C.TRAINABLE.filter(id => C.ACTS[id].useful || Ln.ingrainedOf(g, id) > 0.01).map(id => {
+      const a = C.ACTS[id];
+      const v = Ln.ingrainedOf(g, id);
+      const warm = Cr.mastery(g, id) >= Ln.IN_MIN_MASTERY;
+      return `<div class="ingrain ${warm ? '' : 'cold'}" title="${warm ? 'Praise it to drive this deeper into the line.' : 'It does not know this well enough to ingrain yet.'}">
+        <span>${a.icon}</span>
+        <span class="ingrain-name">${esc(titleCase(a.name))}</span>
+        <span class="ingrain-bar"><i style="width:${(v * 100).toFixed(0)}%"></i></span>
+        <span class="ingrain-pct">${Math.round(v * 100)}%</span>
+      </div>`;
+    }).join('');
 
     setHTML($('card'), `
       <div class="card-head">
@@ -97,6 +117,14 @@
           </div>
         </div>
         <div class="doing">${esc(doing)}</div>
+      </div>
+      <div class="genline">
+        <span>Gen <b>${c.gen || 1}</b></span>
+        <span>${esc(age.name)} · <b>${Math.floor(c.age || 0)}d</b></span>
+        <span class="evo">${evo.tier ? evo.glyph + ' ' + esc(evo.name) : ''}</span>
+      </div>
+      <div class="bars lifebar">
+        ${bar('Life', life * 100, 100, '', Math.max(0, Math.ceil(Ln.lifespan(g) - (c.age || 0))) + 'd left')}
       </div>
       <div class="bars">
         ${bar('Belly', c.hunger, 130, c.hunger < 25 ? 'danger' : 'food')}
@@ -121,6 +149,12 @@
       </div>
       <div class="section-label">What it has learned</div>
       <div class="trainlist">${rows}</div>
+      <div class="section-label">Ingrained — what the line keeps</div>
+      <div class="trainlist">${ingrainRows}</div>
+      <button class="btn big" data-act="breed" ${blocker ? 'disabled' : ''} style="margin-top:8px">
+        🧬 Generation leap ${blocker ? '' : '· gen ' + ((c.gen || 1) + 1)}
+      </button>
+      <p class="tiny">${esc(blocker || 'Everything above 0% carries into the whelp. Everything else dies with this animal.')}</p>
       <div class="section-label">Feed it</div>
       <div class="feedrow">
         ${C.CROP_LIST.map(cr => `<button class="chip" data-feed="${cr.id}" ${(g.stock[cr.id] | 0) > 0 ? '' : 'disabled'}>${cr.glyph} ${g.stock[cr.id] | 0}</button>`).join('')}
@@ -137,6 +171,8 @@
       case 'market': setHTML(body, tabMarket(g)); break;
       case 'village': setHTML(body, tabVillage(g)); break;
       case 'powers': setHTML(body, tabPowers(g)); break;
+      case 'frontier': setHTML(body, tabFrontier(g)); break;
+      case 'bench': setHTML(body, tabBench(g)); break;
       case 'register': setHTML(body, tabRegister(g)); break;
       case 'feats': setHTML(body, tabFeats(g)); break;
     }
@@ -252,6 +288,92 @@
       <p class="tiny">${g.stats.miracles} miracles worked.</p>`;
   }
 
+  function tabFrontier(g) {
+    const ring = D.ringOf(g);
+    const nxt = D.nextRing(g);
+    const cost = D.ringCost(g);
+    const unknown = D.unknownCount(g);
+    const listenState = !M.listenUnlocked(g) ? 'locked'
+      : g.listen ? 'running' : M.listenCooldown(g) > 0 ? 'cooling' : 'ready';
+
+    const rows = g.features.map(inst => {
+      const def = C.FEATURES.find(f => f.id === inst.fid);
+      if (!def) return '';
+      return inst.found
+        ? `<div class="frow"><span>${def.glyph}</span><span><b>${esc(titleCase(def.name))}</b><br><i>${esc(def.blurb)}</i></span><span class="ins">day ${g.discovered[def.id] || '—'}</span></div>`
+        : `<div class="frow unknown"><span>?</span><span><b>Something on the ${esc(C.RINGS[inst.ring].name.replace('The ', '').toLowerCase())}</b><br><i>You have not walked over to it.</i></span><span class="ins">+?</span></div>`;
+    }).join('');
+
+    return `
+      <div class="terrace">
+        <div class="terrace-head">⛰ ${esc(ring.name)} <span>${g.plots.length}/${ring.plots} plots · ${g.village.huts}/${ring.hutCap} huts</span></div>
+        ${nxt ? `<p>${esc(nxt.name)} would add ${nxt.plots - ring.plots} plot slots and room for ${nxt.hutCap - ring.hutCap} more huts — and a fresh band of ground you know nothing about.</p>
+          <div class="btnrow"><button class="btn" data-act="ring">⛰ Raise ${esc(nxt.name)}
+            <span class="cost">${fmt(cost.wood)}🪵 ${fmt(cost.coin)}🪙 ${cost.insight}🧠</span></button></div>`
+          : '<p>The island is as wide as it will ever be.</p>'}
+      </div>
+
+      <div class="terrace">
+        <div class="terrace-head">🔊 The Listening <span>${listenState === 'locked' ? 'not yet known' : listenState === 'running' ? 'in progress' : listenState === 'cooling' ? Math.ceil(M.listenCooldown(g)) + 's' : 'ready'}</span></div>
+        <p>Go still and sweep the island. Whatever answers glows for a moment — click it before it stops. The only way to get storm glass and skymetal out of the ground.</p>
+        <div class="btnrow"><button class="btn" data-act="listen" ${listenState === 'ready' ? '' : 'disabled'}>
+          🔊 Listen <span class="cost">${M.LISTEN_FOCUS} focus</span></button></div>
+      </div>
+
+      <div class="section-label">The ground — ${Object.keys(g.discovered).length} examined, ${unknown} not</div>
+      <p class="hint">Unknown things show as <b>?</b> out on the island. Click one to walk over and examine it${D.examineCost(g) ? ` (${D.examineCost(g)} focus)` : ' (free — you have Long Sight)'}.</p>
+      <div>${rows || '<p class="hint">Nothing left out there.</p>'}</div>
+
+      <div class="section-label">The neural web — ${fmt(g.insight)} insight</div>
+      <div class="web">
+        ${C.NEURONS.map(n => {
+          const owned = !!g.neurons[n.id];
+          const open = D.neuronAvailable(g, n);
+          return `<button class="neuron ${owned ? 'owned' : open ? '' : 'locked'}" data-neuron="${n.id}" ${owned || !open ? 'disabled' : ''}>
+            <span>${n.icon}</span>
+            <span><b>${esc(n.name)}</b><i>${esc(n.desc)}</i></span>
+            <span class="cost">${owned ? '✓' : n.cost + '🧠'}</span>
+          </button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function tabBench(g) {
+    if (!M.benchUnlocked(g)) {
+      return `<p class="hint">You do not have a workbench. Grow <b>The Bench</b> on the neural web to build one.</p>`;
+    }
+    const have = id => g.mats[id] | 0;
+    const ready = benchA && benchB && have(benchA) >= (benchA === benchB ? 2 : 1) && have(benchB) >= 1;
+    const known = C.RECIPES.filter(r => g.recipes[r.id]);
+    const deadEnds = Object.keys(g.deadEnds).length;
+
+    return `<p class="hint">Put two things together and find out. There is no list — ${C.RECIPES.length} pairings do something, ${21 - C.RECIPES.length} do nothing, and finding out either way costs you the materials.</p>
+      <div class="matgrid">
+        ${C.MATERIAL_LIST.map(m => `<button class="matchip ${benchA === m.id || benchB === m.id ? 'sel' : ''}" data-mat="${m.id}" ${have(m.id) ? '' : 'disabled'}>
+          ${m.glyph} ${esc(m.name)} <b>${have(m.id)}</b></button>`).join('')}
+      </div>
+      <div class="bench-slots">
+        <span class="slot ${benchA ? 'full' : ''}" data-slot="a">${benchA ? C.MATERIALS[benchA].glyph : ''}</span>
+        <span>+</span>
+        <span class="slot ${benchB ? 'full' : ''}" data-slot="b">${benchB ? C.MATERIALS[benchB].glyph : ''}</span>
+      </div>
+      <div class="btnrow">
+        <button class="btn hot" data-act="combine" ${ready && g.res.focus >= M.CRAFT_FOCUS ? '' : 'disabled'}>⚒️ Combine <span class="cost">${M.CRAFT_FOCUS} focus</span></button>
+        <button class="btn" data-act="benchclear">Clear</button>
+      </div>
+      <div class="section-label">Buy materials</div>
+      <div class="btnrow wrap">
+        ${C.MATERIAL_LIST.filter(m => m.buy).map(m => `<button class="chip" data-buymat="${m.id}">${m.glyph} ×5 <i>${m.buy * 5}🪙</i></button>`).join('')}
+      </div>
+      <p class="tiny">Storm glass and skymetal are not for sale. Examine the ground, or listen for them.</p>
+      <div class="section-label">Known — ${known.length} of ${C.RECIPES.length}${deadEnds ? ` · ${deadEnds} dead ends` : ''}</div>
+      ${known.length ? known.map(r => `<div class="recipe">
+        <span>${r.glyph}</span>
+        <span><b>${esc(r.name)}</b><br><i>${C.MATERIALS[r.a].glyph} + ${C.MATERIALS[r.b].glyph} · made ${g.crafted[r.id] || 0}×</i></span>
+        <span class="val">${fmt(M.craftValue(g, r))}🪙</span>
+      </div>`).join('') : '<p class="hint">You have not made anything yet.</p>'}`;
+  }
+
   function tabRegister(g) {
     const rows = S.standings(g);
     const fest = C.FESTIVALS[g.festival.index % C.FESTIVALS.length];
@@ -304,9 +426,17 @@
   // --- plot action bar ---------------------------------------------------
   function renderActionBar(g) {
     const el = $('actionbar');
+    if (g.listen) {
+      setHTML(el, `<span class="ab-title">🔊 Listening</span><span class="ab-hint">Click what glows before it fades. ${g.listen.hits} caught.</span>`);
+      return;
+    }
     const i = SW.render.getSelected();
     const p = g.plots.find(pp => pp.i === i);
-    if (!p) { setHTML(el, '<span class="ab-hint">Click a plot, the woodland, or your creature.</span>'); return; }
+    if (!p) {
+      const unknown = D.unknownCount(g);
+      setHTML(el, `<span class="ab-hint">Click a plot, the woodland, or your creature.${unknown ? ` <b>${unknown}</b> unknown thing${unknown === 1 ? '' : 's'} still out there — look for the <b>?</b> marks.` : ''}</span>`);
+      return;
+    }
     const crop = p.crop ? C.CROPS[p.crop] : null;
     let html = `<span class="ab-title">Plot ${p.i + 1} — ${crop ? esc(crop.name) : p.state === 'tilled' ? 'tilled' : 'wild'}</span>`;
     if (p.state === 'raw') {
@@ -430,7 +560,13 @@
         and a terrorising creature. Awe decays and breeds unrest; faith compounds. Pick a god to be.</p>
         <p><b>Festivals</b> every five days, rotating between crops, creature and shrine. <b>Feats</b> and placement in
         <b>the Register</b> are where renown really comes from.</p>
-        <p class="tiny">Keys — <b>P</b> praise · <b>S</b> strike · <b>Space</b> pause · <b>1/2/3</b> speed · <b>F</b> festival panel</p>
+        <p><b>Learning dies with the animal.</b> Praising a chore it already knows well also <i>ingrains</i> it — and only ingrained
+        behaviour survives a <b>generation leap</b>. Breed before it dies of old age and the whelp starts already knowing its
+        parent's trade. Let it die first and you lose most of that. Every few generations the line changes shape permanently.</p>
+        <p><b>The island is not fully known to you.</b> Unknown things sit out past the farm as <b>?</b> marks; walking over and
+        examining one is the only source of <b>Insight</b>, which buys permanent upgrades on the neural web. Raising a terrace
+        makes the island physically bigger and puts a fresh band of unknown ground inside it.</p>
+        <p class="tiny">Keys — <b>P</b> praise · <b>S</b> strike · <b>L</b> listen · <b>B</b> breed · <b>Space</b> pause · <b>1/2/3</b> speed · <b>F</b> festival panel</p>
       </div>
       <button class="btn big" onclick="SW.ui.hideModal()">Understood</button>
     `, { wide: true });
@@ -474,12 +610,17 @@
   function onCanvasMove(e) {
     const w = SW.render.toWorld(e.clientX, e.clientY);
     const p = SW.render.hitPlot(G, w.x, w.y);
+    const f = SW.render.hitFeature(G, w.x, w.y);
     SW.render.setHover(p ? p.i : -1);
-    $('stage').style.cursor = p || SW.render.hitCreature(G, w.x, w.y) ? 'pointer' : 'default';
+    SW.render.setHoverFeature(f);
+    $('stage').style.cursor = (p || f || G.listen || SW.render.hitCreature(G, w.x, w.y)) ? 'pointer' : 'default';
   }
 
   function onCanvasClick(e) {
     const w = SW.render.toWorld(e.clientX, e.clientY);
+    if (G.listen) { M.hitListen(G, w.x, w.y); return; }
+    const feat = SW.render.hitFeature(G, w.x, w.y);
+    if (feat) { D.examine(G, feat); dirty.panel = true; return; }
     if (SW.render.hitCreature(G, w.x, w.y)) {
       if (G.creature.pending) Cr.praise(G);
       else log(G, `${G.creature.name} looks up at you.`);
@@ -536,6 +677,14 @@
       log(G, total ? `The granary takes ${total} food.` : 'Nothing to mill.', total ? 'good' : 'warn');
     }
     else if (d.miracle) S.castMiracle(G, d.miracle);
+    else if (d.neuron) D.buyNeuron(G, d.neuron);
+    else if (d.buymat) { const n = M.buyMaterial(G, d.buymat, 5); if (n) log(G, `${n} ${C.MATERIALS[d.buymat].name.toLowerCase()} delivered.`); }
+    else if (d.mat) {
+      // First click fills the left slot, second the right, third starts over.
+      if (benchA === null) benchA = d.mat;
+      else if (benchB === null) benchB = d.mat;
+      else { benchA = d.mat; benchB = null; }
+    }
     else if (d.feed) Cr.feed(G, d.feed);
     else if (d.leash) { G.creature.leash = d.leash; log(G, `Leash of ${C.LEASHES[d.leash].name}.`); }
     else if (d.act) {
@@ -549,6 +698,13 @@
         case 'clearplot': S.clearPlot(G); break;
         case 'hut': S.buildHut(G); break;
         case 'shrine': S.upgradeShrine(G); break;
+        case 'ring': D.raiseRing(G); break;
+        case 'listen': M.startListen(G); break;
+        case 'breed': if (Ln.canBreed(G)) Ln.breed(G, false); break;
+        case 'combine':
+          if (benchA && benchB) { M.combine(G, benchA, benchB); benchA = null; benchB = null; }
+          break;
+        case 'benchclear': benchA = null; benchB = null; break;
       }
     }
     dirty.panel = true; dirty.card = true;
@@ -567,6 +723,8 @@
     else if (k === '2') SW.main.setSpeed(2);
     else if (k === '3') SW.main.setSpeed(4);
     else if (k === 'f') setTab('register');
+    else if (k === 'l') M.startListen(G);
+    else if (k === 'b') { if (Ln.canBreed(G)) Ln.breed(G, false); }
     else if (k === '?') showHelp();
   }
 

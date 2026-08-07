@@ -4,8 +4,8 @@
   const C = SW.content;
   const { clamp } = SW.core;
 
-  const GRID_W = 4, GRID_H = 4;
-  const MAX_PLOTS = GRID_W * GRID_H;
+  const GRID_W = 6, GRID_H = 6;
+  const MAX_PLOTS = GRID_W * GRID_H;   // the full island, once every terrace is up
   const START_PLOTS = 3;
 
   function makePlot(index) {
@@ -40,6 +40,9 @@
       stats: { strength: L.base.strength, cunning: L.base.cunning, grace: L.base.grace },
       weights: weights,
       leash: 'none',
+      age: 0,          // days lived
+      gen: 1,          // which generation of the line this is
+      ingrained: {},   // actId -> 0..1, the only thing that outlives the animal
       // transient-ish, but persisted so a reload doesn't eat a pending praise
       act: null,       // { id, tick, target, resolved }
       actCooldown: 0,
@@ -51,8 +54,10 @@
   }
 
   function newGame(lineageId, creatureName, godName) {
+    // Only the first terrace exists at the start; the rest of the grid is
+    // added as the island is built outward.
     const plots = [];
-    for (let i = 0; i < MAX_PLOTS; i++) plots.push(makePlot(i));
+    for (let i = 0; i < C.RINGS[0].plots; i++) plots.push(makePlot(i));
 
     const rivals = C.RIVALS.map((r, i) => ({
       name: r.name, pace: r.pace, spike: r.spike, tone: r.tone,
@@ -82,6 +87,25 @@
       village: { villagers: 3, huts: 3, faith: 20, awe: 5, food: 8, unrest: 0 },
       shrine: 0,
 
+      // frontier
+      ring: 0,
+      insight: 0,
+      features: [],          // { fid, ring, ang, dist, found }
+      discovered: {},        // featureId -> day
+      effects: {},           // permanent island effects unlocked by examining
+      neurons: {},           // neural web nodes bought
+      firsts: {},            // one-off novelty awards already collected
+      // lineage
+      evo: 0,                // evolution tier reached
+      gens: 0,               // generation leaps completed
+      // mini-games
+      mats: { fibre: 0, clay: 0, resin: 0, bone: 0, glass: 0, metal: 0 },
+      recipes: {},           // recipeId -> day first made
+      crafted: {},           // recipeId -> times made
+      deadEnds: {},          // pairKey -> day, pairings known to make nothing
+      listen: null,
+      listenAt: -9999,
+
       creature: newCreature(lineageId, creatureName),
 
       rivals: rivals,
@@ -95,6 +119,13 @@
       fx: [],
       __savedAt: Date.now()
     };
+  }
+
+  /* Everything a fresh island needs that isn't a plain field. */
+  function startGame(lineageId, creatureName, godName) {
+    const g = newGame(lineageId, creatureName, godName);
+    SW.discovery.spawnRing(g, 0);
+    return g;
   }
 
   /* Bring an older/partial save up to the current shape without losing progress. */
@@ -111,11 +142,18 @@
     fill(g, fresh);
     if (!C.LINEAGES[g.creature.lineage]) g.creature.lineage = 'mossback';
     for (const id of C.TRAINABLE) if (typeof g.creature.weights[id] !== 'number') g.creature.weights[id] = 1;
+    if (!g.creature.ingrained) g.creature.ingrained = {};
     g.creature.hunger = clamp(g.creature.hunger, 0, 100);
     g.creature.vigor = clamp(g.creature.vigor, 0, 100);
+    // A save from before a terrace existed still has to end up with the right
+    // number of plot slots and the right features on the ground.
+    const slots = C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)].plots;
+    for (let i = g.plots.length + g.lockedPlots.length; i < slots; i++) g.lockedPlots.push(makePlot(i));
+    for (let r = 0; r <= (g.ring | 0); r++) SW.discovery.spawnRing(g, r);
+    g.listen = null;
     g.fx = [];
     return g;
   }
 
-  SW.state = { GRID_W, GRID_H, MAX_PLOTS, makePlot, newCreature, newGame, hydrate };
+  SW.state = { GRID_W, GRID_H, MAX_PLOTS, makePlot, newCreature, newGame, startGame, hydrate };
 })(window.SW = window.SW || {});

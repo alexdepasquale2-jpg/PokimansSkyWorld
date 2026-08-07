@@ -18,7 +18,8 @@ const ROOT = path.join(__dirname, '..');
 const sandbox = { window: {}, console, Math, Date, JSON, parseInt, isNaN };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-for (const f of ['core.js', 'content.js', 'state.js', 'farm.js', 'creature.js', 'sim.js', 'render.js', 'ui.js']) {
+for (const f of ['core.js', 'content.js', 'state.js', 'farm.js', 'creature.js', 'lineage.js',
+                 'discovery.js', 'minigames.js', 'sim.js', 'render.js', 'ui.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), sandbox, { filename: f });
 }
 const SW = sandbox.window.SW;
@@ -29,7 +30,8 @@ const days = parseInt(process.argv[2] || '40', 10);
 const strategy = process.argv[3] || 'trainer';
 const C = SW.content, F = SW.farm, S = SW.sim, Cr = SW.creature;
 
-const g = SW.state.newGame('mossback', 'Pim', 'Tester');
+const g = SW.state.startGame('mossback', 'Pim', 'Tester');
+const Ln = SW.lineage, Dis = SW.discovery, Mg = SW.minigames;
 if (strategy === 'trainer') g.creature.leash = 'learning';
 
 function playerTurn() {
@@ -69,11 +71,60 @@ function playerTurn() {
   if (g.creature.hunger < 85) for (const cr of C.CROP_LIST) if ((g.stock[cr.id] | 0) > 2) { Cr.feed(g, cr.id); break; }
   const want = C.CROP_LIST.filter(c => S.rankOf(g).id >= c.rank).pop();
   if (want && (g.seeds[want.id] | 0) < 4) F.buySeed(g, want.id, 4);
+  // The Listening is a click mini-game; approximate a mediocre player by
+  // catching about two thirds of what answers.
+  if (g.listen) {
+    for (const n of g.listen.nodes) {
+      if (!n.hit && n.t > 0.4 && Math.random() < 0.35) {
+        n.hit = true; g.listen.hits++;
+        Mg.hitListenNode(g, n);
+      }
+    }
+  } else if (Mg.listenReady(g) && g.res.focus > Mg.LISTEN_FOCUS + 10) {
+    Mg.startListen(g);
+  }
+
+  // Walk over to anything still unexamined — Insight has no other source.
+  for (const inst of g.features) {
+    if (!inst.found && g.res.focus > Dis.examineCost(g) + 6) { Dis.examine(g, inst); break; }
+  }
+  // Grow the cheapest neuron currently available — but hold back the Insight a
+  // terrace needs, since terraces gate the shrine and the shrine is the engine.
+  const ringNeed = Dis.ringCost(g);
+  const shrineNext = C.SHRINE_TIERS[g.shrine + 1];
+  const blockedOnGround = shrineNext && (shrineNext.ring || 0) > g.ring;
+  const reserve = ringNeed && blockedOnGround ? ringNeed.insight : 0;
+  const openNeurons = C.NEURONS.filter(n => !g.neurons[n.id] && Dis.neuronAvailable(g, n)).sort((a, b) => a.cost - b.cost);
+  if (openNeurons.length && g.insight - reserve >= openNeurons[0].cost) Dis.buyNeuron(g, openNeurons[0].id);
+
+  // Breed once the animal is grown and well bonded, so the drilled behaviour
+  // carries rather than dying with it.
+  if (Ln.canBreed(g) && g.creature.age > 26 && Ln.ingrainedCount(g, 0.55) >= 2) Ln.breed(g, false);
+
+  // Work the bench whenever there is something to combine.
+  if (Mg.benchUnlocked(g) && g.res.focus > Mg.CRAFT_FOCUS + 8) {
+    const mats = C.MATERIAL_LIST.filter(m => (g.mats[m.id] | 0) > 0);
+    if (g.res.coin > 8000) for (const m of C.MATERIAL_LIST) if (m.buy && (g.mats[m.id] | 0) < 3) Mg.buyMaterial(g, m.id, 3);
+    // prefer an unknown pairing, else the most valuable known one
+    let best = null;
+    for (let i = 0; i < mats.length; i++) for (let j = i; j < mats.length; j++) {
+      const a = mats[i].id, b = mats[j].id;
+      const need = a === b ? 2 : 1;
+      if ((g.mats[a] | 0) < need || (g.mats[b] | 0) < 1) continue;
+      const key = Mg.pairKey(a, b);
+      if (g.deadEnds[key]) continue;
+      const r = Mg.recipeFor(a, b);
+      const score = !r ? 1e9 : (g.recipes[r.id] ? Mg.craftValue(g, r) : 1e8);
+      if (!best || score > best.score) best = { a, b, score };
+    }
+    if (best) Mg.combine(g, best.a, best.b);
+  }
+
   // Spend prayer and coin on the obvious upgrades. The shrine comes first:
   // grandeur multiplies every point of devotion the village produces.
   if (g.res.prayer > 40) S.castMiracle(g, 'rain');
   const sh = C.SHRINE_TIERS[g.shrine + 1];
-  const reachable = sh && S.rankOf(g).id >= sh.rank;
+  const reachable = sh && S.rankOf(g).id >= sh.rank && (sh.ring || 0) <= g.ring;
   if (reachable && g.res.wood >= sh.wood && g.res.coin >= sh.coin) S.upgradeShrine(g);
   // Everything else is bought out of the surplus over the next shrine tier —
   // grandeur multiplies every point of devotion, so it is never worth
@@ -83,6 +134,16 @@ function playerTurn() {
   if (g.village.huts <= g.village.villagers + 1 && surplus > hc.coin * 1.5 && g.res.wood > hc.wood) S.buildHut(g);
   const pc = S.plotCost(g);
   if (g.lockedPlots.length && surplus > pc.coin * 2 && g.res.wood > pc.wood) S.clearPlot(g);
+  // Build the island outward once the current terrace is genuinely full.
+  // Raise the terrace when the current one is full, or when the next shrine
+  // tier is waiting on ground that does not exist yet.
+  const rc = Dis.ringCost(g);
+  const shrineWantsGround = sh && (sh.ring || 0) > g.ring && S.rankOf(g).id >= sh.rank;
+  const terraceFull = !g.lockedPlots.length && g.village.huts >= Dis.hutCap(g) - 1;
+  // More ground is almost always the right buy: it raises the villager cap,
+  // which multiplies everything the shrine does.
+  if (rc && (terraceFull || shrineWantsGround || g.village.huts >= Dis.hutCap(g) - 3)
+      && g.res.coin > rc.coin * 1.15 && g.res.wood > rc.wood && g.insight >= rc.insight) Dis.raiseRing(g);
 }
 
 const marks = [];
@@ -103,7 +164,9 @@ for (let t = 0; t < days * C.TICKS_PER_DAY; t++) {
       kind: Math.round(g.creature.kind),
       size: +g.creature.size.toFixed(2),
       // festival competitiveness: your score over what a strong rival fields
-      fest: C.FESTIVALS.map(f => (S.festivalScore(g, f) / f.par(g.day)).toFixed(1)).join('/')
+      fest: C.FESTIVALS.map(f => (S.festivalScore(g, f) / f.par(g.day)).toFixed(1)).join('/'),
+      gen: g.creature.gen, evo: g.evo, ring: g.ring,
+      ins: Math.round(g.insight), neu: Object.keys(g.neurons).length
     });
   }
 }
@@ -124,6 +187,10 @@ console.log('\nfinal:', {
   plots: g.plots.length,
   coinEarned: g.stats.coinEarned,
   shrine: g.shrine,
+  gens: g.gens, evo: g.evo, ring: g.ring,
+  discovered: Object.keys(g.discovered).length + '/' + C.FEATURES.length,
+  neurons: Object.keys(g.neurons).length + '/' + C.NEURONS.length,
+  recipes: Object.keys(g.recipes).length + '/' + C.RECIPES.length,
   creature: Cr.describe(g)
 });
 console.log('top of register:', S.standings(g).slice(0, 4).map(r => `${r.place}. ${r.name} ${Math.round(r.renown)}`).join('  |  '));

@@ -71,6 +71,7 @@ kbd {
 .res .r i { font-style: normal; font-size: 13px; opacity: 0.95; }
 .res .r b { font-variant-numeric: tabular-nums; }
 .res .renown b { color: var(--gold); }
+.res .insight b { color: #9fd6ff; }
 .res .focus { position: relative; padding-bottom: 5px; }
 .focus-track {
   position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px;
@@ -222,8 +223,8 @@ aside::-webkit-scrollbar-thumb, #log::-webkit-scrollbar-thumb { background: #263
 .hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
 
 /* ---------- right panel ---------- */
-.tabs { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: 1px solid var(--line); flex: 0 0 auto; }
-.tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 10px 0; font-size: 16px; opacity: 0.55; }
+.tabs { display: grid; grid-template-columns: repeat(8, 1fr); border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 10px 0; font-size: 15px; opacity: 0.55; }
 .tab:hover { opacity: 0.85; background: rgba(255,255,255,0.03); }
 .tab.on { opacity: 1; border-bottom-color: var(--gold); background: rgba(231,198,106,0.07); }
 #panel-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; }
@@ -402,6 +403,58 @@ tr.you .rg-place { color: var(--gold); }
   #actionbar { left: 8px; right: 8px; bottom: 8px; }
 }
 
+
+/* ---------- lineage, frontier, bench ---------- */
+.lifebar .bar-fill { background: linear-gradient(90deg, #7ec9a0, #e0b45c, #c86a6a); }
+.genline { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; color: var(--dim); margin: 4px 0 8px; }
+.genline b { color: var(--ink); }
+.genline .evo { margin-left: auto; color: var(--great); }
+.ingrain { display: grid; grid-template-columns: 18px 1fr 50px 32px; align-items: center; gap: 6px; font-size: 11.5px; }
+.ingrain-name { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ingrain-bar { height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; }
+.ingrain-bar i { display: block; height: 100%; background: var(--great); transition: width 0.3s; }
+.ingrain.cold .ingrain-bar i { background: #46506e; }
+.ingrain-pct { text-align: right; font-size: 10.5px; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+
+.terrace { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--panel-2); margin-bottom: 10px; }
+.terrace-head { display: flex; align-items: baseline; gap: 8px; font-family: var(--serif); font-size: 14px; }
+.terrace-head span { margin-left: auto; font-family: var(--sans); font-size: 11px; color: var(--dim); }
+.terrace p { margin: 6px 0 0; font-size: 11.5px; color: var(--dim); }
+
+.frow { display: grid; grid-template-columns: 20px 1fr auto; gap: 8px; align-items: center; font-size: 11.5px; padding: 3px 0; }
+.frow.unknown b { color: #bcd8f5; }
+.frow i { font-style: normal; color: var(--dimmer); font-size: 10.5px; }
+.frow .ins { color: #9fd6ff; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+
+.web { display: grid; gap: 5px; }
+.neuron {
+  display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; text-align: left;
+}
+.neuron:hover:not(:disabled) { border-color: #9fd6ff; }
+.neuron.owned { border-color: #3d6b4a; background: rgba(126,231,135,0.07); }
+.neuron.locked { opacity: 0.42; }
+.neuron b { display: block; font-size: 12.5px; }
+.neuron i { font-style: normal; font-size: 10.5px; color: var(--dim); }
+.neuron .cost { font-size: 11.5px; color: #9fd6ff; font-variant-numeric: tabular-nums; }
+
+.matgrid { display: flex; flex-wrap: wrap; gap: 5px; }
+.matchip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 9px; font-size: 12px;
+}
+.matchip.sel { border-color: var(--gold); background: rgba(231,198,106,0.14); }
+.matchip:disabled { opacity: 0.35; cursor: default; }
+.matchip b { font-variant-numeric: tabular-nums; }
+.bench-slots { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; font-size: 22px; }
+.slot { width: 52px; height: 52px; border: 1px dashed var(--line); border-radius: 10px; display: grid; place-items: center; background: var(--panel-2); }
+.slot.full { border-style: solid; border-color: var(--gold); }
+.recipe { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; font-size: 11.5px; padding: 3px 0; }
+.recipe i { font-style: normal; color: var(--dimmer); font-size: 10.5px; }
+.recipe .val { color: var(--gold); font-variant-numeric: tabular-nums; }
+
 </style>
 </head>
 <body>
@@ -421,6 +474,7 @@ tr.you .rg-place { color: var(--gold); }
       <span class="r" title="Wood"><i>🪵</i><b id="res-wood">0</b></span>
       <span class="r" title="Prayer"><i>🙏</i><b id="res-prayer">0</b></span>
       <span class="r renown" title="Renown — the only score anyone counts"><i>👁️</i><b id="res-renown">0</b></span>
+      <span class="r insight" title="Insight — from examining what you do not yet know"><i>🧠</i><b id="res-insight">0</b></span>
       <span class="r focus" title="Focus — your own stamina; it regenerates">
         <i>🕯️</i><b id="res-focus">0/24</b>
         <span class="focus-track"><span id="focus-fill"></span></span>
@@ -469,6 +523,8 @@ tr.you .rg-place { color: var(--gold); }
         <button class="tab" data-tab="market">🪙</button>
         <button class="tab" data-tab="village">🏘️</button>
         <button class="tab" data-tab="powers">✨</button>
+        <button class="tab" data-tab="frontier">🧭</button>
+        <button class="tab" data-tab="bench">⚒️</button>
         <button class="tab" data-tab="register">📜</button>
         <button class="tab" data-tab="feats">🏆</button>
       </nav>
@@ -676,11 +732,11 @@ tr.you .rg-place { color: var(--gold); }
 
   const SHRINE_TIERS = [
     { tier: 0, name: 'Bare Stone',        wood: 0,   coin: 0,    grandeur: 0,  rank: 0 },
-    { tier: 1, name: 'Cairn',             wood: 12,  coin: 60,   grandeur: 4,  rank: 0 },
-    { tier: 2, name: 'Standing Ring',     wood: 40,  coin: 320,  grandeur: 14, rank: 1 },
-    { tier: 3, name: 'Sky Altar',         wood: 110, coin: 1400, grandeur: 38, rank: 2 },
-    { tier: 4, name: 'Cathedral of Cloud',wood: 260, coin: 5200, grandeur: 90, rank: 3 },
-    { tier: 5, name: 'The Reach Itself',  wood: 600, coin: 18000,grandeur: 210,rank: 4 }
+    { tier: 1, name: 'Cairn',             wood: 12,   coin: 60,     grandeur: 4,  rank: 0 },
+    { tier: 2, name: 'Standing Ring',     wood: 40,   coin: 340,    grandeur: 12, rank: 1 },
+    { tier: 3, name: 'Sky Altar',         wood: 190,  coin: 6000,   grandeur: 30, rank: 2, ring: 0 },
+    { tier: 4, name: 'Cathedral of Cloud',wood: 620,  coin: 60000,  grandeur: 70, rank: 3, ring: 1 },
+    { tier: 5, name: 'The Reach Itself',  wood: 2000, coin: 320000, grandeur: 170,rank: 4, ring: 2 }
   ];
 
   const HUT_COST = { wood: 8, coin: 40, scale: 1.32 };
@@ -763,6 +819,21 @@ tr.you .rg-place { color: var(--gold); }
     { id: 'fest_win_5',     name: 'Serial Winner',       desc: 'Win five festivals.',                       renown: 500, check: g => g.stats.festivalWins >= 5 },
     { id: 'top_five',       name: 'Named in the Register',desc: 'Reach the top five of the Register.',      renown: 200,  check: g => g.lastStanding > 0 && g.lastStanding <= 5 },
     { id: 'top_one',        name: 'Ascendant',           desc: 'Stand first in the Skyward Register.',      renown: 900, check: g => g.lastStanding === 1 },
+    { id: 'gen_2',          name: 'It Bred True',        desc: 'Complete a generation leap.',               renown: 40,   check: g => (g.gens | 0) >= 1 },
+    { id: 'gen_6',          name: 'A Real Lineage',      desc: 'Complete six generation leaps.',            renown: 300,  check: g => (g.gens | 0) >= 6 },
+    { id: 'gen_15',         name: 'Deep Time',           desc: 'Complete fifteen generation leaps.',        renown: 1600, check: g => (g.gens | 0) >= 15 },
+    { id: 'evo_1',          name: 'The Line Turns',      desc: 'Reach the first evolution.',                renown: 140,  check: g => (g.evo | 0) >= 1 },
+    { id: 'evo_3',          name: 'Something Else Now',  desc: 'Reach the third evolution.',                renown: 900,  check: g => (g.evo | 0) >= 3 },
+    { id: 'evo_5',          name: 'Skyborn',             desc: 'Take the line as far as it goes.',          renown: 3200, check: g => (g.evo | 0) >= 5 },
+    { id: 'ingrain_3',      name: 'Bone Deep',           desc: 'Fully ingrain three behaviours.',           renown: 220,  check: g => SW.lineage.ingrainedCount(g, 0.95) >= 3 },
+    { id: 'ring_1',         name: 'Wider Ground',        desc: 'Raise the second terrace.',                 renown: 140,  check: g => (g.ring | 0) >= 1 },
+    { id: 'ring_3',         name: 'The Far Reach',       desc: 'Build the island out as far as it goes.',   renown: 2000, check: g => (g.ring | 0) >= 3 },
+    { id: 'found_8',        name: 'Curious',             desc: 'Examine eight unknown things.',             renown: 110,  check: g => Object.keys(g.discovered).length >= 8 },
+    { id: 'found_all',      name: 'Nothing Left Unknown',desc: 'Examine everything on the island.',         renown: 1400, check: g => Object.keys(g.discovered).length >= SW.content.FEATURES.length },
+    { id: 'neurons_6',      name: 'Rewired',             desc: 'Grow six neurons.',                         renown: 180,  check: g => Object.keys(g.neurons).length >= 6 },
+    { id: 'neurons_all',    name: 'The Whole Web',       desc: 'Grow every neuron.',                        renown: 1800, check: g => Object.keys(g.neurons).length >= SW.content.NEURONS.length },
+    { id: 'recipes_8',      name: 'Handy',               desc: 'Discover eight things at the bench.',       renown: 150,  check: g => Object.keys(g.recipes).length >= 8 },
+    { id: 'recipes_all',    name: 'Master of the Bench', desc: 'Discover every pairing that works.',        renown: 1500, check: g => Object.keys(g.recipes).length >= SW.content.RECIPES.length },
     { id: 'day_10',         name: 'Ten Days',            desc: 'Survive ten days.',                         renown: 30,   check: g => g.day >= 10 },
     { id: 'day_40',         name: 'Forty Days',          desc: 'Survive forty days.',                       renown: 200,  check: g => g.day >= 40 }
   ];
@@ -773,10 +844,174 @@ tr.you .rg-place { color: var(--gold); }
     'Love and terror both climb the Register. They just climb it differently.'
   ];
 
+  /* ---------------------------------------------------------------------
+   * Lineage — the creature ages, breeds, and passes on what you managed to
+   * ingrain. Learning within one life is cheap and temporary; the only thing
+   * that survives a generation is behaviour you reinforced hard enough.
+   * ------------------------------------------------------------------- */
+  const LIFESPAN = 66;   // days, if nothing kills it first
+
+  const AGES = [
+    { id: 'whelp', name: 'Whelp', from: 0,  wits: 1.5,  stamina: 0.7,  statMul: 0.55, sizeCap: 1.3,
+      note: 'Soaks up everything. Too small to be much use.' },
+    { id: 'prime', name: 'Prime', from: 10, wits: 1.0,  stamina: 1.0,  statMul: 1.0,  sizeCap: 3.2,
+      note: 'Strong, steady, and set in its ways.' },
+    { id: 'elder', name: 'Elder', from: 48, wits: 0.65, stamina: 0.72, statMul: 0.92, sizeCap: 3.2,
+      note: 'Slower now, but what it knows, it knows to the bone.' }
+  ];
+
+  /* Every third generation the line itself changes shape. These are permanent
+   * and cumulative — the reason to keep breeding rather than coddle one beast. */
+  const EVOLUTIONS = [
+    { tier: 0, gens: 0,  name: 'Unchanged',    glyph: '·',
+      blurb: 'The shape it was born in.', bonus: {} },
+    { tier: 1, gens: 3,  name: 'Broad-backed', glyph: '🦴',
+      blurb: 'Heavier through the shoulder. It carries more and tires later.',
+      bonus: { strength: 0.25, stamina: 0.20, yield: 0.22 } },
+    { tier: 2, gens: 6,  name: 'Bright-eyed',  glyph: '👁️',
+      blurb: 'It notices things. Teaching takes fewer repetitions, and it finds what is hidden.',
+      bonus: { wits: 0.35, insight: 0.40, yield: 0.10 } },
+    { tier: 3, gens: 10, name: 'Long-limbed',  glyph: '🦵',
+      blurb: 'Covers the island at a lope. It gets through far more work in a day.',
+      bonus: { speed: 0.45, stamina: 0.20, yield: 0.15 } },
+    { tier: 4, gens: 15, name: 'Crested',      glyph: '👑',
+      blurb: 'Unmistakable at a distance. Crowds gather for it.',
+      bonus: { grace: 0.40, renown: 0.45 } },
+    { tier: 5, gens: 21, name: 'Skyborn',      glyph: '🌤️',
+      blurb: 'Something in the line finally answers the sky.',
+      bonus: { strength: 0.30, wits: 0.30, speed: 0.30, grace: 0.30, renown: 0.55, insight: 0.40, yield: 0.20 } }
+  ];
+
+  /* ---------------------------------------------------------------------
+   * The island grows outward in terraces. Each one is more ground, more room
+   * for people, and a fresh band of unknown things to walk up to and examine.
+   * ------------------------------------------------------------------- */
+  const RINGS = [
+    { i: 0, name: 'The First Shelf', plots: 16, radius: 1.00, hutCap: 10, wood: 0,    coin: 0,     insight: 0 },
+    { i: 1, name: 'The Low Terrace', plots: 24, radius: 1.20, hutCap: 18, wood: 190,  coin: 2600,  insight: 14 },
+    { i: 2, name: 'The Wind Shelf',  plots: 30, radius: 1.38, hutCap: 26, wood: 540,  coin: 13000, insight: 44 },
+    { i: 3, name: 'The Far Reach',   plots: 36, radius: 1.54, hutCap: 36, wood: 1500, coin: 52000, insight: 120 }
+  ];
+
+  /* Unknown things on the ground. Walking up and examining one is the only
+   * source of Insight, and several of them permanently change the island. */
+  const FEATURES = [
+    { id: 'spring',    ring: 0, name: 'a cold spring',        glyph: '💧', insight: 5,
+      blurb: 'Water, coming up out of nothing. Your plots will dry out more slowly now.',
+      effect: 'thirst' },
+    { id: 'clay',      ring: 0, name: 'a seam of red clay',   glyph: '🧱', insight: 5, mat: 'clay',
+      blurb: 'Wet, heavy, and it holds a shape.' },
+    { id: 'deadwood',  ring: 0, name: 'a fallen giant',       glyph: '🪵', insight: 4, wood: 45,
+      blurb: 'Dead a long time. Dry enough to work.' },
+    { id: 'fibre',     ring: 0, name: 'a stand of cordgrass', glyph: '🌾', insight: 4, mat: 'fibre',
+      blurb: 'Tough enough to twist into rope.' },
+    { id: 'bones',     ring: 1, name: 'a scatter of bones',   glyph: '🦴', insight: 5, mat: 'bone',
+      blurb: 'Something enormous died here before you existed. It is oddly steadying to know that.' },
+    { id: 'resin',     ring: 1, name: 'a weeping pine',       glyph: '🟠', insight: 4, mat: 'resin',
+      blurb: 'It bleeds slow gold down its own bark.' },
+    { id: 'glass',     ring: 1, name: 'a lightning scar',     glyph: '🔷', insight: 6, mat: 'glass',
+      blurb: 'The strike fused the sand into something that holds light.' },
+    { id: 'loam',      ring: 1, name: 'black loam',           glyph: '🟫', insight: 5,
+      blurb: 'Soil that grew before you did. Everything comes up faster in it.',
+      effect: 'growth' },
+    { id: 'cave',      ring: 2, name: 'a wind-hollowed cave', glyph: '🕳️', insight: 9,
+      blurb: 'Cold, dry, and out of the weather. Your granary keeps better.',
+      effect: 'granary' },
+    { id: 'ore',       ring: 2, name: 'a vein of skymetal',   glyph: '⛏️', insight: 9, mat: 'metal',
+      blurb: 'It came down from somewhere and stayed.' },
+    { id: 'grove',     ring: 2, name: 'a grove of old trees', glyph: '🌳', insight: 8, wood: 260,
+      blurb: 'Older than the village. They will be sorry to see it go.' },
+    { id: 'monolith',  ring: 2, name: 'a leaning monolith',   glyph: '🗿', insight: 14,
+      blurb: 'Carved by nobody you have met. The village will not go near it, and they pray harder.',
+      effect: 'awe' },
+    { id: 'font',      ring: 3, name: 'a still black font',   glyph: '🌑', insight: 22,
+      blurb: 'It does not reflect you. Prayer collects faster here, and nobody can say why.',
+      effect: 'prayer' },
+    { id: 'seedvault', ring: 3, name: 'a sealed seed vault',  glyph: '🌸', insight: 18, mat: 'glass',
+      blurb: 'Somebody buried this against a disaster that evidently arrived.',
+      effect: 'seeds' },
+    { id: 'nest',      ring: 3, name: 'an abandoned nest',    glyph: '🥚', insight: 20,
+      blurb: 'Big enough to sleep in. Whatever laid here was of your creature\'s line.',
+      effect: 'lineage' }
+  ];
+
+  /* `buy` is what the market will sell you, priced so that buying materials
+   * and crafting them is worth only a thin margin. The real money is in the
+   * two it will not sell — storm glass and skymetal come only out of ground
+   * you examine and the Listening, which is what keeps the mini-games the
+   * actual currency engine rather than a button that prints coin. */
+  const MATERIALS = {
+    fibre: { id: 'fibre', name: 'Cordgrass',  glyph: '🌾', buy: 110 },
+    clay:  { id: 'clay',  name: 'Red clay',   glyph: '🧱', buy: 110 },
+    resin: { id: 'resin', name: 'Pine resin', glyph: '🟠', buy: 300 },
+    bone:  { id: 'bone',  name: 'Old bone',   glyph: '🦴', buy: 300 },
+    glass: { id: 'glass', name: 'Storm glass',glyph: '🔷', buy: 0 },
+    metal: { id: 'metal', name: 'Skymetal',   glyph: '⛏️', buy: 0 }
+  };
+  const MATERIAL_LIST = Object.values(MATERIALS);
+
+  /* The bench. You do not get a recipe list — you put two things together and
+   * find out. Discovering a pairing is worth Insight; making it again is worth
+   * coin, which is the point. */
+  const RECIPES = [
+    { id: 'rope',      a: 'fibre', b: 'fibre', name: 'Twisted rope',   glyph: '🪢', coin: 240,  insight: 4 },
+    { id: 'brick',     a: 'clay',  b: 'fibre', name: 'Fired brick',    glyph: '🧱', coin: 260,  insight: 5, wood: 8 },
+    { id: 'cordage',   a: 'resin', b: 'fibre', name: 'Waxed cordage',  glyph: '🧵', coin: 420,  insight: 7 },
+    { id: 'pitch',     a: 'resin', b: 'clay',  name: 'Sealing pitch',  glyph: '🫙', coin: 430,  insight: 6 },
+    { id: 'charm',     a: 'bone',  b: 'fibre', name: 'Knuckle charm',  glyph: '🧿', coin: 470,  insight: 8,  faith: 1 },
+    { id: 'scrimshaw', a: 'bone',  b: 'clay',  name: 'Scrimshaw jar',  glyph: '🏺', coin: 520,  insight: 9 },
+    { id: 'ossuary',   a: 'bone',  b: 'resin', name: 'Sealed ossuary', glyph: '⚰️', coin: 780,  insight: 10 },
+    { id: 'beads',     a: 'glass', b: 'clay',  name: 'Glass beads',    glyph: '📿', coin: 820,  insight: 11, faith: 1 },
+    { id: 'lens',      a: 'glass', b: 'resin', name: 'Burning lens',   glyph: '🔍', coin: 900,  insight: 12 },
+    { id: 'net',       a: 'glass', b: 'fibre', name: 'Spun-glass net', glyph: '🕸️', coin: 760,  insight: 10 },
+    { id: 'idol',      a: 'bone',  b: 'glass', name: 'Watching idol',  glyph: '🗿', coin: 1400, insight: 16 },
+    { id: 'kiln',      a: 'clay',  b: 'metal', name: 'Kiln plate',     glyph: '🍳', coin: 1600, insight: 15, wood: 24 },
+    { id: 'chime',     a: 'metal', b: 'bone',  name: 'Wind chime',     glyph: '🎐', coin: 1800, insight: 14, faith: 1 },
+    { id: 'harness',   a: 'metal', b: 'fibre', name: 'Beast harness',  glyph: '🦯', coin: 1500, insight: 13 },
+    { id: 'reliquary', a: 'metal', b: 'resin', name: 'Reliquary',      glyph: '⚱️', coin: 2200, insight: 20, faith: 2 },
+    { id: 'blade',     a: 'metal', b: 'glass', name: 'Skymetal blade', glyph: '🗡️', coin: 2600, insight: 22 }
+  ];
+
+  /* Insight buys permanent changes to you, not to the creature. */
+  const NEURONS = [
+    { id: 'attention', name: 'Wider Attention', cost: 6,  req: [],
+      desc: '+10 maximum Focus.', icon: '🕯️' },
+    { id: 'patience',  name: 'Patient Hand',    cost: 14, req: ['attention'],
+      desc: 'Praise and striking teach 30% harder.', icon: '✋' },
+    { id: 'stamina',   name: 'Steady Nerve',    cost: 22, req: ['attention'],
+      desc: 'Focus returns 40% faster.', icon: '⏳' },
+    { id: 'husbandry', name: 'Husbandry',       cost: 26, req: ['patience'],
+      desc: 'Crops yield 25% more in your hands and the creature\'s.', icon: '🌾' },
+    { id: 'memory',    name: 'Deep Memory',     cost: 34, req: ['patience'],
+      desc: 'Behaviours ingrain twice as fast, and the line forgets half as much.', icon: '🧠' },
+    { id: 'sight',     name: 'Long Sight',      cost: 30, req: ['listening'],
+      desc: 'Examining costs no Focus, and yields 40% more Insight.', icon: '👁️' },
+    { id: 'listening', name: 'The Listening',   cost: 18, req: ['attention'],
+      desc: 'Unlocks the Listening — sweep the island for what it is hiding.', icon: '🔊' },
+    { id: 'bench',     name: 'The Bench',       cost: 22, req: ['husbandry'],
+      desc: 'Unlocks the workbench, where two materials become something worth selling.', icon: '⚒️' },
+    { id: 'craftsman', name: 'Practised Hands', cost: 46, req: ['bench'],
+      desc: 'Crafted goods sell for 60% more.', icon: '🔨' },
+    { id: 'devotion',  name: 'Devotion',        cost: 52, req: ['memory'],
+      desc: 'Your standing accrues 30% faster.', icon: '🙏' },
+    { id: 'lineage',   name: 'The Long Line',   cost: 60, req: ['memory'],
+      desc: 'Offspring inherit far more of what you ingrained, and live 15% longer.', icon: '🧬' },
+    { id: 'frontier',  name: 'The Frontier',    cost: 40, req: ['sight'],
+      desc: 'Terraces cost a third less to raise.', icon: '🧭' }
+  ];
+
+  const GEN_HINTS = [
+    'Learning dies with the animal. Only what you ingrained gets passed on.',
+    'An act has to be well known before it can be ingrained at all — teach first, then drill.',
+    'Whelps learn fastest and are useless. Elders are the reverse. Plan around it.'
+  ];
+
   SW.content = {
     TICKS_PER_DAY, CROPS, CROP_LIST, RANKS, MIRACLES, MIRACLE_LIST,
     LINEAGES, LINEAGE_LIST, ACTS, ACT_LIST, TRAINABLE, LEASHES, LEASH_LIST,
-    SHRINE_TIERS, HUT_COST, PLOT_COST, FESTIVALS, RIVALS, BARBS, FEATS, HATCH_HINTS
+    SHRINE_TIERS, HUT_COST, PLOT_COST, FESTIVALS, RIVALS, BARBS, FEATS, HATCH_HINTS,
+    LIFESPAN, AGES, EVOLUTIONS, RINGS, FEATURES, MATERIALS, MATERIAL_LIST,
+    RECIPES, NEURONS, GEN_HINTS
   };
 })(window.SW = window.SW || {});
 
@@ -788,8 +1023,8 @@ tr.you .rg-place { color: var(--gold); }
   const C = SW.content;
   const { clamp } = SW.core;
 
-  const GRID_W = 4, GRID_H = 4;
-  const MAX_PLOTS = GRID_W * GRID_H;
+  const GRID_W = 6, GRID_H = 6;
+  const MAX_PLOTS = GRID_W * GRID_H;   // the full island, once every terrace is up
   const START_PLOTS = 3;
 
   function makePlot(index) {
@@ -824,6 +1059,9 @@ tr.you .rg-place { color: var(--gold); }
       stats: { strength: L.base.strength, cunning: L.base.cunning, grace: L.base.grace },
       weights: weights,
       leash: 'none',
+      age: 0,          // days lived
+      gen: 1,          // which generation of the line this is
+      ingrained: {},   // actId -> 0..1, the only thing that outlives the animal
       // transient-ish, but persisted so a reload doesn't eat a pending praise
       act: null,       // { id, tick, target, resolved }
       actCooldown: 0,
@@ -835,8 +1073,10 @@ tr.you .rg-place { color: var(--gold); }
   }
 
   function newGame(lineageId, creatureName, godName) {
+    // Only the first terrace exists at the start; the rest of the grid is
+    // added as the island is built outward.
     const plots = [];
-    for (let i = 0; i < MAX_PLOTS; i++) plots.push(makePlot(i));
+    for (let i = 0; i < C.RINGS[0].plots; i++) plots.push(makePlot(i));
 
     const rivals = C.RIVALS.map((r, i) => ({
       name: r.name, pace: r.pace, spike: r.spike, tone: r.tone,
@@ -866,6 +1106,25 @@ tr.you .rg-place { color: var(--gold); }
       village: { villagers: 3, huts: 3, faith: 20, awe: 5, food: 8, unrest: 0 },
       shrine: 0,
 
+      // frontier
+      ring: 0,
+      insight: 0,
+      features: [],          // { fid, ring, ang, dist, found }
+      discovered: {},        // featureId -> day
+      effects: {},           // permanent island effects unlocked by examining
+      neurons: {},           // neural web nodes bought
+      firsts: {},            // one-off novelty awards already collected
+      // lineage
+      evo: 0,                // evolution tier reached
+      gens: 0,               // generation leaps completed
+      // mini-games
+      mats: { fibre: 0, clay: 0, resin: 0, bone: 0, glass: 0, metal: 0 },
+      recipes: {},           // recipeId -> day first made
+      crafted: {},           // recipeId -> times made
+      deadEnds: {},          // pairKey -> day, pairings known to make nothing
+      listen: null,
+      listenAt: -9999,
+
       creature: newCreature(lineageId, creatureName),
 
       rivals: rivals,
@@ -879,6 +1138,13 @@ tr.you .rg-place { color: var(--gold); }
       fx: [],
       __savedAt: Date.now()
     };
+  }
+
+  /* Everything a fresh island needs that isn't a plain field. */
+  function startGame(lineageId, creatureName, godName) {
+    const g = newGame(lineageId, creatureName, godName);
+    SW.discovery.spawnRing(g, 0);
+    return g;
   }
 
   /* Bring an older/partial save up to the current shape without losing progress. */
@@ -895,13 +1161,20 @@ tr.you .rg-place { color: var(--gold); }
     fill(g, fresh);
     if (!C.LINEAGES[g.creature.lineage]) g.creature.lineage = 'mossback';
     for (const id of C.TRAINABLE) if (typeof g.creature.weights[id] !== 'number') g.creature.weights[id] = 1;
+    if (!g.creature.ingrained) g.creature.ingrained = {};
     g.creature.hunger = clamp(g.creature.hunger, 0, 100);
     g.creature.vigor = clamp(g.creature.vigor, 0, 100);
+    // A save from before a terrace existed still has to end up with the right
+    // number of plot slots and the right features on the ground.
+    const slots = C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)].plots;
+    for (let i = g.plots.length + g.lockedPlots.length; i < slots; i++) g.lockedPlots.push(makePlot(i));
+    for (let r = 0; r <= (g.ring | 0); r++) SW.discovery.spawnRing(g, r);
+    g.listen = null;
     g.fx = [];
     return g;
   }
 
-  SW.state = { GRID_W, GRID_H, MAX_PLOTS, makePlot, newCreature, newGame, hydrate };
+  SW.state = { GRID_W, GRID_H, MAX_PLOTS, makePlot, newCreature, newGame, startGame, hydrate };
 })(window.SW = window.SW || {});
 
 </script>
@@ -991,9 +1264,10 @@ tr.you .rg-place { color: var(--gold); }
     if (!plot || plot.state !== 'ripe') return null;
     const crop = C.CROPS[plot.crop];
     const spoil = plot.rot > 55 ? 0.5 : 1;
-    const amount = Math.max(1, Math.round(crop.yield * (bonus || 1) * spoil));
+    const amount = Math.max(1, Math.round(crop.yield * (bonus || 1) * spoil * SW.discovery.mods.yield(g)));
     g.stock[crop.id] = (g.stock[crop.id] | 0) + amount;
     g.stats.harvests += amount;
+    SW.discovery.firstTime(g, 'crop:' + crop.id, 3, `bringing in ${crop.name}`);
     plot.state = 'tilled';
     plot.crop = null;
     plot.growth = 0;
@@ -1019,10 +1293,10 @@ tr.you .rg-place { color: var(--gold); }
     for (const p of g.plots) {
       if (p.state === 'growing' || p.state === 'ripe') {
         const crop = C.CROPS[p.crop];
-        p.water = clamp(p.water - crop.thirst * dt, 0, 100);
+        p.water = clamp(p.water - crop.thirst * SW.discovery.mods.thirst(g) * dt, 0, 100);
         if (p.state === 'growing') {
           // Dry soil stalls growth rather than stopping it dead.
-          const rate = p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1;
+          const rate = (p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1) * SW.discovery.mods.growth(g);
           p.growth += rate * dt;
           if (p.growth >= crop.growTicks) { p.state = 'ripe'; p.growth = crop.growTicks; }
         } else {
@@ -1127,6 +1401,8 @@ tr.you .rg-place { color: var(--gold); }
   const PRAISE_WINDOW = 9;   // ticks you have to react
 
   const lineage = g => C.LINEAGES[g.creature.lineage];
+  // Age, evolution tier and lineage stock, resolved together.
+  const traits = g => SW.lineage.traits(g);
 
   /* Display value: how well it knows a chore, 0..1. */
   function mastery(g, actId) {
@@ -1150,7 +1426,7 @@ tr.you .rg-place { color: var(--gold); }
   function learnRate(g) {
     const c = g.creature;
     const fear = c.mood < 25 ? 0.55 : 1;          // a terrified beast learns badly
-    return 1 + 0.26 * lineage(g).wits * (0.55 + c.bond / 140) * fear;
+    return 1 + 0.26 * traits(g).wits * SW.discovery.mods.learn(g) * (0.55 + c.bond / 140) * fear;
   }
 
   // --- feasibility -------------------------------------------------------
@@ -1355,6 +1631,7 @@ tr.you .rg-place { color: var(--gold); }
     }
 
     if (!ok) return false;
+    SW.discovery.firstTime(g, 'act:' + actId, 2, `watching it ${a.name}`);
 
     // Cost, drift, and slow physical growth.
     c.vigor = clamp(c.vigor - a.vigor, 0, 100);
@@ -1373,7 +1650,7 @@ tr.you .rg-place { color: var(--gold); }
   function beginAct(g) {
     const c = g.creature;
     const chosen = chooseAct(g);
-    const quick = 1 / (0.8 + c.stats.cunning / 45);
+    const quick = 1 / ((0.8 + c.stats.cunning / 45) * traits(g).speed);
     c.act = {
       id: chosen.id,
       anchor: chosen.target,
@@ -1388,17 +1665,18 @@ tr.you .rg-place { color: var(--gold); }
   function tick(g, dt) {
     const c = g.creature;
     const L = lineage(g);
+    const T = traits(g);
 
     // Needs.
-    c.hunger = clamp(c.hunger - 0.22 * L.appetite * (0.7 + c.size * 0.4) * dt, 0, 130);
-    c.vigor = clamp(c.vigor + (c.act && c.act.id === 'rest' ? 2.2 : 0.42) * L.stamina * dt, 0, 100);
+    c.hunger = clamp(c.hunger - 0.22 * T.appetite * (0.7 + c.size * 0.4) * dt, 0, 130);
+    c.vigor = clamp(c.vigor + (c.act && c.act.id === 'rest' ? 2.2 : 0.42) * T.stamina * dt, 0, 100);
     c.mood = clamp(c.mood - 0.12 * dt + (c.hunger < 20 ? -0.35 * dt : 0) + (c.bond > 60 ? 0.05 * dt : 0), 0, 100);
     if (c.hunger <= 0) {
       c.vigor = clamp(c.vigor - 0.5 * dt, 0, 100);
       c.mood = clamp(c.mood - 0.3 * dt, 0, 100);
     }
     // Well-fed creatures grow. Growth is one-way; you cannot shrink a beast.
-    if (c.hunger > 78) c.size = clamp(c.size + 0.0009 * dt, 0.6, 3.2);
+    if (c.hunger > 78) c.size = clamp(c.size + 0.0009 * dt, 0.6, T.sizeCap);
 
     // Praise window expiry.
     if (c.pending) {
@@ -1407,7 +1685,7 @@ tr.you .rg-place { color: var(--gold); }
     }
 
     // Slow forgetting toward instinct — thistlebeaks lose it fastest.
-    const forget = 0.00035 * L.wits * dt;
+    const forget = 0.00035 * L.wits * SW.discovery.mods.forget(g) * dt;
     for (const id in c.weights) {
       const base = (L.instinct[id] || 1);
       c.weights[id] += (base - c.weights[id]) * forget;
@@ -1423,6 +1701,7 @@ tr.you .rg-place { color: var(--gold); }
       const done = applyAct(g, a.id, a.anchor);
       if (done && a.id !== 'wander') {
         c.pending = { act: a.id, t: 0 };
+        c.__didAct = a.id;
       }
       a.phase = 'idle'; a.t = 0;
     } else if (a.phase === 'idle' && a.t >= a.idle) {
@@ -1445,8 +1724,12 @@ tr.you .rg-place { color: var(--gold); }
     c.diligence = clamp(c.diligence + a.diligent * 1.3, -100, 100);
     c.praised++;
     c.pending = null;
-    pop(g, '❤', 'good');
-    SW.ui && SW.ui.log(g, `You lay a hand on ${c.name}. It will ${a.name} again.`, 'good');
+    // Drilling a behaviour it already knows well is what puts it into the line.
+    const dug = SW.lineage.ingrain(g, id, 0.055);
+    pop(g, dug > 0 ? '❤ ✚' : '❤', 'good');
+    SW.ui && SW.ui.log(g, dug > 0
+      ? `You lay a hand on ${c.name}. It will ${a.name} again — and so will its whelps.`
+      : `You lay a hand on ${c.name}. It will ${a.name} again.`, 'good');
     return true;
   }
 
@@ -1549,6 +1832,622 @@ tr.you .rg-place { color: var(--gold); }
 
 </script>
 <script>
+/* Skyward Reach — the line.
+ *
+ * The Ancestors idea, applied to the creature you were already teaching:
+ * anything learned inside one lifetime dies with the animal. Only behaviour
+ * you deliberately *ingrained* — drilled after it was already well known —
+ * survives into the next generation. Breeding is therefore the real progress
+ * track, and every third leap the whole line changes shape for good.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const { clamp, rnd, chance } = SW.core;
+
+  // --- age ---------------------------------------------------------------
+  function lifespan(g) {
+    return C.LIFESPAN * (g.neurons && g.neurons.lineage ? 1.15 : 1);
+  }
+
+  function ageOf(g) {
+    const a = g.creature.age || 0;
+    let cur = C.AGES[0];
+    for (const st of C.AGES) if (a >= st.from) cur = st;
+    return cur;
+  }
+
+  const evolutionOf = g => C.EVOLUTIONS[clamp(g.evo | 0, 0, C.EVOLUTIONS.length - 1)];
+
+  function nextEvolution(g) {
+    const nxt = C.EVOLUTIONS[(g.evo | 0) + 1];
+    return nxt || null;
+  }
+
+  /* Accumulated permanent bonus from every evolution reached so far. */
+  function bonus(g, key) {
+    let total = 0;
+    for (let i = 0; i <= (g.evo | 0) && i < C.EVOLUTIONS.length; i++) {
+      total += C.EVOLUTIONS[i].bonus[key] || 0;
+    }
+    return total;
+  }
+
+  /* One place that answers "how capable is this animal right now" — lineage
+   * stock, times age, times everything the line has evolved into. */
+  function traits(g) {
+    const L = C.LINEAGES[g.creature.lineage];
+    const age = ageOf(g);
+    return {
+      wits: L.wits * age.wits * (1 + bonus(g, 'wits')),
+      stamina: L.stamina * age.stamina * (1 + bonus(g, 'stamina')),
+      appetite: L.appetite,
+      speed: 1 + bonus(g, 'speed'),
+      statMul: age.statMul,
+      sizeCap: Math.min(age.sizeCap, 3.2) + bonus(g, 'strength'),
+      age: age
+    };
+  }
+
+  // --- ingraining --------------------------------------------------------
+  /* You can only ingrain what the creature already does well. Drilling a
+   * behaviour it barely knows does nothing, which is what makes the order of
+   * operations — teach, then drill, then breed — the actual game. */
+  const IN_MIN_MASTERY = 0.5;
+
+  function ingrainedOf(g, actId) {
+    return clamp((g.creature.ingrained && g.creature.ingrained[actId]) || 0, 0, 1);
+  }
+
+  function canIngrain(g, actId) {
+    return SW.creature.mastery(g, actId) >= IN_MIN_MASTERY;
+  }
+
+  function ingrain(g, actId, amount) {
+    const c = g.creature;
+    if (!c.ingrained) c.ingrained = {};
+    if (!canIngrain(g, actId)) return 0;
+    const mul = (g.neurons && g.neurons.memory ? 2 : 1) * traits(g).wits;
+    const before = ingrainedOf(g, actId);
+    c.ingrained[actId] = clamp(before + amount * mul, 0, 1);
+    return c.ingrained[actId] - before;
+  }
+
+  function ingrainedCount(g, threshold) {
+    let n = 0;
+    for (const id of C.TRAINABLE) if (ingrainedOf(g, id) >= threshold) n++;
+    return n;
+  }
+
+  // --- breeding ----------------------------------------------------------
+  function canBreed(g) {
+    const c = g.creature;
+    return ageOf(g).id !== 'whelp' && c.bond >= 35;
+  }
+
+  function breedBlocker(g) {
+    const c = g.creature;
+    if (ageOf(g).id === 'whelp') return 'It is still a whelp.';
+    if (c.bond < 35) return `It does not trust you enough yet (bond ${Math.round(c.bond)}/35).`;
+    return null;
+  }
+
+  /* The generation leap. `natural` means the animal died of old age without
+   * you choosing the moment, which costs you most of the inheritance. */
+  function breed(g, natural) {
+    const parent = g.creature;
+    const L = C.LINEAGES[parent.lineage];
+    const heritable = (g.neurons && g.neurons.lineage ? 0.62 : 0.38) * (natural ? 0.45 : 1);
+    const carryIngrained = (g.neurons && g.neurons.lineage ? 0.5 : 0.32) * (natural ? 0.5 : 1);
+
+    const child = SW.state.newCreature(parent.lineage, parent.name);
+    child.gen = (parent.gen || 1) + 1;
+    child.age = 0;
+    child.ingrained = {};
+
+    for (const id of C.TRAINABLE.concat(['wander'])) {
+      const instinct = L.instinct[id] || 1;
+      const pw = parent.weights[id] || instinct;
+      const ing = ingrainedOf(g, id);
+      // Unreinforced learning reverts to instinct. Reinforced learning carries.
+      child.weights[id] = clamp(instinct + (pw - instinct) * ing * heritable, SW.creature.W_MIN, SW.creature.W_MAX);
+      child.ingrained[id] = clamp(ing * carryIngrained, 0, 1);
+    }
+
+    // Stats drift toward the parent's, with a little mutation each time.
+    for (const k of ['strength', 'cunning', 'grace']) {
+      const base = L.base[k];
+      const inherited = base + (parent.stats[k] - base) * 0.35 * (natural ? 0.6 : 1);
+      child.stats[k] = Math.max(1, inherited * rnd(0.94, 1.10));
+    }
+    child.kind = parent.kind * 0.45;
+    child.diligence = parent.diligence * 0.45;
+    child.leash = parent.leash;
+    child.name = parent.name;
+    child.x = parent.x; child.y = parent.y; child.tx = parent.x; child.ty = parent.y;
+
+    g.creature = child;
+    g.gens = (g.gens || 0) + 1;
+
+    const reward = Math.round(90 * Math.pow(g.gens, 1.25));
+    g.res.renown += reward;
+    SW.discovery.firstTime(g, 'gen', 8, 'taking the line forward');
+
+    if (natural) {
+      SW.ui.log(g, `${parent.name} dies of old age. A whelp of its line takes its place, and most of what the old one knew is simply gone.`, 'bad');
+    } else {
+      SW.ui.log(g, `Generation ${child.gen}. What you drilled into ${parent.name} is already in the whelp. +${reward} renown.`, 'great');
+    }
+    g.fx.push({ at: 'banner', text: 'GENERATION ' + child.gen, life: 4.5, t: 0 });
+
+    // Every third leap or so, the line itself changes.
+    const nxt = nextEvolution(g);
+    if (nxt && g.gens >= nxt.gens) {
+      g.evo = (g.evo | 0) + 1;
+      SW.discovery.firstTime(g, 'evo:' + g.evo, 14, 'watching the line change shape');
+      const bonusRenown = Math.round(600 * Math.pow(g.evo, 1.4));
+      g.res.renown += bonusRenown;
+      SW.ui.log(g, `The line turns over into something new: ${nxt.name}. ${nxt.blurb} +${bonusRenown} renown.`, 'great');
+      g.fx.push({ at: 'banner', text: nxt.glyph + ' ' + nxt.name.toUpperCase(), life: 6, t: 0 });
+    }
+    return child;
+  }
+
+  // --- per-tick ----------------------------------------------------------
+  function tick(g, dt) {
+    const c = g.creature;
+    c.age = (c.age || 0) + dt / C.TICKS_PER_DAY;
+
+    // Doing something it already knows well, well, wears the groove deeper.
+    // Slow: praising is far faster, which is the point of praising.
+    if (c.__didAct) {
+      const id = c.__didAct;
+      c.__didAct = null;
+      if (SW.creature.mastery(g, id) > 0.72) ingrain(g, id, 0.0035);
+    }
+
+    const span = lifespan(g);
+    if (c.age >= span * 0.86 && !c.__warned) {
+      c.__warned = true;
+      SW.ui.log(g, `${c.name} is going grey. Whatever you still want in the line, drill it now.`, 'warn');
+    }
+    if (c.age >= span) breed(g, true);
+  }
+
+  /* Progress of the current life, for the card. */
+  function lifeProgress(g) {
+    return clamp((g.creature.age || 0) / lifespan(g), 0, 1);
+  }
+
+  SW.lineage = {
+    IN_MIN_MASTERY, lifespan, ageOf, evolutionOf, nextEvolution, bonus, traits,
+    ingrainedOf, canIngrain, ingrain, ingrainedCount,
+    canBreed, breedBlocker, breed, tick, lifeProgress
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — the frontier.
+ *
+ * The island is not fully known to you. Unknown things sit out past the farm
+ * as question marks; walking up and examining one is the only source of
+ * Insight, and Insight is the only thing that buys permanent changes to
+ * yourself. Raising a terrace pushes the edge outward and puts a fresh band
+ * of unknown things inside it.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const { clamp, hashNoise, fmt } = SW.core;
+
+  const ringOf = g => C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)];
+  const nextRing = g => C.RINGS[(g.ring | 0) + 1] || null;
+
+  function ringCost(g) {
+    const r = nextRing(g);
+    if (!r) return null;
+    const off = g.neurons && g.neurons.frontier ? 0.67 : 1;
+    return {
+      wood: Math.ceil(r.wood * off),
+      coin: Math.ceil(r.coin * off),
+      insight: Math.ceil(r.insight * off)
+    };
+  }
+
+  /* Scatter the features belonging to a ring into the band that ring adds.
+   * Positions are in units of the base island radius, so they stay put as the
+   * island grows outward around them. */
+  function spawnRing(g, ringIndex) {
+    // The landmass is a blob, not a true ellipse, so keep everything inside
+    // ~84% of the nominal radius or features end up hanging over the edge.
+    const SAFE = 0.84;
+    const inner = (ringIndex === 0 ? 0.52 : C.RINGS[ringIndex - 1].radius * SAFE + 0.06);
+    const outer = C.RINGS[ringIndex].radius * SAFE;
+    const list = C.FEATURES.filter(f => f.ring === ringIndex);
+    list.forEach((f, i) => {
+      if (g.features.some(x => x.fid === f.id)) return;
+      const n1 = hashNoise(4200 + ringIndex * 31, i);
+      const n2 = hashNoise(9100 + ringIndex * 17, i);
+      g.features.push({
+        fid: f.id,
+        ring: ringIndex,
+        // spread around the rim, nudged so they never stack
+        ang: (i / Math.max(1, list.length)) * Math.PI * 2 + n1 * 0.8,
+        dist: inner + (outer - inner) * (0.25 + n2 * 0.7),
+        found: false
+      });
+    });
+  }
+
+  function insightMul(g) {
+    return (1 + SW.lineage.bonus(g, 'insight')) * (g.neurons && g.neurons.sight ? 1.4 : 1);
+  }
+
+  const EXAMINE_FOCUS = 4;
+
+  function examineCost(g) {
+    return g.neurons && g.neurons.sight ? 0 : EXAMINE_FOCUS;
+  }
+
+  function examine(g, inst) {
+    if (!inst || inst.found) return false;
+    const def = C.FEATURES.find(f => f.id === inst.fid);
+    if (!def) return false;
+    const cost = examineCost(g);
+    if (g.res.focus < cost) { SW.ui.log(g, 'Not enough focus to give it a proper look.', 'warn'); return false; }
+    g.res.focus -= cost;
+    inst.found = true;
+    g.discovered[def.id] = g.day;
+
+    const gained = Math.max(1, Math.round(def.insight * insightMul(g)));
+    g.insight += gained;
+    if (def.mat) g.mats[def.mat] = (g.mats[def.mat] | 0) + 3;
+    if (def.wood) g.res.wood += def.wood;
+    if (def.effect) g.effects[def.effect] = true;
+
+    let extra = '';
+    if (def.mat) extra += ` 3 ${C.MATERIALS[def.mat].name.toLowerCase()}.`;
+    if (def.wood) extra += ` ${def.wood} wood.`;
+    SW.ui.log(g, `You examine ${def.name}. ${def.blurb} +${gained} insight.${extra}`, 'great');
+    g.fx.push({ at: 'banner', text: def.glyph + ' ' + def.name, life: 3.5, t: 0 });
+    return true;
+  }
+
+  /* Doing something for the first time is worth Insight — the Ancestors idea
+   * that novelty is what actually rewires you. Without this the economy cannot
+   * bootstrap: terrace-0 features alone do not cover a single neuron, let alone
+   * the Listening that makes Insight repeatable. */
+  function firstTime(g, key, amount, label) {
+    if (!g.firsts) g.firsts = {};
+    if (g.firsts[key]) return 0;
+    g.firsts[key] = g.day;
+    const n = Math.max(1, Math.round(amount * insightMul(g)));
+    g.insight += n;
+    if (label) SW.ui.log(g, `First time ${label}. +${n} insight.`, 'good');
+    return n;
+  }
+
+  function unknownCount(g) {
+    return g.features.filter(f => !f.found).length;
+  }
+
+  // --- raising a terrace -------------------------------------------------
+  function raiseRing(g) {
+    const r = nextRing(g);
+    if (!r) { SW.ui.log(g, 'There is no more sky to build out into.', 'warn'); return false; }
+    const cost = ringCost(g);
+    if (g.res.wood < cost.wood || g.res.coin < cost.coin || g.insight < cost.insight) {
+      SW.ui.log(g, 'Not enough to raise the next terrace.', 'warn');
+      return false;
+    }
+    g.res.wood -= cost.wood;
+    g.res.coin -= cost.coin;
+    g.insight -= cost.insight;
+    g.ring = r.i;
+
+    // New ground: more plot slots to buy, and a wider band of unknown things.
+    const have = g.plots.length + g.lockedPlots.length;
+    for (let i = have; i < r.plots; i++) g.lockedPlots.push(SW.state.makePlot(i));
+    spawnRing(g, r.i);
+
+    SW.ui.log(g, `${r.name} rises out of the cloud. The island is bigger than it was, and you do not know all of it.`, 'great');
+    g.fx.push({ at: 'banner', text: '⛰ ' + r.name.toUpperCase(), life: 5, t: 0 });
+    return true;
+  }
+
+  function hutCap(g) { return ringOf(g).hutCap; }
+
+  // --- the neural web ----------------------------------------------------
+  function neuronAvailable(g, n) {
+    return n.req.every(r => g.neurons[r]);
+  }
+
+  function buyNeuron(g, id) {
+    const n = C.NEURONS.find(x => x.id === id);
+    if (!n) return false;
+    if (g.neurons[id]) return false;
+    if (!neuronAvailable(g, n)) { SW.ui.log(g, 'Something has to come before that.', 'warn'); return false; }
+    if (g.insight < n.cost) { SW.ui.log(g, 'Not enough insight.', 'warn'); return false; }
+    g.insight -= n.cost;
+    g.neurons[id] = g.day;
+    if (id === 'attention') g.res.focusMax += 10;
+    SW.ui.log(g, `${n.name}. ${n.desc}`, 'great');
+    return true;
+  }
+
+  /* Modifiers the rest of the sim asks about, all in one place. */
+  const mods = {
+    thirst: g => (g.effects.thirst ? 0.75 : 1),
+    growth: g => (g.effects.growth ? 1.15 : 1),
+    eat: g => (g.effects.granary ? 0.85 : 1),
+    prayer: g => (g.effects.prayer ? 1.25 : 1),
+    yield: g => (1 + SW.lineage.bonus(g, 'yield')) * (g.neurons.husbandry ? 1.25 : 1),
+    focusRegen: g => (g.neurons.stamina ? 1.4 : 1),
+    learn: g => (g.neurons.patience ? 1.3 : 1),
+    forget: g => (g.neurons.memory ? 0.5 : 1),
+    renown: g => (1 + SW.lineage.bonus(g, 'renown')) * (g.neurons.devotion ? 1.3 : 1),
+    craft: g => (g.neurons.craftsman ? 1.6 : 1)
+  };
+
+  SW.discovery = {
+    ringOf, nextRing, ringCost, spawnRing, examine, examineCost, unknownCount,
+    raiseRing, hutCap, neuronAvailable, buyNeuron, insightMul, firstTime, mods
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — the two things you play rather than manage.
+ *
+ * The Listening: stop working, sweep the island, and click what answers before
+ * it goes quiet again. The only reliable source of storm glass and skymetal.
+ *
+ * The Bench: put two materials together and find out what happens. There is no
+ * recipe list. Five of the twenty-one pairings are dead ends, and finding one
+ * out is worth a little on its own.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const D = SW.discovery;
+  const { clamp, rnd, rndInt, pick, chance, fmt } = SW.core;
+
+  // ---------------------------------------------------------------- listen
+  const LISTEN_FOCUS = 8;
+  const LISTEN_DUR = 15;        // ticks
+  const LISTEN_COOLDOWN = 50;   // ticks
+  const NODE_LIFE = 2.4;
+  const NODE_GAP = 1.25;
+
+  function listenUnlocked(g) { return !!g.neurons.listening; }
+
+  function listenReady(g) {
+    return listenUnlocked(g) && !g.listen && (g.tick - (g.listenAt || -9999)) >= LISTEN_COOLDOWN;
+  }
+
+  function listenCooldown(g) {
+    return Math.max(0, LISTEN_COOLDOWN - (g.tick - (g.listenAt || -9999)));
+  }
+
+  /* Which materials the island is willing to give up, by how far out you have
+   * built. Skymetal only exists once you have reached The Far Reach. */
+  function matPool(g) {
+    const pool = ['fibre', 'fibre', 'clay', 'clay'];
+    if (g.ring >= 1) pool.push('resin', 'bone');
+    if (g.ring >= 2) pool.push('glass', 'glass');
+    if (g.ring >= 3) pool.push('metal', 'metal');
+    return pool;
+  }
+
+  function startListen(g) {
+    if (!listenUnlocked(g)) { SW.ui.log(g, 'You do not know how to listen yet.', 'warn'); return false; }
+    if (g.listen) return false;
+    if (listenCooldown(g) > 0) {
+      SW.ui.log(g, `Too soon. The island is still ringing (${Math.ceil(listenCooldown(g))}s).`, 'warn');
+      return false;
+    }
+    if (g.res.focus < LISTEN_FOCUS) { SW.ui.log(g, 'Not enough focus to listen properly.', 'warn'); return false; }
+    g.res.focus -= LISTEN_FOCUS;
+    g.listen = { t: 0, next: 0.5, nodes: [], hits: 0, spawned: 0, take: { insight: 0, wood: 0, coin: 0, mats: {} } };
+    SW.ui.log(g, 'You go still and listen. The island starts giving itself away.', 'good');
+    return true;
+  }
+
+  function spawnNode(g) {
+    const L = g.listen;
+    const radius = D.ringOf(g).radius;
+    const roll = Math.random();
+    const kind = roll < 0.30 ? 'insight' : roll < 0.55 ? 'mat' : roll < 0.80 ? 'coin' : 'wood';
+    L.nodes.push({
+      ang: rnd(0, Math.PI * 2),
+      dist: rnd(0.22, radius * 0.92),
+      t: 0,
+      life: NODE_LIFE,
+      kind: kind,
+      hit: false
+    });
+    L.spawned++;
+  }
+
+  function tick(g, dt) {
+    const L = g.listen;
+    if (!L) return;
+    L.t += dt;
+    L.next -= dt;
+    if (L.next <= 0 && L.t < LISTEN_DUR - NODE_LIFE * 0.5) {
+      spawnNode(g);
+      L.next = NODE_GAP * rnd(0.75, 1.3);
+    }
+    for (let i = L.nodes.length - 1; i >= 0; i--) {
+      const n = L.nodes[i];
+      n.t += dt;
+      if (n.t >= n.life) L.nodes.splice(i, 1);
+    }
+    if (L.t >= LISTEN_DUR) finishListen(g);
+  }
+
+  function collect(g, node) {
+    const L = g.listen;
+    const t = L.take;
+    switch (node.kind) {
+      case 'insight': {
+        // The only repeatable source of Insight in the game, so it has to be
+        // worth stopping work for — and worth more the further out you build.
+        const n = Math.max(1, Math.round((2 + g.ring * 2) * D.insightMul(g)));
+        g.insight += n; t.insight += n;
+        break;
+      }
+      case 'wood': {
+        const n = 8 + g.ring * 12;
+        g.res.wood += n; t.wood += n;
+        break;
+      }
+      case 'coin': {
+        const n = Math.round(55 * (1 + g.day * 0.06) * (1 + g.ring * 0.5));
+        g.res.coin += n; t.coin += n;
+        break;
+      }
+      case 'mat': {
+        const m = pick(matPool(g));
+        g.mats[m] = (g.mats[m] | 0) + 1;
+        t.mats[m] = (t.mats[m] | 0) + 1;
+        break;
+      }
+    }
+  }
+
+  /* Awarding a caught node, split out so the headless harness can drive the
+   * mini-game without going through pixel coordinates. */
+  function hitListenNode(g, n) {
+    collect(g, n);
+    n.t = Math.max(n.t, n.life - 0.35);
+    const p = SW.render.featurePoint(n.ang, n.dist);
+    g.fx.push({ at: 'point', x: p.x, y: p.y, text: '✦', tone: 'good', life: 0.9, t: 0 });
+  }
+
+  /* Called with scene coordinates from the canvas click handler. */
+  function hitListen(g, wx, wy) {
+    const L = g.listen;
+    if (!L) return false;
+    for (const n of L.nodes) {
+      if (n.hit) continue;
+      const p = SW.render.featurePoint(n.ang, n.dist);
+      if (Math.hypot(wx - p.x, wy - p.y) <= 30) {
+        n.hit = true;
+        L.hits++;
+        hitListenNode(g, n);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function finishListen(g) {
+    const L = g.listen;
+    g.listen = null;
+    g.listenAt = g.tick;
+    const t = L.take;
+    const bits = [];
+    if (t.insight) bits.push(`${t.insight} insight`);
+    if (t.coin) bits.push(`${fmt(t.coin)} coin`);
+    if (t.wood) bits.push(`${t.wood} wood`);
+    for (const m in t.mats) bits.push(`${t.mats[m]} ${C.MATERIALS[m].name.toLowerCase()}`);
+    if (!bits.length) {
+      SW.ui.log(g, 'You listened, and heard nothing you could catch.', 'warn');
+    } else {
+      SW.ui.log(g, `${L.hits} of ${L.spawned} answered: ${bits.join(', ')}.`, 'great');
+    }
+  }
+
+  // ----------------------------------------------------------------- bench
+  function benchUnlocked(g) { return !!g.neurons.bench; }
+
+  const pairKey = (a, b) => [a, b].sort().join('+');
+
+  function recipeFor(a, b) {
+    const k = pairKey(a, b);
+    return C.RECIPES.find(r => pairKey(r.a, r.b) === k) || null;
+  }
+
+  function craftValue(g, r) {
+    return Math.round(r.coin * D.mods.craft(g));
+  }
+
+  /* Combine two materials. Consumes one of each either way — a dead end still
+   * costs you, but the first time you find one it is worth an insight. */
+  const CRAFT_FOCUS = 3;
+
+  function combine(g, a, b) {
+    if (!benchUnlocked(g)) return false;
+    const need = a === b ? 2 : 1;
+    if ((g.mats[a] | 0) < need || (g.mats[b] | 0) < (a === b ? 0 : 1)) {
+      SW.ui.log(g, 'You do not have both of those.', 'warn');
+      return false;
+    }
+    // Bench work is your own labour, and it competes with the farm for it.
+    if (g.res.focus < CRAFT_FOCUS) { SW.ui.log(g, 'Not enough focus to work the bench.', 'warn'); return false; }
+    g.res.focus -= CRAFT_FOCUS;
+    g.mats[a] -= need;
+    if (a !== b) g.mats[b] -= 1;
+
+    const r = recipeFor(a, b);
+    if (!r) {
+      const k = pairKey(a, b);
+      if (!g.deadEnds[k]) {
+        g.deadEnds[k] = g.day;
+        g.insight += 1;
+        SW.ui.log(g, `${C.MATERIALS[a].name} and ${C.MATERIALS[b].name} make nothing at all. Now you know. +1 insight.`, 'warn');
+      } else {
+        SW.ui.log(g, 'Nothing, again. You knew that.', 'warn');
+      }
+      return false;
+    }
+
+    const value = craftValue(g, r);
+    g.res.coin += value;
+    g.stats.coinEarned += value;
+    g.crafted[r.id] = (g.crafted[r.id] | 0) + 1;
+    if (r.wood) g.res.wood += r.wood;
+    if (r.faith) g.village.faith = clamp(g.village.faith + r.faith, 0, 100);
+
+    if (!g.recipes[r.id]) {
+      g.recipes[r.id] = g.day;
+      const ins = Math.max(1, Math.round(r.insight * D.insightMul(g)));
+      g.insight += ins;
+      SW.ui.log(g, `${r.glyph} ${r.name}. You had not made one before. +${ins} insight, +${fmt(value)} coin.`, 'great');
+      g.fx.push({ at: 'banner', text: r.glyph + ' ' + r.name, life: 3.5, t: 0 });
+    } else {
+      SW.ui.log(g, `${r.glyph} ${r.name} — sold for ${fmt(value)} coin.`, 'good');
+    }
+    return true;
+  }
+
+  function buyMaterial(g, id, n) {
+    const m = C.MATERIALS[id];
+    if (!m || !m.buy) { SW.ui.log(g, 'Nobody sells that. You have to find it.', 'warn'); return 0; }
+    const afford = Math.min(n, Math.floor(g.res.coin / m.buy));
+    if (afford <= 0) { SW.ui.log(g, 'Not enough coin.', 'warn'); return 0; }
+    g.res.coin -= m.buy * afford;
+    g.mats[id] = (g.mats[id] | 0) + afford;
+    return afford;
+  }
+
+  function matCount(g) {
+    let n = 0;
+    for (const k in g.mats) n += g.mats[k] | 0;
+    return n;
+  }
+
+  SW.minigames = {
+    LISTEN_FOCUS, LISTEN_DUR, CRAFT_FOCUS, listenUnlocked, listenReady, listenCooldown,
+    startListen, tick, hitListen, hitListenNode, listenReady, benchUnlocked, recipeFor, craftValue,
+    combine, buyMaterial, matCount, pairKey
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
 /* Skyward Reach — the world tick: village, economy, rivals, festivals, feats,
  * plus every action the player themself can take. */
 (function (SW) {
@@ -1645,9 +2544,13 @@ tr.you .rg-place { color: var(--gold); }
 
   function buildHut(g) {
     const c = hutCost(g);
+    if (g.village.huts >= SW.discovery.hutCap(g)) {
+      return fail(g, 'There is no more room on this terrace. Build the island outward first.');
+    }
     if (g.res.wood < c.wood || g.res.coin < c.coin) return fail(g, 'You cannot afford another hut.');
     g.res.wood -= c.wood; g.res.coin -= c.coin;
     g.village.huts++;
+    SW.discovery.firstTime(g, 'build:hut', 3, 'raising a hut');
     SW.ui.log(g, 'A new hut goes up. Somewhere below, someone hears about it.', 'good');
     return true;
   }
@@ -1658,6 +2561,7 @@ tr.you .rg-place { color: var(--gold); }
     if (g.res.wood < c.wood || g.res.coin < c.coin) return fail(g, 'Not enough wood and coin.');
     g.res.wood -= c.wood; g.res.coin -= c.coin;
     g.plots.push(g.lockedPlots.shift());
+    SW.discovery.firstTime(g, 'build:plot', 3, 'breaking new ground');
     SW.ui.log(g, 'New ground, cleared and claimed.', 'good');
     return true;
   }
@@ -1666,9 +2570,11 @@ tr.you .rg-place { color: var(--gold); }
     const next = C.SHRINE_TIERS[g.shrine + 1];
     if (!next) return fail(g, 'The shrine is already everything it can be.');
     if (rankOf(g).id < next.rank) return fail(g, `You must stand at ${C.RANKS[next.rank].name} before the stones will hold.`);
+    if ((next.ring || 0) > (g.ring | 0)) return fail(g, `${C.RINGS[next.ring].name} has to exist before there is ground to put it on.`);
     if (g.res.wood < next.wood || g.res.coin < next.coin) return fail(g, 'Not enough wood and coin.');
     g.res.wood -= next.wood; g.res.coin -= next.coin;
     g.shrine++;
+    SW.discovery.firstTime(g, 'shrine:' + g.shrine, 5, `raising the ${next.name}`);
     g.village.faith = clamp(g.village.faith + 6, 0, 100);
     SW.ui.log(g, `The shrine rises. It is a ${next.name} now, and it can be seen from other islands.`, 'great');
     return true;
@@ -1682,6 +2588,7 @@ tr.you .rg-place { color: var(--gold); }
     if (g.res.prayer < m.cost) return fail(g, 'Not enough prayer.');
     g.res.prayer -= m.cost;
     g.stats.miracles++;
+    SW.discovery.firstTime(g, 'miracle:' + id, 3, `working the ${m.name}`);
     switch (id) {
       case 'rain':
         for (const p of g.plots) if (p.crop) { p.water = 100; p.rot = Math.max(0, p.rot - 30); }
@@ -1724,7 +2631,7 @@ tr.you .rg-place { color: var(--gold); }
   // --- world tick --------------------------------------------------------
   function tickVillage(g, dt) {
     const v = g.village;
-    const eaten = v.villagers * 0.085 * dt;
+    const eaten = v.villagers * 0.085 * SW.discovery.mods.eat(g) * dt;
     if (v.food >= eaten) {
       v.food -= eaten;
       v.faith = clamp(v.faith + 0.028 * dt, 0, 100);
@@ -1738,24 +2645,25 @@ tr.you .rg-place { color: var(--gold); }
     // full granary, neighbours who stayed — less whatever they are afraid of.
     // A people who fear you do not also love you, so the two paths compete
     // instead of stacking.
-    const pull = clamp(18 + grandeur(g) * 1.8 + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
+    const pull = clamp(18 + Math.min(grandeur(g) * 1.8, 46) + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
       - v.awe * 0.62 - v.unrest * 0.45, 0, 100);
+    if (g.effects.awe) v.awe = Math.max(v.awe, 14);      // the monolith never stops looming
     v.faith += (pull - v.faith) * 0.0022 * dt;
     v.faith = clamp(v.faith, 0, 100);
     v.awe = clamp(v.awe - 0.022 * dt, 0, 100);
-    // Living under a terror is exhausting. Awe keeps unrest topped up on its
-    // own, so a fear empire steadily bleeds the villagers it multiplies.
-    v.unrest = clamp(v.unrest + v.awe * 0.0042 * dt, 0, 100);
+    // Living under a terror is exhausting, but only once it is genuinely a
+    // terror. Below that, fear is just respect and costs nothing.
+    v.unrest = clamp(v.unrest + Math.max(0, v.awe - 45) * 0.005 * dt, 0, 100);
 
     // Prayer: love gives it freely, terror gives it grudgingly.
-    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.03);
+    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.05) * SW.discovery.mods.prayer(g);
     g.res.prayer += rate * dt;
 
     // Standing compounds. A congregation is worth what it feels about you,
     // multiplied by how far away your shrine can be seen. Neither half alone
     // gets you up the Register — this is the engine the whole grind feeds.
     const devotion = v.villagers * (v.faith + v.awe) / 100;
-    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * dt;
+    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * SW.discovery.mods.renown(g) * dt;
   }
 
   function checkFeats(g) {
@@ -1776,7 +2684,7 @@ tr.you .rg-place { color: var(--gold); }
   // ~70 days and then levels off for good: an established god is not getting
   // any more established. A fully built island out-earns even the fastest of
   // them, which is what makes first place reachable instead of a treadmill.
-  const RIVAL_MAX_GAIN = 650;
+  const RIVAL_MAX_GAIN = 1400;
 
   function tickRivals(g) {
     // Rivals climb their own curve and never chase you. Nothing rubber-bands,
@@ -1856,6 +2764,7 @@ tr.you .rg-place { color: var(--gold); }
       : Math.round(8 + g.day);
     g.res.renown += payout;
     g.stats.festivals++;
+    SW.discovery.firstTime(g, 'fest:' + cat.id, 4, `entering ${cat.name}`);
     if (place === 1) g.stats.festivalWins++;
     if (place <= 3) g.trophies.push({ fest: cat.id, name: cat.name, place, day: g.day });
 
@@ -1875,6 +2784,10 @@ tr.you .rg-place { color: var(--gold); }
     g.day++;
     g.stats.days++;
     F.rollPrices(g);
+    if (g.effects.seeds) {
+      const best = C.CROP_LIST.filter(c => rankOf(g).id >= c.rank).pop();
+      if (best) g.seeds[best.id] = (g.seeds[best.id] | 0) + 2;
+    }
     tickRivals(g);
     tickChatter(g);
 
@@ -1897,6 +2810,7 @@ tr.you .rg-place { color: var(--gold); }
     const after = rankOf(g).id;
     if (after > before) {
       const rk = C.RANKS[after];
+      SW.discovery.firstTime(g, 'rank:' + rk.id, 6, `being called ${rk.name}`);
       SW.ui.log(g, `The Register lists you as ${rk.name}. ${rk.unlock || ''}`, 'great');
       g.fx.push({ at: 'banner', text: 'RANK · ' + rk.name, life: 5, t: 0 });
     }
@@ -1905,10 +2819,12 @@ tr.you .rg-place { color: var(--gold); }
   function tick(g, dt) {
     g.tick += dt;
     g.dayTick += dt;
-    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * dt, 0, g.res.focusMax);
+    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * SW.discovery.mods.focusRegen(g) * dt, 0, g.res.focusMax);
 
     F.tickPlots(g, dt);
     Cr.tick(g, dt);
+    SW.lineage.tick(g, dt);
+    SW.minigames.tick(g, dt);
     tickVillage(g, dt);
 
     while (g.dayTick >= C.TICKS_PER_DAY) {
@@ -1971,8 +2887,12 @@ tr.you .rg-place { color: var(--gold); }
   const { clamp, lerp, hashNoise } = SW.core;
 
   const W = 960, H = 540;
-  // The part of the frame worth guaranteeing on screen, and its centre.
-  const FIT = { w: 790, h: 476, cx: 476, cy: 316 };
+  const UI_FONT = 'ui-sans-serif, system-ui, sans-serif';
+  // The island's footprint at terrace 0. Everything on the ground is placed
+  // relative to this, and the whole thing scales as terraces go up.
+  const ISLAND = { cx: 476, cy: 309, rx: 356, ry: 124 };
+  // The part of the frame worth guaranteeing on screen, for a given radius.
+  const fitFor = r => ({ w: 700 * r + 90, h: 420 * r + 56, cx: ISLAND.cx, cy: 316 });
 
   // Island furniture, in logical canvas pixels.
   const GRID = { ox: 408, oy: 232, ax: 46, ay: 23 };
@@ -1982,9 +2902,11 @@ tr.you .rg-place { color: var(--gold); }
   const DEN = { x: 492, y: 432 };
 
   let canvas = null, ctx = null, dpr = 1, scale = 1, offX = 0, offY = 0;
+  let cssW = 960, cssH = 540, radius = 1;
   let time = 0;
   let hover = -1;
   let selected = -1;
+  let hoverFeature = null;
 
   let attached = false;
   function attach(el) {
@@ -2004,13 +2926,20 @@ tr.you .rg-place { color: var(--gold); }
     canvas.height = Math.floor(ch * dpr);
     canvas.style.width = cw + 'px';
     canvas.style.height = ch + 'px';
-    // Fit the island's bounding box rather than the whole 960x540 frame: the
-    // design frame has generous sky margins, and on a narrow phone stage those
-    // margins would shrink the island to a thumbnail. The sky is painted over
-    // whatever falls outside, so cropping the margins costs nothing.
-    scale = Math.min(cw / FIT.w, ch / FIT.h);
-    offX = cw / 2 - FIT.cx * scale;
-    offY = ch / 2 - FIT.cy * scale;
+    cssW = cw; cssH = ch;
+    project();
+  }
+
+  /* Fit the island's footprint rather than the whole 960x540 frame: the design
+   * frame has generous sky margins, and on a narrow stage those margins would
+   * shrink the island to a thumbnail. The sky is painted over whatever falls
+   * outside, so cropping them costs nothing — and as terraces go up the view
+   * pulls back to keep the new ground on screen. */
+  function project() {
+    const fit = fitFor(radius);
+    scale = Math.min(cssW / fit.w, cssH / fit.h);
+    offX = cssW / 2 - fit.cx * scale;
+    offY = cssH / 2 - fit.cy * scale;
   }
 
   function toWorld(clientX, clientY) {
@@ -2024,20 +2953,37 @@ tr.you .rg-place { color: var(--gold); }
     return { x: r.left + offX + wx * scale, y: r.top + offY + wy * scale };
   }
 
-  /* Unlock order, centre-out, so three plots read as a small farm rather than
-   * a diagonal stripe and the field stays compact as it grows to sixteen. */
-  const PLOT_CELL = [
-    [1, 1], [2, 1], [1, 2], [2, 2],
-    [1, 0], [0, 1], [2, 0], [3, 1],
-    [0, 2], [3, 2], [1, 3], [2, 3],
-    [0, 0], [3, 0], [0, 3], [3, 3]
-  ];
+  /* Unlock order over the full 6x6 field, sorted outward from the middle, so
+   * three plots read as a small farm rather than a diagonal stripe and the
+   * field stays compact all the way to thirty-six. The inner 4x4 are exactly
+   * the sixteen nearest the centre, which keeps the first terrace's farm
+   * where it has always been. */
+  const PLOT_CELL = (() => {
+    const cells = [];
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) {
+      cells.push({ x, y, d: Math.hypot(x - 2.5, y - 2.5), a: Math.atan2(y - 2.5, x - 2.5) });
+    }
+    cells.sort((p, q) => (p.d - q.d) || (p.a - q.a));
+    return cells.map(c => [c.x, c.y]);
+  })();
+
   function plotCenter(p) {
     const cell = PLOT_CELL[p.i] || [p.gx, p.gy];
-    const gx = cell[0] + 0.5, gy = cell[1] + 0.5;
+    // shift so the inner block sits where the original 4x4 grid did
+    const gx = cell[0] - 1 + 0.5, gy = cell[1] - 1 + 0.5;
     return {
       x: GRID.ox + gx * GRID.ax - gy * GRID.ax,
       y: GRID.oy + gx * GRID.ay + gy * GRID.ay
+    };
+  }
+
+  /* Where a thing sitting at (angle, distance) on the island lands on screen.
+   * Distance is in units of the terrace-0 radius, so features stay put as the
+   * ground grows out around them. */
+  function featurePoint(ang, dist) {
+    return {
+      x: ISLAND.cx + Math.cos(ang) * dist * ISLAND.rx,
+      y: ISLAND.cy + Math.sin(ang) * dist * ISLAND.ry
     };
   }
 
@@ -2178,6 +3124,12 @@ tr.you .rg-place { color: var(--gold); }
   // --- island ------------------------------------------------------------
   function drawIsland(g, sky) {
     const amb = sky.amb;
+    // Terraces scale the whole landmass around its centre; everything built on
+    // it keeps its own coordinates and simply ends up further from the edge.
+    ctx.save();
+    ctx.translate(ISLAND.cx, ISLAND.cy);
+    ctx.scale(radius, radius);
+    ctx.translate(-ISLAND.cx, -ISLAND.cy);
     const grassTop = mix('#7fb56a', '#1c2740', 1 - amb);
     const grassLow = mix('#5d9450', '#141c30', 1 - amb);
     const rock = mix('#8a7560', '#241f2e', 1 - amb);
@@ -2226,8 +3178,22 @@ tr.you .rg-place { color: var(--gold); }
     ctx.fillStyle = gGrad;
     ctx.fill();
     ctx.strokeStyle = mix('#94c97e', '#243252', 1 - amb);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 / radius;
     ctx.stroke();
+
+    // Terrace seams, so the added ground reads as added ground.
+    for (let r = 1; r <= (g.ring | 0); r++) {
+      const rr = C.RINGS[r - 1].radius / C.RINGS[g.ring].radius;
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = '#20301f';
+      ctx.lineWidth = 2.5 / radius;
+      ctx.beginPath();
+      ctx.ellipse(ISLAND.cx, ISLAND.cy + 4, ISLAND.rx * rr, ISLAND.ry * rr, 0, 0, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   // --- plots -------------------------------------------------------------
@@ -2438,6 +3404,113 @@ tr.you .rg-place { color: var(--gold); }
     }
   }
 
+  /* Unknown things read as pale question marks that will not sit still.
+   * Examined ones settle into a small marker you can still see from anywhere,
+   * because they are the record of how much of the island you have walked. */
+  function drawFeatures(g, sky) {
+    for (const inst of g.features) {
+      const def = C.FEATURES.find(f => f.id === inst.fid);
+      if (!def) continue;
+      const p = featurePoint(inst.ang, inst.dist);
+      if (!inst.found) {
+        const bob = Math.sin(time * 2 + inst.ang * 3) * 3;
+        const pulse = 0.55 + 0.45 * Math.sin(time * 2.4 + inst.ang * 5);
+        ctx.save();
+        const gl = ctx.createRadialGradient(p.x, p.y - 10 + bob, 1, p.x, p.y - 10 + bob, 30);
+        gl.addColorStop(0, `rgba(190,220,255,${0.30 * pulse})`);
+        gl.addColorStop(1, 'rgba(190,220,255,0)');
+        ctx.fillStyle = gl;
+        ctx.beginPath(); ctx.arc(p.x, p.y - 10 + bob, 30, 0, 7); ctx.fill();
+        ctx.globalAlpha = 0.55 + 0.45 * pulse;
+        ctx.font = '700 22px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#e8f1ff';
+        ctx.strokeStyle = 'rgba(10,14,24,0.65)';
+        ctx.lineWidth = 3;
+        ctx.strokeText('?', p.x, p.y - 4 + bob);
+        ctx.fillText('?', p.x, p.y - 4 + bob);
+        ctx.restore();
+        if (hoverFeature === inst) {
+          ctx.save();
+          ctx.strokeStyle = '#ffe08a';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.arc(p.x, p.y - 8, 22, 0, 7); ctx.stroke();
+          ctx.restore();
+        }
+      } else {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.font = '16px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillText(def.glyph, p.x, p.y);
+        ctx.restore();
+      }
+    }
+  }
+
+  /* The Listening: sweeps out from the middle of the island, and whatever
+   * answers glows for a couple of seconds. */
+  function drawListen(g) {
+    const L = g.listen;
+    if (!L) return;
+    ctx.save();
+    for (let i = 0; i < 3; i++) {
+      const k = ((L.t * 0.55 + i / 3) % 1);
+      ctx.globalAlpha = (1 - k) * 0.30;
+      ctx.strokeStyle = '#bfe4ff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(ISLAND.cx, ISLAND.cy, ISLAND.rx * k * radius, ISLAND.ry * k * radius, 0, 0, 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    for (const n of L.nodes) {
+      const p = featurePoint(n.ang, n.dist);
+      const left = clamp(1 - n.t / n.life, 0, 1);
+      const tint = n.kind === 'insight' ? '#9fd6ff' : n.kind === 'mat' ? '#ffd28a'
+        : n.kind === 'coin' ? '#ffe9a8' : '#a9dfa2';
+      ctx.save();
+      if (n.hit) {
+        ctx.globalAlpha = left * 2;
+        ctx.strokeStyle = '#8ff0a4';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 26 * (1 - left * 2 + 1), 0, 7); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      const pulse = 0.6 + 0.4 * Math.sin(time * 8);
+      const gl = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 26);
+      gl.addColorStop(0, tint);
+      gl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.globalAlpha = 0.55 * pulse;
+      ctx.fillStyle = gl;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 26, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = tint;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill();
+      // the closing ring is the time you have left to click it
+      ctx.strokeStyle = tint;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 10 + left * 14, 0, 7); ctx.stroke();
+      ctx.restore();
+    }
+
+    // time remaining
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    const w = 220, x = W / 2 - w / 2, y = 26;
+    ctx.fillStyle = 'rgba(8,12,20,0.6)';
+    ctx.fillRect(x, y, w, 6);
+    ctx.fillStyle = '#bfe4ff';
+    ctx.fillRect(x, y, w * clamp(1 - L.t / SW.minigames.LISTEN_DUR, 0, 1), 6);
+    ctx.font = '600 12px ' + UI_FONT;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#dceeff';
+    ctx.fillText('LISTENING · ' + L.hits + ' caught', W / 2, y - 6);
+    ctx.restore();
+  }
+
   // --- the creature ------------------------------------------------------
   function drawCreature(g, sky) {
     const c = g.creature;
@@ -2640,6 +3713,14 @@ tr.you .rg-place { color: var(--gold); }
         ctx.strokeText(f.text, c.x, fy);
         ctx.fillText(f.text, c.x, fy);
         ctx.restore();
+      } else if (f.at === 'point') {
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.font = '700 20px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = f.tone === 'good' ? '#8ff0a4' : '#dfe7ff';
+        ctx.fillText(f.text, f.x, f.y - k * 26);
+        ctx.restore();
       } else if (f.at === 'banner') {
         ctx.save();
         const inK = clamp(f.t / 0.4, 0, 1) * clamp((life - f.t) / 0.7, 0, 1);
@@ -2698,6 +3779,8 @@ tr.you .rg-place { color: var(--gold); }
   function frame(g, dt) {
     if (!ctx) return;
     time += dt;
+    const want = C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)].radius;
+    if (want !== radius) { radius = want; project(); }
     const t = (g.dayTick % C.TICKS_PER_DAY) / C.TICKS_PER_DAY;
     const sky = skyAt(t);
 
@@ -2721,12 +3804,14 @@ tr.you .rg-place { color: var(--gold); }
     drawIsland(g, sky);
     drawTrees(sky);
     drawPlots(g, sky);
+    drawFeatures(g, sky);
     drawShrine(g, sky);
     drawHuts(g, sky);
     drawVillagers(g, sky);
     moveCreature(g, dt);
     drawCreature(g, sky);
     drawSceneLabels(g, sky);
+    drawListen(g);
     drawFx(g, dt);
 
     ctx.restore();
@@ -2747,6 +3832,18 @@ tr.you .rg-place { color: var(--gold); }
     }
     return null;
   }
+  function hitFeature(g, wx, wy) {
+    let best = null, bestD = 34;
+    for (const inst of g.features) {
+      if (inst.found) continue;
+      const p = featurePoint(inst.ang, inst.dist);
+      const d = Math.hypot(wx - p.x, wy - (p.y - 8));
+      if (d < bestD) { bestD = d; best = inst; }
+    }
+    return best;
+  }
+  const setHoverFeature = f => { hoverFeature = f; };
+
   function hitCreature(g, wx, wy) {
     const c = g.creature;
     return Math.hypot(wx - c.x, wy - (c.y - 26 * c.size)) < 40 * clamp(c.size, 0.7, 2.4);
@@ -2756,7 +3853,8 @@ tr.you .rg-place { color: var(--gold); }
   const getSelected = () => selected;
 
   SW.render = {
-    W, H, attach, resize, frame, toWorld, toScreen, hitPlot, hitLockedPlot, hitCreature,
+    W, H, ISLAND, attach, resize, frame, toWorld, toScreen, hitPlot, hitLockedPlot, hitCreature,
+    hitFeature, setHoverFeature, featurePoint,
     setHover, setSelected, getSelected, plotCenter, anchorPoint,
     WOOD, VILLAGE, SHRINE, DEN
   };
@@ -2771,11 +3869,15 @@ tr.you .rg-place { color: var(--gold); }
   const F = SW.farm;
   const Cr = SW.creature;
   const S = SW.sim;
+  const Ln = SW.lineage;
+  const D = SW.discovery;
+  const M = SW.minigames;
   const { clamp, fmt, titleCase } = SW.core;
 
   let G = null;
   let tab = 'farm';
   let lastFestivalShown = -1;
+  let benchA = null, benchB = null;
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -2822,6 +3924,7 @@ tr.you .rg-place { color: var(--gold); }
     $('res-wood').textContent = fmt(g.res.wood);
     $('res-prayer').textContent = fmt(g.res.prayer);
     $('res-renown').textContent = fmt(g.res.renown);
+    $('res-insight').textContent = fmt(g.insight);
     $('res-focus').textContent = Math.floor(g.res.focus) + '/' + g.res.focusMax;
     $('focus-fill').style.width = (g.res.focus / g.res.focusMax * 100) + '%';
     $('hud-day').textContent = 'Day ' + g.day;
@@ -2852,6 +3955,21 @@ tr.you .rg-place { color: var(--gold); }
     }).join('');
 
     const doing = c.act ? `${C.ACTS[c.act.id].icon} ${c.act.phase === 'travel' ? 'heading off to ' : ''}${C.ACTS[c.act.id].name}` : 'thinking';
+    const age = Ln.ageOf(g);
+    const evo = Ln.evolutionOf(g);
+    const life = Ln.lifeProgress(g);
+    const blocker = Ln.breedBlocker(g);
+    const ingrainRows = C.TRAINABLE.filter(id => C.ACTS[id].useful || Ln.ingrainedOf(g, id) > 0.01).map(id => {
+      const a = C.ACTS[id];
+      const v = Ln.ingrainedOf(g, id);
+      const warm = Cr.mastery(g, id) >= Ln.IN_MIN_MASTERY;
+      return `<div class="ingrain ${warm ? '' : 'cold'}" title="${warm ? 'Praise it to drive this deeper into the line.' : 'It does not know this well enough to ingrain yet.'}">
+        <span>${a.icon}</span>
+        <span class="ingrain-name">${esc(titleCase(a.name))}</span>
+        <span class="ingrain-bar"><i style="width:${(v * 100).toFixed(0)}%"></i></span>
+        <span class="ingrain-pct">${Math.round(v * 100)}%</span>
+      </div>`;
+    }).join('');
 
     setHTML($('card'), `
       <div class="card-head">
@@ -2863,6 +3981,14 @@ tr.you .rg-place { color: var(--gold); }
           </div>
         </div>
         <div class="doing">${esc(doing)}</div>
+      </div>
+      <div class="genline">
+        <span>Gen <b>${c.gen || 1}</b></span>
+        <span>${esc(age.name)} · <b>${Math.floor(c.age || 0)}d</b></span>
+        <span class="evo">${evo.tier ? evo.glyph + ' ' + esc(evo.name) : ''}</span>
+      </div>
+      <div class="bars lifebar">
+        ${bar('Life', life * 100, 100, '', Math.max(0, Math.ceil(Ln.lifespan(g) - (c.age || 0))) + 'd left')}
       </div>
       <div class="bars">
         ${bar('Belly', c.hunger, 130, c.hunger < 25 ? 'danger' : 'food')}
@@ -2887,6 +4013,12 @@ tr.you .rg-place { color: var(--gold); }
       </div>
       <div class="section-label">What it has learned</div>
       <div class="trainlist">${rows}</div>
+      <div class="section-label">Ingrained — what the line keeps</div>
+      <div class="trainlist">${ingrainRows}</div>
+      <button class="btn big" data-act="breed" ${blocker ? 'disabled' : ''} style="margin-top:8px">
+        🧬 Generation leap ${blocker ? '' : '· gen ' + ((c.gen || 1) + 1)}
+      </button>
+      <p class="tiny">${esc(blocker || 'Everything above 0% carries into the whelp. Everything else dies with this animal.')}</p>
       <div class="section-label">Feed it</div>
       <div class="feedrow">
         ${C.CROP_LIST.map(cr => `<button class="chip" data-feed="${cr.id}" ${(g.stock[cr.id] | 0) > 0 ? '' : 'disabled'}>${cr.glyph} ${g.stock[cr.id] | 0}</button>`).join('')}
@@ -2903,6 +4035,8 @@ tr.you .rg-place { color: var(--gold); }
       case 'market': setHTML(body, tabMarket(g)); break;
       case 'village': setHTML(body, tabVillage(g)); break;
       case 'powers': setHTML(body, tabPowers(g)); break;
+      case 'frontier': setHTML(body, tabFrontier(g)); break;
+      case 'bench': setHTML(body, tabBench(g)); break;
       case 'register': setHTML(body, tabRegister(g)); break;
       case 'feats': setHTML(body, tabFeats(g)); break;
     }
@@ -3018,6 +4152,92 @@ tr.you .rg-place { color: var(--gold); }
       <p class="tiny">${g.stats.miracles} miracles worked.</p>`;
   }
 
+  function tabFrontier(g) {
+    const ring = D.ringOf(g);
+    const nxt = D.nextRing(g);
+    const cost = D.ringCost(g);
+    const unknown = D.unknownCount(g);
+    const listenState = !M.listenUnlocked(g) ? 'locked'
+      : g.listen ? 'running' : M.listenCooldown(g) > 0 ? 'cooling' : 'ready';
+
+    const rows = g.features.map(inst => {
+      const def = C.FEATURES.find(f => f.id === inst.fid);
+      if (!def) return '';
+      return inst.found
+        ? `<div class="frow"><span>${def.glyph}</span><span><b>${esc(titleCase(def.name))}</b><br><i>${esc(def.blurb)}</i></span><span class="ins">day ${g.discovered[def.id] || '—'}</span></div>`
+        : `<div class="frow unknown"><span>?</span><span><b>Something on the ${esc(C.RINGS[inst.ring].name.replace('The ', '').toLowerCase())}</b><br><i>You have not walked over to it.</i></span><span class="ins">+?</span></div>`;
+    }).join('');
+
+    return `
+      <div class="terrace">
+        <div class="terrace-head">⛰ ${esc(ring.name)} <span>${g.plots.length}/${ring.plots} plots · ${g.village.huts}/${ring.hutCap} huts</span></div>
+        ${nxt ? `<p>${esc(nxt.name)} would add ${nxt.plots - ring.plots} plot slots and room for ${nxt.hutCap - ring.hutCap} more huts — and a fresh band of ground you know nothing about.</p>
+          <div class="btnrow"><button class="btn" data-act="ring">⛰ Raise ${esc(nxt.name)}
+            <span class="cost">${fmt(cost.wood)}🪵 ${fmt(cost.coin)}🪙 ${cost.insight}🧠</span></button></div>`
+          : '<p>The island is as wide as it will ever be.</p>'}
+      </div>
+
+      <div class="terrace">
+        <div class="terrace-head">🔊 The Listening <span>${listenState === 'locked' ? 'not yet known' : listenState === 'running' ? 'in progress' : listenState === 'cooling' ? Math.ceil(M.listenCooldown(g)) + 's' : 'ready'}</span></div>
+        <p>Go still and sweep the island. Whatever answers glows for a moment — click it before it stops. The only way to get storm glass and skymetal out of the ground.</p>
+        <div class="btnrow"><button class="btn" data-act="listen" ${listenState === 'ready' ? '' : 'disabled'}>
+          🔊 Listen <span class="cost">${M.LISTEN_FOCUS} focus</span></button></div>
+      </div>
+
+      <div class="section-label">The ground — ${Object.keys(g.discovered).length} examined, ${unknown} not</div>
+      <p class="hint">Unknown things show as <b>?</b> out on the island. Click one to walk over and examine it${D.examineCost(g) ? ` (${D.examineCost(g)} focus)` : ' (free — you have Long Sight)'}.</p>
+      <div>${rows || '<p class="hint">Nothing left out there.</p>'}</div>
+
+      <div class="section-label">The neural web — ${fmt(g.insight)} insight</div>
+      <div class="web">
+        ${C.NEURONS.map(n => {
+          const owned = !!g.neurons[n.id];
+          const open = D.neuronAvailable(g, n);
+          return `<button class="neuron ${owned ? 'owned' : open ? '' : 'locked'}" data-neuron="${n.id}" ${owned || !open ? 'disabled' : ''}>
+            <span>${n.icon}</span>
+            <span><b>${esc(n.name)}</b><i>${esc(n.desc)}</i></span>
+            <span class="cost">${owned ? '✓' : n.cost + '🧠'}</span>
+          </button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function tabBench(g) {
+    if (!M.benchUnlocked(g)) {
+      return `<p class="hint">You do not have a workbench. Grow <b>The Bench</b> on the neural web to build one.</p>`;
+    }
+    const have = id => g.mats[id] | 0;
+    const ready = benchA && benchB && have(benchA) >= (benchA === benchB ? 2 : 1) && have(benchB) >= 1;
+    const known = C.RECIPES.filter(r => g.recipes[r.id]);
+    const deadEnds = Object.keys(g.deadEnds).length;
+
+    return `<p class="hint">Put two things together and find out. There is no list — ${C.RECIPES.length} pairings do something, ${21 - C.RECIPES.length} do nothing, and finding out either way costs you the materials.</p>
+      <div class="matgrid">
+        ${C.MATERIAL_LIST.map(m => `<button class="matchip ${benchA === m.id || benchB === m.id ? 'sel' : ''}" data-mat="${m.id}" ${have(m.id) ? '' : 'disabled'}>
+          ${m.glyph} ${esc(m.name)} <b>${have(m.id)}</b></button>`).join('')}
+      </div>
+      <div class="bench-slots">
+        <span class="slot ${benchA ? 'full' : ''}" data-slot="a">${benchA ? C.MATERIALS[benchA].glyph : ''}</span>
+        <span>+</span>
+        <span class="slot ${benchB ? 'full' : ''}" data-slot="b">${benchB ? C.MATERIALS[benchB].glyph : ''}</span>
+      </div>
+      <div class="btnrow">
+        <button class="btn hot" data-act="combine" ${ready && g.res.focus >= M.CRAFT_FOCUS ? '' : 'disabled'}>⚒️ Combine <span class="cost">${M.CRAFT_FOCUS} focus</span></button>
+        <button class="btn" data-act="benchclear">Clear</button>
+      </div>
+      <div class="section-label">Buy materials</div>
+      <div class="btnrow wrap">
+        ${C.MATERIAL_LIST.filter(m => m.buy).map(m => `<button class="chip" data-buymat="${m.id}">${m.glyph} ×5 <i>${m.buy * 5}🪙</i></button>`).join('')}
+      </div>
+      <p class="tiny">Storm glass and skymetal are not for sale. Examine the ground, or listen for them.</p>
+      <div class="section-label">Known — ${known.length} of ${C.RECIPES.length}${deadEnds ? ` · ${deadEnds} dead ends` : ''}</div>
+      ${known.length ? known.map(r => `<div class="recipe">
+        <span>${r.glyph}</span>
+        <span><b>${esc(r.name)}</b><br><i>${C.MATERIALS[r.a].glyph} + ${C.MATERIALS[r.b].glyph} · made ${g.crafted[r.id] || 0}×</i></span>
+        <span class="val">${fmt(M.craftValue(g, r))}🪙</span>
+      </div>`).join('') : '<p class="hint">You have not made anything yet.</p>'}`;
+  }
+
   function tabRegister(g) {
     const rows = S.standings(g);
     const fest = C.FESTIVALS[g.festival.index % C.FESTIVALS.length];
@@ -3070,9 +4290,17 @@ tr.you .rg-place { color: var(--gold); }
   // --- plot action bar ---------------------------------------------------
   function renderActionBar(g) {
     const el = $('actionbar');
+    if (g.listen) {
+      setHTML(el, `<span class="ab-title">🔊 Listening</span><span class="ab-hint">Click what glows before it fades. ${g.listen.hits} caught.</span>`);
+      return;
+    }
     const i = SW.render.getSelected();
     const p = g.plots.find(pp => pp.i === i);
-    if (!p) { setHTML(el, '<span class="ab-hint">Click a plot, the woodland, or your creature.</span>'); return; }
+    if (!p) {
+      const unknown = D.unknownCount(g);
+      setHTML(el, `<span class="ab-hint">Click a plot, the woodland, or your creature.${unknown ? ` <b>${unknown}</b> unknown thing${unknown === 1 ? '' : 's'} still out there — look for the <b>?</b> marks.` : ''}</span>`);
+      return;
+    }
     const crop = p.crop ? C.CROPS[p.crop] : null;
     let html = `<span class="ab-title">Plot ${p.i + 1} — ${crop ? esc(crop.name) : p.state === 'tilled' ? 'tilled' : 'wild'}</span>`;
     if (p.state === 'raw') {
@@ -3196,7 +4424,13 @@ tr.you .rg-place { color: var(--gold); }
         and a terrorising creature. Awe decays and breeds unrest; faith compounds. Pick a god to be.</p>
         <p><b>Festivals</b> every five days, rotating between crops, creature and shrine. <b>Feats</b> and placement in
         <b>the Register</b> are where renown really comes from.</p>
-        <p class="tiny">Keys — <b>P</b> praise · <b>S</b> strike · <b>Space</b> pause · <b>1/2/3</b> speed · <b>F</b> festival panel</p>
+        <p><b>Learning dies with the animal.</b> Praising a chore it already knows well also <i>ingrains</i> it — and only ingrained
+        behaviour survives a <b>generation leap</b>. Breed before it dies of old age and the whelp starts already knowing its
+        parent's trade. Let it die first and you lose most of that. Every few generations the line changes shape permanently.</p>
+        <p><b>The island is not fully known to you.</b> Unknown things sit out past the farm as <b>?</b> marks; walking over and
+        examining one is the only source of <b>Insight</b>, which buys permanent upgrades on the neural web. Raising a terrace
+        makes the island physically bigger and puts a fresh band of unknown ground inside it.</p>
+        <p class="tiny">Keys — <b>P</b> praise · <b>S</b> strike · <b>L</b> listen · <b>B</b> breed · <b>Space</b> pause · <b>1/2/3</b> speed · <b>F</b> festival panel</p>
       </div>
       <button class="btn big" onclick="SW.ui.hideModal()">Understood</button>
     `, { wide: true });
@@ -3240,12 +4474,17 @@ tr.you .rg-place { color: var(--gold); }
   function onCanvasMove(e) {
     const w = SW.render.toWorld(e.clientX, e.clientY);
     const p = SW.render.hitPlot(G, w.x, w.y);
+    const f = SW.render.hitFeature(G, w.x, w.y);
     SW.render.setHover(p ? p.i : -1);
-    $('stage').style.cursor = p || SW.render.hitCreature(G, w.x, w.y) ? 'pointer' : 'default';
+    SW.render.setHoverFeature(f);
+    $('stage').style.cursor = (p || f || G.listen || SW.render.hitCreature(G, w.x, w.y)) ? 'pointer' : 'default';
   }
 
   function onCanvasClick(e) {
     const w = SW.render.toWorld(e.clientX, e.clientY);
+    if (G.listen) { M.hitListen(G, w.x, w.y); return; }
+    const feat = SW.render.hitFeature(G, w.x, w.y);
+    if (feat) { D.examine(G, feat); dirty.panel = true; return; }
     if (SW.render.hitCreature(G, w.x, w.y)) {
       if (G.creature.pending) Cr.praise(G);
       else log(G, `${G.creature.name} looks up at you.`);
@@ -3302,6 +4541,14 @@ tr.you .rg-place { color: var(--gold); }
       log(G, total ? `The granary takes ${total} food.` : 'Nothing to mill.', total ? 'good' : 'warn');
     }
     else if (d.miracle) S.castMiracle(G, d.miracle);
+    else if (d.neuron) D.buyNeuron(G, d.neuron);
+    else if (d.buymat) { const n = M.buyMaterial(G, d.buymat, 5); if (n) log(G, `${n} ${C.MATERIALS[d.buymat].name.toLowerCase()} delivered.`); }
+    else if (d.mat) {
+      // First click fills the left slot, second the right, third starts over.
+      if (benchA === null) benchA = d.mat;
+      else if (benchB === null) benchB = d.mat;
+      else { benchA = d.mat; benchB = null; }
+    }
     else if (d.feed) Cr.feed(G, d.feed);
     else if (d.leash) { G.creature.leash = d.leash; log(G, `Leash of ${C.LEASHES[d.leash].name}.`); }
     else if (d.act) {
@@ -3315,6 +4562,13 @@ tr.you .rg-place { color: var(--gold); }
         case 'clearplot': S.clearPlot(G); break;
         case 'hut': S.buildHut(G); break;
         case 'shrine': S.upgradeShrine(G); break;
+        case 'ring': D.raiseRing(G); break;
+        case 'listen': M.startListen(G); break;
+        case 'breed': if (Ln.canBreed(G)) Ln.breed(G, false); break;
+        case 'combine':
+          if (benchA && benchB) { M.combine(G, benchA, benchB); benchA = null; benchB = null; }
+          break;
+        case 'benchclear': benchA = null; benchB = null; break;
       }
     }
     dirty.panel = true; dirty.card = true;
@@ -3333,6 +4587,8 @@ tr.you .rg-place { color: var(--gold); }
     else if (k === '2') SW.main.setSpeed(2);
     else if (k === '3') SW.main.setSpeed(4);
     else if (k === 'f') setTab('register');
+    else if (k === 'l') M.startListen(G);
+    else if (k === 'b') { if (Ln.canBreed(G)) Ln.breed(G, false); }
     else if (k === '?') showHelp();
   }
 
@@ -3472,7 +4728,7 @@ tr.you .rg-place { color: var(--gold); }
     } else {
       SW.render.attach(document.getElementById('scene'));
       SW.ui.showHatch((lineage, beastName, godName) => {
-        const g = SW.state.newGame(lineage, beastName, godName);
+        const g = SW.state.startGame(lineage, beastName, godName);
         SW.ui.log(g, `The egg opens. ${beastName} looks at you and waits to be told what it is.`, 'great');
         SW.ui.log(g, 'Click a plot to work it. Praise or strike the creature after it acts — that is how it learns.', 'info');
         begin(g);

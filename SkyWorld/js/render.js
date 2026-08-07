@@ -9,8 +9,12 @@
   const { clamp, lerp, hashNoise } = SW.core;
 
   const W = 960, H = 540;
-  // The part of the frame worth guaranteeing on screen, and its centre.
-  const FIT = { w: 790, h: 476, cx: 476, cy: 316 };
+  const UI_FONT = 'ui-sans-serif, system-ui, sans-serif';
+  // The island's footprint at terrace 0. Everything on the ground is placed
+  // relative to this, and the whole thing scales as terraces go up.
+  const ISLAND = { cx: 476, cy: 309, rx: 356, ry: 124 };
+  // The part of the frame worth guaranteeing on screen, for a given radius.
+  const fitFor = r => ({ w: 700 * r + 90, h: 420 * r + 56, cx: ISLAND.cx, cy: 316 });
 
   // Island furniture, in logical canvas pixels.
   const GRID = { ox: 408, oy: 232, ax: 46, ay: 23 };
@@ -20,9 +24,11 @@
   const DEN = { x: 492, y: 432 };
 
   let canvas = null, ctx = null, dpr = 1, scale = 1, offX = 0, offY = 0;
+  let cssW = 960, cssH = 540, radius = 1;
   let time = 0;
   let hover = -1;
   let selected = -1;
+  let hoverFeature = null;
 
   let attached = false;
   function attach(el) {
@@ -42,13 +48,20 @@
     canvas.height = Math.floor(ch * dpr);
     canvas.style.width = cw + 'px';
     canvas.style.height = ch + 'px';
-    // Fit the island's bounding box rather than the whole 960x540 frame: the
-    // design frame has generous sky margins, and on a narrow phone stage those
-    // margins would shrink the island to a thumbnail. The sky is painted over
-    // whatever falls outside, so cropping the margins costs nothing.
-    scale = Math.min(cw / FIT.w, ch / FIT.h);
-    offX = cw / 2 - FIT.cx * scale;
-    offY = ch / 2 - FIT.cy * scale;
+    cssW = cw; cssH = ch;
+    project();
+  }
+
+  /* Fit the island's footprint rather than the whole 960x540 frame: the design
+   * frame has generous sky margins, and on a narrow stage those margins would
+   * shrink the island to a thumbnail. The sky is painted over whatever falls
+   * outside, so cropping them costs nothing — and as terraces go up the view
+   * pulls back to keep the new ground on screen. */
+  function project() {
+    const fit = fitFor(radius);
+    scale = Math.min(cssW / fit.w, cssH / fit.h);
+    offX = cssW / 2 - fit.cx * scale;
+    offY = cssH / 2 - fit.cy * scale;
   }
 
   function toWorld(clientX, clientY) {
@@ -62,20 +75,37 @@
     return { x: r.left + offX + wx * scale, y: r.top + offY + wy * scale };
   }
 
-  /* Unlock order, centre-out, so three plots read as a small farm rather than
-   * a diagonal stripe and the field stays compact as it grows to sixteen. */
-  const PLOT_CELL = [
-    [1, 1], [2, 1], [1, 2], [2, 2],
-    [1, 0], [0, 1], [2, 0], [3, 1],
-    [0, 2], [3, 2], [1, 3], [2, 3],
-    [0, 0], [3, 0], [0, 3], [3, 3]
-  ];
+  /* Unlock order over the full 6x6 field, sorted outward from the middle, so
+   * three plots read as a small farm rather than a diagonal stripe and the
+   * field stays compact all the way to thirty-six. The inner 4x4 are exactly
+   * the sixteen nearest the centre, which keeps the first terrace's farm
+   * where it has always been. */
+  const PLOT_CELL = (() => {
+    const cells = [];
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) {
+      cells.push({ x, y, d: Math.hypot(x - 2.5, y - 2.5), a: Math.atan2(y - 2.5, x - 2.5) });
+    }
+    cells.sort((p, q) => (p.d - q.d) || (p.a - q.a));
+    return cells.map(c => [c.x, c.y]);
+  })();
+
   function plotCenter(p) {
     const cell = PLOT_CELL[p.i] || [p.gx, p.gy];
-    const gx = cell[0] + 0.5, gy = cell[1] + 0.5;
+    // shift so the inner block sits where the original 4x4 grid did
+    const gx = cell[0] - 1 + 0.5, gy = cell[1] - 1 + 0.5;
     return {
       x: GRID.ox + gx * GRID.ax - gy * GRID.ax,
       y: GRID.oy + gx * GRID.ay + gy * GRID.ay
+    };
+  }
+
+  /* Where a thing sitting at (angle, distance) on the island lands on screen.
+   * Distance is in units of the terrace-0 radius, so features stay put as the
+   * ground grows out around them. */
+  function featurePoint(ang, dist) {
+    return {
+      x: ISLAND.cx + Math.cos(ang) * dist * ISLAND.rx,
+      y: ISLAND.cy + Math.sin(ang) * dist * ISLAND.ry
     };
   }
 
@@ -216,6 +246,12 @@
   // --- island ------------------------------------------------------------
   function drawIsland(g, sky) {
     const amb = sky.amb;
+    // Terraces scale the whole landmass around its centre; everything built on
+    // it keeps its own coordinates and simply ends up further from the edge.
+    ctx.save();
+    ctx.translate(ISLAND.cx, ISLAND.cy);
+    ctx.scale(radius, radius);
+    ctx.translate(-ISLAND.cx, -ISLAND.cy);
     const grassTop = mix('#7fb56a', '#1c2740', 1 - amb);
     const grassLow = mix('#5d9450', '#141c30', 1 - amb);
     const rock = mix('#8a7560', '#241f2e', 1 - amb);
@@ -264,8 +300,22 @@
     ctx.fillStyle = gGrad;
     ctx.fill();
     ctx.strokeStyle = mix('#94c97e', '#243252', 1 - amb);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 / radius;
     ctx.stroke();
+
+    // Terrace seams, so the added ground reads as added ground.
+    for (let r = 1; r <= (g.ring | 0); r++) {
+      const rr = C.RINGS[r - 1].radius / C.RINGS[g.ring].radius;
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = '#20301f';
+      ctx.lineWidth = 2.5 / radius;
+      ctx.beginPath();
+      ctx.ellipse(ISLAND.cx, ISLAND.cy + 4, ISLAND.rx * rr, ISLAND.ry * rr, 0, 0, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   // --- plots -------------------------------------------------------------
@@ -476,6 +526,113 @@
     }
   }
 
+  /* Unknown things read as pale question marks that will not sit still.
+   * Examined ones settle into a small marker you can still see from anywhere,
+   * because they are the record of how much of the island you have walked. */
+  function drawFeatures(g, sky) {
+    for (const inst of g.features) {
+      const def = C.FEATURES.find(f => f.id === inst.fid);
+      if (!def) continue;
+      const p = featurePoint(inst.ang, inst.dist);
+      if (!inst.found) {
+        const bob = Math.sin(time * 2 + inst.ang * 3) * 3;
+        const pulse = 0.55 + 0.45 * Math.sin(time * 2.4 + inst.ang * 5);
+        ctx.save();
+        const gl = ctx.createRadialGradient(p.x, p.y - 10 + bob, 1, p.x, p.y - 10 + bob, 30);
+        gl.addColorStop(0, `rgba(190,220,255,${0.30 * pulse})`);
+        gl.addColorStop(1, 'rgba(190,220,255,0)');
+        ctx.fillStyle = gl;
+        ctx.beginPath(); ctx.arc(p.x, p.y - 10 + bob, 30, 0, 7); ctx.fill();
+        ctx.globalAlpha = 0.55 + 0.45 * pulse;
+        ctx.font = '700 22px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#e8f1ff';
+        ctx.strokeStyle = 'rgba(10,14,24,0.65)';
+        ctx.lineWidth = 3;
+        ctx.strokeText('?', p.x, p.y - 4 + bob);
+        ctx.fillText('?', p.x, p.y - 4 + bob);
+        ctx.restore();
+        if (hoverFeature === inst) {
+          ctx.save();
+          ctx.strokeStyle = '#ffe08a';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.arc(p.x, p.y - 8, 22, 0, 7); ctx.stroke();
+          ctx.restore();
+        }
+      } else {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.font = '16px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillText(def.glyph, p.x, p.y);
+        ctx.restore();
+      }
+    }
+  }
+
+  /* The Listening: sweeps out from the middle of the island, and whatever
+   * answers glows for a couple of seconds. */
+  function drawListen(g) {
+    const L = g.listen;
+    if (!L) return;
+    ctx.save();
+    for (let i = 0; i < 3; i++) {
+      const k = ((L.t * 0.55 + i / 3) % 1);
+      ctx.globalAlpha = (1 - k) * 0.30;
+      ctx.strokeStyle = '#bfe4ff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(ISLAND.cx, ISLAND.cy, ISLAND.rx * k * radius, ISLAND.ry * k * radius, 0, 0, 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    for (const n of L.nodes) {
+      const p = featurePoint(n.ang, n.dist);
+      const left = clamp(1 - n.t / n.life, 0, 1);
+      const tint = n.kind === 'insight' ? '#9fd6ff' : n.kind === 'mat' ? '#ffd28a'
+        : n.kind === 'coin' ? '#ffe9a8' : '#a9dfa2';
+      ctx.save();
+      if (n.hit) {
+        ctx.globalAlpha = left * 2;
+        ctx.strokeStyle = '#8ff0a4';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 26 * (1 - left * 2 + 1), 0, 7); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      const pulse = 0.6 + 0.4 * Math.sin(time * 8);
+      const gl = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 26);
+      gl.addColorStop(0, tint);
+      gl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.globalAlpha = 0.55 * pulse;
+      ctx.fillStyle = gl;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 26, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = tint;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill();
+      // the closing ring is the time you have left to click it
+      ctx.strokeStyle = tint;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 10 + left * 14, 0, 7); ctx.stroke();
+      ctx.restore();
+    }
+
+    // time remaining
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    const w = 220, x = W / 2 - w / 2, y = 26;
+    ctx.fillStyle = 'rgba(8,12,20,0.6)';
+    ctx.fillRect(x, y, w, 6);
+    ctx.fillStyle = '#bfe4ff';
+    ctx.fillRect(x, y, w * clamp(1 - L.t / SW.minigames.LISTEN_DUR, 0, 1), 6);
+    ctx.font = '600 12px ' + UI_FONT;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#dceeff';
+    ctx.fillText('LISTENING · ' + L.hits + ' caught', W / 2, y - 6);
+    ctx.restore();
+  }
+
   // --- the creature ------------------------------------------------------
   function drawCreature(g, sky) {
     const c = g.creature;
@@ -678,6 +835,14 @@
         ctx.strokeText(f.text, c.x, fy);
         ctx.fillText(f.text, c.x, fy);
         ctx.restore();
+      } else if (f.at === 'point') {
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.font = '700 20px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = f.tone === 'good' ? '#8ff0a4' : '#dfe7ff';
+        ctx.fillText(f.text, f.x, f.y - k * 26);
+        ctx.restore();
       } else if (f.at === 'banner') {
         ctx.save();
         const inK = clamp(f.t / 0.4, 0, 1) * clamp((life - f.t) / 0.7, 0, 1);
@@ -736,6 +901,8 @@
   function frame(g, dt) {
     if (!ctx) return;
     time += dt;
+    const want = C.RINGS[clamp(g.ring | 0, 0, C.RINGS.length - 1)].radius;
+    if (want !== radius) { radius = want; project(); }
     const t = (g.dayTick % C.TICKS_PER_DAY) / C.TICKS_PER_DAY;
     const sky = skyAt(t);
 
@@ -759,12 +926,14 @@
     drawIsland(g, sky);
     drawTrees(sky);
     drawPlots(g, sky);
+    drawFeatures(g, sky);
     drawShrine(g, sky);
     drawHuts(g, sky);
     drawVillagers(g, sky);
     moveCreature(g, dt);
     drawCreature(g, sky);
     drawSceneLabels(g, sky);
+    drawListen(g);
     drawFx(g, dt);
 
     ctx.restore();
@@ -785,6 +954,18 @@
     }
     return null;
   }
+  function hitFeature(g, wx, wy) {
+    let best = null, bestD = 34;
+    for (const inst of g.features) {
+      if (inst.found) continue;
+      const p = featurePoint(inst.ang, inst.dist);
+      const d = Math.hypot(wx - p.x, wy - (p.y - 8));
+      if (d < bestD) { bestD = d; best = inst; }
+    }
+    return best;
+  }
+  const setHoverFeature = f => { hoverFeature = f; };
+
   function hitCreature(g, wx, wy) {
     const c = g.creature;
     return Math.hypot(wx - c.x, wy - (c.y - 26 * c.size)) < 40 * clamp(c.size, 0.7, 2.4);
@@ -794,7 +975,8 @@
   const getSelected = () => selected;
 
   SW.render = {
-    W, H, attach, resize, frame, toWorld, toScreen, hitPlot, hitLockedPlot, hitCreature,
+    W, H, ISLAND, attach, resize, frame, toWorld, toScreen, hitPlot, hitLockedPlot, hitCreature,
+    hitFeature, setHoverFeature, featurePoint,
     setHover, setSelected, getSelected, plotCenter, anchorPoint,
     WOOD, VILLAGE, SHRINE, DEN
   };

@@ -83,9 +83,10 @@
     if (!plot || plot.state !== 'ripe') return null;
     const crop = C.CROPS[plot.crop];
     const spoil = plot.rot > 55 ? 0.5 : 1;
-    const amount = Math.max(1, Math.round(crop.yield * (bonus || 1) * spoil));
+    const amount = Math.max(1, Math.round(crop.yield * (bonus || 1) * spoil * SW.discovery.mods.yield(g)));
     g.stock[crop.id] = (g.stock[crop.id] | 0) + amount;
     g.stats.harvests += amount;
+    SW.discovery.firstTime(g, 'crop:' + crop.id, 3, `bringing in ${crop.name}`);
     plot.state = 'tilled';
     plot.crop = null;
     plot.growth = 0;
@@ -111,10 +112,10 @@
     for (const p of g.plots) {
       if (p.state === 'growing' || p.state === 'ripe') {
         const crop = C.CROPS[p.crop];
-        p.water = clamp(p.water - crop.thirst * dt, 0, 100);
+        p.water = clamp(p.water - crop.thirst * SW.discovery.mods.thirst(g) * dt, 0, 100);
         if (p.state === 'growing') {
           // Dry soil stalls growth rather than stopping it dead.
-          const rate = p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1;
+          const rate = (p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1) * SW.discovery.mods.growth(g);
           p.growth += rate * dt;
           if (p.growth >= crop.growTicks) { p.state = 'ripe'; p.growth = crop.growTicks; }
         } else {

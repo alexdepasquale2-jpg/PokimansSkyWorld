@@ -4,10 +4,13 @@ An HTML5 game about raising a creature that learns from praise and punishment,
 farming a floating island, and grinding your way up a public leaderboard of
 minor gods.
 
-Three influences, deliberately: the pet-with-needs and item economy of Neopets,
+Four influences, deliberately: the pet-with-needs and item economy of Neopets,
 the reinforcement-taught creature and faith/terror village of Black & White 2,
-and the long compounding grind of a farming/idle game where the whole point is
-that other people can see your number.
+the long compounding grind of a farming/idle game where the whole point is that
+other people can see your number, and — running underneath all of it — the
+spine of *Ancestors: The Humankind Odyssey*: reinforce a behaviour, lock it in
+at a generation leap, spend what novelty teaches you, and push the frontier
+outward into ground you know nothing about.
 
 No build step, no dependencies, no network. Open `index.html` and play.
 
@@ -21,6 +24,9 @@ SkyWorld/
     state.js          game state shape, new game, save migration
     farm.js           plots, crops, market
     creature.js       the creature's brain: desires, learning, alignment, looks
+    lineage.js        ages, ingraining, generation leaps, evolutions
+    discovery.js      the frontier — features, Insight, terraces, neural web
+    minigames.js      the Listening and the Bench
     sim.js            world tick — village, economy, rivals, festivals, feats
     render.js         canvas scene, drawn procedurally
     ui.js             DOM panels, tabs, modals, input
@@ -90,9 +96,70 @@ recognisably different animals.
 
 Villagers eat from the granary and pray in proportion to how they feel about
 you. Feeding them and building the shrine raises **Faith**. Storms and a
-terrorising creature raise **Awe**. Both make prayer and renown; awe decays and
-breeds unrest, faith compounds. There is a feat for maxing either and a better
-one for holding both.
+terrorising creature raise **Awe**. Both make prayer and both count toward
+renown, but they genuinely compete: awe suppresses the faith your village
+settles at, and past about 45 it keeps unrest topped up until people start
+leaving — and villagers are the multiplier on everything. Fear is faster and
+extracts prayer just as efficiently; love compounds and keeps the village.
+Holding 60 of each at once is a feat for a reason.
+
+### The line
+
+The Ancestors idea, applied to the creature you were already teaching.
+
+Learning is cheap and it dies with the animal. Praising a chore the creature
+*already knows well* also **ingrains** it, a separate meter per behaviour, and
+only ingrained behaviour survives a **generation leap**. So the loop is: teach
+it, drill it, then breed before it dies. A whelp of a well-drilled parent
+starts already knowing the trade; one whose parent you let die of old age
+inherits a fraction of it.
+
+Age matters in both directions. Whelps learn at 1.5× and are physically
+useless; elders are the reverse. A creature lives about 66 days, and you get a
+warning when it starts going grey.
+
+Every few leaps the line itself changes shape — Broad-backed, Bright-eyed,
+Long-limbed, Crested, Skyborn — and those bonuses are permanent and cumulative.
+This is the long-run multiplier on everything else: in headless testing a
+player who trains and breeds is 1.2× ahead of one who only farms by hand at day
+60, 2.7× at day 120, and 5.3× at day 200.
+
+### The frontier
+
+The island is not fully known to you. Unknown things sit out past the farm as
+`?` marks; walking over and examining one is the main source of **Insight**,
+several of them permanently change the island (a spring slows evaporation,
+black loam speeds growth, a monolith keeps the village permanently uneasy), and
+some hand over materials.
+
+Doing anything for the first time also pays Insight — a crop you have never
+harvested, a miracle you have never worked, a rank you have never held. Novelty
+is what rewires you, and without it the economy could not bootstrap.
+
+Insight buys the **neural web**: twelve permanent upgrades to *you* rather than
+the creature, including the two mini-games. It also pays for **terraces**.
+
+### The island grows
+
+Four terraces. Raising one physically enlarges the landmass — the camera pulls
+back, the farm grid extends from sixteen plots toward thirty-six, the villager
+cap rises, and a fresh band of unknown ground appears inside the new rim. The
+late shrine tiers need the ground to exist before there is anywhere to put
+them, so the two tracks interlock.
+
+### The mini-games
+
+**The Listening** (neural web). Stop working and sweep the island; whatever
+answers glows for a couple of seconds and you click it before it fades. Pays
+coin, wood, Insight and materials, and it is the only source of storm glass and
+skymetal. On a cooldown, and it costs Focus, so it competes with farming.
+
+**The Bench** (neural web). Put two materials together and find out. There is
+no recipe list — sixteen of the twenty-one pairings make something, five make
+nothing, and discovering either is worth Insight the first time. Buyable
+materials are priced so that buy-and-craft is only a thin margin; the money is
+in the two materials you cannot buy, which is what keeps the Listening worth
+playing.
 
 ### The Register
 
@@ -104,9 +171,11 @@ Renown comes mostly from one compounding source:
 
 ```
 renown/tick = (1 + shrine_grandeur * 0.05) * villagers * (faith + awe)/100 * 0.09
+              * (evolution renown bonus) * (1.3 if Devotion neuron)
 ```
 
-Shrine tier multiplies devotion; devotion needs a village worth having. Neither
+Shrine tier multiplies devotion; devotion needs a village worth having, which
+needs terraces to house them; and a deep line multiplies the whole thing. Neither
 half alone gets you up the ladder. Feats and festival placings are the spikes
 on top.
 
@@ -137,10 +206,16 @@ node tools/simtest.js 40 idle      # touches nothing
 ```
 
 It prints a five-day sample table (renown, standing, mastery, festival
-competitiveness) and a final summary. At 40 days the three strategies separate
-cleanly — idle finishes last with a few hundred renown, hand-farming reaches
-low thousands, and training the creature roughly doubles that and wins
-festivals.
+competitiveness, generation, terrace, Insight) and a final summary. The scripted
+player examines features, grows neurons, works the bench, approximates a
+mediocre player at the Listening, and breeds when the creature is grown and
+well bonded.
+
+Rough pacing it produces, for an unremarkable strategy: fifth to tenth on the
+Register around day 40, the fourth shrine tier and second terrace by day 90,
+the fifth shrine tier — the pivotal unlock — somewhere between day 130 and 200,
+and first place around day 200 to 250. Playing well is faster; the numbers move
+a lot depending on when the shrine lands.
 
 ## Controls
 
@@ -149,9 +224,12 @@ festivals.
 | click a plot | do the obvious thing — till, sow, water, harvest |
 | click the woodland | gather wood |
 | click the creature | praise it, if it is waiting to be judged |
-| `P` / `S` | praise / strike |
 | `space` | pause |
 | `1` `2` `3` | speed 1× / 2× / 4× |
+| click a `?` | walk over and examine it |
+| `P` / `S` | praise / strike |
+| `L` | the Listening |
+| `B` | generation leap |
 | `F` | the Register |
 | `?` | how it works |
 

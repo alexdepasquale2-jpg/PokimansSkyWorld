@@ -111,11 +111,11 @@
 
   const SHRINE_TIERS = [
     { tier: 0, name: 'Bare Stone',        wood: 0,   coin: 0,    grandeur: 0,  rank: 0 },
-    { tier: 1, name: 'Cairn',             wood: 12,  coin: 60,   grandeur: 4,  rank: 0 },
-    { tier: 2, name: 'Standing Ring',     wood: 40,  coin: 320,  grandeur: 14, rank: 1 },
-    { tier: 3, name: 'Sky Altar',         wood: 110, coin: 1400, grandeur: 38, rank: 2 },
-    { tier: 4, name: 'Cathedral of Cloud',wood: 260, coin: 5200, grandeur: 90, rank: 3 },
-    { tier: 5, name: 'The Reach Itself',  wood: 600, coin: 18000,grandeur: 210,rank: 4 }
+    { tier: 1, name: 'Cairn',             wood: 12,   coin: 60,     grandeur: 4,  rank: 0 },
+    { tier: 2, name: 'Standing Ring',     wood: 40,   coin: 340,    grandeur: 12, rank: 1 },
+    { tier: 3, name: 'Sky Altar',         wood: 190,  coin: 6000,   grandeur: 30, rank: 2, ring: 0 },
+    { tier: 4, name: 'Cathedral of Cloud',wood: 620,  coin: 60000,  grandeur: 70, rank: 3, ring: 1 },
+    { tier: 5, name: 'The Reach Itself',  wood: 2000, coin: 320000, grandeur: 170,rank: 4, ring: 2 }
   ];
 
   const HUT_COST = { wood: 8, coin: 40, scale: 1.32 };
@@ -198,6 +198,21 @@
     { id: 'fest_win_5',     name: 'Serial Winner',       desc: 'Win five festivals.',                       renown: 500, check: g => g.stats.festivalWins >= 5 },
     { id: 'top_five',       name: 'Named in the Register',desc: 'Reach the top five of the Register.',      renown: 200,  check: g => g.lastStanding > 0 && g.lastStanding <= 5 },
     { id: 'top_one',        name: 'Ascendant',           desc: 'Stand first in the Skyward Register.',      renown: 900, check: g => g.lastStanding === 1 },
+    { id: 'gen_2',          name: 'It Bred True',        desc: 'Complete a generation leap.',               renown: 40,   check: g => (g.gens | 0) >= 1 },
+    { id: 'gen_6',          name: 'A Real Lineage',      desc: 'Complete six generation leaps.',            renown: 300,  check: g => (g.gens | 0) >= 6 },
+    { id: 'gen_15',         name: 'Deep Time',           desc: 'Complete fifteen generation leaps.',        renown: 1600, check: g => (g.gens | 0) >= 15 },
+    { id: 'evo_1',          name: 'The Line Turns',      desc: 'Reach the first evolution.',                renown: 140,  check: g => (g.evo | 0) >= 1 },
+    { id: 'evo_3',          name: 'Something Else Now',  desc: 'Reach the third evolution.',                renown: 900,  check: g => (g.evo | 0) >= 3 },
+    { id: 'evo_5',          name: 'Skyborn',             desc: 'Take the line as far as it goes.',          renown: 3200, check: g => (g.evo | 0) >= 5 },
+    { id: 'ingrain_3',      name: 'Bone Deep',           desc: 'Fully ingrain three behaviours.',           renown: 220,  check: g => SW.lineage.ingrainedCount(g, 0.95) >= 3 },
+    { id: 'ring_1',         name: 'Wider Ground',        desc: 'Raise the second terrace.',                 renown: 140,  check: g => (g.ring | 0) >= 1 },
+    { id: 'ring_3',         name: 'The Far Reach',       desc: 'Build the island out as far as it goes.',   renown: 2000, check: g => (g.ring | 0) >= 3 },
+    { id: 'found_8',        name: 'Curious',             desc: 'Examine eight unknown things.',             renown: 110,  check: g => Object.keys(g.discovered).length >= 8 },
+    { id: 'found_all',      name: 'Nothing Left Unknown',desc: 'Examine everything on the island.',         renown: 1400, check: g => Object.keys(g.discovered).length >= SW.content.FEATURES.length },
+    { id: 'neurons_6',      name: 'Rewired',             desc: 'Grow six neurons.',                         renown: 180,  check: g => Object.keys(g.neurons).length >= 6 },
+    { id: 'neurons_all',    name: 'The Whole Web',       desc: 'Grow every neuron.',                        renown: 1800, check: g => Object.keys(g.neurons).length >= SW.content.NEURONS.length },
+    { id: 'recipes_8',      name: 'Handy',               desc: 'Discover eight things at the bench.',       renown: 150,  check: g => Object.keys(g.recipes).length >= 8 },
+    { id: 'recipes_all',    name: 'Master of the Bench', desc: 'Discover every pairing that works.',        renown: 1500, check: g => Object.keys(g.recipes).length >= SW.content.RECIPES.length },
     { id: 'day_10',         name: 'Ten Days',            desc: 'Survive ten days.',                         renown: 30,   check: g => g.day >= 10 },
     { id: 'day_40',         name: 'Forty Days',          desc: 'Survive forty days.',                       renown: 200,  check: g => g.day >= 40 }
   ];
@@ -208,9 +223,173 @@
     'Love and terror both climb the Register. They just climb it differently.'
   ];
 
+  /* ---------------------------------------------------------------------
+   * Lineage — the creature ages, breeds, and passes on what you managed to
+   * ingrain. Learning within one life is cheap and temporary; the only thing
+   * that survives a generation is behaviour you reinforced hard enough.
+   * ------------------------------------------------------------------- */
+  const LIFESPAN = 66;   // days, if nothing kills it first
+
+  const AGES = [
+    { id: 'whelp', name: 'Whelp', from: 0,  wits: 1.5,  stamina: 0.7,  statMul: 0.55, sizeCap: 1.3,
+      note: 'Soaks up everything. Too small to be much use.' },
+    { id: 'prime', name: 'Prime', from: 10, wits: 1.0,  stamina: 1.0,  statMul: 1.0,  sizeCap: 3.2,
+      note: 'Strong, steady, and set in its ways.' },
+    { id: 'elder', name: 'Elder', from: 48, wits: 0.65, stamina: 0.72, statMul: 0.92, sizeCap: 3.2,
+      note: 'Slower now, but what it knows, it knows to the bone.' }
+  ];
+
+  /* Every third generation the line itself changes shape. These are permanent
+   * and cumulative — the reason to keep breeding rather than coddle one beast. */
+  const EVOLUTIONS = [
+    { tier: 0, gens: 0,  name: 'Unchanged',    glyph: '·',
+      blurb: 'The shape it was born in.', bonus: {} },
+    { tier: 1, gens: 3,  name: 'Broad-backed', glyph: '🦴',
+      blurb: 'Heavier through the shoulder. It carries more and tires later.',
+      bonus: { strength: 0.25, stamina: 0.20, yield: 0.22 } },
+    { tier: 2, gens: 6,  name: 'Bright-eyed',  glyph: '👁️',
+      blurb: 'It notices things. Teaching takes fewer repetitions, and it finds what is hidden.',
+      bonus: { wits: 0.35, insight: 0.40, yield: 0.10 } },
+    { tier: 3, gens: 10, name: 'Long-limbed',  glyph: '🦵',
+      blurb: 'Covers the island at a lope. It gets through far more work in a day.',
+      bonus: { speed: 0.45, stamina: 0.20, yield: 0.15 } },
+    { tier: 4, gens: 15, name: 'Crested',      glyph: '👑',
+      blurb: 'Unmistakable at a distance. Crowds gather for it.',
+      bonus: { grace: 0.40, renown: 0.45 } },
+    { tier: 5, gens: 21, name: 'Skyborn',      glyph: '🌤️',
+      blurb: 'Something in the line finally answers the sky.',
+      bonus: { strength: 0.30, wits: 0.30, speed: 0.30, grace: 0.30, renown: 0.55, insight: 0.40, yield: 0.20 } }
+  ];
+
+  /* ---------------------------------------------------------------------
+   * The island grows outward in terraces. Each one is more ground, more room
+   * for people, and a fresh band of unknown things to walk up to and examine.
+   * ------------------------------------------------------------------- */
+  const RINGS = [
+    { i: 0, name: 'The First Shelf', plots: 16, radius: 1.00, hutCap: 10, wood: 0,    coin: 0,     insight: 0 },
+    { i: 1, name: 'The Low Terrace', plots: 24, radius: 1.20, hutCap: 18, wood: 190,  coin: 2600,  insight: 14 },
+    { i: 2, name: 'The Wind Shelf',  plots: 30, radius: 1.38, hutCap: 26, wood: 540,  coin: 13000, insight: 44 },
+    { i: 3, name: 'The Far Reach',   plots: 36, radius: 1.54, hutCap: 36, wood: 1500, coin: 52000, insight: 120 }
+  ];
+
+  /* Unknown things on the ground. Walking up and examining one is the only
+   * source of Insight, and several of them permanently change the island. */
+  const FEATURES = [
+    { id: 'spring',    ring: 0, name: 'a cold spring',        glyph: '💧', insight: 5,
+      blurb: 'Water, coming up out of nothing. Your plots will dry out more slowly now.',
+      effect: 'thirst' },
+    { id: 'clay',      ring: 0, name: 'a seam of red clay',   glyph: '🧱', insight: 5, mat: 'clay',
+      blurb: 'Wet, heavy, and it holds a shape.' },
+    { id: 'deadwood',  ring: 0, name: 'a fallen giant',       glyph: '🪵', insight: 4, wood: 45,
+      blurb: 'Dead a long time. Dry enough to work.' },
+    { id: 'fibre',     ring: 0, name: 'a stand of cordgrass', glyph: '🌾', insight: 4, mat: 'fibre',
+      blurb: 'Tough enough to twist into rope.' },
+    { id: 'bones',     ring: 1, name: 'a scatter of bones',   glyph: '🦴', insight: 5, mat: 'bone',
+      blurb: 'Something enormous died here before you existed. It is oddly steadying to know that.' },
+    { id: 'resin',     ring: 1, name: 'a weeping pine',       glyph: '🟠', insight: 4, mat: 'resin',
+      blurb: 'It bleeds slow gold down its own bark.' },
+    { id: 'glass',     ring: 1, name: 'a lightning scar',     glyph: '🔷', insight: 6, mat: 'glass',
+      blurb: 'The strike fused the sand into something that holds light.' },
+    { id: 'loam',      ring: 1, name: 'black loam',           glyph: '🟫', insight: 5,
+      blurb: 'Soil that grew before you did. Everything comes up faster in it.',
+      effect: 'growth' },
+    { id: 'cave',      ring: 2, name: 'a wind-hollowed cave', glyph: '🕳️', insight: 9,
+      blurb: 'Cold, dry, and out of the weather. Your granary keeps better.',
+      effect: 'granary' },
+    { id: 'ore',       ring: 2, name: 'a vein of skymetal',   glyph: '⛏️', insight: 9, mat: 'metal',
+      blurb: 'It came down from somewhere and stayed.' },
+    { id: 'grove',     ring: 2, name: 'a grove of old trees', glyph: '🌳', insight: 8, wood: 260,
+      blurb: 'Older than the village. They will be sorry to see it go.' },
+    { id: 'monolith',  ring: 2, name: 'a leaning monolith',   glyph: '🗿', insight: 14,
+      blurb: 'Carved by nobody you have met. The village will not go near it, and they pray harder.',
+      effect: 'awe' },
+    { id: 'font',      ring: 3, name: 'a still black font',   glyph: '🌑', insight: 22,
+      blurb: 'It does not reflect you. Prayer collects faster here, and nobody can say why.',
+      effect: 'prayer' },
+    { id: 'seedvault', ring: 3, name: 'a sealed seed vault',  glyph: '🌸', insight: 18, mat: 'glass',
+      blurb: 'Somebody buried this against a disaster that evidently arrived.',
+      effect: 'seeds' },
+    { id: 'nest',      ring: 3, name: 'an abandoned nest',    glyph: '🥚', insight: 20,
+      blurb: 'Big enough to sleep in. Whatever laid here was of your creature\'s line.',
+      effect: 'lineage' }
+  ];
+
+  /* `buy` is what the market will sell you, priced so that buying materials
+   * and crafting them is worth only a thin margin. The real money is in the
+   * two it will not sell — storm glass and skymetal come only out of ground
+   * you examine and the Listening, which is what keeps the mini-games the
+   * actual currency engine rather than a button that prints coin. */
+  const MATERIALS = {
+    fibre: { id: 'fibre', name: 'Cordgrass',  glyph: '🌾', buy: 110 },
+    clay:  { id: 'clay',  name: 'Red clay',   glyph: '🧱', buy: 110 },
+    resin: { id: 'resin', name: 'Pine resin', glyph: '🟠', buy: 300 },
+    bone:  { id: 'bone',  name: 'Old bone',   glyph: '🦴', buy: 300 },
+    glass: { id: 'glass', name: 'Storm glass',glyph: '🔷', buy: 0 },
+    metal: { id: 'metal', name: 'Skymetal',   glyph: '⛏️', buy: 0 }
+  };
+  const MATERIAL_LIST = Object.values(MATERIALS);
+
+  /* The bench. You do not get a recipe list — you put two things together and
+   * find out. Discovering a pairing is worth Insight; making it again is worth
+   * coin, which is the point. */
+  const RECIPES = [
+    { id: 'rope',      a: 'fibre', b: 'fibre', name: 'Twisted rope',   glyph: '🪢', coin: 240,  insight: 4 },
+    { id: 'brick',     a: 'clay',  b: 'fibre', name: 'Fired brick',    glyph: '🧱', coin: 260,  insight: 5, wood: 8 },
+    { id: 'cordage',   a: 'resin', b: 'fibre', name: 'Waxed cordage',  glyph: '🧵', coin: 420,  insight: 7 },
+    { id: 'pitch',     a: 'resin', b: 'clay',  name: 'Sealing pitch',  glyph: '🫙', coin: 430,  insight: 6 },
+    { id: 'charm',     a: 'bone',  b: 'fibre', name: 'Knuckle charm',  glyph: '🧿', coin: 470,  insight: 8,  faith: 1 },
+    { id: 'scrimshaw', a: 'bone',  b: 'clay',  name: 'Scrimshaw jar',  glyph: '🏺', coin: 520,  insight: 9 },
+    { id: 'ossuary',   a: 'bone',  b: 'resin', name: 'Sealed ossuary', glyph: '⚰️', coin: 780,  insight: 10 },
+    { id: 'beads',     a: 'glass', b: 'clay',  name: 'Glass beads',    glyph: '📿', coin: 820,  insight: 11, faith: 1 },
+    { id: 'lens',      a: 'glass', b: 'resin', name: 'Burning lens',   glyph: '🔍', coin: 900,  insight: 12 },
+    { id: 'net',       a: 'glass', b: 'fibre', name: 'Spun-glass net', glyph: '🕸️', coin: 760,  insight: 10 },
+    { id: 'idol',      a: 'bone',  b: 'glass', name: 'Watching idol',  glyph: '🗿', coin: 1400, insight: 16 },
+    { id: 'kiln',      a: 'clay',  b: 'metal', name: 'Kiln plate',     glyph: '🍳', coin: 1600, insight: 15, wood: 24 },
+    { id: 'chime',     a: 'metal', b: 'bone',  name: 'Wind chime',     glyph: '🎐', coin: 1800, insight: 14, faith: 1 },
+    { id: 'harness',   a: 'metal', b: 'fibre', name: 'Beast harness',  glyph: '🦯', coin: 1500, insight: 13 },
+    { id: 'reliquary', a: 'metal', b: 'resin', name: 'Reliquary',      glyph: '⚱️', coin: 2200, insight: 20, faith: 2 },
+    { id: 'blade',     a: 'metal', b: 'glass', name: 'Skymetal blade', glyph: '🗡️', coin: 2600, insight: 22 }
+  ];
+
+  /* Insight buys permanent changes to you, not to the creature. */
+  const NEURONS = [
+    { id: 'attention', name: 'Wider Attention', cost: 6,  req: [],
+      desc: '+10 maximum Focus.', icon: '🕯️' },
+    { id: 'patience',  name: 'Patient Hand',    cost: 14, req: ['attention'],
+      desc: 'Praise and striking teach 30% harder.', icon: '✋' },
+    { id: 'stamina',   name: 'Steady Nerve',    cost: 22, req: ['attention'],
+      desc: 'Focus returns 40% faster.', icon: '⏳' },
+    { id: 'husbandry', name: 'Husbandry',       cost: 26, req: ['patience'],
+      desc: 'Crops yield 25% more in your hands and the creature\'s.', icon: '🌾' },
+    { id: 'memory',    name: 'Deep Memory',     cost: 34, req: ['patience'],
+      desc: 'Behaviours ingrain twice as fast, and the line forgets half as much.', icon: '🧠' },
+    { id: 'sight',     name: 'Long Sight',      cost: 30, req: ['listening'],
+      desc: 'Examining costs no Focus, and yields 40% more Insight.', icon: '👁️' },
+    { id: 'listening', name: 'The Listening',   cost: 18, req: ['attention'],
+      desc: 'Unlocks the Listening — sweep the island for what it is hiding.', icon: '🔊' },
+    { id: 'bench',     name: 'The Bench',       cost: 22, req: ['husbandry'],
+      desc: 'Unlocks the workbench, where two materials become something worth selling.', icon: '⚒️' },
+    { id: 'craftsman', name: 'Practised Hands', cost: 46, req: ['bench'],
+      desc: 'Crafted goods sell for 60% more.', icon: '🔨' },
+    { id: 'devotion',  name: 'Devotion',        cost: 52, req: ['memory'],
+      desc: 'Your standing accrues 30% faster.', icon: '🙏' },
+    { id: 'lineage',   name: 'The Long Line',   cost: 60, req: ['memory'],
+      desc: 'Offspring inherit far more of what you ingrained, and live 15% longer.', icon: '🧬' },
+    { id: 'frontier',  name: 'The Frontier',    cost: 40, req: ['sight'],
+      desc: 'Terraces cost a third less to raise.', icon: '🧭' }
+  ];
+
+  const GEN_HINTS = [
+    'Learning dies with the animal. Only what you ingrained gets passed on.',
+    'An act has to be well known before it can be ingrained at all — teach first, then drill.',
+    'Whelps learn fastest and are useless. Elders are the reverse. Plan around it.'
+  ];
+
   SW.content = {
     TICKS_PER_DAY, CROPS, CROP_LIST, RANKS, MIRACLES, MIRACLE_LIST,
     LINEAGES, LINEAGE_LIST, ACTS, ACT_LIST, TRAINABLE, LEASHES, LEASH_LIST,
-    SHRINE_TIERS, HUT_COST, PLOT_COST, FESTIVALS, RIVALS, BARBS, FEATS, HATCH_HINTS
+    SHRINE_TIERS, HUT_COST, PLOT_COST, FESTIVALS, RIVALS, BARBS, FEATS, HATCH_HINTS,
+    LIFESPAN, AGES, EVOLUTIONS, RINGS, FEATURES, MATERIALS, MATERIAL_LIST,
+    RECIPES, NEURONS, GEN_HINTS
   };
 })(window.SW = window.SW || {});

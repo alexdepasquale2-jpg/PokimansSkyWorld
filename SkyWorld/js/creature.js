@@ -17,6 +17,8 @@
   const PRAISE_WINDOW = 9;   // ticks you have to react
 
   const lineage = g => C.LINEAGES[g.creature.lineage];
+  // Age, evolution tier and lineage stock, resolved together.
+  const traits = g => SW.lineage.traits(g);
 
   /* Display value: how well it knows a chore, 0..1. */
   function mastery(g, actId) {
@@ -40,7 +42,7 @@
   function learnRate(g) {
     const c = g.creature;
     const fear = c.mood < 25 ? 0.55 : 1;          // a terrified beast learns badly
-    return 1 + 0.26 * lineage(g).wits * (0.55 + c.bond / 140) * fear;
+    return 1 + 0.26 * traits(g).wits * SW.discovery.mods.learn(g) * (0.55 + c.bond / 140) * fear;
   }
 
   // --- feasibility -------------------------------------------------------
@@ -245,6 +247,7 @@
     }
 
     if (!ok) return false;
+    SW.discovery.firstTime(g, 'act:' + actId, 2, `watching it ${a.name}`);
 
     // Cost, drift, and slow physical growth.
     c.vigor = clamp(c.vigor - a.vigor, 0, 100);
@@ -263,7 +266,7 @@
   function beginAct(g) {
     const c = g.creature;
     const chosen = chooseAct(g);
-    const quick = 1 / (0.8 + c.stats.cunning / 45);
+    const quick = 1 / ((0.8 + c.stats.cunning / 45) * traits(g).speed);
     c.act = {
       id: chosen.id,
       anchor: chosen.target,
@@ -278,17 +281,18 @@
   function tick(g, dt) {
     const c = g.creature;
     const L = lineage(g);
+    const T = traits(g);
 
     // Needs.
-    c.hunger = clamp(c.hunger - 0.22 * L.appetite * (0.7 + c.size * 0.4) * dt, 0, 130);
-    c.vigor = clamp(c.vigor + (c.act && c.act.id === 'rest' ? 2.2 : 0.42) * L.stamina * dt, 0, 100);
+    c.hunger = clamp(c.hunger - 0.22 * T.appetite * (0.7 + c.size * 0.4) * dt, 0, 130);
+    c.vigor = clamp(c.vigor + (c.act && c.act.id === 'rest' ? 2.2 : 0.42) * T.stamina * dt, 0, 100);
     c.mood = clamp(c.mood - 0.12 * dt + (c.hunger < 20 ? -0.35 * dt : 0) + (c.bond > 60 ? 0.05 * dt : 0), 0, 100);
     if (c.hunger <= 0) {
       c.vigor = clamp(c.vigor - 0.5 * dt, 0, 100);
       c.mood = clamp(c.mood - 0.3 * dt, 0, 100);
     }
     // Well-fed creatures grow. Growth is one-way; you cannot shrink a beast.
-    if (c.hunger > 78) c.size = clamp(c.size + 0.0009 * dt, 0.6, 3.2);
+    if (c.hunger > 78) c.size = clamp(c.size + 0.0009 * dt, 0.6, T.sizeCap);
 
     // Praise window expiry.
     if (c.pending) {
@@ -297,7 +301,7 @@
     }
 
     // Slow forgetting toward instinct — thistlebeaks lose it fastest.
-    const forget = 0.00035 * L.wits * dt;
+    const forget = 0.00035 * L.wits * SW.discovery.mods.forget(g) * dt;
     for (const id in c.weights) {
       const base = (L.instinct[id] || 1);
       c.weights[id] += (base - c.weights[id]) * forget;
@@ -313,6 +317,7 @@
       const done = applyAct(g, a.id, a.anchor);
       if (done && a.id !== 'wander') {
         c.pending = { act: a.id, t: 0 };
+        c.__didAct = a.id;
       }
       a.phase = 'idle'; a.t = 0;
     } else if (a.phase === 'idle' && a.t >= a.idle) {
@@ -335,8 +340,12 @@
     c.diligence = clamp(c.diligence + a.diligent * 1.3, -100, 100);
     c.praised++;
     c.pending = null;
-    pop(g, '❤', 'good');
-    SW.ui && SW.ui.log(g, `You lay a hand on ${c.name}. It will ${a.name} again.`, 'good');
+    // Drilling a behaviour it already knows well is what puts it into the line.
+    const dug = SW.lineage.ingrain(g, id, 0.055);
+    pop(g, dug > 0 ? '❤ ✚' : '❤', 'good');
+    SW.ui && SW.ui.log(g, dug > 0
+      ? `You lay a hand on ${c.name}. It will ${a.name} again — and so will its whelps.`
+      : `You lay a hand on ${c.name}. It will ${a.name} again.`, 'good');
     return true;
   }
 
