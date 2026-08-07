@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aloud — read aloud, and test the voice</title>
+<meta name="description" content="A text-to-speech reader for the phone, with a bench that measures what your device's speech engine actually does.">
+<meta name="theme-color" content="#eff2f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1416" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="bar">
+    <div class="mark">Aloud <span>reader &amp; bench</span></div>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" data-tab="read" aria-selected="true" aria-controls="tab-read">Read</button>
+      <button type="button" role="tab" data-tab="session" aria-selected="false" aria-controls="tab-session">Session</button>
+      <button type="button" role="tab" data-tab="voices" aria-selected="false" aria-controls="tab-voices">Voices</button>
+    </nav>
+
+    <button type="button" class="icon-btn" id="btn-settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9L5.3 5.3"></path></svg>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ------------------------------------------------------------ read -->
+    <section class="tab-panel" id="tab-read" role="tabpanel" aria-label="Read">
+
+      <div class="note" id="no-speech" hidden>
+        <b>This browser has no speech synthesis.</b> The text below will display and
+        segment correctly, but nothing can be spoken here. Try Chrome or Safari on a
+        phone.
+      </div>
+
+      <div class="source">
+        <div class="section-head">
+          <h2>Text</h2>
+          <p class="hint">Stays on this device.</p>
+        </div>
+
+        <label class="sr-only" for="text">Text to read aloud</label>
+        <textarea id="text" placeholder="Paste anything you would rather listen to than read."></textarea>
+
+        <div class="row">
+          <button type="button" class="btn grow" id="btn-file">Load .txt</button>
+          <button type="button" class="btn grow" id="btn-sample">Sample</button>
+          <button type="button" class="btn grow" id="btn-clear">Clear</button>
+          <input type="file" id="file" accept=".txt,text/plain" hidden>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>Reading</h2>
+        <p class="hint">Tap a sentence to start there.</p>
+      </div>
+
+      <div class="pane" id="pane"></div>
+
+      <p class="note" id="caps-line"></p>
+    </section>
+
+    <!-- --------------------------------------------------------- session -->
+    <section class="tab-panel" id="tab-session" role="tabpanel" aria-label="Session" hidden>
+
+      <div class="section-head">
+        <h2>Narration</h2>
+        <p class="hint" id="sess-source">nothing loaded yet</p>
+      </div>
+
+      <div class="row" id="sess-modes"></div>
+
+      <p class="hint" id="sess-summary"></p>
+      <p class="note" id="sess-caveat" hidden></p>
+
+      <div class="row">
+        <button type="button" class="btn primary grow" id="sess-play">Read this aloud</button>
+        <button type="button" class="btn" id="sess-download">Save text</button>
+      </div>
+
+      <ul class="beats" id="sess-preview"></ul>
+
+      <div class="section-head">
+        <h2>Live bridge</h2>
+      </div>
+
+      <p class="hint">
+        A browser cannot read a Claude Code transcript off disk, and cannot call
+        GitHub from a <code>file://</code> page. So the link runs the other way:
+        run <code>python3 tools/bridge.py</code> and it watches the session, runs
+        the suites on request, and hands the beats over here.
+      </p>
+
+      <label class="sr-only" for="sess-bridge">Bridge address</label>
+      <input type="url" class="filter" id="sess-bridge" placeholder="http://localhost:8765" inputmode="url">
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-connect">Connect</button>
+        <button type="button" class="btn grow" id="sess-run-tests">Run the suites</button>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="sess-follow">
+        <span>Follow the session, and re-read when it moves on</span>
+      </label>
+
+      <div class="section-head">
+        <h2>Or load one by hand</h2>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-load-file">Open narration.json</button>
+        <input type="file" id="sess-file" accept=".json,application/json" hidden>
+      </div>
+
+      <label class="sr-only" for="sess-paste">Paste a narration script</label>
+      <textarea id="sess-paste" class="paste" placeholder="…or paste the JSON here"></textarea>
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-use-paste">Use pasted script</button>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- voices -->
+    <section class="tab-panel" id="tab-voices" role="tabpanel" aria-label="Voices" hidden>
+
+      <div class="section-head">
+        <h2>Voices on this device</h2>
+        <p class="hint">On-device voices work offline.</p>
+      </div>
+
+      <label class="sr-only" for="voice-filter">Filter voices</label>
+      <input type="search" class="filter" id="voice-filter" placeholder="Filter by name or language…">
+      <ul class="voice-list" id="voice-list"></ul>
+
+      <div class="section-head">
+        <h2>The bench</h2>
+      </div>
+
+      <p class="hint">
+        Speech engines fail in ways feature detection cannot see — the API is always
+        present, and the methods always exist. These probes speak and measure. The full
+        run takes about a minute and you will hear it working.
+      </p>
+
+      <div class="row">
+        <button type="button" class="btn primary grow" id="btn-full">Run full bench</button>
+        <button type="button" class="btn grow" id="btn-quick">Quick run</button>
+        <button type="button" class="btn" id="btn-abort" hidden>Stop</button>
+        <button type="button" class="btn" id="btn-copy" hidden>Copy report</button>
+      </div>
+
+      <ul class="report" id="report"></ul>
+      <div class="summary" id="bench-summary" hidden></div>
+    </section>
+
+  </main>
+
+  <!-- ------------------------------------------------------------ transport -->
+  <div class="transport" id="transport">
+    <div class="progress"><i id="progress-fill"></i></div>
+    <div class="transport-inner">
+      <button type="button" class="tbtn" id="t-prev" aria-label="Previous sentence">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h2.2v12H7zM19 6v12l-8.4-6z"/></svg>
+      </button>
+
+      <button type="button" class="tbtn play" id="t-play" aria-label="Play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+
+      <button type="button" class="tbtn" id="t-next" aria-label="Next sentence">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.8 6H17v12h-2.2zM5 6l8.4 6L5 18z"/></svg>
+      </button>
+
+      <button type="button" class="tbtn" id="t-stop" aria-label="Stop">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>
+      </button>
+
+      <div class="counter" id="counter"></div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------- settings -->
+  <div class="scrim" id="scrim"></div>
+
+  <div class="sheet" id="sheet" role="dialog" aria-label="Settings" aria-modal="false">
+    <div class="sheet-inner">
+      <div class="grip"></div>
+
+      <div class="field">
+        <label for="set-voice">Voice</label>
+        <select id="set-voice"></select>
+      </div>
+
+      <div class="field">
+        <label for="set-rate">Speed <i id="set-rate-val"></i></label>
+        <input type="range" id="set-rate" min="0.5" max="2" step="0.05">
+      </div>
+
+      <div class="field">
+        <label for="set-pitch">Pitch <i id="set-pitch-val"></i></label>
+        <input type="range" id="set-pitch" min="0" max="2" step="0.05">
+      </div>
+
+      <div class="field">
+        <label for="set-volume">Volume <i id="set-volume-val"></i></label>
+        <input type="range" id="set-volume" min="0" max="1" step="0.05">
+      </div>
+
+      <div class="field">
+        <label for="set-size">Reading size <i id="set-size-val"></i></label>
+        <input type="range" id="set-size" min="15" max="30" step="1">
+      </div>
+
+      <div class="field">
+        <label for="set-chunk">Longest utterance <i id="set-chunk-val"></i></label>
+        <input type="range" id="set-chunk" min="80" max="400" step="10">
+        <p class="hint">Sentences longer than this are split at a comma. Lower it if
+          speech cuts out mid-sentence on this device.</p>
+      </div>
+
+      <div class="field">
+        <label>Theme</label>
+        <div class="seg">
+          <button type="button" class="btn" data-theme-choice="auto" aria-pressed="true">Auto</button>
+          <button type="button" class="btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn primary" id="btn-sheet-close" style="width:100%">Done</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+</div>
+
+<script src="js/split.js"></script>
+<script src="js/probes.js"></script>
+<script src="js/narrate.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/reader.js"></script>
+<script src="js/bench.js"></script>
+<script src="js/session.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

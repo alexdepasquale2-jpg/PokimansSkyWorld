@@ -1,0 +1,3638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aloud — read aloud, and test the voice</title>
+<meta name="description" content="A text-to-speech reader for the phone, with a bench that measures what your device's speech engine actually does.">
+<meta name="theme-color" content="#eff2f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1416" media="(prefers-color-scheme: dark)">
+<style>
+/* Aloud — a reader and a voice bench.
+ *
+ * Cool neutrals biased toward the accent's cyan so the greys read as chosen.
+ * One accent (deep teal in light, bright teal in dark) carries every live and
+ * active state; pass/warn/fail are semantic and deliberately separate from it.
+ *
+ * Three type roles, each earned: sans for the interface, a serif for the
+ * reading pane — it is prose you follow along with, and the change of voice
+ * separates the text from the controls around it — and a mono for the bench,
+ * which is an instrument readout.
+ */
+
+/* --- tokens: the complete light palette lives on bare :root ---------------- */
+
+:root {
+  /* Native controls — scrollbars, range thumbs, the select popup, the caret —
+     are painted by the browser, and only this tells it which way to paint. */
+  color-scheme: light;
+
+  --bg: #eff2f4;
+  --surface: #ffffff;
+  --surface-2: #e3e9ec;
+  --surface-3: #d7e0e4;
+
+  --ink: #131a1d;
+  --ink-2: #46565c;
+  --ink-3: #6e7f86;
+
+  --line: #cfd9de;
+  --line-soft: #e0e7ea;
+
+  --accent: #00707f;
+  --accent-strong: #005966;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(0, 140, 157, 0.18);
+  --accent-band: rgba(0, 140, 157, 0.10);
+
+  --pass: #1b7a4b;
+  --warn: #93611a;
+  --fail: #b02a20;
+
+  --shadow-1: 0 1px 2px rgba(19, 26, 29, 0.06), 0 1px 1px rgba(19, 26, 29, 0.04);
+  --shadow-2: 0 -8px 28px rgba(19, 26, 29, 0.12);
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-read: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-base: 0.9375rem;
+  --t-md: 1.0625rem;
+  --t-lg: 1.25rem;
+  --t-xl: 1.5rem;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  --radius: 10px;
+  --radius-lg: 16px;
+  --tap: 44px;
+
+  --read-size: 19px;
+  --shell: 720px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* Only the tokens are redefined for dark, and only where an explicit light
+   choice has not been stamped on the root. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #0e1416;
+    --surface: #161f22;
+    --surface-2: #1f2c30;
+    --surface-3: #27373c;
+
+    --ink: #e6eef0;
+    --ink-2: #a9bcc2;
+    --ink-3: #7e9198;
+
+    --line: #2b383d;
+    --line-soft: #223034;
+
+    --accent: #3fd0e0;
+    --accent-strong: #6fdfec;
+    --accent-ink: #06232a;
+    --accent-soft: rgba(63, 208, 224, 0.24);
+    --accent-band: rgba(63, 208, 224, 0.12);
+
+    --pass: #5fcb90;
+    --warn: #e0b04a;
+    --fail: #ff8f84;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 -8px 28px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* The toggle has to win in the other direction too. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0e1416;
+  --surface: #161f22;
+  --surface-2: #1f2c30;
+  --surface-3: #27373c;
+
+  --ink: #e6eef0;
+  --ink-2: #a9bcc2;
+  --ink-3: #7e9198;
+
+  --line: #2b383d;
+  --line-soft: #223034;
+
+  --accent: #3fd0e0;
+  --accent-strong: #6fdfec;
+  --accent-ink: #06232a;
+  --accent-soft: rgba(63, 208, 224, 0.24);
+  --accent-band: rgba(63, 208, 224, 0.12);
+
+  --pass: #5fcb90;
+  --warn: #e0b04a;
+  --fail: #ff8f84;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 -8px 28px rgba(0, 0, 0, 0.55);
+}
+
+/* --- ground --------------------------------------------------------------- */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* The host paints its own ground behind the page, so this must be explicit. */
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  overflow-wrap: break-word;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.app {
+  max-width: var(--shell);
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- top bar -------------------------------------------------------------- */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.mark {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 650;
+  font-size: var(--t-md);
+  letter-spacing: -0.01em;
+}
+
+.mark span {
+  font-size: var(--t-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tabs {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+.tabs button {
+  min-height: 34px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.tabs button[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.icon-btn {
+  width: var(--tap);
+  height: var(--tap);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.icon-btn:active { background: var(--surface-2); }
+.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* --- main ----------------------------------------------------------------- */
+
+main {
+  flex: 1;
+  padding: var(--s-4) var(--s-3);
+  /* clearance for the transport bar */
+  padding-bottom: calc(96px + var(--safe-b));
+}
+
+.tab-panel[hidden] { display: none; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: var(--t-xs);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--t-sm);
+}
+
+/* --- source drawer -------------------------------------------------------- */
+
+.source {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.source textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: var(--t-base);
+  line-height: 1.55;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.btn {
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-sm);
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.btn:active { background: var(--surface-2); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn.primary:active { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn.grow { flex: 1; }
+
+/* --- reading pane --------------------------------------------------------- */
+
+.pane {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4) var(--s-4) var(--s-5);
+  font-family: var(--font-read);
+  font-size: var(--read-size);
+  line-height: 1.72;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.chunk {
+  border-radius: 4px;
+  padding: 1px 0;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.chunk:hover { background: var(--accent-band); }
+
+.chunk.is-current {
+  background: var(--accent-band);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.chunk .word {
+  background: var(--accent-soft);
+  border-radius: 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.pane-empty {
+  font-family: var(--font-ui);
+  font-size: var(--t-base);
+  color: var(--ink-3);
+  text-align: center;
+  padding: var(--s-5) 0;
+}
+
+/* --- transport ------------------------------------------------------------ */
+
+.transport {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  padding: var(--s-2) var(--s-3) calc(var(--s-2) + var(--safe-b));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+}
+
+.transport-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--line-soft);
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 200ms linear;
+}
+
+.tbtn {
+  width: var(--tap);
+  height: var(--tap);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tbtn:disabled { opacity: 0.35; cursor: default; }
+.tbtn svg { width: 20px; height: 20px; fill: currentColor; }
+
+.tbtn.play {
+  width: 56px;
+  height: 56px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tbtn.play svg { width: 24px; height: 24px; }
+.tbtn.play.is-live { animation: breathe 2.4s ease-in-out infinite; }
+
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
+  50% { box-shadow: 0 0 0 8px var(--accent-soft); }
+}
+
+.counter {
+  margin-left: auto;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  line-height: 1.3;
+}
+
+.counter b { display: block; color: var(--ink-2); font-weight: 600; }
+
+/* --- voices --------------------------------------------------------------- */
+
+.filter {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: var(--s-3);
+}
+
+.voice-list {
+  list-style: none;
+  margin: 0 0 var(--s-5);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.voice {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-top: 1px solid var(--line-soft);
+}
+
+.voice:first-child { border-top: 0; }
+.voice.is-chosen { background: var(--accent-band); }
+
+.voice-id { min-width: 0; flex: 1; }
+.voice-id b { display: block; font-weight: 550; font-size: var(--t-base); }
+
+.voice-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+}
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.pill.local { background: var(--accent-soft); color: var(--accent-strong); }
+.pill.net { background: var(--surface-2); color: var(--ink-3); }
+
+:root[data-theme="dark"] .pill.local,
+.pill.local { color: var(--accent); }
+
+.voice-act { display: flex; gap: var(--s-2); flex: none; }
+
+.mini {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: var(--t-xs);
+  font-weight: 550;
+  cursor: pointer;
+}
+
+/* --- bench report --------------------------------------------------------- */
+
+.report {
+  list-style: none;
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.probe {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--s-3);
+}
+
+.probe.pass { border-left-color: var(--pass); }
+.probe.warn { border-left-color: var(--warn); }
+.probe.fail { border-left-color: var(--fail); }
+.probe.skip { border-left-color: var(--ink-3); }
+.probe.running { border-left-color: var(--accent); }
+
+.probe-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.probe-head b { font-weight: 600; font-size: var(--t-base); flex: 1; }
+
+.verdict {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.probe.pass .verdict { color: var(--pass); }
+.probe.warn .verdict { color: var(--warn); }
+.probe.fail .verdict { color: var(--fail); }
+.probe.skip .verdict { color: var(--ink-3); }
+.probe.running .verdict { color: var(--accent); }
+
+.measured {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.probe p {
+  margin: 6px 0 0;
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.summary {
+  margin-top: var(--s-4);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+/* --- narration ------------------------------------------------------------ */
+
+/* Kinds are told apart by hue, so a recorded result never reads as a
+   reconstructed thought. Reconstruction additionally carries a dashed edge —
+   colour alone should not be load-bearing. */
+
+.beats {
+  list-style: none;
+  margin: var(--s-4) 0 var(--s-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.beat {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--s-3);
+}
+
+.beat p { margin: 4px 0 0; font-size: var(--t-sm); line-height: 1.5; }
+.beat.more { color: var(--ink-3); font-size: var(--t-sm); text-align: center; }
+
+.beat-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.beat-head b {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.beat-head i,
+.beat-label i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  opacity: 0.8;
+}
+
+.beat-head em,
+.beat-label em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.beat-brief   { border-left-color: var(--ink); }
+.beat-thought { border-left-color: var(--accent); }
+.beat-action  { border-left-color: var(--ink-3); }
+.beat-result  { border-left-color: var(--warn); }
+.beat-say     { border-left-color: var(--line); }
+.beat-verdict { border-left-color: var(--pass); }
+
+.beat.tone-good .beat-head b { color: var(--pass); }
+.beat.tone-bad  { border-left-color: var(--fail); }
+.beat.tone-bad  .beat-head b { color: var(--fail); }
+.beat.tone-warn .beat-head b { color: var(--warn); }
+
+/* the heading that sits inside the reading pane */
+.beat-label {
+  display: block;
+  margin: var(--s-4) 0 var(--s-1);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  color: var(--ink-3);
+}
+
+.beat-label:first-child { margin-top: 0; }
+
+.beat-label b {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.beat-label.beat-thought b { color: var(--accent); }
+.beat-label.beat-verdict b { color: var(--pass); }
+.beat-label.tone-bad b { color: var(--fail); }
+.beat-label.tone-warn b { color: var(--warn); }
+
+.paste {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+/* --- settings sheet ------------------------------------------------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(8, 14, 16, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.scrim.open { opacity: 1; pointer-events: auto; }
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  max-height: 86dvh;
+  overflow-y: auto;
+  padding: var(--s-4) var(--s-4) calc(var(--s-5) + var(--safe-b));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-2);
+  transform: translateY(102%);
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.sheet.open { transform: translateY(0); }
+
+.sheet-inner { max-width: var(--shell); margin: 0 auto; }
+
+.grip {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  margin: 0 auto var(--s-4);
+}
+
+.field { margin-bottom: var(--s-4); }
+
+.field label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--t-sm);
+  font-weight: 550;
+  margin-bottom: 6px;
+}
+
+.field label i {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.field select,
+.field input[type="range"] {
+  width: 100%;
+}
+
+.field select {
+  min-height: var(--tap);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.field input[type="range"] { accent-color: var(--accent); height: var(--tap); }
+
+.seg { display: flex; gap: var(--s-2); }
+.seg .btn { flex: 1; }
+
+/* Any toggling button, not just the ones in a segmented control — the
+   narration mode row needs the same state and was silently going without it. */
+.btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-band);
+  color: var(--accent-strong);
+}
+
+/* --- misc ----------------------------------------------------------------- */
+
+.note {
+  margin: var(--s-3) 0 0;
+  padding: var(--s-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+}
+
+.note b { color: var(--ink-2); font-weight: 600; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(110px + var(--safe-b));
+  z-index: 70;
+  transform: translate(-50%, 12px);
+  padding: 10px var(--s-4);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--t-sm);
+  font-weight: 550;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* On a phone the tabs and the gear need the room more than the eyebrow does. */
+@media (max-width: 439px) {
+  .mark span { display: none; }
+}
+
+@media (min-width: 700px) {
+  main { padding-left: var(--s-4); padding-right: var(--s-4); }
+  :root { --read-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="bar">
+    <div class="mark">Aloud <span>reader &amp; bench</span></div>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" data-tab="read" aria-selected="true" aria-controls="tab-read">Read</button>
+      <button type="button" role="tab" data-tab="session" aria-selected="false" aria-controls="tab-session">Session</button>
+      <button type="button" role="tab" data-tab="voices" aria-selected="false" aria-controls="tab-voices">Voices</button>
+    </nav>
+
+    <button type="button" class="icon-btn" id="btn-settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9L5.3 5.3"></path></svg>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ------------------------------------------------------------ read -->
+    <section class="tab-panel" id="tab-read" role="tabpanel" aria-label="Read">
+
+      <div class="note" id="no-speech" hidden>
+        <b>This browser has no speech synthesis.</b> The text below will display and
+        segment correctly, but nothing can be spoken here. Try Chrome or Safari on a
+        phone.
+      </div>
+
+      <div class="source">
+        <div class="section-head">
+          <h2>Text</h2>
+          <p class="hint">Stays on this device.</p>
+        </div>
+
+        <label class="sr-only" for="text">Text to read aloud</label>
+        <textarea id="text" placeholder="Paste anything you would rather listen to than read."></textarea>
+
+        <div class="row">
+          <button type="button" class="btn grow" id="btn-file">Load .txt</button>
+          <button type="button" class="btn grow" id="btn-sample">Sample</button>
+          <button type="button" class="btn grow" id="btn-clear">Clear</button>
+          <input type="file" id="file" accept=".txt,text/plain" hidden>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>Reading</h2>
+        <p class="hint">Tap a sentence to start there.</p>
+      </div>
+
+      <div class="pane" id="pane"></div>
+
+      <p class="note" id="caps-line"></p>
+    </section>
+
+    <!-- --------------------------------------------------------- session -->
+    <section class="tab-panel" id="tab-session" role="tabpanel" aria-label="Session" hidden>
+
+      <div class="section-head">
+        <h2>Narration</h2>
+        <p class="hint" id="sess-source">nothing loaded yet</p>
+      </div>
+
+      <div class="row" id="sess-modes"></div>
+
+      <p class="hint" id="sess-summary"></p>
+      <p class="note" id="sess-caveat" hidden></p>
+
+      <div class="row">
+        <button type="button" class="btn primary grow" id="sess-play">Read this aloud</button>
+        <button type="button" class="btn" id="sess-download">Save text</button>
+      </div>
+
+      <ul class="beats" id="sess-preview"></ul>
+
+      <div class="section-head">
+        <h2>Live bridge</h2>
+      </div>
+
+      <p class="hint">
+        A browser cannot read a Claude Code transcript off disk, and cannot call
+        GitHub from a <code>file://</code> page. So the link runs the other way:
+        run <code>python3 tools/bridge.py</code> and it watches the session, runs
+        the suites on request, and hands the beats over here.
+      </p>
+
+      <label class="sr-only" for="sess-bridge">Bridge address</label>
+      <input type="url" class="filter" id="sess-bridge" placeholder="http://localhost:8765" inputmode="url">
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-connect">Connect</button>
+        <button type="button" class="btn grow" id="sess-run-tests">Run the suites</button>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="sess-follow">
+        <span>Follow the session, and re-read when it moves on</span>
+      </label>
+
+      <div class="section-head">
+        <h2>Or load one by hand</h2>
+      </div>
+
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-load-file">Open narration.json</button>
+        <input type="file" id="sess-file" accept=".json,application/json" hidden>
+      </div>
+
+      <label class="sr-only" for="sess-paste">Paste a narration script</label>
+      <textarea id="sess-paste" class="paste" placeholder="…or paste the JSON here"></textarea>
+      <div class="row">
+        <button type="button" class="btn grow" id="sess-use-paste">Use pasted script</button>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- voices -->
+    <section class="tab-panel" id="tab-voices" role="tabpanel" aria-label="Voices" hidden>
+
+      <div class="section-head">
+        <h2>Voices on this device</h2>
+        <p class="hint">On-device voices work offline.</p>
+      </div>
+
+      <label class="sr-only" for="voice-filter">Filter voices</label>
+      <input type="search" class="filter" id="voice-filter" placeholder="Filter by name or language…">
+      <ul class="voice-list" id="voice-list"></ul>
+
+      <div class="section-head">
+        <h2>The bench</h2>
+      </div>
+
+      <p class="hint">
+        Speech engines fail in ways feature detection cannot see — the API is always
+        present, and the methods always exist. These probes speak and measure. The full
+        run takes about a minute and you will hear it working.
+      </p>
+
+      <div class="row">
+        <button type="button" class="btn primary grow" id="btn-full">Run full bench</button>
+        <button type="button" class="btn grow" id="btn-quick">Quick run</button>
+        <button type="button" class="btn" id="btn-abort" hidden>Stop</button>
+        <button type="button" class="btn" id="btn-copy" hidden>Copy report</button>
+      </div>
+
+      <ul class="report" id="report"></ul>
+      <div class="summary" id="bench-summary" hidden></div>
+    </section>
+
+  </main>
+
+  <!-- ------------------------------------------------------------ transport -->
+  <div class="transport" id="transport">
+    <div class="progress"><i id="progress-fill"></i></div>
+    <div class="transport-inner">
+      <button type="button" class="tbtn" id="t-prev" aria-label="Previous sentence">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h2.2v12H7zM19 6v12l-8.4-6z"/></svg>
+      </button>
+
+      <button type="button" class="tbtn play" id="t-play" aria-label="Play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+
+      <button type="button" class="tbtn" id="t-next" aria-label="Next sentence">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.8 6H17v12h-2.2zM5 6l8.4 6L5 18z"/></svg>
+      </button>
+
+      <button type="button" class="tbtn" id="t-stop" aria-label="Stop">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>
+      </button>
+
+      <div class="counter" id="counter"></div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------- settings -->
+  <div class="scrim" id="scrim"></div>
+
+  <div class="sheet" id="sheet" role="dialog" aria-label="Settings" aria-modal="false">
+    <div class="sheet-inner">
+      <div class="grip"></div>
+
+      <div class="field">
+        <label for="set-voice">Voice</label>
+        <select id="set-voice"></select>
+      </div>
+
+      <div class="field">
+        <label for="set-rate">Speed <i id="set-rate-val"></i></label>
+        <input type="range" id="set-rate" min="0.5" max="2" step="0.05">
+      </div>
+
+      <div class="field">
+        <label for="set-pitch">Pitch <i id="set-pitch-val"></i></label>
+        <input type="range" id="set-pitch" min="0" max="2" step="0.05">
+      </div>
+
+      <div class="field">
+        <label for="set-volume">Volume <i id="set-volume-val"></i></label>
+        <input type="range" id="set-volume" min="0" max="1" step="0.05">
+      </div>
+
+      <div class="field">
+        <label for="set-size">Reading size <i id="set-size-val"></i></label>
+        <input type="range" id="set-size" min="15" max="30" step="1">
+      </div>
+
+      <div class="field">
+        <label for="set-chunk">Longest utterance <i id="set-chunk-val"></i></label>
+        <input type="range" id="set-chunk" min="80" max="400" step="10">
+        <p class="hint">Sentences longer than this are split at a comma. Lower it if
+          speech cuts out mid-sentence on this device.</p>
+      </div>
+
+      <div class="field">
+        <label>Theme</label>
+        <div class="seg">
+          <button type="button" class="btn" data-theme-choice="auto" aria-pressed="true">Auto</button>
+          <button type="button" class="btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn primary" id="btn-sheet-close" style="width:100%">Done</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+</div>
+
+<script>window.TTS=window.TTS||{};window.TTS.NARRATION={"version":1,"title":"Aloud — the making of","generated":"2026-08-07T17:55:31.011Z","modes":{"dev":{"label":"Development","source":{"kind":"session","file":"8e3cd54c-c3e0-5fa2-913e-21b3c1345821.jsonl","branch":"claude/tts-dev-narration-smoke-test-a1q9a2","cwd":"/home/user/PokimansSkyWorld/TTS","model":"claude-opus-5"},"caveat":"The transcript carries 67 thinking blocks and every one is empty — Claude Code strips the text before writing to disk. What follows is reconstructed from the actions and their results, not a record of thought.","beats":[{"kind":"brief","text":"continue","tone":"neutral","speaker":"director"},{"kind":"say","text":"I'll start by understanding the current state of the repository and the task at hand.","tone":"neutral"},{"kind":"action","text":"Now I check repo state and branches.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I list repo root.","tone":"neutral","at":"Bash"},{"kind":"result","text":"nothing to commit, working tree clean","tone":"neutral","at":"check repo state and branches"},{"kind":"action","text":"Now I compare branch to main and list contents.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I search for TTS/narration/smoke references.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read SkyWorld README and file sizes.","tone":"neutral","at":"Bash"},{"kind":"result","text":"ceiling — an established god is not getting any more established. A fully built","tone":"neutral","at":"read SkyWorld README and file sizes"},{"kind":"action","text":"Now I go looking for a tool I need.","tone":"neutral","at":"ToolSearch"},{"kind":"action","text":"Now I inspect Aetherline TTS/narration matches.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I list pull requests on github.","tone":"neutral","at":"mcp__github__list_pull_requests"},{"kind":"action","text":"Now I list issues on github.","tone":"neutral","at":"mcp__github__list_issues"},{"kind":"action","text":"Now I look for a narration/log feed in SkyWorld.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read Aetherline bootstrap test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"_out(\"%d passed, %d failed%s\" % [","tone":"good","at":"read Aetherline bootstrap test harness"},{"kind":"action","text":"Now I check for audio/voice support in SkyWorld.","tone":"neutral","at":"Bash"},{"kind":"result","text":"/bin/bash: line 1: cd: SkyWorld: No such file or directory","tone":"bad","at":"check for audio/voice support in SkyWorld"},{"kind":"thought","text":"Wrong path. Worth fixing before it turns into a wild goose chase.","tone":"warn","inferred":true},{"kind":"action","text":"Now I check for audio/voice support in SkyWorld.","tone":"neutral","at":"Bash"},{"kind":"say","text":"I've dug into the repo state. Here's what I found before asking you to point me: - The branch `claude/tts-dev-narration-smoke-test-a1q9a2` exists locally and on origin but sits **exactly at `main` (652617c)** — no commits, clean tree, no PR, no open issues. So there's no in-progress work to resume; the branch name is the only signal about intent. - The repo holds two projects: **`SkyWorld/`** (vanilla-JS HTML5 game…","tone":"neutral"},{"kind":"action","text":"Now I stop and ask, rather than guess.","tone":"neutral","at":"AskUserQuestion"},{"kind":"say","text":"That reframes it completely — this isn't about the game at all. A standalone mobile TTS tool. Let me pin down what it actually does before I plan it.","tone":"neutral"},{"kind":"action","text":"Now I stop and ask, rather than guess.","tone":"neutral","at":"AskUserQuestion"},{"kind":"say","text":"Good — that settles it. Let me verify the tooling I'd use for the build and headless checks.","tone":"neutral"},{"kind":"action","text":"Now I check node and Playwright availability.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read existing build script convention.","tone":"neutral","at":"Bash"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"result","text":"console.error('build: an external reference survived inlining');","tone":"neutral","at":"read existing build script convention"},{"kind":"action","text":"Now I locate the chromium executable.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I check npm registry reachability.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I check npm registry reachability with exit code.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Node 22, npm reachable, and the Playwright Chromium binary is present (I can drive it directly — no npm install, keeping the repo's zero-dependency convention). Writing the plan.","tone":"neutral"},{"kind":"action","text":"Now I write continue-generic-thompson.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I go looking for a tool I need.","tone":"neutral","at":"ToolSearch"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written. Presenting it for approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written. Presenting it for your approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Plan is written. Presenting it for approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written to `/root/.claude/plans/continue-generic-thompson.md`. Here's the summary before I ask for approval: **Aloud** — a standalone TTS reader + voice bench for mobile, in a new top-level `TTS/` directory, following the zero-dependency structure `SkyWorld/` already uses. The two halves are coupled deliberately: mobile speech engines have real, well-known bugs — Android Chrome truncates utterances at…","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"[Request interrupted by user for tool use]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is written to `/root/.claude/plans/continue-generic-thompson.md`. Submitting it for approval.","tone":"neutral"},{"kind":"action","text":"Now I put the plan up for approval.","tone":"neutral","at":"ExitPlanMode"},{"kind":"brief","text":"Continue from where you left off.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Plan approved. Let me check the existing harness conventions and load the artifact design guidance before I start writing.","tone":"neutral"},{"kind":"action","text":"Now I read simtest conventions.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I load the artifact-design skill.","tone":"neutral","at":"Skill"},{"kind":"result","text":"ls: cannot access '/home/user/PokimansSkyWorld/package.json': No such file or directory","tone":"bad","at":"read simtest conventions"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"brief","text":"Approach this as the design lead at a small studio known for their versatility, giving every client a visual identity pitched at the treatment the task actually calls for. Make deliberate choices about palette, typography, and layout that are specific to this subject, and avoid templated designs. ## Read the request first Calibrate treatment, not whether to design. A doc deserves the same craft as a landing page — what changes is the treatment that craft is delivered in. Many requests call for…","tone":"neutral","speaker":"director"},{"kind":"say","text":"Plan approved — implementing now. **Design plan** (utility treatment, information-design first): - **Color** — cool neutrals with a cyan bias so they read as chosen, not default grey: light `#EFF2F4` / `#FFF` / ink `#131A1D`; dark `#0E1416` / `#161F22` / ink `#E6EEF0`. One accent, deep teal `#00707F` (light) → `#3FD0E0` (dark), used for live/active state and as a low-alpha band under the sentence being spoken.…","tone":"neutral"},{"kind":"action","text":"Now I write split.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write probes.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write engine.","tone":"neutral","at":"Write"},{"kind":"say","text":"Now the stylesheet, following the design plan.","tone":"neutral"},{"kind":"action","text":"Now I write style (styles).","tone":"neutral","at":"Write"},{"kind":"say","text":"Now the three UI modules.","tone":"neutral"},{"kind":"action","text":"Now I write reader.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write bench.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write app.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I write index.","tone":"neutral","at":"Write"},{"kind":"say","text":"Two probes had a race — `pause()` firing `onend` could resolve the trial before the control timers read the result. Rewriting them as explicit sequences.","tone":"neutral"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the build script and the zero-dependency self-test harness.","tone":"neutral"},{"kind":"action","text":"Now I write build (module).","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I change probes.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I write selftest.","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I run the self-test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Bench — a missing API","tone":"neutral","at":"run the self-test harness"},{"kind":"thought","text":"That failed. Before changing anything I want to know whether the code is wrong or the expectation is.","tone":"bad","inferred":true},{"kind":"say","text":"Both failures are my expectations, not the code — but the ellipsis one is a genuine improvement worth making: `Wait… no.` is one sentence, and an ellipsis followed by a lowercase word shouldn't break.","tone":"neutral"},{"kind":"action","text":"Now I change split.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I re-run the self-test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Bench — a missing API","tone":"neutral","at":"re-run the self-test harness"},{"kind":"say","text":"`no` was in the abbreviation list (as in \"No. 5\"), so it swallowed the full stop in \"…no.\" — a bad trade, since a sentence ending in \"no.\" is far commoner in prose.","tone":"neutral"},{"kind":"action","text":"Now I change split.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change split.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I re-run the self-test harness.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Bench — a missing API","tone":"neutral","at":"re-run the self-test harness"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"say","text":"61 assertions pass. Now the build and the browser load check.","tone":"neutral"},{"kind":"action","text":"Now I write pagecheck (module).","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I build both outputs and run the page check.","tone":"neutral","at":"Bash"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"action","text":"Now I find what trips the fragment structure check.","tone":"neutral","at":"Bash"},{"kind":"say","text":"`\u003cheader>` was tripping the `\u003chead` guard. Tightening the check.","tone":"neutral"},{"kind":"action","text":"Now I change build (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I build and run the page check.","tone":"neutral","at":"Bash"},{"kind":"result","text":"built dist/artifact.html (90.9 kB)","tone":"neutral","at":"build and run the page check"},{"kind":"say","text":"The page boots clean. Now let me make `pagecheck` actually exercise behaviour, not just boot — driving the real DOM in the browser.","tone":"neutral"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I run the extended page check.","tone":"neutral","at":"Bash"},{"kind":"say","text":"All green. Let me look at it — rendering phone-sized screenshots in both themes.","tone":"neutral"},{"kind":"action","text":"Now I render light and dark screenshots of the reading tab.","tone":"neutral","at":"Bash"},{"kind":"result","text":"Error: ENOENT: no such file or directory, open 'undefined/read-light.html'","tone":"bad","at":"render light and dark screenshots of the reading tab"},{"kind":"thought","text":"Wrong path. Worth fixing before it turns into a wild goose chase.","tone":"warn","inferred":true},{"kind":"action","text":"Now I render light and dark screenshots.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read read-light.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Content looks clipped — I need to check whether that's a real overflow or a screenshot-harness artifact before \"fixing\" anything.","tone":"neutral"},{"kind":"action","text":"Now I measure the actual layout viewport in headless.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Good — `scrollWidth === clientWidth` (485), so there's **no horizontal overflow**; headless just ignored `--window-size` for layout and cropped the PNG. Let me render at a true 390px viewport via an iframe.","tone":"neutral"},{"kind":"action","text":"Now I render true 390px-wide screenshots via iframe.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read shot-light.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Let me measure element geometry rather than infer from a render that may be mid-layout.","tone":"neutral"},{"kind":"action","text":"Now I measure element geometry at 390px viewport.","tone":"neutral","at":"Bash"},{"kind":"thought","text":"Something threw. Read it properly rather than guessing at a fix.","tone":"warn","inferred":true},{"kind":"say","text":"`--dump-dom` only dumps the top document. Measuring the page directly instead.","tone":"neutral"},{"kind":"action","text":"Now I measure geometry on the page directly.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Geometry is correct — transport pinned to the bottom (y 740 + h 73 = 813 = viewport), no horizontal overflow. The only real issue is the header eyebrow wrapping at 390px. Let me check the other two views.","tone":"neutral"},{"kind":"action","text":"Now I read shot-dark.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Dark theme resolves — but the textarea looks light against it. Let me verify with computed styles rather than trust the PNG.","tone":"neutral"},{"kind":"action","text":"Now I check computed styles under the dark theme.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Computed styles are correct (textarea is `rgb(14,20,22)`) — the white box was a headless paint artifact. But `color-scheme: normal` is a real finding: native scrollbars, range thumbs and select popups would render light on the dark theme. Fixing that and the header wrap.","tone":"neutral"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I rebuild and re-render screenshots.","tone":"neutral","at":"Bash"},{"kind":"result","text":"built dist/artifact.html (91.3 kB)","tone":"neutral","at":"rebuild and re-render screenshots"},{"kind":"action","text":"Now I read shot-dark.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Dark textarea now correct — that confirms `color-scheme` was the cause — and the header no longer wraps. The iframe crops the fixed transport, so let me screenshot the page directly where geometry already proved it sits flush to the bottom.","tone":"neutral"},{"kind":"action","text":"Now I screenshot pages directly to see the transport.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read direct-bench.png.","tone":"neutral","at":"Read"},{"kind":"action","text":"Now I read direct-light.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"Transport renders correctly with \"1 / 9 sentences\" — segmentation ran end to end. Now the README.","tone":"neutral"},{"kind":"action","text":"Now I write README.","tone":"neutral","at":"Write"},{"kind":"say","text":"Full verification pass before committing.","tone":"neutral"},{"kind":"action","text":"Now I run the full verification suite.","tone":"neutral","at":"Bash"},{"kind":"result","text":"61 passed, 0 failed","tone":"good","at":"run the full verification suite"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"action","text":"Now I stage the new tool and review.","tone":"neutral","at":"Bash"},{"kind":"result","text":"14 files changed, 9712 insertions(+)","tone":"neutral","at":"stage the new tool and review"},{"kind":"action","text":"Now I commit the new tool.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I push the branch.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Pushed. Now publishing the artifact so you have a URL you can open on your phone.","tone":"neutral"},{"kind":"action","text":"Now I publish the page.","tone":"neutral","at":"Artifact"},{"kind":"say","text":"Done. **Open on your phone:** https://claude.ai/code/artifact/39e5b4bb-cba0-4205-bd19-09a9be63cac8 Your \"continue\" landed on an empty branch — no commits, no PR, nothing to resume — so what you got is what you then described: a standalone mobile TTS tool, **Aloud**, committed to `TTS/` on `claude/tts-dev-narration-smoke-test-a1q9a2` and published as an artifact. One self-contained 92 kB page, no dependencies, no…","tone":"neutral"},{"kind":"brief","text":"execute the plan","tone":"neutral","speaker":"director"},{"kind":"say","text":"The plan is already fully executed — that happened after you approved it earlier in this session. Let me verify the state rather than redo the work.","tone":"neutral"},{"kind":"action","text":"Now I verify branch state and pushed commit.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I re-verify tests, build reproducibility, and clean tree.","tone":"neutral","at":"Bash"},{"kind":"result","text":"61 passed, 0 failed","tone":"good","at":"re-verify tests, build reproducibility, and clean tree"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"say","text":"Everything the plan called for is already done and verified — nothing was left to execute. **State confirmed just now:** - Commit `7b98a4f` on `claude/tts-dev-narration-smoke-test-a1q9a2`, and local `HEAD` matches `origin/…` exactly — the push landed. - All 14 files present under `TTS/`. - `selftest.js`: **61 passed, 0 failed**. - `pagecheck.mjs`: **all checks passed** in real Chromium. - Rebuilding produces…","tone":"neutral"},{"kind":"brief","text":"implement the connection between the artifact and the claude code, so that it automatically will with either cc session or github it will read the internal monolog of the developer as they would have been thinking, through development OR test mode, which utilizes agents to run testing and it will get that data and read it as if it was a player. this is all in the plan right? it should be.. implement the full tool.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Straight answer first: **no, this isn't in the plan.** The plan file covers a standalone reader plus voice bench — nothing about connecting to Claude Code, GitHub, agents, or a narration feed. This is new scope. I'll build it, but I'm not going to pretend it was already agreed. One hard constraint I have to check before designing anything: the published artifact runs under a strict CSP that blocks *all* external…","tone":"neutral"},{"kind":"action","text":"Now I load the artifact-capabilities skill.","tone":"neutral","at":"Skill"},{"kind":"brief","text":"Base directory for this skill: /tmp/claude-0/bundled-skills/2.1.224/b49dff7d676d7310ae4c7aecd53fea37/artifact-capabilities # Artifact runtime capabilities A published Artifact page can declare **runtime capabilities** — abilities the claude.ai viewer grants the page at open time — by passing `capabilities: {name: config}` to the Artifact tool. The control plane is the authority on valid names and config shapes. Declaration gestures: **omitting** `capabilities` on a redeploy carries the stored…","tone":"neutral","speaker":"director"},{"kind":"action","text":"Now I go looking for a tool I need.","tone":"neutral","at":"ToolSearch"},{"kind":"action","text":"Now I read the downloads capability type definitions.","tone":"neutral","at":"Bash"},{"kind":"result","text":"* Stable error codes; treat unknown codes as `\"unavailable\"`.","tone":"neutral","at":"read the downloads capability type definitions"},{"kind":"say","text":"Confirmed the constraint, and it changes the design: available capabilities are **`downloads` and `mcp` only**, and **no claude.ai connectors are connected**. Those `mcp__github__*` tools are this session's local MCP server, which the skill explicitly excludes. So the published page **cannot** call GitHub or a CC session — there is no capability that would let it. So the connection has to run the other way…","tone":"neutral"},{"kind":"brief","text":"[Request interrupted by user]","tone":"neutral","speaker":"director"},{"kind":"brief","text":"if that's the case then fuck the artifact we can do html5 or python for pydroid.","tone":"neutral","speaker":"director"},{"kind":"say","text":"Dropping the artifact removes the CSP wall entirely — a local HTML file can talk to the network. Let me verify the two facts the design depends on before building on them.","tone":"neutral"},{"kind":"action","text":"Now I verify GitHub CORS support and local session transcript storage.","tone":"neutral","at":"Bash"},{"kind":"say","text":"The 403 is the sandbox proxy, not GitHub. But the session transcript exists — that's the monologue source. Let me inspect its shape.","tone":"neutral"},{"kind":"action","text":"Now I inspect session transcript structure.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I inspect assistant records and thinking blocks.","tone":"neutral","at":"Bash"},{"kind":"say","text":"52 thinking blocks exist, but the first sample is empty. Let me check whether the monologue text is actually stored or stripped.","tone":"neutral"},{"kind":"action","text":"Now I check whether thinking text is retained.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Decisive finding before I build: **all 53 thinking blocks in the session transcript are empty** — the verbatim reasoning is stripped on write, only signatures remain. So literal internal monologue is not recoverable from disk. What *is* there is the complete truthful record: 97 tool calls with full inputs, their results, 40 assistant messages, prompts, timestamps, branch. So the monologue gets **reconstructed**…","tone":"neutral"},{"kind":"action","text":"Now I write monologue (module).","tone":"neutral","at":"Write"},{"kind":"action","text":"Now I generate narration from session, git and tests.","tone":"neutral","at":"Bash"},{"kind":"say","text":"367 beats generated from real data. Let me check the prose quality.","tone":"neutral"},{"kind":"action","text":"Now I inspect generated narration quality.","tone":"neutral","at":"Bash"},{"kind":"result","text":"[verdict] driving the interface logged no errors.","tone":"neutral","at":"inspect generated narration quality"},{"kind":"say","text":"Test and history modes read well. Dev mode has noise — raw paths and `total 20` don't work spoken. Tightening the result filter.","tone":"neutral"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the player side — the pure narration module first, so it's testable.","tone":"neutral"},{"kind":"action","text":"Now I write narrate.","tone":"neutral","at":"Write"},{"kind":"say","text":"Now wiring narration into the reader, reusing the existing pane and transport rather than building a second playback path.","tone":"neutral"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change reader.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the Session tab, which owns the sources — baked-in script, file, paste, or a live bridge.","tone":"neutral"},{"kind":"action","text":"Now I write session.","tone":"neutral","at":"Write"},{"kind":"say","text":"Now the bridge — this is where Python earns its place: the page can't read a transcript off disk or call GitHub from `file://`, so a small stdlib-only server does it.","tone":"neutral"},{"kind":"action","text":"Now I write bridge (python).","tone":"neutral","at":"Write"},{"kind":"say","text":"Now wiring the new tab into the page and app.","tone":"neutral"},{"kind":"action","text":"Now I change index.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change index.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change index.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now app.js needs to register the session tab and expose what it needs.","tone":"neutral"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change app.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now the styles for beats and the new controls.","tone":"neutral"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now bake the narration into the build so the standalone file carries it.","tone":"neutral"},{"kind":"action","text":"Now I change build (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change build (module).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now test coverage for the new module.","tone":"neutral"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change selftest.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I run selftest with new narration tests.","tone":"neutral","at":"Bash"},{"kind":"result","text":"88 passed, 0 failed","tone":"good","at":"run selftest with new narration tests"},{"kind":"thought","text":"Green. That is the part I can trust; the rest still needs a real device.","tone":"good","inferred":true},{"kind":"say","text":"88 passing. Regenerating narration with the tightened filter and rebuilding.","tone":"neutral"},{"kind":"action","text":"Now I regenerate narration and rebuild.","tone":"neutral","at":"Bash"},{"kind":"result","text":"built dist/artifact.html (174.3 kB)","tone":"neutral","at":"regenerate narration and rebuild"},{"kind":"say","text":"Still noisy — an `ls -l` line slipped through and a bad inference fired on a README. Tightening both.","tone":"neutral"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I regenerate and inspect improved dev narration.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Two leaks remain — both are *file contents* (a README, a line of code) being read as outcomes. The real rule: only a command produces an outcome; file contents never do.","tone":"neutral"},{"kind":"action","text":"Now I change monologue (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I restrict result beats to reporting tools and regenerate.","tone":"neutral","at":"Bash"},{"kind":"say","text":"Now verifying the bridge actually works end to end.","tone":"neutral"},{"kind":"action","text":"Now I start the bridge and exercise its endpoints.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I verify static serving, CORS and path traversal guard.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I change bridge (python).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change pagecheck (module).","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I run page check with session tab coverage.","tone":"neutral","at":"Bash"},{"kind":"say","text":"All 30 checks pass, including the full narration path. Let me look at the Session tab.","tone":"neutral"},{"kind":"action","text":"Now I screenshot the session tab in both themes.","tone":"neutral","at":"Bash"},{"kind":"action","text":"Now I read sess-dark.png.","tone":"neutral","at":"Read"},{"kind":"say","text":"One visual bug: the selected mode button has no pressed state — that styling only existed inside `.seg`. Making it general.","tone":"neutral"},{"kind":"action","text":"Now I change style (styles).","tone":"neutral","at":"Edit"},{"kind":"say","text":"Now updating the README to cover the new half.","tone":"neutral"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"action","text":"Now I change README.","tone":"neutral","at":"Edit"},{"kind":"say","text":"Full verification pass, then commit.","tone":"neutral"},{"kind":"action","text":"Now I full verification of all suites.","tone":"neutral","at":"Bash"},{"kind":"say","text":"`pkill -f` matched its own command line. Re-running without it.","tone":"neutral"},{"kind":"action","text":"Now I full verification of all suites.","tone":"neutral","at":"Bash"}]},"history":{"label":"Commit history","source":{"kind":"git","branch":"claude/tts-dev-narration-smoke-test-a1q9a2","head":"7b98a4f"},"caveat":"Commit messages are written down rather than inferred, so this mode is the closest thing here to the real reasoning.","beats":[{"kind":"action","text":"On 2026-08-07 I committed: Add Aloud: a mobile TTS reader with a voice bench.","tone":"neutral","at":"7b98a4f"},{"kind":"result","text":"14 files changed.","tone":"neutral","at":"7b98a4f"},{"kind":"thought","text":"A standalone, self-contained page — no dependencies, no network, no build step to use it. Text is read with the voices already on the device and never leaves it. It is two tools because mobile speech engines are broken in ways feature detection cannot see: speechSynthesis is always present, every method exists, and every one returns without complaint. You have to speak something and time it. The reader is built around six measured failures — Android Chrome truncating a single utterance at ~15s, getVoices() empty on the first call, pause() that either does nothing or stops outright, absent…","tone":"neutral","at":"7b98a4f"},{"kind":"action","text":"On 2026-08-07 I committed: Add twenty more systems, two mini-games, and loop work.","tone":"neutral","at":"4e56cf4"},{"kind":"result","text":"23 files changed.","tone":"neutral","at":"4e56cf4"},{"kind":"thought","text":"Second layer of mechanics, each with three or more moving parts, all feeding the existing loop rather than sitting beside it: seasons; daily weather with a forecast; per-plot soil with depletion, recovery and crop rotation; three fertilisers; named villagers with moods and traits; seven assignable roles; eight buildings at three tiers; five creature ailments with causes you can see coming; nine techniques learned by repetition; bloodlines with wild mates, hybrid vigour and a pedigree; the Trial Ring; four caravans; contracts; fourteen relics with slots and fusion; twelve titles; sixteen…","tone":"neutral","at":"4e56cf4"},{"kind":"action","text":"On 2026-08-07 I committed: Add generations, a growing island, and two mini-games.","tone":"neutral","at":"980b634"},{"kind":"result","text":"16 files changed.","tone":"neutral","at":"980b634"},{"kind":"thought","text":"Reframes the game around the spine of Ancestors: The Humankind Odyssey, layered onto the training system that was already here. The line. Learning is cheap and dies with the animal. Praising a chore the creature already knows well also *ingrains* it, and only ingrained behaviour survives a generation leap — so the loop becomes teach, drill, then breed before it dies of old age. Whelps learn at 1.5x and are useless; elders are the reverse. Every few leaps the line permanently changes shape, and those bonuses are the long-run multiplier: a player who trains and breeds is 1.2x ahead of one who…","tone":"neutral","at":"980b634"},{"kind":"action","text":"On 2026-08-07 I committed: Add Skyward Reach: creature-raising farm sim on a floating island.","tone":"neutral","at":"1d0986b"},{"kind":"result","text":"16 files changed.","tone":"neutral","at":"1d0986b"},{"kind":"thought","text":"A self-contained HTML5 game. You are a minor god with one island, three believers and no reputation, climbing a public leaderboard of rival gods. Three systems, deliberately braided: - The creature is taught, never commanded. It picks acts by softmax over learned weights; you get a nine-second window to praise or strike, which multiplies or divides that act's weight and moves its alignment. Needs override training, so a starving beast eats the field it was taught to harvest. The Leash of Learning is a second channel: chores you do by hand bleed into its weights. - Your own actions cost…","tone":"neutral","at":"1d0986b"},{"kind":"action","text":"On 2026-08-03 I committed: Phase 4a: the shared cultural neural network.","tone":"neutral","at":"41940bf"},{"kind":"result","text":"34 files changed.","tone":"neutral","at":"41940bf"},{"kind":"thought","text":"Clans now share one small MLP that learns from what their members live through. A behaviour discovered by four individuals becomes something all forty of them know, and a fraction of it is inherited by the generation after — cultural transmission as a mechanism rather than a scripted system. The Phase 0 seams held. `creature.gd` needed no change to its tick path, `SimulationBudget` needed no change beyond retiring its TODO, and `SaveSystem` needed none at all: the round-robin slices, the experience funnel and the provider registration were already the right shape. Core: - culture_net.gd —…","tone":"neutral","at":"41940bf"},{"kind":"action","text":"On 2026-08-02 I committed: Initial session output p2 finish.","tone":"neutral","at":"35f9cfa"},{"kind":"result","text":"111 files changed.","tone":"neutral","at":"35f9cfa"}]},"test":{"label":"Test run","source":{"kind":"test","at":"2026-08-07T17:55:33.288Z","exit":0},"caveat":"Every verdict here is a real assertion from a real run, not a summary of one.","beats":[{"kind":"brief","text":"Test mode. Run the suites and tell me what happened.","tone":"neutral","speaker":"director"},{"kind":"action","text":"Running the self-test.","tone":"neutral","at":"the self-test"},{"kind":"verdict","text":"three plain sentences.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an abbreviation does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a decimal does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"initials do not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a dotted abbreviation does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an ellipsis trailing into lowercase does not end a sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an ellipsis before a capital does end one.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"three dots behave like an ellipsis too.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a closing quote stays with its sentence.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"multiple terminators stay together.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a blank line ends a chunk.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a single newline does not — hard-wrapped text stays whole.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"whitespace only yields nothing.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"empty string yields nothing.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a non-string yields nothing.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"text with no terminator is still one chunk.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"\"no.\" ends a sentence when no number follows.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"\"No.\" before a number does not.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a run-on is chopped into several chunks.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"no chunk exceeds the utterance limit.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"chopping prefers a clause break.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"an unbreakable run is still cut.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"the unbreakable run survives intact.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"chunks reproduce the source exactly.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"chunks partition the source with no gap or overlap.","tone":"good","at":"Segmentation"},{"kind":"verdict","text":"a script parses to its modes.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"beats survive parsing.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"beat indices are sequential.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the caveat is carried through.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a reconstructed beat stays marked.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"kinds are counted.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"invalid JSON is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a script with no modes is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a mode with no beats is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a mode of empty beats is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a non-object is rejected.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"flattening announces the kind of beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a reconstruction is announced as one.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"announcements can be turned off.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"every beat gets a range.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"ranges are ordered and contiguous.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"ranges land inside the text.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"an offset maps to its beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the last character maps to the last beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"an offset in the gap between beats still maps somewhere.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"every chunk knows its beat.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"every chunk knows its kind.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the first chunk of each beat is flagged.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"chunk beats never go backwards.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"the tagged text still reproduces the flattened text.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"a reconstruction is read slower than an action.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"an unknown kind still has a voice.","tone":"good","at":"Narration scripts"},{"kind":"verdict","text":"probe \"api\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"voices\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"basic\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"cutoff\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"boundary\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"pauseresume\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"cancel\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"rate\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"probe \"queue\" passes.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"the healthy engine reports usable capabilities.","tone":"good","at":"Bench — a healthy engine"},{"kind":"verdict","text":"a delayed voice list is still found.","tone":"good","at":"Bench — voices that arrive late"},{"kind":"verdict","text":"the delay is reported.","tone":"good","at":"Bench — voices that arrive late"},{"kind":"verdict","text":"an empty voice list fails.","tone":"good","at":"Bench — no voices at all"},{"kind":"verdict","text":"network-only voices warn.","tone":"good","at":"Bench — no voices at all"},{"kind":"verdict","text":"the warning mentions working offline.","tone":"good","at":"Bench — no voices at all"},{"kind":"verdict","text":"a truncating engine is caught.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"the report names the cause.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"the short phrase still passes on the same engine.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"caps record the truncation.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"an early ending warns rather than misattributing the cause.","tone":"good","at":"Bench — the Android truncation bug"},{"kind":"verdict","text":"a no-op pause is caught.","tone":"good","at":"Bench — pause() that does nothing"},{"kind":"verdict","text":"the report says pause had no effect.","tone":"good","at":"Bench — pause() that does nothing"},{"kind":"verdict","text":"caps withhold native pause.","tone":"good","at":"Bench — pause() that does nothing"},{"kind":"verdict","text":"a stopping pause is caught.","tone":"good","at":"Bench — pause() that stops instead"},{"kind":"verdict","text":"the report distinguishes it from a no-op.","tone":"good","at":"Bench — pause() that stops instead"},{"kind":"verdict","text":"missing boundary events warn.","tone":"good","at":"Bench — no word boundary events"},{"kind":"verdict","text":"the report explains the fallback.","tone":"good","at":"Bench — no word boundary events"},{"kind":"verdict","text":"caps withhold word highlighting.","tone":"good","at":"Bench — no word boundary events"},{"kind":"verdict","text":"an ignored rate is caught.","tone":"good","at":"Bench — an engine that ignores rate"},{"kind":"verdict","text":"a wedged engine fails instead of hanging.","tone":"good","at":"Bench — an engine that never finishes"},{"kind":"verdict","text":"the report says speech is wedged.","tone":"good","at":"Bench — an engine that never finishes"},{"kind":"verdict","text":"a browser without speechSynthesis fails cleanly.","tone":"good","at":"Bench — a missing API"},{"kind":"verdict","text":"a quick run skips the slow probes.","tone":"good","at":"Bench — the runner"},{"kind":"verdict","text":"a quick run still covers the fast probes.","tone":"good","at":"Bench — the runner"},{"kind":"verdict","text":"every quick probe passed on a healthy engine.","tone":"good","at":"Bench — the runner"},{"kind":"verdict","text":"an abort stops the remaining probes.","tone":"good","at":"Bench — aborting"},{"kind":"result","text":"the self-test: 88 passed, 0 failed.","tone":"good","at":"the self-test"},{"kind":"thought","text":"All of it green — though none of these assertions can hear anything, so this is correctness, not audio.","tone":"good","inferred":true},{"kind":"action","text":"Rebuilding the single-file page.","tone":"neutral","at":"build"},{"kind":"result","text":"The page comes out at 162.1 kB.","tone":"good","at":"build"},{"kind":"action","text":"Running the page check.","tone":"neutral","at":"the page check"},{"kind":"verdict","text":"the page logged no errors.","tone":"good","at":""},{"kind":"verdict","text":"the reader booted and rendered its empty state.","tone":"good","at":""},{"kind":"verdict","text":"the transport rendered.","tone":"good","at":""},{"kind":"verdict","text":"the settings sheet rendered.","tone":"good","at":""},{"kind":"verdict","text":"the voice select was populated by script.","tone":"good","at":""},{"kind":"verdict","text":"the capability note was written by script.","tone":"good","at":""},{"kind":"verdict","text":"the sentence counter was painted.","tone":"good","at":""},{"kind":"verdict","text":"no external references survive.","tone":"good","at":""},{"kind":"verdict","text":"the driver ran without throwing.","tone":"good","at":""},{"kind":"verdict","text":"typed text is segmented into the pane.","tone":"good","at":""},{"kind":"verdict","text":"the pane reproduces the source exactly.","tone":"good","at":""},{"kind":"verdict","text":"tapping a sentence makes it current.","tone":"good","at":""},{"kind":"verdict","text":"the counter tracks the position.","tone":"good","at":""},{"kind":"verdict","text":"switching tabs shows the voices panel.","tone":"good","at":""},{"kind":"verdict","text":"the transport hides outside the reading tab.","tone":"good","at":""},{"kind":"verdict","text":"the settings sheet opens.","tone":"good","at":""},{"kind":"verdict","text":"the settings sheet closes.","tone":"good","at":""},{"kind":"verdict","text":"clearing empties the pane.","tone":"good","at":""},{"kind":"verdict","text":"the session tab opens.","tone":"good","at":""},{"kind":"verdict","text":"a narration is baked into the page.","tone":"good","at":""},{"kind":"verdict","text":"the baked script is announced as built in.","tone":"good","at":""},{"kind":"verdict","text":"every mode gets a button.","tone":"good","at":""},{"kind":"verdict","text":"beats are previewed.","tone":"good","at":""},{"kind":"verdict","text":"playing a narration switches to the reading tab.","tone":"good","at":""},{"kind":"verdict","text":"the narration segments into the pane.","tone":"good","at":""},{"kind":"verdict","text":"beats are labelled in the pane.","tone":"good","at":""},{"kind":"verdict","text":"reconstructed beats are marked as such.","tone":"good","at":""},{"kind":"verdict","text":"the narration announces the kind of beat.","tone":"good","at":""},{"kind":"verdict","text":"driving the interface logged no errors.","tone":"good","at":""},{"kind":"result","text":"the page check: all checks passed.","tone":"good","at":"the page check"},{"kind":"verdict","text":"Everything passed. Segmentation, the probe logic, the wiring and a clean boot are all verified — and not one word of it was spoken out loud, because headless has no voices.","tone":"good","at":"summary"}]}}};</script>
+<script>
+/* Segmentation — text in, speakable chunks out.
+ *
+ * Pure: no DOM, no speech API, no timers. This is the half of the reader that
+ * can be tested properly, so everything fiddly lives here.
+ *
+ * Two jobs:
+ *
+ *  1. Find sentence boundaries without splitting on "Dr.", "3.14" or "J. R. R.".
+ *  2. Cut anything still too long into clause-sized pieces, because Android
+ *     Chrome truncates a single utterance at roughly fifteen seconds. Speaking
+ *     one chunk at a time is the workaround, and it is also what gives the
+ *     reader a seek unit and a highlight unit.
+ *
+ * Every chunk carries its exact offsets in the source string, so the reading
+ * pane highlights the original text rather than a reconstruction of it. The
+ * chunks partition the input: joining their slices reproduces the input byte
+ * for byte, which the self-test asserts.
+ */
+(function (window) {
+  'use strict';
+
+  var DEFAULT_MAX_CHARS = 180;
+
+  var TERMINATORS = '.!?…。！？';
+  var CLOSERS = '"”’\')]}»';
+  var CLAUSE = ',;:—–';
+
+  /* Words that end in a period without ending a sentence. Not exhaustive —
+   * no list is — but it covers what turns up in pasted prose. */
+  var ABBREV = {};
+  ('mr mrs ms mx dr prof rev fr st jr sr vs etc cf al fig inc ltd co corp ' +
+   'dept est univ approx ave rd blvd ln apt ste vol ch chap ed eds pp ca circa ' +
+   'jan feb mar apr jun jul aug sep sept oct nov dec mon tue tues wed thu thur ' +
+   'thurs fri sat sun hr hrs pt pts qty'
+  ).split(' ').forEach(function (w) { ABBREV[w] = true; });
+
+  /* These are abbreviations only when a number follows — "No. 5" is a label,
+   * "the answer is no." is a sentence, and prose has far more of the latter. */
+  var NUMBERED = { no: true, nos: true, vol: true, ch: true, pp: true, fig: true };
+
+  function isSpace(c) { return c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f' || c === '\v' || c === ' '; }
+  function has(set, c) { return c !== undefined && set.indexOf(c) >= 0; }
+
+  /* Is the period at `dot` part of an abbreviation or an initial rather than
+   * the end of a sentence? */
+  function abbreviationAt(text, dot) {
+    var i = dot;
+    while (i > 0 && /[A-Za-z]/.test(text.charAt(i - 1))) i--;
+    var word = text.slice(i, dot);
+    if (!word) return false;
+
+    if (word.length === 1) {
+      // "J. R. R. Tolkien" — a lone capital is an initial, never a full stop.
+      if (word === word.toUpperCase()) return true;
+      // the tail of a dotted abbreviation: the "g" of "e.g."
+      if (i > 0 && text.charAt(i - 1) === '.') return true;
+      return false;
+    }
+
+    var lower = word.toLowerCase();
+    if (NUMBERED[lower]) {
+      var p = dot + 1;
+      while (p < text.length && isSpace(text.charAt(p))) p++;
+      return p < text.length && /[0-9]/.test(text.charAt(p));
+    }
+    return ABBREV[lower] === true;
+  }
+
+  /* Offsets at which one chunk ends and the next begins. */
+  function boundaries(text) {
+    var n = text.length;
+    var cuts = [];
+    var i = 0;
+
+    while (i < n) {
+      var c = text.charAt(i);
+
+      // A blank line always ends a chunk. A single newline does not — plain
+      // text is often hard-wrapped, and splitting every wrapped line would
+      // chop sentences into stutters.
+      if (c === '\n' || c === '\r') {
+        var j = i, newlines = 0;
+        while (j < n && isSpace(text.charAt(j))) {
+          if (text.charAt(j) === '\n') newlines++;
+          j++;
+        }
+        if (newlines >= 2) cuts.push(j);
+        i = j;
+        continue;
+      }
+
+      if (has(TERMINATORS, c)) {
+        var t = i;
+        while (t < n && has(TERMINATORS, text.charAt(t))) t++;   // "?!" and "..."
+        var k = t;
+        while (k < n && has(CLOSERS, text.charAt(k))) k++;       // ...he said."
+
+        var atEnd = k >= n;
+        if (atEnd || isSpace(text.charAt(k))) {
+          var lone = (t - i === 1 && c === '.');
+
+          // An ellipsis trailing off into a lowercase word is a pause inside a
+          // sentence, not the end of one: "Wait… no." is one breath.
+          var ellipsis = (c === '…') || (c === '.' && t - i >= 3);
+          var continues = false;
+          if (ellipsis) {
+            var p = k;
+            while (p < n && isSpace(text.charAt(p))) p++;
+            continues = p < n && /[a-z]/.test(text.charAt(p));
+          }
+
+          if (!continues && !(lone && abbreviationAt(text, i))) {
+            // Take the trailing spaces with this chunk, plus at most one
+            // newline; a second newline belongs to the blank-line rule.
+            var m = k, seenNewline = false;
+            while (m < n && isSpace(text.charAt(m))) {
+              if (text.charAt(m) === '\n') {
+                if (seenNewline) break;
+                seenNewline = true;
+              }
+              m++;
+            }
+            cuts.push(m);
+            i = m;
+            continue;
+          }
+        }
+        i = t;
+        continue;
+      }
+
+      i++;
+    }
+
+    // Dedupe and drop the degenerate ends; the caller supplies 0 and n.
+    var seen = {}, clean = [];
+    for (var q = 0; q < cuts.length; q++) {
+      var v = cuts[q];
+      if (v > 0 && v < n && !seen[v]) { seen[v] = true; clean.push(v); }
+    }
+    clean.sort(function (a, b) { return a - b; });
+    return clean;
+  }
+
+  /* Break [start, end) into pieces no longer than maxChars, preferring a
+   * clause break, then any space, and only then a hard cut mid-word. */
+  function chop(text, start, end, maxChars) {
+    var out = [];
+    var s = start;
+    var floor = Math.max(24, Math.floor(maxChars / 3));
+
+    while (end - s > maxChars) {
+      var limit = s + maxChars;
+      var cut = -1;
+      var i;
+
+      for (i = limit; i > s + floor; i--) {
+        if (has(CLAUSE, text.charAt(i - 1)) && i < end && isSpace(text.charAt(i))) { cut = i; break; }
+      }
+      if (cut < 0) {
+        for (i = limit; i > s + floor; i--) {
+          if (isSpace(text.charAt(i - 1))) { cut = i; break; }
+        }
+      }
+      if (cut < 0) cut = limit;
+
+      out.push([s, cut]);
+      s = cut;
+    }
+    out.push([s, end]);
+    return out;
+  }
+
+  /* text -> [{ index, start, end, text, speech }] */
+  function segment(text, opts) {
+    var maxChars = (opts && opts.maxChars) || DEFAULT_MAX_CHARS;
+    if (typeof text !== 'string' || !text.replace(/\s/g, '')) return [];
+
+    var n = text.length;
+    var cuts = boundaries(text);
+    var ranges = [];
+    var prev = 0, i;
+
+    for (i = 0; i < cuts.length; i++) {
+      if (cuts[i] > prev) { ranges.push([prev, cuts[i]]); prev = cuts[i]; }
+    }
+    if (prev < n) ranges.push([prev, n]);
+
+    var raw = [];
+    for (i = 0; i < ranges.length; i++) {
+      var pieces = chop(text, ranges[i][0], ranges[i][1], maxChars);
+      for (var p = 0; p < pieces.length; p++) {
+        var a = pieces[p][0], b = pieces[p][1];
+        raw.push({ start: a, end: b, text: text.slice(a, b), speech: text.slice(a, b).trim() });
+      }
+    }
+
+    // Whitespace-only pieces are real text and must not vanish from the pane,
+    // but they are not worth an utterance. Fold them into a neighbour.
+    var merged = [];
+    for (i = 0; i < raw.length; i++) {
+      var c = raw[i];
+      if (!c.speech && merged.length) {
+        var last = merged[merged.length - 1];
+        last.end = c.end;
+        last.text = text.slice(last.start, last.end);
+        continue;
+      }
+      merged.push(c);
+    }
+    while (merged.length > 1 && !merged[0].speech) {
+      merged[1].start = merged[0].start;
+      merged[1].text = text.slice(merged[1].start, merged[1].end);
+      merged.shift();
+    }
+
+    for (i = 0; i < merged.length; i++) merged[i].index = i;
+    return merged;
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.split = {
+    segment: segment,
+    boundaries: boundaries,
+    DEFAULT_MAX_CHARS: DEFAULT_MAX_CHARS
+  };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* The voice bench — nine probes against a speech engine.
+ *
+ * Mobile speech engines are quietly broken in ways that matter to a reader,
+ * and none of it is discoverable from feature detection: the API is present
+ * and every method exists. You have to speak something and time it.
+ *
+ * So these probes measure. They take the engine by injection — `ctx.synth`,
+ * `ctx.Utterance`, and the clock and timers as `ctx.now` / `ctx.setTimeout` —
+ * which is what lets tools/selftest.js run this exact code against mock
+ * engines on a virtual clock, including an engine that reproduces the Android
+ * truncation bug. A bench that has never been shown a broken engine is not
+ * evidence of anything.
+ *
+ * Probe order matters: `basic` establishes the speaking-rate baseline that
+ * `cutoff` measures against, so the list is a sequence, not a set.
+ */
+(function (window) {
+  'use strict';
+
+  var SHORT = 'The quick brown fox jumps over the lazy dog.';
+  var MEDIUM = 'Speech runs on a clock the page does not control, so the only honest way to test it is to speak and measure.';
+
+  /* Roughly where Android Chrome cuts a long utterance off. */
+  var ANDROID_CUTOFF_MS = 15000;
+  var CUTOFF_LOW = 12000;
+  var CUTOFF_HIGH = 18500;
+
+  function longText(minChars) {
+    var s = '';
+    var i = 1;
+    while (s.length < minChars) {
+      s += 'This is sentence number ' + i + ' of a deliberately long passage, written to run past the point where a mobile speech engine gives up on a single utterance. ';
+      i++;
+    }
+    return s.slice(0, minChars);
+  }
+
+  function sleep(ctx, ms) {
+    return new Promise(function (resolve) { ctx.setTimeout(resolve, ms); });
+  }
+
+  /* Resolves true as soon as pred() holds, false if it never does in time. */
+  function waitUntil(ctx, pred, ms) {
+    return new Promise(function (resolve) {
+      var deadline = ctx.now() + ms;
+      (function tick() {
+        if (pred()) { resolve(true); return; }
+        if (ctx.now() >= deadline) { resolve(false); return; }
+        ctx.setTimeout(tick, 100);
+      })();
+    });
+  }
+
+  /* A bare utterance whose lifecycle we watch by hand, for the probes that
+   * have to interrupt it. Using trial() for those is a race: pause() ending
+   * the utterance resolves the trial before the follow-up checks can run. */
+  function watched(ctx, text, rate) {
+    var w = { started: false, ended: false, error: null, startAt: 0, endAt: 0, u: null, threw: null };
+    try {
+      w.u = new ctx.Utterance(text);
+    } catch (err) {
+      w.threw = String((err && err.message) || err);
+      return w;
+    }
+    if (ctx.voice) w.u.voice = ctx.voice;
+    w.u.rate = rate || 1;
+    w.u.volume = 1;
+    w.u.onstart = function () { w.started = true; w.startAt = ctx.now(); };
+    w.u.onend = function () { w.ended = true; w.endAt = ctx.now(); };
+    w.u.onerror = function (e) {
+      w.error = (e && (e.error || e.name)) || 'error';
+      w.ended = true;
+      w.endAt = ctx.now();
+    };
+    try {
+      ctx.synth.cancel();
+      ctx.synth.speak(w.u);
+    } catch (err2) {
+      w.threw = String((err2 && err2.message) || err2);
+    }
+    return w;
+  }
+
+  /* Speak once and report what happened. Never rejects. */
+  function trial(ctx, opts) {
+    return new Promise(function (resolve) {
+      var res = {
+        started: false, ended: false, error: null, why: '',
+        startAt: 0, endAt: 0, t0: ctx.now(),
+        boundaries: 0, lastCharIndex: -1
+      };
+      var done = false;
+      var timer = null;
+
+      function finish(why) {
+        if (done) return;
+        done = true;
+        res.why = why;
+        res.endAt = ctx.now();
+        res.speakMs = res.started ? (res.endAt - res.startAt) : (res.endAt - res.t0);
+        res.startMs = res.started ? (res.startAt - res.t0) : -1;
+        if (timer !== null) ctx.clearTimeout(timer);
+        resolve(res);
+      }
+      res.finish = finish;
+
+      var u;
+      try {
+        u = new ctx.Utterance(opts.text);
+      } catch (err) {
+        res.error = String((err && err.message) || err);
+        finish('throw');
+        return;
+      }
+
+      if (ctx.voice) u.voice = ctx.voice;
+      u.rate = opts.rate || 1;
+      u.pitch = opts.pitch || 1;
+      u.volume = opts.volume == null ? 1 : opts.volume;
+
+      u.onstart = function () {
+        res.started = true;
+        res.startAt = ctx.now();
+        if (opts.onStart) opts.onStart(res);
+      };
+      u.onboundary = function (e) {
+        res.boundaries++;
+        if (e && typeof e.charIndex === 'number' && e.charIndex >= 0) res.lastCharIndex = e.charIndex;
+      };
+      u.onend = function () { res.ended = true; finish('end'); };
+      u.onerror = function (e) {
+        res.error = (e && (e.error || e.name)) || 'error';
+        finish('error');
+      };
+
+      timer = ctx.setTimeout(function () { finish('timeout'); }, opts.timeout || 10000);
+
+      try {
+        ctx.synth.cancel();
+        ctx.synth.speak(u);
+      } catch (err2) {
+        res.error = String((err2 && err2.message) || err2);
+        finish('throw');
+      }
+    });
+  }
+
+  /* getVoices() is empty on the first call in Chrome. The spec says listen for
+   * voiceschanged; some engines never fire it, so poll as well. */
+  function waitForVoices(ctx, ms) {
+    return new Promise(function (resolve) {
+      var done = false, poll = null, timer = null;
+
+      function current() {
+        try { return ctx.synth.getVoices() || []; } catch (e) { return []; }
+      }
+      function finish() {
+        if (done) return;
+        done = true;
+        if (poll !== null) ctx.clearInterval(poll);
+        if (timer !== null) ctx.clearTimeout(timer);
+        try {
+          if (ctx.synth.removeEventListener) ctx.synth.removeEventListener('voiceschanged', check);
+        } catch (e) { /* engine without EventTarget */ }
+        resolve(current());
+      }
+      function check() { if (current().length) finish(); }
+
+      try {
+        if (ctx.synth.addEventListener) ctx.synth.addEventListener('voiceschanged', check);
+      } catch (e) { /* ditto */ }
+
+      poll = ctx.setInterval(check, 150);
+      timer = ctx.setTimeout(finish, ms || 4000);
+      check();
+    });
+  }
+
+  function ok(measured, note) { return { status: 'pass', measured: measured, note: note }; }
+  function warn(measured, note) { return { status: 'warn', measured: measured, note: note }; }
+  function bad(measured, note) { return { status: 'fail', measured: measured, note: note }; }
+  function skip(measured, note) { return { status: 'skip', measured: measured, note: note }; }
+
+  function secs(ms) { return (ms / 1000).toFixed(1) + 's'; }
+
+  var PROBES = [
+    {
+      id: 'api',
+      name: 'Speech API present',
+      why: 'Everything else depends on it.',
+      slow: false,
+      run: function (ctx) {
+        if (!ctx.synth || typeof ctx.synth.speak !== 'function') {
+          return Promise.resolve(bad('absent', 'This browser exposes no speechSynthesis. The reader cannot work here.'));
+        }
+        if (typeof ctx.Utterance !== 'function') {
+          return Promise.resolve(bad('no SpeechSynthesisUtterance', 'The constructor is missing, so nothing can be queued.'));
+        }
+        return Promise.resolve(ok('available', 'speechSynthesis and SpeechSynthesisUtterance both exist.'));
+      }
+    },
+
+    {
+      id: 'voices',
+      name: 'Voice list loads',
+      why: 'getVoices() is empty on the first call in Chrome.',
+      slow: false,
+      run: function (ctx) {
+        var t0 = ctx.now();
+        var immediate = [];
+        try { immediate = ctx.synth.getVoices() || []; } catch (e) { immediate = []; }
+
+        var after = immediate.length ? Promise.resolve(immediate) : waitForVoices(ctx, 4000);
+
+        return after.then(function (voices) {
+          var waited = ctx.now() - t0;
+          ctx.state.voices = voices;
+
+          if (!voices.length) {
+            return bad('0 voices', 'The engine reports no voices at all. On Android this usually means no speech engine is installed or enabled in system settings.');
+          }
+
+          var local = 0;
+          for (var i = 0; i < voices.length; i++) if (voices[i].localService) local++;
+          var measured = voices.length + ' voices, ' + local + ' on-device';
+          var how = immediate.length
+            ? 'available on the first call'
+            : 'arrived asynchronously after ' + secs(waited);
+
+          if (!local) {
+            return warn(measured, 'Every voice is a network voice — ' + how + '. Speech will fail offline and stall on a poor connection.');
+          }
+          return ok(measured, 'Voice list ' + how + '. ' + local + ' work offline.');
+        });
+      }
+    },
+
+    {
+      id: 'basic',
+      name: 'Speaks a short phrase',
+      why: 'Establishes the speaking-rate baseline the cutoff probe measures against.',
+      slow: false,
+      run: function (ctx) {
+        return trial(ctx, { text: SHORT, timeout: 12000 }).then(function (r) {
+          if (r.why === 'timeout') {
+            return bad('no response in 12s', 'The engine accepted the utterance and never reported starting or finishing. Speech is wedged.');
+          }
+          if (r.error) return bad('error: ' + r.error, 'The engine refused the utterance.');
+          if (!r.started) return warn('ended without onstart, ' + secs(r.speakMs), 'The utterance completed but never fired onstart, so progress cannot be tracked precisely.');
+
+          ctx.state.baseline = { chars: SHORT.length, ms: r.speakMs };
+          return ok(secs(r.speakMs) + ' for ' + SHORT.length + ' chars, ' + r.startMs + 'ms to start',
+            'Normal speech works. Roughly ' + Math.round(SHORT.length / (r.speakMs / 1000)) + ' characters per second at rate 1.');
+        });
+      }
+    },
+
+    {
+      id: 'cutoff',
+      name: 'Long utterance survives',
+      why: 'Android Chrome truncates a single utterance at about fifteen seconds.',
+      slow: true,
+      run: function (ctx) {
+        var base = ctx.state.baseline;
+        if (!base) return Promise.resolve(skip('no baseline', 'The short-phrase probe did not produce a timing baseline, so there is nothing to compare against.'));
+
+        var msPerChar = base.ms / base.chars;
+        if (!(msPerChar > 0)) return Promise.resolve(skip('no usable baseline', 'The baseline measured zero speaking time, so nothing can be predicted from it.'));
+
+        // Size the passage to land just past the cutoff — long enough to
+        // provoke the bug, short enough that a healthy engine still finishes
+        // inside a tolerable wait.
+        var target = 24000;
+        var chars = Math.min(6000, Math.max(600, Math.ceil(target / msPerChar)));
+        var text = longText(chars);
+        var predicted = Math.round(text.length * msPerChar);
+
+        if (predicted < CUTOFF_HIGH) {
+          return Promise.resolve(skip('longest passage predicts only ' + secs(predicted),
+            'This engine speaks fast enough that even a long passage finishes before the cutoff would bite, so the bug cannot be provoked here.'));
+        }
+
+        var budget = Math.min(Math.round(predicted * 1.8), 75000);
+        return trial(ctx, { text: text, timeout: budget }).then(function (r) {
+          var m = secs(r.speakMs) + ' vs ~' + secs(predicted) + ' expected';
+
+          if (r.why === 'timeout') {
+            return warn(m, 'The utterance ran past its budget without ending. Not a truncation, but the engine is not reporting completion.');
+          }
+          if (r.error) return bad('error after ' + secs(r.speakMs), 'The engine errored partway through a long utterance: ' + r.error + '.');
+
+          if (r.speakMs >= predicted * 0.75) {
+            return ok(m, 'A long utterance ran to completion. Chunking is not strictly required here, though the reader still chunks for seeking and highlighting.');
+          }
+          if (r.speakMs >= CUTOFF_LOW && r.speakMs <= CUTOFF_HIGH) {
+            return bad(m, 'Cut off at about ' + secs(ANDROID_CUTOFF_MS) + ' — the Android truncation bug. The reader works around it by speaking one sentence at a time, so reading is unaffected.');
+          }
+          return warn(m, 'The utterance ended well before it should have. Something is interrupting long speech on this device.');
+        });
+      }
+    },
+
+    {
+      id: 'boundary',
+      name: 'Word boundary events',
+      why: 'Decides whether word-level highlighting and mid-sentence resume are possible.',
+      slow: false,
+      run: function (ctx) {
+        return trial(ctx, { text: MEDIUM, timeout: 20000 }).then(function (r) {
+          if (r.error || r.why === 'timeout') {
+            return skip('inconclusive', 'The utterance did not complete cleanly, so boundary support could not be judged.');
+          }
+          if (!r.boundaries) {
+            return warn('none fired', 'No onboundary events. Common on Android and iOS. The reader highlights whole sentences instead of words, and resumes from the start of a sentence rather than mid-word.');
+          }
+          if (r.lastCharIndex < 0) {
+            return warn(r.boundaries + ' events, no charIndex', 'Boundary events fire but carry no usable position, so they cannot drive a highlight.');
+          }
+          return ok(r.boundaries + ' events, last charIndex ' + r.lastCharIndex,
+            'Word-level highlighting is available, and pausing can resume from the exact word.');
+        });
+      }
+    },
+
+    {
+      id: 'pauseresume',
+      name: 'Pause and resume',
+      why: 'pause() often behaves as stop on Android.',
+      slow: true,
+      run: function (ctx) {
+        var w = watched(ctx, longText(600), 1);
+        if (w.threw) return Promise.resolve(bad('threw', 'The engine refused the utterance: ' + w.threw + '.'));
+
+        var pausedFlag = false;
+        var stoppedWhilePaused = false;
+
+        return sleep(ctx, 1400).then(function () {
+          if (!w.started) return 'never-started';
+          if (w.ended) return 'ended-early';
+
+          try { ctx.synth.pause(); } catch (e) { /* judged by the flag below */ }
+
+          return sleep(ctx, 700).then(function () {
+            try { pausedFlag = !!ctx.synth.paused; } catch (e) { pausedFlag = false; }
+            stoppedWhilePaused = w.ended;
+
+            try { ctx.synth.resume(); } catch (e2) { /* judged below */ }
+
+            if (stoppedWhilePaused) return 'stopped';
+            if (!pausedFlag) return 'no-effect';
+
+            return waitUntil(ctx, function () { return w.ended; }, 60000)
+              .then(function (finished) { return finished ? 'resumed' : 'stalled'; });
+          });
+        }).then(function (verdict) {
+          try { ctx.synth.cancel(); } catch (e) { /* nothing queued */ }
+
+          if (verdict === 'never-started') return skip('never started', 'The utterance did not start, so pause could not be tested.');
+          if (verdict === 'ended-early') return skip('finished too soon', 'The test utterance was over before pause could be tried.');
+
+          if (verdict === 'stopped') {
+            return bad('stopped while paused', 'pause() ended the utterance instead of holding it — the usual Android behaviour. The reader treats pause as stop-and-remember and re-speaks the sentence on resume.');
+          }
+          if (verdict === 'no-effect') {
+            return bad('paused flag stayed false', 'pause() had no effect at all. The reader cancels and remembers the position instead.');
+          }
+          if (verdict === 'stalled') {
+            return bad('never resumed', 'After pause() the utterance never finished, so resume() did not restart it.');
+          }
+          if (w.error) return bad('error: ' + w.error, 'The engine errored across a pause/resume cycle.');
+
+          return ok('held and resumed, total ' + secs(w.endAt - w.startAt),
+            'Native pause and resume work, so the reader pauses mid-sentence and continues from exactly there.');
+        });
+      }
+    },
+
+    {
+      id: 'cancel',
+      name: 'Cancel clears the queue',
+      why: 'A wedged queue makes every later utterance silently do nothing.',
+      slow: false,
+      run: function (ctx) {
+        var w = watched(ctx, longText(500), 1);
+        if (w.threw) return Promise.resolve(bad('threw', 'The engine refused the utterance: ' + w.threw + '.'));
+
+        var stillSpeaking = false;
+
+        return sleep(ctx, 900).then(function () {
+          try { ctx.synth.cancel(); } catch (e) { /* judged below */ }
+          return sleep(ctx, 400);
+        }).then(function () {
+          try { stillSpeaking = !!ctx.synth.speaking; } catch (e) { stillSpeaking = false; }
+          // The question that actually matters: can anything be spoken after?
+          return trial(ctx, { text: SHORT, timeout: 12000 });
+        }).then(function (r2) {
+          if (stillSpeaking) {
+            return bad('still speaking after cancel', 'cancel() did not stop the engine, so stopping the reader may not stop the voice.');
+          }
+          if (!r2.started || r2.error || r2.why === 'timeout') {
+            return bad('queue wedged', 'Nothing could be spoken after a cancel. On this device the reader may need a page reload to recover.');
+          }
+          return ok('cleared, next utterance spoke', 'cancel() stops the engine cleanly and leaves it able to speak again.');
+        });
+      }
+    },
+
+    {
+      id: 'rate',
+      name: 'Rate is honoured',
+      why: 'Some engines accept a rate and ignore it.',
+      slow: true,
+      run: function (ctx) {
+        return trial(ctx, { text: MEDIUM, rate: 0.6, timeout: 40000 }).then(function (slow) {
+          if (!slow.started || slow.error) return skip('inconclusive', 'The slow pass did not complete.');
+          return trial(ctx, { text: MEDIUM, rate: 1.8, timeout: 30000 }).then(function (fast) {
+            if (!fast.started || fast.error) return skip('inconclusive', 'The fast pass did not complete.');
+
+            var ratio = fast.speakMs > 0 ? slow.speakMs / fast.speakMs : 0;
+            var m = secs(slow.speakMs) + ' at 0.6× vs ' + secs(fast.speakMs) + ' at 1.8× (' + ratio.toFixed(2) + '×)';
+
+            if (ratio >= 1.35) return ok(m, 'The rate slider does what it says.');
+            if (ratio >= 1.1) return warn(m, 'Rate has some effect but far less than requested. Expect the slider to feel weak.');
+            return bad(m, 'The engine ignores rate. The slider will appear to do nothing on this voice — try a different one.');
+          });
+        });
+      }
+    },
+
+    {
+      id: 'queue',
+      name: 'Utterances queue in order',
+      why: 'The reader relies on one utterance following another.',
+      slow: false,
+      run: function (ctx) {
+        return new Promise(function (resolve) {
+          var order = [];
+          var done = false;
+          var words = ['one', 'two', 'three'];
+          var timer = null;
+
+          function finish() {
+            if (done) return;
+            done = true;
+            if (timer !== null) ctx.clearTimeout(timer);
+            try { ctx.synth.cancel(); } catch (e) { /* nothing to clean */ }
+
+            if (order.length < 3) {
+              resolve(bad('only ' + order.length + ' of 3 finished', 'Queued utterances were dropped. The reader re-issues each sentence itself, so this is survivable, but the engine is unreliable.'));
+              return;
+            }
+            if (order.join(',') !== 'one,two,three') {
+              resolve(bad('finished as ' + order.join(', '), 'Utterances completed out of order, so sentences would be read out of sequence.'));
+              return;
+            }
+            resolve(ok('one, two, three in order', 'The engine queues correctly.'));
+          }
+
+          try { ctx.synth.cancel(); } catch (e) { /* nothing to clean */ }
+
+          for (var i = 0; i < words.length; i++) {
+            (function (word) {
+              var u = new ctx.Utterance(word);
+              if (ctx.voice) u.voice = ctx.voice;
+              u.onend = function () {
+                order.push(word);
+                if (order.length === 3) finish();
+              };
+              u.onerror = function () { finish(); };
+              ctx.synth.speak(u);
+            })(words[i]);
+          }
+
+          timer = ctx.setTimeout(finish, 20000);
+        });
+      }
+    }
+  ];
+
+  /* What the reader needs to know about this device. */
+  function capsFrom(results) {
+    function statusOf(id) { return results[id] && results[id].status; }
+    return {
+      boundary: statusOf('boundary') === 'pass',
+      nativePause: statusOf('pauseresume') === 'pass',
+      truncates: statusOf('cutoff') === 'fail',
+      at: Date.now()
+    };
+  }
+
+  /* Run the probes in order. `opts.quick` skips the slow ones. */
+  function runAll(ctx, opts) {
+    opts = opts || {};
+    ctx.state = ctx.state || {};
+
+    var list = PROBES.filter(function (p) { return opts.quick ? !p.slow : true; });
+    var results = {};
+    var chain = Promise.resolve();
+
+    list.forEach(function (probe, i) {
+      chain = chain.then(function () {
+        if (ctx.shouldAbort && ctx.shouldAbort()) {
+          results[probe.id] = skip('aborted', 'The run was stopped before this probe.');
+          return null;
+        }
+        if (opts.onProgress) opts.onProgress({ probe: probe, index: i, total: list.length, phase: 'start' });
+
+        return probe.run(ctx).then(function (r) {
+          results[probe.id] = r;
+          if (opts.onProgress) opts.onProgress({ probe: probe, index: i, total: list.length, phase: 'done', result: r });
+        }, function (err) {
+          results[probe.id] = bad('threw', 'The probe itself failed: ' + String((err && err.message) || err));
+          if (opts.onProgress) opts.onProgress({ probe: probe, index: i, total: list.length, phase: 'done', result: results[probe.id] });
+        });
+      });
+    });
+
+    return chain.then(function () {
+      try { ctx.synth.cancel(); } catch (e) { /* engine already gone */ }
+      return { results: results, caps: capsFrom(results), probes: list };
+    });
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.probes = {
+    PROBES: PROBES,
+    runAll: runAll,
+    capsFrom: capsFrom,
+    waitForVoices: waitForVoices,
+    sleep: sleep,
+    waitUntil: waitUntil,
+    longText: longText,
+    ANDROID_CUTOFF_MS: ANDROID_CUTOFF_MS
+  };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* Narration scripts — validation, and the turn from beats into a document.
+ *
+ * Pure: no DOM, no speech API. A script is what tools/monologue.mjs writes —
+ * a development record turned into speakable beats. This module checks one is
+ * well formed, flattens a mode into a single string the existing segmenter can
+ * chew on, and maps every chunk back to the beat it came from so the player
+ * can label and colour it.
+ *
+ * The flattening matters: rather than inventing a second playback path, a
+ * narration mode becomes ordinary text with an index beside it, and the reader
+ * plays it with the machinery that already works.
+ */
+(function (window) {
+  'use strict';
+
+  var KINDS = {
+    brief:   { label: 'Brief',   rate: 1.00, pitch: 1.00 },
+    thought: { label: 'Thinking', rate: 0.94, pitch: 0.96 },
+    action:  { label: 'Doing',   rate: 1.06, pitch: 1.00 },
+    result:  { label: 'Result',  rate: 1.00, pitch: 0.98 },
+    say:     { label: 'Saying',  rate: 1.00, pitch: 1.02 },
+    verdict: { label: 'Verdict', rate: 0.96, pitch: 1.00 }
+  };
+
+  function kindOf(kind) { return KINDS[kind] || KINDS.say; }
+
+  /* Throws a message worth showing a person. */
+  function parseScript(input) {
+    var raw = input;
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); }
+      catch (e) { throw new Error('That is not valid JSON: ' + e.message); }
+    }
+    if (!raw || typeof raw !== 'object') throw new Error('A narration script must be an object.');
+    if (!raw.modes || typeof raw.modes !== 'object') throw new Error('No "modes" in this script.');
+
+    var names = Object.keys(raw.modes);
+    if (!names.length) throw new Error('The script has no modes in it.');
+
+    var modes = {};
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      var mode = raw.modes[name];
+      if (!mode || !Array.isArray(mode.beats)) throw new Error('Mode "' + name + '" has no beats.');
+
+      var beats = [];
+      for (var b = 0; b < mode.beats.length; b++) {
+        var raw_b = mode.beats[b];
+        if (!raw_b || typeof raw_b.text !== 'string') continue;
+        var text = raw_b.text.trim();
+        if (!text) continue;
+        beats.push({
+          index: beats.length,
+          kind: KINDS[raw_b.kind] ? raw_b.kind : 'say',
+          text: text,
+          tone: raw_b.tone || 'neutral',
+          at: raw_b.at || '',
+          inferred: !!raw_b.inferred,
+          speaker: raw_b.speaker || ''
+        });
+      }
+      if (!beats.length) throw new Error('Mode "' + name + '" has no readable beats.');
+
+      modes[name] = {
+        name: name,
+        label: mode.label || name,
+        caveat: mode.caveat || '',
+        source: mode.source || {},
+        beats: beats
+      };
+    }
+
+    return {
+      version: raw.version || 1,
+      title: raw.title || 'Narration',
+      generated: raw.generated || '',
+      modes: modes,
+      order: Object.keys(modes)
+    };
+  }
+
+  /* A mode becomes one string plus the offsets each beat occupies in it. */
+  function flatten(mode, opts) {
+    var spoken = !opts || opts.announce !== false;
+    var parts = [];
+    var ranges = [];
+    var at = 0;
+
+    for (var i = 0; i < mode.beats.length; i++) {
+      var b = mode.beats[i];
+
+      // A short spoken label keeps a listener oriented — otherwise a result
+      // and a reconstruction sound identical, which is the one thing this
+      // must not do.
+      var lead = '';
+      if (spoken) {
+        if (b.kind === 'brief') lead = 'The brief: ';
+        else if (b.kind === 'thought') lead = b.inferred ? 'Reconstructed: ' : 'Thinking: ';
+        else if (b.kind === 'result') lead = 'Result: ';
+        else if (b.kind === 'verdict') lead = 'Verdict: ';
+      }
+
+      var text = lead + b.text;
+      if (!/[.!?…]$/.test(text)) text += '.';
+
+      var start = at;
+      parts.push(text);
+      at += text.length;
+      ranges.push({ beat: b.index, start: start, end: at });
+
+      if (i < mode.beats.length - 1) {
+        parts.push('\n\n');
+        at += 2;
+      }
+    }
+
+    return { text: parts.join(''), ranges: ranges };
+  }
+
+  /* Which beat does a source offset belong to? Chunks are produced by
+   * split.segment over the flattened text, so this is how a chunk finds its
+   * beat. Binary search: a long session runs to hundreds of beats. */
+  function beatAt(ranges, offset) {
+    var lo = 0, hi = ranges.length - 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (offset < ranges[mid].start) hi = mid - 1;
+      else if (offset >= ranges[mid].end) lo = mid + 1;
+      else return ranges[mid].beat;
+    }
+    return ranges.length ? ranges[Math.min(lo, ranges.length - 1)].beat : 0;
+  }
+
+  /* Tag each chunk with its beat, so the player can colour and label it and
+   * modulate the voice per kind. */
+  function tag(chunks, ranges, beats) {
+    for (var i = 0; i < chunks.length; i++) {
+      var index = beatAt(ranges, chunks[i].start);
+      chunks[i].beat = index;
+      chunks[i].beatKind = beats[index] ? beats[index].kind : 'say';
+      chunks[i].beatFirst = i === 0 || chunks[i - 1].beat !== index;
+    }
+    return chunks;
+  }
+
+  function counts(mode) {
+    var out = {};
+    for (var i = 0; i < mode.beats.length; i++) {
+      var k = mode.beats[i].kind;
+      out[k] = (out[k] || 0) + 1;
+    }
+    return out;
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.narrate = {
+    KINDS: KINDS,
+    kindOf: kindOf,
+    parseScript: parseScript,
+    flatten: flatten,
+    beatAt: beatAt,
+    tag: tag,
+    counts: counts
+  };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* Playback — turns a list of chunks into speech you can steer.
+ *
+ * One utterance at a time, never a bulk enqueue. Queueing the whole document
+ * would forfeit seeking and walk straight into the engine queue bugs the bench
+ * measures; speaking sentence by sentence costs nothing and gives the reader a
+ * cursor for free.
+ *
+ * Everything here is defensive about a specific measured failure:
+ *
+ *   cancel() before every speak()   — clears a wedged queue
+ *   a generation token on callbacks — a cancelled utterance still fires onend
+ *                                     in Chrome, and that stale event would
+ *                                     otherwise advance the cursor
+ *   a start watchdog                — Chrome sometimes swallows the first
+ *                                     utterance entirely
+ *   pause by cancel-and-remember    — unless the bench proved native pause
+ *                                     works on this device
+ *   resume on visibilitychange      — Android kills speech in the background
+ *   a screen wake lock              — the screen sleeping stops the voice
+ */
+(function (window) {
+  'use strict';
+
+  var START_TIMEOUT_MS = 1600;
+
+  function createEngine(cfg) {
+    var synth = cfg.synth;
+    var Utterance = cfg.Utterance;
+    var emit = cfg.emit || function () {};
+    var settings = cfg.settings || function () { return {}; };
+
+    var self = {
+      chunks: [],
+      index: 0,
+      playing: false,
+      paused: false,
+      caps: cfg.caps || { boundary: false, nativePause: false },
+      offset: 0,        // characters into chunks[index].speech already spoken
+      wordAt: -1        // absolute char offset of the word being spoken, or -1
+    };
+
+    var token = 0;
+    var startTimer = null;
+    var retried = false;
+    var wakeLock = null;
+
+    function available() { return !!(synth && typeof synth.speak === 'function' && typeof Utterance === 'function'); }
+
+    function clearStartTimer() {
+      if (startTimer !== null) { clearTimeout(startTimer); startTimer = null; }
+    }
+
+    function state() {
+      emit('state', {
+        playing: self.playing,
+        paused: self.paused,
+        index: self.index,
+        total: self.chunks.length
+      });
+    }
+
+    // --- screen wake lock ----------------------------------------------------
+    // Without it the screen sleeps mid-paragraph and the voice goes with it.
+
+    function acquireWakeLock() {
+      if (wakeLock || !navigator.wakeLock || !navigator.wakeLock.request) return;
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLock = lock;
+        lock.addEventListener('release', function () { wakeLock = null; });
+      }).catch(function () { /* denied or unsupported; not worth surfacing */ });
+    }
+
+    function releaseWakeLock() {
+      if (!wakeLock) return;
+      var lock = wakeLock;
+      wakeLock = null;
+      try { lock.release(); } catch (e) { /* already gone */ }
+    }
+
+    // --- speaking ------------------------------------------------------------
+
+    function speakCurrent() {
+      if (!available()) { emit('error', { message: 'This browser has no speech synthesis.' }); return; }
+
+      var chunk = self.chunks[self.index];
+      if (!chunk) { finish(); return; }
+
+      var body = chunk.speech.slice(self.offset);
+      if (!body.trim()) { advance(); return; }
+
+      var mine = ++token;
+      var base = self.offset;
+      var s = settings();
+      retried = false;
+
+      var u = new Utterance(body);
+      if (s.voice) u.voice = s.voice;
+      u.rate = s.rate || 1;
+      u.pitch = s.pitch == null ? 1 : s.pitch;
+      u.volume = s.volume == null ? 1 : s.volume;
+      u.lang = (s.voice && s.voice.lang) || undefined;
+
+      u.onstart = function () {
+        if (mine !== token) return;
+        clearStartTimer();
+        emit('chunk', { index: self.index });
+      };
+
+      u.onboundary = function (e) {
+        if (mine !== token) return;
+        if (!e || typeof e.charIndex !== 'number' || e.charIndex < 0) return;
+        self.offset = base + e.charIndex;
+        self.wordAt = self.offset;
+        emit('word', { index: self.index, charIndex: self.offset, length: e.charLength || 0 });
+      };
+
+      u.onend = function () {
+        if (mine !== token) return;      // a stale end from a cancelled utterance
+        clearStartTimer();
+        advance();
+      };
+
+      u.onerror = function (e) {
+        if (mine !== token) return;
+        clearStartTimer();
+        var kind = (e && (e.error || e.name)) || 'error';
+        // Cancelling is how we stop and seek; it is not a failure.
+        if (kind === 'canceled' || kind === 'cancelled' || kind === 'interrupted') return;
+        self.playing = false;
+        releaseWakeLock();
+        state();
+        emit('error', { message: 'The speech engine reported "' + kind + '".' });
+      };
+
+      try {
+        synth.cancel();
+        synth.speak(u);
+      } catch (err) {
+        emit('error', { message: String((err && err.message) || err) });
+        return;
+      }
+
+      // Chrome occasionally accepts an utterance and never starts it.
+      clearStartTimer();
+      startTimer = setTimeout(function () {
+        startTimer = null;
+        if (mine !== token || !self.playing || self.paused) return;
+        if (retried) {
+          emit('error', { message: 'The speech engine accepted the text but never started. Try another voice, or reload.' });
+          self.playing = false;
+          releaseWakeLock();
+          state();
+          return;
+        }
+        retried = true;
+        speakCurrent();
+      }, START_TIMEOUT_MS);
+    }
+
+    function advance() {
+      self.offset = 0;
+      self.wordAt = -1;
+      if (self.index + 1 >= self.chunks.length) { finish(); return; }
+      self.index++;
+      emit('chunk', { index: self.index });
+      state();
+      speakCurrent();
+    }
+
+    function finish() {
+      token++;
+      clearStartTimer();
+      self.playing = false;
+      self.paused = false;
+      self.offset = 0;
+      self.wordAt = -1;
+      releaseWakeLock();
+      state();
+      emit('done', { index: self.index });
+    }
+
+    // --- controls ------------------------------------------------------------
+
+    self.setChunks = function (chunks) {
+      self.stop();
+      self.chunks = chunks || [];
+      self.index = 0;
+      self.offset = 0;
+      state();
+    };
+
+    self.play = function (from) {
+      if (!self.chunks.length) return;
+      if (typeof from === 'number') {
+        token++;
+        self.index = Math.max(0, Math.min(from, self.chunks.length - 1));
+        self.offset = 0;
+      }
+      if (self.playing && self.paused) { self.resume(); return; }
+      if (self.playing) return;
+
+      self.playing = true;
+      self.paused = false;
+      acquireWakeLock();
+      state();
+      emit('chunk', { index: self.index });
+      speakCurrent();
+    };
+
+    self.pause = function () {
+      if (!self.playing || self.paused) return;
+      self.paused = true;
+      clearStartTimer();
+
+      if (self.caps.nativePause) {
+        try { synth.pause(); } catch (e) { /* fall through to the safe path */ }
+        if (synth.paused) { releaseWakeLock(); state(); return; }
+      }
+
+      // The safe path: stop, and remember how far in we got. Where the bench
+      // found no boundary events, offset is still 0 and the sentence restarts —
+      // which is why the reader says so rather than pretending otherwise.
+      token++;
+      try { synth.cancel(); } catch (e2) { /* already stopped */ }
+      releaseWakeLock();
+      state();
+    };
+
+    self.resume = function () {
+      if (!self.playing || !self.paused) return;
+      self.paused = false;
+      acquireWakeLock();
+      state();
+
+      if (self.caps.nativePause && synth.paused) {
+        try { synth.resume(); return; } catch (e) { /* fall through */ }
+      }
+      speakCurrent();
+    };
+
+    self.toggle = function () {
+      if (!self.playing) self.play();
+      else if (self.paused) self.resume();
+      else self.pause();
+    };
+
+    self.stop = function () {
+      token++;
+      clearStartTimer();
+      self.playing = false;
+      self.paused = false;
+      self.offset = 0;
+      self.wordAt = -1;
+      try { if (synth && synth.cancel) synth.cancel(); } catch (e) { /* nothing queued */ }
+      releaseWakeLock();
+      state();
+    };
+
+    self.seek = function (i) {
+      if (!self.chunks.length) return;
+      var wasPlaying = self.playing && !self.paused;
+      token++;
+      clearStartTimer();
+      try { if (synth && synth.cancel) synth.cancel(); } catch (e) { /* nothing queued */ }
+
+      self.index = Math.max(0, Math.min(i, self.chunks.length - 1));
+      self.offset = 0;
+      self.wordAt = -1;
+      emit('chunk', { index: self.index });
+      state();
+
+      if (wasPlaying) { self.playing = true; self.paused = false; speakCurrent(); }
+    };
+
+    self.next = function () { self.seek(self.index + 1); };
+    self.prev = function () {
+      // Mid-sentence, "back" means the start of this sentence — the same thing
+      // a person means when they say it.
+      self.seek(self.offset > 8 ? self.index : self.index - 1);
+    };
+
+    self.setCaps = function (caps) { if (caps) self.caps = caps; };
+
+    // Android stops speech when the tab goes to the background and does not
+    // start it again by itself. Pick the sentence back up on return.
+    self.onVisible = function () {
+      if (!self.playing || self.paused) return;
+      var speaking = false;
+      try { speaking = !!(synth && (synth.speaking || synth.pending)); } catch (e) { speaking = false; }
+      if (!speaking) speakCurrent();
+      else acquireWakeLock();
+    };
+
+    return self;
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.engine = { create: createEngine, START_TIMEOUT_MS: START_TIMEOUT_MS };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* The Read tab — source drawer, reading pane, transport.
+ *
+ * The pane renders one span per chunk covering the whole source string, so the
+ * text on screen is the text you pasted, whitespace and all. Tapping a span
+ * seeks to it. The current chunk gets a band; where the bench found boundary
+ * events, the word inside it gets a marker too.
+ */
+(function (window) {
+  'use strict';
+
+  var D = document;
+  function $(id) { return D.getElementById(id); }
+
+  var SAMPLE = [
+    'Aloud reads text out with the voices already on your device. Nothing is uploaded, ' +
+    'and nothing is downloaded — once this page has loaded it works with the network off.',
+    '',
+    'The hard part is not the reading. It is that mobile speech engines misbehave in ways ' +
+    'you cannot detect by asking them. Dr. Chen at approx. 3.14 in the afternoon is one ' +
+    'sentence, not four, and this reader knows that. A passage longer than about fifteen ' +
+    'seconds is silently cut off by Android Chrome, so nothing here is ever spoken as one ' +
+    'long utterance; it is broken into sentences and fed through one at a time.',
+    '',
+    'Open the Voices tab and run the bench to find out what your device actually does. ' +
+    'Then come back, pick a voice that works offline, and press play.'
+  ].join('\n');
+
+  function init(app) {
+    var pane = $('pane');
+    var ta = $('text');
+    var fileInput = $('file');
+    var counter = $('counter');
+    var progress = $('progress-fill');
+
+    var btnPlay = $('t-play');
+    var btnPrev = $('t-prev');
+    var btnNext = $('t-next');
+    var btnStop = $('t-stop');
+
+    var chunks = [];
+    var spans = [];
+    var current = -1;
+    var narration = null;   // {mode, beats, ranges} while playing a narration
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var engine = window.TTS.engine.create({
+      synth: app.synth,
+      Utterance: app.Utterance,
+      caps: app.caps,
+      settings: function () {
+        var s = app.settings;
+        var out = { voice: app.currentVoice(), rate: s.rate, pitch: s.pitch, volume: s.volume };
+
+        // In a narration, the kind of beat shapes the delivery — a
+        // reconstruction is read a little slower than an action, a result a
+        // little flatter. Without this every kind sounds identical, which is
+        // the one thing a reconstructed monologue must not do.
+        var c = chunks[engine.index];
+        if (c && c.beatKind && app.settings.actKinds !== false) {
+          var k = window.TTS.narrate.kindOf(c.beatKind);
+          out.rate = Math.max(0.5, Math.min(2, s.rate * k.rate));
+          out.pitch = Math.max(0, Math.min(2, s.pitch * k.pitch));
+        }
+        return out;
+      },
+      emit: onEngine
+    });
+
+    // --- rendering ---------------------------------------------------------
+
+    function renderPane() {
+      pane.textContent = '';
+      spans = [];
+      current = -1;
+
+      if (!chunks.length) {
+        var empty = D.createElement('div');
+        empty.className = 'pane-empty';
+        empty.textContent = 'Nothing to read yet. Paste some text above, or load a .txt file.';
+        pane.appendChild(empty);
+        return;
+      }
+
+      var frag = D.createDocumentFragment();
+      for (var i = 0; i < chunks.length; i++) {
+        // In a narration, each beat gets a heading so the eye can tell a
+        // recorded result from a reconstructed thought at a glance.
+        if (chunks[i].beatFirst && narration) {
+          var b = narration.beats[chunks[i].beat];
+          if (b) frag.appendChild(beatLabel(b));
+        }
+        var s = D.createElement('span');
+        s.className = 'chunk';
+        s.setAttribute('data-i', String(i));
+        s.textContent = chunks[i].text;
+        frag.appendChild(s);
+        spans.push(s);
+      }
+      pane.appendChild(frag);
+    }
+
+    function beatLabel(b) {
+      var el = D.createElement('span');
+      el.className = 'beat-label beat-' + b.kind + (b.tone ? ' tone-' + b.tone : '');
+      var name = D.createElement('b');
+      name.textContent = window.TTS.narrate.kindOf(b.kind).label;
+      el.appendChild(name);
+      if (b.inferred) {
+        var tag = D.createElement('i');
+        tag.textContent = 'reconstructed';
+        el.appendChild(tag);
+      }
+      if (b.at) {
+        var at = D.createElement('em');
+        at.textContent = b.at;
+        el.appendChild(at);
+      }
+      return el;
+    }
+
+    function plainChunk(i) {
+      if (spans[i]) spans[i].textContent = chunks[i].text;
+    }
+
+    function setCurrent(i) {
+      if (i === current) return;
+      if (spans[current]) {
+        spans[current].classList.remove('is-current');
+        plainChunk(current);
+      }
+      current = i;
+      var el = spans[i];
+      if (!el) return;
+      el.classList.add('is-current');
+      if (el.scrollIntoView) {
+        el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+      }
+    }
+
+    /* charIndex counts into chunk.speech; the span shows chunk.text, which may
+     * carry leading whitespace. Shift by that much or the marker drifts. */
+    function markWord(i, charIndex, length) {
+      var el = spans[i];
+      var chunk = chunks[i];
+      if (!el || !chunk) return;
+
+      var lead = chunk.text.length - chunk.text.replace(/^\s+/, '').length;
+      var start = lead + charIndex;
+      if (start >= chunk.text.length) return;
+
+      var end;
+      if (length && length > 0) {
+        end = start + length;
+      } else {
+        end = start;
+        while (end < chunk.text.length && !/\s/.test(chunk.text.charAt(end))) end++;
+      }
+      if (end <= start) return;
+
+      el.textContent = '';
+      el.appendChild(D.createTextNode(chunk.text.slice(0, start)));
+      var w = D.createElement('span');
+      w.className = 'word';
+      w.textContent = chunk.text.slice(start, end);
+      el.appendChild(w);
+      el.appendChild(D.createTextNode(chunk.text.slice(end)));
+    }
+
+    var PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+    var PAUSE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.4z"/></svg>';
+
+    function paintTransport() {
+      var live = engine.playing && !engine.paused;
+      btnPlay.innerHTML = live ? PAUSE_ICON : PLAY_ICON;
+      btnPlay.setAttribute('aria-label', live ? 'Pause' : 'Play');
+      btnPlay.classList.toggle('is-live', live);
+
+      var has = chunks.length > 0;
+      btnPlay.disabled = !has;
+      btnPrev.disabled = !has;
+      btnNext.disabled = !has;
+      btnStop.disabled = !engine.playing;
+
+      var at = has ? engine.index + 1 : 0;
+      counter.innerHTML = '';
+      var b = D.createElement('b');
+      b.textContent = has ? at + ' / ' + chunks.length : '—';
+      counter.appendChild(b);
+      counter.appendChild(D.createTextNode(has ? 'sentences' : 'no text'));
+
+      progress.style.width = has ? Math.round(at / chunks.length * 100) + '%' : '0%';
+    }
+
+    // --- engine events -----------------------------------------------------
+
+    function onEngine(kind, data) {
+      if (kind === 'chunk') {
+        setCurrent(data.index);
+        paintTransport();
+      } else if (kind === 'word') {
+        if (app.caps.boundary) markWord(data.index, data.charIndex, data.length);
+      } else if (kind === 'state') {
+        paintTransport();
+        app.saveProgress(engine.index);
+      } else if (kind === 'done') {
+        if (spans[current]) { spans[current].classList.remove('is-current'); plainChunk(current); }
+        current = -1;
+        paintTransport();
+      } else if (kind === 'error') {
+        app.toast(data.message);
+        paintTransport();
+      }
+    }
+
+    // --- text --------------------------------------------------------------
+
+    var saveTimer = null;
+
+    function setText(text, opts) {
+      chunks = window.TTS.split.segment(text, { maxChars: app.settings.maxChars });
+      if (narration) window.TTS.narrate.tag(chunks, narration.ranges, narration.beats);
+      engine.setChunks(chunks);
+      renderPane();
+
+      var resume = opts && opts.resumeAt;
+      if (resume && resume > 0 && resume < chunks.length) {
+        engine.index = resume;
+        setCurrent(resume);
+      }
+      paintTransport();
+    }
+
+    function textChanged() {
+      narration = null;          // typing replaces a narration with plain text
+      setText(ta.value);
+      if (saveTimer !== null) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function () { app.saveText(ta.value); }, 400);
+    }
+
+    /* Load one mode of a parsed narration script and play it with the
+     * machinery the reader already has. */
+    function loadNarration(mode) {
+      var flat = window.TTS.narrate.flatten(mode);
+      narration = { mode: mode, beats: mode.beats, ranges: flat.ranges };
+      engine.stop();
+      ta.value = flat.text;
+      setText(flat.text);
+      app.saveText(flat.text);
+      return chunks.length;
+    }
+
+    // --- wiring ------------------------------------------------------------
+
+    ta.addEventListener('input', textChanged);
+
+    $('btn-sample').addEventListener('click', function () {
+      ta.value = SAMPLE;
+      textChanged();
+      app.toast('Sample text loaded.');
+    });
+
+    $('btn-clear').addEventListener('click', function () {
+      engine.stop();
+      ta.value = '';
+      textChanged();
+    });
+
+    $('btn-file').addEventListener('click', function () { fileInput.click(); });
+
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () {
+        ta.value = String(fr.result || '');
+        textChanged();
+        app.toast('Loaded ' + f.name + '.');
+      };
+      fr.onerror = function () { app.toast('That file could not be read.'); };
+      fr.readAsText(f);
+      fileInput.value = '';
+    });
+
+    pane.addEventListener('click', function (e) {
+      var el = e.target;
+      while (el && el !== pane && !el.classList.contains('chunk')) el = el.parentNode;
+      if (!el || el === pane) return;
+      var i = parseInt(el.getAttribute('data-i'), 10);
+      if (isNaN(i)) return;
+      engine.seek(i);
+      if (!engine.playing) engine.play(i);
+    });
+
+    btnPlay.addEventListener('click', function () { engine.toggle(); });
+    btnPrev.addEventListener('click', function () { engine.prev(); });
+    btnNext.addEventListener('click', function () { engine.next(); });
+    btnStop.addEventListener('click', function () { engine.stop(); });
+
+    D.addEventListener('keydown', function (e) {
+      var t = e.target;
+      if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.tagName === 'SELECT')) return;
+      if (app.activeTab() !== 'read') return;
+
+      if (e.key === ' ') { e.preventDefault(); engine.toggle(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); engine.next(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); engine.prev(); }
+      else if (e.key === 'Escape') { engine.stop(); }
+    });
+
+    D.addEventListener('visibilitychange', function () {
+      if (!D.hidden) engine.onVisible();
+    });
+
+    window.addEventListener('pagehide', function () { engine.stop(); });
+
+    // Restore whatever was open last time.
+    var saved = app.savedText();
+    if (saved) {
+      ta.value = saved;
+      setText(saved, { resumeAt: app.savedProgress() });
+    } else {
+      setText('');
+    }
+
+    return {
+      engine: engine,
+      loadNarration: loadNarration,
+      play: function (from) { engine.play(from || 0); },
+      resegment: function () { setText(ta.value, { resumeAt: engine.index }); },
+      stop: function () { engine.stop(); }
+    };
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.reader = { init: init, SAMPLE: SAMPLE };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* The Voices tab — the roster, and the bench that measures it.
+ *
+ * The roster answers "which voice should I use", and the one fact that matters
+ * most there is whether a voice is on-device, because a network voice fails
+ * with the network off and stalls on a bad connection.
+ *
+ * The bench answers "can I trust this engine". It runs the probes in
+ * js/probes.js against the live speechSynthesis and writes what it learns into
+ * the capability flags the reader reads back.
+ */
+(function (window) {
+  'use strict';
+
+  var D = document;
+  function $(id) { return D.getElementById(id); }
+
+  var VERDICT = { pass: 'pass', warn: 'warn', fail: 'fail', skip: 'skip' };
+
+  function init(app) {
+    var list = $('voice-list');
+    var filter = $('voice-filter');
+    var report = $('report');
+    var summary = $('bench-summary');
+    var btnQuick = $('btn-quick');
+    var btnFull = $('btn-full');
+    var btnAbort = $('btn-abort');
+    var btnCopy = $('btn-copy');
+
+    var running = false;
+    var aborted = false;
+    var lastRun = null;
+
+    // --- roster ------------------------------------------------------------
+
+    function renderVoices() {
+      var voices = app.voices;
+      var q = (filter.value || '').trim().toLowerCase();
+      list.textContent = '';
+
+      if (!voices.length) {
+        var li = D.createElement('li');
+        li.className = 'voice';
+        li.textContent = 'No voices reported yet. On Android this usually means no speech engine is enabled in system settings.';
+        list.appendChild(li);
+        return;
+      }
+
+      var shown = 0;
+      for (var i = 0; i < voices.length; i++) {
+        var v = voices[i];
+        if (q && (v.name + ' ' + v.lang).toLowerCase().indexOf(q) < 0) continue;
+        shown++;
+        list.appendChild(voiceRow(v));
+      }
+
+      if (!shown) {
+        var none = D.createElement('li');
+        none.className = 'voice';
+        none.textContent = 'No voice matches "' + filter.value + '".';
+        list.appendChild(none);
+      }
+    }
+
+    function voiceRow(v) {
+      var li = D.createElement('li');
+      li.className = 'voice' + (app.settings.voiceURI === v.voiceURI ? ' is-chosen' : '');
+
+      var id = D.createElement('div');
+      id.className = 'voice-id';
+      var name = D.createElement('b');
+      name.textContent = v.name;
+      id.appendChild(name);
+
+      var meta = D.createElement('div');
+      meta.className = 'voice-meta';
+
+      var lang = D.createElement('span');
+      lang.className = 'chip';
+      lang.textContent = v.lang || '??';
+      meta.appendChild(lang);
+
+      var pill = D.createElement('span');
+      pill.className = 'pill ' + (v.localService ? 'local' : 'net');
+      pill.textContent = v.localService ? 'on device' : 'network';
+      meta.appendChild(pill);
+
+      if (v['default']) {
+        var def = D.createElement('span');
+        def.textContent = 'system default';
+        meta.appendChild(def);
+      }
+
+      id.appendChild(meta);
+      li.appendChild(id);
+
+      var act = D.createElement('div');
+      act.className = 'voice-act';
+
+      var hear = D.createElement('button');
+      hear.className = 'mini';
+      hear.type = 'button';
+      hear.textContent = 'Hear';
+      hear.addEventListener('click', function () { sample(v); });
+      act.appendChild(hear);
+
+      var use = D.createElement('button');
+      use.className = 'mini';
+      use.type = 'button';
+      use.textContent = 'Use';
+      use.addEventListener('click', function () {
+        app.settings.voiceURI = v.voiceURI;
+        app.saveSettings();
+        app.syncVoiceSelect();
+        renderVoices();
+        app.toast(v.name + ' is now the reading voice.');
+      });
+      act.appendChild(use);
+
+      li.appendChild(act);
+      return li;
+    }
+
+    function sample(v) {
+      if (!app.synth) return;
+      try {
+        app.synth.cancel();
+        var u = new app.Utterance('This is ' + v.name + ', reading at your current settings.');
+        u.voice = v;
+        u.rate = app.settings.rate;
+        u.pitch = app.settings.pitch;
+        u.volume = app.settings.volume;
+        u.onerror = function () { app.toast('That voice could not speak.'); };
+        app.synth.speak(u);
+      } catch (e) {
+        app.toast('That voice could not speak.');
+      }
+    }
+
+    // --- the bench ---------------------------------------------------------
+
+    function probeRow(probe, result) {
+      var li = D.createElement('li');
+      li.className = 'probe ' + (result ? (VERDICT[result.status] || 'skip') : 'running');
+      li.id = 'probe-' + probe.id;
+
+      var head = D.createElement('div');
+      head.className = 'probe-head';
+      var b = D.createElement('b');
+      b.textContent = probe.name;
+      head.appendChild(b);
+      var verdict = D.createElement('span');
+      verdict.className = 'verdict';
+      verdict.textContent = result ? result.status : 'running';
+      head.appendChild(verdict);
+      li.appendChild(head);
+
+      var measured = D.createElement('div');
+      measured.className = 'measured';
+      measured.textContent = result ? result.measured : 'speaking…';
+      li.appendChild(measured);
+
+      var p = D.createElement('p');
+      p.textContent = result ? result.note : probe.why;
+      li.appendChild(p);
+
+      return li;
+    }
+
+    function setBusy(on) {
+      running = on;
+      btnQuick.disabled = on;
+      btnFull.disabled = on;
+      btnAbort.hidden = !on;
+      btnCopy.hidden = on || !lastRun;
+    }
+
+    function run(quick) {
+      if (running) return;
+      if (!app.synth) { app.toast('This browser has no speech synthesis.'); return; }
+
+      aborted = false;
+      setBusy(true);
+      report.textContent = '';
+      summary.hidden = true;
+
+      var ctx = {
+        synth: app.synth,
+        Utterance: app.Utterance,
+        voice: app.currentVoice(),
+        now: function () { return Date.now(); },
+        setTimeout: function (fn, ms) { return window.setTimeout(fn, ms); },
+        clearTimeout: function (id) { return window.clearTimeout(id); },
+        setInterval: function (fn, ms) { return window.setInterval(fn, ms); },
+        clearInterval: function (id) { return window.clearInterval(id); },
+        shouldAbort: function () { return aborted; },
+        state: {}
+      };
+
+      window.TTS.probes.runAll(ctx, {
+        quick: !!quick,
+        onProgress: function (ev) {
+          var existing = $('probe-' + ev.probe.id);
+          var row = probeRow(ev.probe, ev.phase === 'done' ? ev.result : null);
+          if (existing) report.replaceChild(row, existing);
+          else report.appendChild(row);
+        }
+      }).then(function (out) {
+        lastRun = { out: out, quick: !!quick, at: new Date() };
+        app.setCaps(out.caps);
+        setBusy(false);
+        btnCopy.hidden = false;
+        showSummary(out, quick);
+        if (ctx.state.voices && ctx.state.voices.length) app.refreshVoices();
+      });
+    }
+
+    function showSummary(out, quick) {
+      var counts = { pass: 0, warn: 0, fail: 0, skip: 0 };
+      var ids = Object.keys(out.results);
+      for (var i = 0; i < ids.length; i++) {
+        var st = out.results[ids[i]].status;
+        counts[st] = (counts[st] || 0) + 1;
+      }
+
+      var lines = [
+        counts.pass + ' passed, ' + counts.warn + ' warned, ' + counts.fail + ' failed'
+        + (counts.skip ? ', ' + counts.skip + ' skipped' : '') + '.'
+      ];
+
+      lines.push(out.caps.truncates
+        ? 'This device truncates long utterances, which is exactly what the sentence-by-sentence reader is built for — reading is unaffected.'
+        : 'No truncation found on this device.');
+
+      lines.push(out.caps.boundary
+        ? 'Word-level highlighting is on, and pausing resumes from the exact word.'
+        : 'No word boundary events, so the reader highlights whole sentences and resumes from the start of one.');
+
+      lines.push(out.caps.nativePause
+        ? 'Native pause works, so pausing holds the sentence where it is.'
+        : 'Native pause is unreliable here, so pausing stops and the sentence is re-spoken on resume.');
+
+      if (quick) lines.push('This was the quick run — the truncation, pause and rate probes were skipped.');
+
+      summary.textContent = lines.join(' ');
+      summary.hidden = false;
+    }
+
+    // --- the copyable report ------------------------------------------------
+
+    function reportText() {
+      if (!lastRun) return '';
+      var out = lastRun.out;
+      var v = app.currentVoice();
+      var lines = [];
+
+      lines.push('Aloud voice bench — ' + lastRun.at.toISOString());
+      lines.push('run: ' + (lastRun.quick ? 'quick' : 'full'));
+      lines.push('ua: ' + (navigator.userAgent || 'unknown'));
+      lines.push('voice: ' + (v ? v.name + ' (' + v.lang + ', ' + (v.localService ? 'on-device' : 'network') + ')' : 'engine default'));
+      lines.push('voices: ' + app.voices.length + ' total');
+      lines.push('');
+
+      for (var i = 0; i < out.probes.length; i++) {
+        var p = out.probes[i];
+        var r = out.results[p.id];
+        if (!r) continue;
+        lines.push(pad(r.status.toUpperCase(), 5) + ' ' + p.name);
+        lines.push('      ' + r.measured);
+        lines.push('      ' + r.note);
+        lines.push('');
+      }
+
+      lines.push('caps: boundary=' + out.caps.boundary + ' nativePause=' + out.caps.nativePause + ' truncates=' + out.caps.truncates);
+      return lines.join('\n');
+    }
+
+    function pad(s, n) { while (s.length < n) s += ' '; return s; }
+
+    function copyReport() {
+      var text = reportText();
+      if (!text) return;
+
+      function fallback() {
+        var el = D.createElement('textarea');
+        el.value = text;
+        el.setAttribute('readonly', 'readonly');
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        D.body.appendChild(el);
+        el.select();
+        var okay = false;
+        try { okay = D.execCommand('copy'); } catch (e) { okay = false; }
+        D.body.removeChild(el);
+        app.toast(okay ? 'Report copied.' : 'Copy failed — select the text by hand.');
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { app.toast('Report copied.'); },
+          fallback
+        );
+      } else {
+        fallback();
+      }
+    }
+
+    // --- wiring ------------------------------------------------------------
+
+    filter.addEventListener('input', renderVoices);
+    btnQuick.addEventListener('click', function () { run(true); });
+    btnFull.addEventListener('click', function () { run(false); });
+    btnCopy.addEventListener('click', copyReport);
+
+    btnAbort.addEventListener('click', function () {
+      aborted = true;
+      try { app.synth.cancel(); } catch (e) { /* nothing queued */ }
+      app.toast('Stopping after the current probe.');
+    });
+
+    btnCopy.hidden = true;
+    btnAbort.hidden = true;
+
+    return { renderVoices: renderVoices, reportText: reportText };
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.bench = { init: init };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* The Session tab — where a development record becomes something to listen to.
+ *
+ * Four ways in, in order of how little they ask of you:
+ *
+ *   baked    a narration.json compiled into the page at build time
+ *   bridge   tools/bridge.py on this machine or over the LAN, polled live
+ *   file     open a narration.json by hand
+ *   paste    drop the JSON in
+ *
+ * The bridge is the live one. The page cannot read a session transcript off
+ * disk and cannot call GitHub from a file:// origin, so the connection runs
+ * the other way: a small local server watches the transcript, runs the suites
+ * on request, and hands over beats. When it is running, this tab follows a
+ * session as it happens.
+ */
+(function (window) {
+  'use strict';
+
+  var D = document;
+  function $(id) { return D.getElementById(id); }
+
+  var POLL_MS = 4000;
+
+  function init(app) {
+    var sourceLine = $('sess-source');
+    var modeRow = $('sess-modes');
+    var summary = $('sess-summary');
+    var preview = $('sess-preview');
+    var caveat = $('sess-caveat');
+    var bridgeInput = $('sess-bridge');
+    var followBox = $('sess-follow');
+    var fileInput = $('sess-file');
+    var pasteBox = $('sess-paste');
+
+    var script = null;
+    var currentMode = null;
+    var pollTimer = null;
+    var lastSignature = '';
+
+    // --- loading -----------------------------------------------------------
+
+    function adopt(parsed, whence) {
+      script = parsed;
+      sourceLine.textContent = whence;
+      currentMode = script.order[0];
+      renderModes();
+      selectMode(currentMode);
+    }
+
+    function tryAdopt(raw, whence) {
+      try {
+        adopt(window.TTS.narrate.parseScript(raw), whence);
+        app.toast('Loaded ' + Object.keys(script.modes).length + ' mode(s).');
+        return true;
+      } catch (e) {
+        app.toast(e.message);
+        return false;
+      }
+    }
+
+    function loadBaked() {
+      if (window.TTS.NARRATION) {
+        tryAdopt(window.TTS.NARRATION, 'built into this page');
+        return true;
+      }
+      return false;
+    }
+
+    // --- the bridge --------------------------------------------------------
+
+    function bridgeBase() {
+      var v = (bridgeInput.value || '').trim().replace(/\/+$/, '');
+      return v || '';
+    }
+
+    function fetchBridge(path) {
+      var base = bridgeBase();
+      if (!base) return Promise.reject(new Error('No bridge address.'));
+      if (!window.fetch) return Promise.reject(new Error('This browser has no fetch.'));
+      return window.fetch(base + path, { cache: 'no-store' }).then(function (r) {
+        if (!r.ok) throw new Error('The bridge answered ' + r.status + '.');
+        return r.json();
+      });
+    }
+
+    function connect(quiet) {
+      return fetchBridge('/api/narration').then(function (data) {
+        var signature = JSON.stringify(data && data.generated) + ':' + beatTotal(data);
+        if (signature === lastSignature) return false;
+        lastSignature = signature;
+        var was = currentMode;
+        adopt(window.TTS.narrate.parseScript(data), 'live from ' + bridgeBase());
+        if (was && script.modes[was]) selectMode(was);
+        if (!quiet) app.toast('Connected to the bridge.');
+        return true;
+      }, function (err) {
+        if (!quiet) app.toast(err.message + ' Is tools/bridge.py running?');
+        return false;
+      });
+    }
+
+    function beatTotal(data) {
+      if (!data || !data.modes) return 0;
+      var n = 0;
+      for (var k in data.modes) if (data.modes[k] && data.modes[k].beats) n += data.modes[k].beats.length;
+      return n;
+    }
+
+    function setFollowing(on) {
+      if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null; }
+      if (!on) return;
+      pollTimer = setInterval(function () {
+        connect(true).then(function (changed) {
+          if (changed) app.toast('The session moved on — narration refreshed.');
+        });
+      }, POLL_MS);
+    }
+
+    // --- rendering ---------------------------------------------------------
+
+    function renderModes() {
+      modeRow.textContent = '';
+      if (!script) return;
+
+      for (var i = 0; i < script.order.length; i++) {
+        (function (name) {
+          var mode = script.modes[name];
+          var b = D.createElement('button');
+          b.type = 'button';
+          b.className = 'btn';
+          b.setAttribute('aria-pressed', String(name === currentMode));
+          b.textContent = mode.label + ' (' + mode.beats.length + ')';
+          b.addEventListener('click', function () { selectMode(name); });
+          modeRow.appendChild(b);
+        })(script.order[i]);
+      }
+    }
+
+    function selectMode(name) {
+      if (!script || !script.modes[name]) return;
+      currentMode = name;
+      renderModes();
+
+      var mode = script.modes[name];
+      var tally = window.TTS.narrate.counts(mode);
+      var bits = [];
+      for (var k in tally) bits.push(tally[k] + ' ' + window.TTS.narrate.kindOf(k).label.toLowerCase());
+
+      var src = mode.source || {};
+      var where = src.kind === 'session' ? ('session ' + (src.file || '')) :
+        src.kind === 'git' ? ('git, branch ' + (src.branch || '?')) :
+        src.kind === 'test' ? ('a test run at ' + (src.at || '').slice(0, 19).replace('T', ' ')) : (src.kind || 'unknown');
+
+      summary.textContent = mode.beats.length + ' beats — ' + bits.join(', ') + '. From ' + where + '.';
+
+      caveat.textContent = mode.caveat || '';
+      caveat.hidden = !mode.caveat;
+
+      preview.textContent = '';
+      var upto = Math.min(mode.beats.length, 40);
+      for (var i = 0; i < upto; i++) preview.appendChild(previewRow(mode.beats[i]));
+      if (mode.beats.length > upto) {
+        var more = D.createElement('li');
+        more.className = 'beat more';
+        more.textContent = '…and ' + (mode.beats.length - upto) + ' more.';
+        preview.appendChild(more);
+      }
+    }
+
+    function previewRow(b) {
+      var li = D.createElement('li');
+      li.className = 'beat beat-' + b.kind + ' tone-' + b.tone;
+
+      var head = D.createElement('div');
+      head.className = 'beat-head';
+
+      var kind = D.createElement('b');
+      kind.textContent = window.TTS.narrate.kindOf(b.kind).label;
+      head.appendChild(kind);
+
+      if (b.inferred) {
+        var tag = D.createElement('i');
+        tag.textContent = 'reconstructed';
+        head.appendChild(tag);
+      }
+      if (b.at) {
+        var at = D.createElement('em');
+        at.textContent = b.at;
+        head.appendChild(at);
+      }
+      li.appendChild(head);
+
+      var p = D.createElement('p');
+      p.textContent = b.text;
+      li.appendChild(p);
+      return li;
+    }
+
+    // --- wiring ------------------------------------------------------------
+
+    $('sess-connect').addEventListener('click', function () {
+      connect(false);
+      app.saveBridge(bridgeInput.value);
+    });
+
+    followBox.addEventListener('change', function () {
+      setFollowing(followBox.checked);
+      if (followBox.checked) connect(true);
+    });
+
+    $('sess-run-tests').addEventListener('click', function () {
+      app.toast('Asking the bridge to run the suites…');
+      fetchBridge('/api/run-tests').then(function () {
+        return connect(true);
+      }).then(function () {
+        if (script && script.modes.test) selectMode('test');
+        app.toast('Test run finished.');
+      }, function (err) {
+        app.toast(err.message + ' Is tools/bridge.py running?');
+      });
+    });
+
+    $('sess-play').addEventListener('click', function () {
+      if (!script || !currentMode) { app.toast('Load a narration first.'); return; }
+      var n = app.reader().loadNarration(script.modes[currentMode]);
+      app.setTab('read');
+      app.reader().play(0);
+      app.toast('Reading ' + script.modes[currentMode].label.toLowerCase() + ' — ' + n + ' sentences.');
+    });
+
+    $('sess-load-file').addEventListener('click', function () { fileInput.click(); });
+
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () { tryAdopt(String(fr.result || ''), f.name); };
+      fr.onerror = function () { app.toast('That file could not be read.'); };
+      fr.readAsText(f);
+      fileInput.value = '';
+    });
+
+    $('sess-use-paste').addEventListener('click', function () {
+      var raw = (pasteBox.value || '').trim();
+      if (!raw) { app.toast('Nothing pasted.'); return; }
+      if (tryAdopt(raw, 'pasted')) pasteBox.value = '';
+    });
+
+    $('sess-download').addEventListener('click', function () {
+      if (!script || !currentMode) { app.toast('Load a narration first.'); return; }
+      var mode = script.modes[currentMode];
+      var text = window.TTS.narrate.flatten(mode, { announce: false }).text;
+
+      // The page may have been granted a save; if not, fall back to a blob.
+      var name = 'aloud-' + currentMode + '.txt';
+      if (window.claude && window.claude.downloads) {
+        window.claude.downloads.save({ filename: name, data: text }).then(function () {
+          app.toast('Saved.');
+        }, function (err) {
+          if (err && err.code === 'declined') return;
+          blobSave(name, text);
+        });
+        return;
+      }
+      blobSave(name, text);
+    });
+
+    function blobSave(name, text) {
+      try {
+        var url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        var a = D.createElement('a');
+        a.href = url;
+        a.download = name;
+        D.body.appendChild(a);
+        a.click();
+        D.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        app.toast('Downloaded ' + name + '.');
+      } catch (e) {
+        app.toast('This browser would not save the file.');
+      }
+    }
+
+    // --- go ----------------------------------------------------------------
+
+    bridgeInput.value = app.savedBridge();
+
+    if (!loadBaked()) {
+      sourceLine.textContent = 'nothing loaded yet';
+      summary.textContent = 'Run "node tools/monologue.mjs all" to build one, or start tools/bridge.py and connect.';
+    }
+
+    return {
+      refresh: function () { if (script && currentMode) selectMode(currentMode); },
+      hasScript: function () { return !!script; }
+    };
+  }
+
+  window.TTS = window.TTS || {};
+  window.TTS.session = { init: init };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* Bootstrap — settings, storage, tabs, the settings sheet, and the glue that
+ * lets the bench tell the reader what this device can actually do.
+ *
+ * localStorage throws rather than degrades in some private-browsing modes, so
+ * every access here is wrapped. Losing your settings is a nuisance; a blank
+ * page because a getter threw is not acceptable.
+ */
+(function (window) {
+  'use strict';
+
+  var D = document;
+  function $(id) { return D.getElementById(id); }
+
+  var KEY = {
+    settings: 'aloud.settings',
+    caps: 'aloud.caps',
+    text: 'aloud.text',
+    progress: 'aloud.progress',
+    bridge: 'aloud.bridge'
+  };
+
+  var DEFAULTS = {
+    voiceURI: '',
+    rate: 1,
+    pitch: 1,
+    volume: 1,
+    maxChars: 180,
+    readSize: 19,
+    theme: 'auto'
+  };
+
+  function read(key, fallback) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      return raw === null ? fallback : JSON.parse(raw);
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function write(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* full or blocked */ }
+  }
+
+  function boot() {
+    var synth = window.speechSynthesis || null;
+    var Utterance = window.SpeechSynthesisUtterance || null;
+
+    var settings = Object.assign({}, DEFAULTS, read(KEY.settings, {}));
+    var caps = Object.assign({ boundary: false, nativePause: false, truncates: false }, read(KEY.caps, {}));
+
+    var app = {
+      synth: synth,
+      Utterance: Utterance,
+      settings: settings,
+      caps: caps,
+      voices: [],
+
+      saveSettings: function () { write(KEY.settings, app.settings); },
+      savedText: function () { return read(KEY.text, ''); },
+      saveText: function (t) { write(KEY.text, t); write(KEY.progress, 0); },
+      savedProgress: function () { return read(KEY.progress, 0) | 0; },
+      saveProgress: function (i) { write(KEY.progress, i | 0); },
+      savedBridge: function () { return read(KEY.bridge, 'http://localhost:8765'); },
+      saveBridge: function (v) { write(KEY.bridge, String(v || '').trim()); },
+      reader: function () { return reader; },
+      setTab: function (name) { setTab(name); },
+
+      currentVoice: function () {
+        if (!app.settings.voiceURI) return null;
+        for (var i = 0; i < app.voices.length; i++) {
+          if (app.voices[i].voiceURI === app.settings.voiceURI) return app.voices[i];
+        }
+        return null;
+      },
+
+      setCaps: function (next) {
+        app.caps = Object.assign({}, app.caps, next);
+        write(KEY.caps, app.caps);
+        if (reader) reader.engine.setCaps(app.caps);
+        paintCaps();
+      },
+
+      activeTab: function () { return tab; },
+      toast: toast,
+      refreshVoices: refreshVoices,
+      syncVoiceSelect: syncVoiceSelect
+    };
+
+    // --- toast -------------------------------------------------------------
+
+    var toastEl = $('toast');
+    var toastTimer = null;
+
+    function toast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add('show');
+      if (toastTimer !== null) clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+    }
+
+    // --- theme -------------------------------------------------------------
+
+    function applyTheme() {
+      var t = app.settings.theme;
+      if (t === 'auto') D.documentElement.removeAttribute('data-theme');
+      else D.documentElement.setAttribute('data-theme', t);
+
+      var buttons = D.querySelectorAll('[data-theme-choice]');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].setAttribute('aria-pressed', String(buttons[i].getAttribute('data-theme-choice') === t));
+      }
+    }
+
+    // --- tabs --------------------------------------------------------------
+
+    var tab = 'read';
+
+    function setTab(name) {
+      tab = name;
+      var buttons = D.querySelectorAll('.tabs button');
+      for (var i = 0; i < buttons.length; i++) {
+        var on = buttons[i].getAttribute('data-tab') === name;
+        buttons[i].setAttribute('aria-selected', String(on));
+      }
+      $('tab-read').hidden = name !== 'read';
+      $('tab-session').hidden = name !== 'session';
+      $('tab-voices').hidden = name !== 'voices';
+      $('transport').hidden = name !== 'read';
+      if (name === 'voices' && bench) bench.renderVoices();
+      if (name === 'session' && session) session.refresh();
+    }
+
+    // --- settings sheet ----------------------------------------------------
+
+    var sheet = $('sheet');
+    var scrim = $('scrim');
+
+    function openSheet() { sheet.classList.add('open'); scrim.classList.add('open'); }
+    function closeSheet() { sheet.classList.remove('open'); scrim.classList.remove('open'); }
+
+    // --- voices ------------------------------------------------------------
+
+    var voiceSelect = $('set-voice');
+
+    function refreshVoices() {
+      var list = [];
+      try { list = (synth && synth.getVoices()) || []; } catch (e) { list = []; }
+
+      // Group by language, on-device first — the distinction that decides
+      // whether a voice works with the network off.
+      list = list.slice().sort(function (a, b) {
+        if (!!b.localService !== !!a.localService) return b.localService ? 1 : -1;
+        if (a.lang !== b.lang) return a.lang < b.lang ? -1 : 1;
+        return a.name < b.name ? -1 : 1;
+      });
+
+      app.voices = list;
+      syncVoiceSelect();
+      if (bench) bench.renderVoices();
+    }
+
+    function syncVoiceSelect() {
+      voiceSelect.textContent = '';
+
+      var auto = D.createElement('option');
+      auto.value = '';
+      auto.textContent = 'Engine default';
+      voiceSelect.appendChild(auto);
+
+      for (var i = 0; i < app.voices.length; i++) {
+        var v = app.voices[i];
+        var opt = D.createElement('option');
+        opt.value = v.voiceURI;
+        opt.textContent = v.name + ' — ' + v.lang + (v.localService ? '' : ' (network)');
+        voiceSelect.appendChild(opt);
+      }
+      voiceSelect.value = app.settings.voiceURI || '';
+    }
+
+    // --- capability line ---------------------------------------------------
+
+    function paintCaps() {
+      var el = $('caps-line');
+      if (!el) return;
+
+      if (!app.caps.at) {
+        el.innerHTML = '<b>The bench has not run on this device.</b> Until it does, the reader assumes pause is unreliable and re-speaks the current sentence when you resume. Open the Voices tab and run it once.';
+        return;
+      }
+
+      var bits = [];
+      bits.push(app.caps.boundary ? 'word highlighting on' : 'sentence highlighting only');
+      bits.push(app.caps.nativePause ? 'pause holds the sentence' : 'pause restarts the sentence');
+      if (app.caps.truncates) bits.push('long utterances truncate, so text is read sentence by sentence');
+      el.innerHTML = '<b>Measured on this device:</b> ' + bits.join(', ') + '.';
+    }
+
+    // --- settings controls -------------------------------------------------
+
+    function bindRange(id, key, format, after) {
+      var input = $(id);
+      var label = $(id + '-val');
+      input.value = String(app.settings[key]);
+      label.textContent = format(app.settings[key]);
+
+      input.addEventListener('input', function () {
+        app.settings[key] = parseFloat(input.value);
+        label.textContent = format(app.settings[key]);
+        app.saveSettings();
+        if (after) after();
+      });
+    }
+
+    // --- go ----------------------------------------------------------------
+
+    var reader = null;
+    var bench = null;
+    var session = null;
+
+    if (!synth || !Utterance) {
+      $('no-speech').hidden = false;
+    }
+
+    reader = window.TTS.reader.init(app);
+    bench = window.TTS.bench.init(app);
+    session = window.TTS.session.init(app);
+
+    var tabButtons = D.querySelectorAll('.tabs button');
+    for (var i = 0; i < tabButtons.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () { setTab(btn.getAttribute('data-tab')); });
+      })(tabButtons[i]);
+    }
+
+    $('btn-settings').addEventListener('click', openSheet);
+    $('btn-sheet-close').addEventListener('click', closeSheet);
+    scrim.addEventListener('click', closeSheet);
+
+    voiceSelect.addEventListener('change', function () {
+      app.settings.voiceURI = voiceSelect.value;
+      app.saveSettings();
+      if (bench) bench.renderVoices();
+    });
+
+    bindRange('set-rate', 'rate', function (v) { return v.toFixed(2) + '×'; });
+    bindRange('set-pitch', 'pitch', function (v) { return v.toFixed(2); });
+    bindRange('set-volume', 'volume', function (v) { return Math.round(v * 100) + '%'; });
+    bindRange('set-size', 'readSize', function (v) { return v + 'px'; }, function () {
+      D.documentElement.style.setProperty('--read-size', app.settings.readSize + 'px');
+    });
+    bindRange('set-chunk', 'maxChars', function (v) { return v + ' chars'; }, function () {
+      if (reader) reader.resegment();
+    });
+
+    var themeButtons = D.querySelectorAll('[data-theme-choice]');
+    for (var t = 0; t < themeButtons.length; t++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          app.settings.theme = btn.getAttribute('data-theme-choice');
+          app.saveSettings();
+          applyTheme();
+        });
+      })(themeButtons[t]);
+    }
+
+    D.documentElement.style.setProperty('--read-size', app.settings.readSize + 'px');
+    applyTheme();
+    paintCaps();
+    setTab('read');
+
+    refreshVoices();
+    if (synth && synth.addEventListener) {
+      synth.addEventListener('voiceschanged', refreshVoices);
+    }
+    // Some engines never fire voiceschanged; give the list a few nudges.
+    var tries = 0;
+    var poll = setInterval(function () {
+      tries++;
+      if (app.voices.length || tries > 12) { clearInterval(poll); return; }
+      refreshVoices();
+    }, 250);
+
+    window.TTS.app = app;
+  }
+
+  if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+</body>
+</html>
