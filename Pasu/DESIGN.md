@@ -25,8 +25,7 @@ permanent account is a player who quits with no recourse.
 
 ## 2. Turn economy
 
-Each turn you take a fixed number of **actions**. The eraser advances after your
-turn, on a schedule you can see several turns ahead.
+Each turn you take **four actions**. The force moves after your turn.
 
 Actions: move along the graph, hold or release a dimension, shape an effect,
 shelter a settlement, search a site, speak to kin.
@@ -101,12 +100,16 @@ Stone + Heat + Presence
 Resolution rules — small, fixed, learnable:
 
 - `Solidity > 0 and Persistence > 0` → barrier, standing for `Persistence` turns
-- `Energy > 0 and Binding > 0` → applies over time to whatever it is bound to
+- `Energy > 0 and Binding > 0` → burns whatever it is bound to, each turn
 - `Energy > 0 and Binding <= 0` → resolves once, at range `Extent`
-- `Motion > Mass` → displaces rather than holds
+- `Motion > 0 and Motion > Mass` → displaces rather than holds
 - `Perception > 0` → the effect also reveals; `Perception < 0` conceals
 - `Persistence <= 0` → resolves this turn and is gone
 - `Mass < 0` → the effect travels instead of staying where it was shaped
+
+Fourteen dimensions give 91 pairs and 364 triples. A handful of pairs are inert,
+and that is deliberate: a sum that does nothing is still knowledge, and the codex
+records it.
 
 The rules are printed in the game. The combinations are not. What you learn is
 what the sums do.
@@ -157,21 +160,40 @@ restored (9, 17). The map degrades permanently within a run.
 
 That ratchet is the design. You cannot save everything, so you choose.
 
-Each run draws one eraser with a distinct method:
+**Settlements are not passive.** Every settlement holds one turn on its own —
+axiom 1 is not a claim about you in particular. Speaking to them buys another
+turn; sheltering them buys two more. Each is once per settlement: people gather
+once, not again because you asked twice. A fully prepared settlement costs the
+force four turns, and preparing one costs two actions plus the walk there. That
+is the entire triage budget, and it does not cover seven settlements.
 
-- **The route** — moves settlement to settlement in a fixed order. Predictable,
-  fast, and unstoppable in a straight fight; you play ahead of it.
-- **The spread** — erases outward from wherever it last erased. Slow start,
-  exponential. Containment beats interception.
-- **The answer** — erases nothing until opposed, then erases the nearest
-  settlement to whoever opposed it. Punishes the practitioner directly.
-- **The patient** — erases on a long timer but cannot be delayed at all, only
-  outpaced. Pure triage, no defense.
-- **The quiet** — erases without any visible signal. Only Perception-positive
-  holdings reveal where it has been.
+**A barrier redirects; it does not wall.** If the road to the nearest settlement
+is blocked, the force takes the next one instead. Shaping decides the order in
+which things are lost, which is the only kind of choice axiom 1 actually offers.
 
-An eraser's method is identified on sight only if you have met it in an earlier
+Each run draws one force with a distinct method. All five clear an unopposed map
+in roughly the same time — they differ by method, never by speed, or the run's
+difficulty would be settled the moment the force was drawn.
+
+- **The route** — a fixed order, decided at the start, never deviated from. The
+  most predictable and the least efficient. You play ahead of it.
+- **The spread** — always takes the nearest thing still standing. Efficient, so
+  redirecting it is the only real lever.
+- **The answer** — erases nothing until opposed, and protecting is opposing. It
+  then goes for whatever is nearest to *you*. It stops waiting on its own at
+  turn six, so refusing to act is not a strategy.
+- **The patient** — cannot be walled, displaced or hurt. Resistance still slows
+  it, so it is pure triage: buy turns, save the ones you can reach.
+- **The quiet** — leaves no signal. Only its last known position is drawn, and
+  only a Perception-positive holding shows where it actually is.
+
+A force's method is identified on sight only if you have met it in an earlier
 run. Otherwise you find out by watching it work.
+
+**If your kin is spent, the run is played out without you before it is scored.**
+Axiom 1 gives life its object; it does not make the erasure conditional on
+anyone being there to see it. Otherwise dying early would be the way to keep a
+number, and it was — that was the first real bug the simulation found.
 
 Erasers were once innocent and are life (10, 19). Nothing in the game frames them
 as a different kind of thing, and nothing narrates a judgement about them.
@@ -302,5 +324,70 @@ run varies because the *constraints* vary, not because the numbers were rerolled
    reroll; it may be one too many.
 4. Whether the erased should remain visible on the map. Visible is honest and may
    be miserable.
-5. Whether an eraser can be stopped at all, or only outpaced. "The patient" says
-   no; the other four imply yes. Both cannot be the default.
+5. ~~Whether a force can be stopped at all, or only outpaced.~~ **Settled in the
+   build**: four of the five can be killed; the patient cannot be killed, walled
+   or displaced, only outpaced. Measured stop rate against competent play is
+   16–27% for the four, 0% for the patient.
+
+---
+
+## 15. The build
+
+`index.html` is the game. Single file, no dependencies, no network, no build
+step — open it in a browser or serve the directory. Runs are saved to
+`localStorage` on every action; the codex is stored separately and survives
+across runs, which is the only thing that does.
+
+### How it was tested
+
+The whole rules layer is pure functions over a state object, so it was driven
+headless without a browser:
+
+- **600 random-play runs** — no crashes, no infinite loops. This is the floor:
+  careless play scores 0.4–2.6 of 7 and breaks its role almost every time.
+- **500 runs each of two scripted policies** — one that never takes Pasu, one
+  that gathers dimensions and pays it. This is what the balance numbers below
+  came from.
+- **Unopposed clock probe** — the clock removed, to measure how long each force
+  needs to erase everything with nobody opposing it. Used to equalise the five.
+- **Browser pass** (Playwright, 390×844) — a full run start to finish: map
+  renders, Pasu transitions, the erased state locks the door, the end screen
+  resolves, no console errors, no horizontal overflow.
+
+### What the simulation changed
+
+Three things were wrong and only showed up under measurement:
+
+1. **Ending the run early was the best strategy.** Score is what remains
+   unerased, so dying at turn 5 froze it at 7/7. Fixed by playing the run out
+   without you when your kin is spent.
+2. **Sheltering was a wall, not a cost.** Re-shelterable at +1 per action, it
+   outran the force forever. Fixed by making speak and shelter once-per-
+   settlement.
+3. **Barriers stopped the force dead**, so any aura with solidity and
+   persistence trivialised the game. Fixed by making a blocked road redirect it
+   to the next settlement instead.
+
+### Where it landed
+
+Competent scripted play, 500 runs per line, out of 7 settlements:
+
+```
+                  innocent      practitioner
+the answer          2.99            3.28     stopped 25%
+the route           2.00            2.32     stopped 21%
+the spread          1.68            1.96     stopped 21%
+the quiet           1.68            2.07     stopped 27%
+the patient         1.64            1.34     stopped  0%
+overall             1.96            2.25
+```
+
+The shape is the one the design asked for. The practitioner scores higher on
+average and stops the force outright a quarter of the time — a ceiling the
+innocent line does not have — while wiping out more often, and losing outright
+to the patient, which cannot be walled or killed and punishes the turns spent
+gathering. The innocent line is flatter and safer. Paying Pasu is worth it, and
+not always.
+
+A deliberate human should sit above both; these are scripted policies, not good
+players.

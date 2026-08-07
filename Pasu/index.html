@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0c0d10">
+<title>Pasu</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0c0d10; --panel:#14161b; --line:#242832; --line2:#333947;
+  --ink:#c9ced9; --dim:#6b7280; --bright:#eef1f6;
+  --held:#7fb98a; --erased:#5a4045; --site:#8a7fb9; --ground:#b9a87f;
+  --eraser:#c05a5a; --you:#e8eaf0; --warn:#d09a4a;
+  --f:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--f);
+  font-size:14px; line-height:1.45; overflow:hidden;
+  -webkit-user-select:none; user-select:none;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;position:relative}
+
+/* ---------- generic ---------- */
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line2);
+  padding:8px 10px;cursor:pointer;border-radius:2px}
+button:active{background:#1d212a}
+button[disabled]{opacity:.32;cursor:default}
+.row{display:flex;gap:6px}
+.muted{color:var(--dim)}
+.warnc{color:var(--warn)}
+h1{font-size:15px;font-weight:600;letter-spacing:.22em;color:var(--bright);text-transform:uppercase}
+h2{font-size:12px;font-weight:600;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
+hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+
+/* ---------- screens ---------- */
+.screen{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;
+  padding:18px;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:20}
+.screen.on{display:flex}
+
+/* ---------- hud ---------- */
+#hud{border-bottom:1px solid var(--line);padding:8px 10px;flex:0 0 auto}
+#hud .l1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#hud .l2{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:12px}
+.pips{letter-spacing:2px}
+#roleline{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.3}
+#roleline.broken{color:var(--eraser)}
+
+/* ---------- map ---------- */
+#mapwrap{flex:1 1 auto;position:relative;min-height:0;overflow:hidden}
+#map{position:absolute;inset:0}
+#edges{position:absolute;inset:0;width:100%;height:100%}
+.node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+  align-items:center;gap:2px;cursor:pointer}
+.dot{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line2);background:var(--panel);
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dim)}
+.node.settlement .dot{border-color:var(--held);color:var(--held)}
+.node.settlement.erased .dot{border-color:var(--erased);background:#15100f;color:var(--erased)}
+.node.settlement.concealed .dot{border-style:dashed}
+.node.site .dot{border-color:var(--site);color:var(--site)}
+.node.site.taken .dot{opacity:.35}
+.node.ground .dot{border-color:var(--ground);color:var(--ground)}
+.node.reach .dot{box-shadow:0 0 0 3px rgba(200,210,230,.13)}
+.node .lbl{font-size:9px;color:var(--dim);white-space:nowrap;max-width:74px;overflow:hidden;text-overflow:ellipsis}
+.node.barrier .dot{box-shadow:0 0 0 2px rgba(127,185,138,.5)}
+.badge{position:absolute;top:-7px;right:-9px;font-size:9px;color:var(--bright);
+  background:#232935;border:1px solid var(--line2);border-radius:8px;padding:0 3px}
+#you,#era{position:absolute;transform:translate(-50%,-50%);pointer-events:none;
+  font-size:11px;font-weight:700;transition:left .22s,top .22s}
+#you{color:var(--you);text-shadow:0 0 6px #000}
+#era{color:var(--eraser);text-shadow:0 0 8px #000}
+#era.hidden{opacity:.16}
+.fx{position:absolute;transform:translate(-50%,-50%);font-size:9px;color:var(--held);
+  pointer-events:none;text-shadow:0 0 4px #000}
+
+/* ---------- log ---------- */
+#log{flex:0 0 auto;height:62px;overflow-y:auto;border-top:1px solid var(--line);
+  padding:5px 10px;font-size:11.5px;color:var(--dim);line-height:1.42}
+#log b{color:var(--ink);font-weight:400}
+#log .bad{color:var(--eraser)}
+#log .good{color:var(--held)}
+
+/* ---------- holding ---------- */
+#hold{flex:0 0 auto;border-top:1px solid var(--line);padding:8px 10px;background:var(--panel)}
+.dims{display:flex;flex-wrap:wrap;gap:5px}
+.dim{border:1px solid var(--line2);padding:4px 7px;font-size:11.5px;border-radius:2px;
+  color:var(--dim);cursor:pointer;background:#12141a}
+.dim.on{color:var(--bright);border-color:var(--held);background:#16211a}
+.dim.locked{opacity:.4;cursor:default}
+.dim.aura{border-left:3px solid var(--ground)}
+#sum{font-size:11px;color:var(--dim);margin-top:6px;min-height:15px;word-break:break-word}
+#rules{font-size:11.5px;color:var(--held);margin-top:2px;min-height:16px}
+#strain{font-size:11px;color:var(--warn);margin-top:2px;min-height:14px}
+
+/* ---------- actions ---------- */
+#acts{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:8px 10px 10px}
+#acts button{font-size:12px;padding:9px 4px}
+#acts button small{display:block;font-size:9px;color:var(--dim)}
+
+/* ---------- misc panels ---------- */
+.card{border:1px solid var(--line);padding:12px;margin-bottom:10px;background:var(--panel)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:2px 0}
+.kv span:last-child{color:var(--bright);text-align:right}
+.big{font-size:30px;color:var(--bright);line-height:1.1}
+ul{margin-left:16px;font-size:12.5px}
+li{margin-bottom:3px}
+.codexrow{font-size:11.5px;border-bottom:1px solid var(--line);padding:5px 0;
+  display:flex;justify-content:space-between;gap:10px}
+.codexrow span:last-child{color:var(--held);text-align:right;flex:0 0 auto}
+.spacer{flex:1 1 auto;min-height:10px}
+.stack{display:flex;flex-direction:column;gap:6px}
+.tabs{display:flex;gap:5px;margin-bottom:10px}
+.tabs button.on{border-color:var(--bright);color:var(--bright)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="hud">
+    <div class="l1">
+      <span id="hTurn">turn 1/28</span>
+      <span id="hActs" class="pips">•••</span>
+    </div>
+    <div class="l2">
+      <span id="hState">innocent · aura Stone</span>
+      <span id="hKin">kin 4 · wounds ●●●</span>
+    </div>
+    <div id="roleline">the one who counts — visit a settlement before shaping there</div>
+  </div>
+
+  <div id="mapwrap">
+    <div id="map">
+      <svg id="edges" preserveAspectRatio="none"></svg>
+      <div id="you">◆</div>
+      <div id="era">✕</div>
+    </div>
+  </div>
+
+  <div id="log"></div>
+
+  <div id="hold">
+    <div class="dims" id="dims"></div>
+    <div id="sum"></div>
+    <div id="rules"></div>
+    <div id="strain"></div>
+  </div>
+
+  <div id="acts">
+    <button id="bShape">shape<small>1 action</small></button>
+    <button id="bShelter">shelter<small>1 action</small></button>
+    <button id="bSearch">search<small>1 action</small></button>
+    <button id="bSpeak">speak<small>1 action</small></button>
+    <button id="bPasu">Pasu<small>free · once</small></button>
+    <button id="bEnd">end turn<small>&nbsp;</small></button>
+  </div>
+
+  <!-- ============ screens ============ -->
+  <div class="screen on" id="scTitle">
+    <div class="spacer"></div>
+    <h1>Pasu</h1>
+    <p class="muted" style="margin-top:10px;max-width:34em">
+      All life exists to protect the innocence of as many as possible.<br>
+      All roads lead to Pasu.
+    </p>
+    <div class="spacer"></div>
+    <div class="stack">
+      <button id="bNew">begin a run</button>
+      <button id="bResume">resume run</button>
+      <button id="bCodex">codex</button>
+      <button id="bHelp">how it works</button>
+    </div>
+    <div class="spacer"></div>
+    <p class="muted" style="font-size:11px" id="titleStats"></p>
+  </div>
+
+  <div class="screen" id="scBirth">
+    <h1>born</h1>
+    <div style="height:14px"></div>
+    <div class="card">
+      <h2>your aura</h2>
+      <div class="big" id="bAura">Stone</div>
+      <div class="muted" id="bAuraV" style="font-size:12px;margin-top:4px"></div>
+      <p class="muted" style="font-size:11.5px;margin-top:8px">
+        One dimension, held from birth. Until Pasu it is everything you can do.
+      </p>
+    </div>
+    <div class="card">
+      <h2>your kin</h2>
+      <div class="kv"><span>members</span><span id="bKin">4</span></div>
+      <div class="kv"><span>your role</span><span id="bRole">—</span></div>
+      <div class="muted" id="bRoleD" style="font-size:11.5px;margin-top:6px"></div>
+      <p class="muted" style="font-size:11px;margin-top:8px">
+        Break the role and the kin stops supporting you: no one takes your place when you die.
+      </p>
+    </div>
+    <div class="card">
+      <h2>what is coming</h2>
+      <div class="kv"><span>the erasing force</span><span id="bEraser">unknown</span></div>
+      <div class="muted" id="bEraserD" style="font-size:11.5px;margin-top:6px"></div>
+    </div>
+    <div class="spacer"></div>
+    <button id="bStart">walk</button>
+  </div>
+
+  <div class="screen" id="scPasu">
+    <div class="spacer"></div>
+    <h1>Pasu</h1>
+    <div style="height:16px"></div>
+    <p style="font-size:13px;max-width:34em">Forgo your innocence.</p>
+    <div style="height:12px"></div>
+    <ul class="muted">
+      <li>You will be able to hold more than one dimension.</li>
+      <li>You cannot be protected again.</li>
+      <li>You subtract yourself from what you are counting.</li>
+      <li>You keep your aura and your role.</li>
+      <li>This cannot be undone.</li>
+    </ul>
+    <div class="spacer"></div>
+    <div class="row">
+      <button id="bPasuNo" style="flex:1">not yet</button>
+      <button id="bPasuYes" style="flex:1">forgo</button>
+    </div>
+  </div>
+
+  <div class="screen" id="scEnd">
+    <h1 id="eTitle">the run ends</h1>
+    <div style="height:12px"></div>
+    <div class="card">
+      <div class="kv"><span>held</span><span id="eHeld">0 / 0</span></div>
+      <div class="kv"><span>yours</span><span id="eYours">kept</span></div>
+      <div class="kv"><span>turns</span><span id="eTurns">0</span></div>
+      <div class="kv"><span>kin spent</span><span id="eKin">0</span></div>
+    </div>
+    <div class="card">
+      <h2>what you learned</h2>
+      <div id="eLearn" style="font-size:12px"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="stack">
+      <button id="bAgain">begin another run</button>
+      <button id="bEndCodex">codex</button>
+    </div>
+  </div>
+
+  <div class="screen" id="scCodex">
+    <h1>codex</h1>
+    <div style="height:10px"></div>
+    <div class="tabs">
+      <button data-tab="comb" class="on">combinations</button>
+      <button data-tab="dims">dimensions</button>
+      <button data-tab="eras">forces</button>
+    </div>
+    <div id="codexBody" style="flex:1 1 auto"></div>
+    <div style="height:10px"></div>
+    <button id="bCodexBack">back</button>
+  </div>
+
+  <div class="screen" id="scHelp">
+    <h1>how it works</h1>
+    <div style="height:10px"></div>
+    <div style="font-size:12.5px;line-height:1.55">
+      <h2>the run</h2>
+      <p class="muted">An erasing force crosses the region. It strips innocence from settlements.
+      The erased stay alive; they stop counting and cannot be restored. You cannot save
+      everything. Choose.</p>
+      <hr>
+      <h2>three actions a turn</h2>
+      <p class="muted">Move by tapping an adjacent node. Shelter a settlement to make it
+      cost the force an extra turn. Search a site to locate a dimension. Shape to make
+      something out of what you hold.</p>
+      <hr>
+      <h2>dimensions</h2>
+      <p class="muted">Every dimension is a set of properties with magnitudes. Held
+      dimensions sum. The sum decides what happens — there are no recipes.</p>
+      <div id="helpRules" style="margin-top:6px"></div>
+      <hr>
+      <h2>Pasu</h2>
+      <p class="muted">Innocence is holding only your aura. You may find other dimensions
+      but you cannot hold them. Pasu ends that limit and cannot be undone. Take it too
+      early and you have little to combine. Take it too late and the erasure has run.</p>
+      <p class="muted" style="margin-top:6px">Each dimension held past the first strains you.
+      A strained holding does not fail — it resolves wrong.</p>
+      <hr>
+      <h2>death</h2>
+      <p class="muted">The force wounds what it reaches. If it reaches you while you are
+      innocent, it erases you: you gain nothing and can never take Pasu this run. At three
+      wounds you die, your role vacates, and another of your kin takes it — sharing your
+      aura, holding a different role, innocent again.</p>
+      <hr>
+      <h2>between runs</h2>
+      <p class="muted">Nothing carries but knowledge. No stats, no gear, no unlocks. The
+      codex remembers what you saw a sum do.</p>
+    </div>
+    <div style="height:12px"></div>
+    <button id="bHelpBack">back</button>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   Pasu — a run-based game.  Every rule below is traceable to AXIOMS.md.
+   ========================================================================== */
+
+const PROPS = ["solidity","mass","energy","persistence","extent","binding","perception","motion"];
+
+/* Axiom 4/12: dimensions are vectors over one shared property vocabulary. */
+const DIMS = {
+  Stone:    {solidity:3, mass:2, persistence:2},
+  Heat:     {energy:3, extent:1, persistence:-1},
+  Presence: {binding:3, perception:2, extent:2},
+  Distance: {extent:4, motion:1, mass:-1},
+  Duration: {persistence:4},
+  Weight:   {mass:4, motion:-2},
+  Current:  {motion:3, extent:2, persistence:-1},
+  Silence:  {perception:-3, binding:2, extent:2},
+  Growth:   {persistence:3, mass:1, energy:1},
+  Cold:     {energy:-2, solidity:2, persistence:2},
+  Depth:    {extent:3, solidity:-2, perception:1},
+  Edge:     {energy:4, extent:-2, binding:1},
+  Echo:     {perception:3, persistence:2, extent:3},
+  Ash:      {mass:-3, extent:2, persistence:1}
+};
+const DIMNAMES = Object.keys(DIMS);
+
+/* The seven printed rules.  The rules are given; the combinations are not. */
+const RULES = [
+  {id:"barrier",  txt:"solidity > 0 and persistence > 0 → barrier, standing for persistence turns"},
+  {id:"bound",    txt:"energy > 0 and binding > 0 → burns whatever it is bound to, each turn"},
+  {id:"strike",   txt:"energy > 0 and binding ≤ 0 → resolves once, at range extent"},
+  {id:"displace", txt:"motion above zero and above mass → displaces rather than holds"},
+  {id:"reveal",   txt:"perception > 0 → also reveals; perception < 0 conceals"},
+  {id:"transient",txt:"persistence ≤ 0 → gone at the end of this turn"},
+  {id:"travel",   txt:"mass < 0 → the effect travels instead of staying"}
+];
+
+const ROLES = [
+  {id:"ground",  name:"the one who holds the ground",
+   desc:"stand on kin ground at least once every three turns"},
+  {id:"apart",   name:"the one who does not sleep apart",
+   desc:"end every turn at a settlement or on kin ground"},
+  {id:"counts",  name:"the one who counts",
+   desc:"visit a settlement before shaping anything at it"},
+  {id:"repeat",  name:"the one who does not repeat",
+   desc:"never shape twice in the same place"},
+  {id:"speaks",  name:"the one who speaks first",
+   desc:"speak to kin at a settlement before shaping there"}
+];
+
+/* Axiom 2/19: five forces, each with a method.  Once innocent, still life. */
+/* All five clear an unopposed map in roughly the same time. What differs is the
+   method, never the speed — otherwise the run's difficulty would be decided at
+   the moment the force was drawn. */
+const ERASERS = [
+  {id:"route",  name:"the route",  hp:12,  turns:30,
+   desc:"moves settlement to settlement in a fixed order — predictable, and it does not deviate"},
+  {id:"spread", name:"the spread", hp:10,  turns:30,
+   desc:"always takes the nearest thing still standing"},
+  {id:"answer", name:"the answer", hp:14,  turns:30,
+   desc:"erases nothing until opposed — then goes for whatever is nearest to you"},
+  {id:"patient",name:"the patient",hp:1e9, turns:30,
+   desc:"cannot be stopped, walled or hurt. it can only be outpaced"},
+  {id:"quiet",  name:"the quiet",  hp:10,  turns:30,
+   desc:"leaves no signal — only a holding that reveals will show where it is"}
+];
+
+const SAVE="pasu.run.v1", MEM="pasu.codex.v1";
+const ACTS=4;                 // actions per turn
+
+/* ---------------------------------------------------------------- storage */
+function loadMem(){
+  try{const m=JSON.parse(localStorage.getItem(MEM));
+      if(m&&m.comb) return m;}catch(e){}
+  return {comb:{}, dims:{}, eras:{}, runs:0, best:0};
+}
+function saveMem(){ try{localStorage.setItem(MEM,JSON.stringify(mem));}catch(e){} }
+let mem = loadMem();
+
+let S = null;                                   // run state
+function saveRun(){ try{ localStorage.setItem(SAVE, JSON.stringify(S)); }catch(e){} }
+function clearRun(){ try{ localStorage.removeItem(SAVE); }catch(e){} }
+
+/* ------------------------------------------------------------------ utils */
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random()*n);
+const pick = a => a[rnd(a.length)];
+function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];} return a; }
+function vec(){ const v={}; for(const p of PROPS) v[p]=0; return v; }
+function dimVec(name){ const v=vec(); const d=DIMS[name]; for(const k in d) v[k]=d[k]; return v; }
+function sumVec(names){ const v=vec(); for(const n of names){const d=DIMS[n]; for(const k in d) v[k]+=d[k];} return v; }
+function vecStr(v){
+  const parts=[]; for(const p of PROPS) if(v[p]) parts.push(p+" "+(v[p]>0?"":"")+v[p]);
+  return parts.length?parts.join(" · "):"nothing";
+}
+
+/* ------------------------------------------------- resolution (the rules) */
+function resolve(v){
+  const out=[];
+  if(v.solidity>0 && v.persistence>0) out.push({k:"barrier",  turns:v.persistence});
+  if(v.energy>0   && v.binding>0)     out.push({k:"bound",    dmg:v.energy, turns:Math.max(1,v.persistence)});
+  if(v.energy>0   && v.binding<=0)    out.push({k:"strike",   dmg:v.energy, range:Math.max(0,v.extent)});
+  if(v.motion>0 && v.motion>v.mass)   out.push({k:"displace", dist:Math.max(1,v.motion-v.mass), range:Math.max(1,v.extent)});
+  if(v.perception>0)                  out.push({k:"reveal",   turns:Math.max(1,v.perception), range:Math.max(1,v.extent)});
+  if(v.perception<0)                  out.push({k:"conceal",  turns:Math.max(1,v.persistence)});
+  if(v.persistence<=0)                out.push({k:"transient"});
+  if(v.mass<0)                        out.push({k:"travel"});
+  return out;
+}
+const RULENAME={barrier:"barrier",bound:"burns what it holds",strike:"strikes once",
+  displace:"displaces",reveal:"reveals",conceal:"conceals",transient:"gone this turn",travel:"travels"};
+function effLabel(e){
+  switch(e.k){
+    case "barrier":  return "barrier "+e.turns+"t";
+    case "bound":    return "burn "+e.dmg+" · "+e.turns+"t";
+    case "strike":   return "strike "+e.dmg+" @"+e.range;
+    case "displace": return "displace "+e.dist;
+    case "reveal":   return "reveal "+e.turns+"t";
+    case "conceal":  return "conceal "+e.turns+"t";
+    case "transient":return "transient";
+    case "travel":   return "travels";
+  }
+  return e.k;
+}
+
+/* ------------------------------------------------------------ map making */
+const SETTLEMENT_NAMES=["Ilm","Vesk","Toran","Ardhe","Nimet","Kova","Sarn","Pella","Draeg","Umber","Hesk","Vaan"];
+const SITE_NAMES=["the shelf","the cut","the sink","the seam","the pit","the reach","the flats"];
+
+function buildMap(){
+  const nodes=[], N=14;
+  // jittered grid over a 100x100 space
+  const cols=3, rows=Math.ceil(N/cols);
+  let i=0;
+  for(let r=0;r<rows && i<N;r++) for(let c=0;c<cols && i<N;c++,i++){
+    nodes.push({
+      id:i,
+      x: 16 + c*(68/(cols-1)) + (Math.random()*13-6.5),
+      y:  9 + r*(82/(rows-1)) + (Math.random()*8-4),
+      type:"site", name:"", erased:false, res:0, visited:false, visitedTurn:-1,
+      shaped:false, spoken:false, everSpoken:false, sheltered:false,
+      taken:false, dim:null, conceal:0
+    });
+  }
+  // edges: each node to its 2 nearest, then a spanning pass for connectivity
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const edges=new Set();
+  const key=(a,b)=>a<b?a+"-"+b:b+"-"+a;
+  for(const n of nodes){
+    const near=nodes.filter(m=>m!==n).sort((p,q)=>dist(n,p)-dist(n,q)).slice(0,2+rnd(2));
+    for(const m of near) edges.add(key(n.id,m.id));
+  }
+  // spanning: connect any component to the main one
+  const adjOf=()=>{const a=nodes.map(()=>[]);
+    for(const e of edges){const[p,q]=e.split("-").map(Number);a[p].push(q);a[q].push(p);}return a;};
+  for(let guard=0;guard<40;guard++){
+    const adj=adjOf(), seen=new Set([0]), st=[0];
+    while(st.length){const c=st.pop(); for(const m of adj[c]) if(!seen.has(m)){seen.add(m);st.push(m);}}
+    if(seen.size===nodes.length) break;
+    const out=nodes.filter(n=>!seen.has(n.id));
+    let best=null,bd=1e9;
+    for(const o of out) for(const s of nodes) if(seen.has(s.id)){
+      const d=dist(o,s); if(d<bd){bd=d;best=[o.id,s.id];}}
+    edges.add(key(best[0],best[1]));
+  }
+  const adj=adjOf();
+
+  // roles for nodes: 1 ground, 7 settlements, rest sites
+  const order=shuffled(nodes.map(n=>n.id));
+  const gid=order[0];
+  nodes[gid].type="ground"; nodes[gid].name="kin ground";
+  const sn=shuffled(SETTLEMENT_NAMES);
+  // Axiom 1 is not only about you: a settlement holds one turn on its own.
+  for(let k=1;k<=7;k++){ const n=nodes[order[k]]; n.type="settlement"; n.name=sn[k-1]; n.res=1; }
+  const st=shuffled(SITE_NAMES);
+  let si=0;
+  for(let k=8;k<order.length;k++){ const n=nodes[order[k]]; n.type="site"; n.name=st[si++%st.length]; }
+
+  return {nodes, adj, edges:[...edges].map(e=>e.split("-").map(Number)), ground:gid};
+}
+
+/* graph helpers */
+function bfs(from, blocked){
+  const d=S.map.nodes.map(()=>-1); d[from]=0; const q=[from];
+  while(q.length){ const c=q.shift();
+    for(const m of S.map.adj[c]) if(d[m]<0 && !(blocked&&blocked(m))){ d[m]=d[c]+1; q.push(m); } }
+  return d;
+}
+function stepToward(from, to, blocked){
+  const d=bfs(to, blocked);            // distance from every node to `to`
+  if(d[from]<0) return -1;
+  let best=-1, bv=d[from];
+  for(const m of S.map.adj[from]) if(d[m]>=0 && d[m]<bv && !(blocked&&blocked(m))){ bv=d[m]; best=m; }
+  return best;
+}
+function isBarrier(id){
+  return S.effects.some(e=>e.node===id && e.k==="barrier");
+}
+
+/* ------------------------------------------------------------- new run */
+function newRun(){
+  const map=buildMap();
+  const eraser=pick(ERASERS);
+  const aura=pick(DIMNAMES);
+  const role=pick(ROLES);
+
+  // findable subset: 5 dimensions other than the aura, one per site
+  const sites=map.nodes.filter(n=>n.type==="site");
+  const pool=shuffled(DIMNAMES.filter(d=>d!==aura));
+  sites.forEach((n,i)=>{ n.dim = i<Math.min(sites.length,6) ? pool[i] : null; });
+
+  // eraser starts on the node furthest from kin ground
+  const tmp={map}; S=tmp;                     // bfs needs S.map
+  const dg=bfs(map.ground);
+  let start=0,bd=-1;
+  map.nodes.forEach(n=>{ if(dg[n.id]>bd){bd=dg[n.id];start=n.id;} });
+
+  S = {
+    map, turn:1, acts:ACTS, maxTurns:eraser.turns,
+    era:{id:eraser.id, at:start, hp:eraser.hp, seen:eraser.id!=="quiet", ghost:null,
+         revealed:0, target:null, order:null, dwell:0, cool:0, woken:eraser.id!=="answer"},
+    you:{at:map.ground, innocent:true, erased:false, wounds:3, held:[aura], aura, found:[],
+         role:role.id, roleBroken:false, sinceGround:0, kin:4, kinSpent:0},
+    effects:[], log:[], over:false, learned:[]
+  };
+  if(eraser.id==="route"){
+    S.era.order = shuffled(map.nodes.filter(n=>n.type==="settlement").map(n=>n.id));
+  }
+  map.nodes[map.ground].visited=true;
+  map.nodes[map.ground].visitedTurn=0;
+
+  mem.dims[aura]=true; mem.runs++; saveMem();
+  return {eraser, aura, role};
+}
+
+/* ----------------------------------------------------------------- log */
+function say(t, cls){
+  S.log.push({t, cls:cls||""});
+  if(S.log.length>60) S.log.shift();
+  drawLog();
+}
+function drawLog(){
+  const el=$("log");
+  el.innerHTML = S.log.slice(-30).map(l=>`<div class="${l.cls}">${l.t}</div>`).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+/* --------------------------------------------------------------- render */
+function drawMap(){
+  const map=$("map"), svg=$("edges");
+  [...map.querySelectorAll(".node,.fx")].forEach(n=>n.remove());
+  const W=map.clientWidth, H=map.clientHeight;
+  svg.setAttribute("viewBox","0 0 100 100");
+  svg.innerHTML = S.map.edges.map(([a,b])=>{
+    const A=S.map.nodes[a], B=S.map.nodes[b];
+    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#242832" stroke-width="0.35" vector-effect="non-scaling-stroke"/>`;
+  }).join("");
+
+  const reach = new Set(S.map.adj[S.you.at]);
+  for(const n of S.map.nodes){
+    const d=document.createElement("div");
+    d.className="node "+n.type
+      +(n.erased?" erased":"")+(n.taken?" taken":"")
+      +(reach.has(n.id)?" reach":"")+(isBarrier(n.id)?" barrier":"")
+      +(n.conceal>0?" concealed":"");
+    d.style.left=n.x+"%"; d.style.top=n.y+"%";
+    let glyph = n.type==="settlement" ? (n.erased?"·":"◎") : n.type==="ground" ? "⌂" : "○";
+    let badge = "";
+    if(n.type==="settlement" && n.res>0) badge=`<i class="badge">+${n.res}</i>`;
+    if(n.type==="site" && n.dim && !n.taken) badge=`<i class="badge">?</i>`;
+    d.innerHTML=`<div class="dot" style="position:relative">${glyph}${badge}</div>`
+      +`<div class="lbl">${n.name||""}</div>`;
+    d.onclick=()=>tapNode(n.id);
+    map.appendChild(d);
+  }
+  // effects
+  for(const e of S.effects){
+    const n=S.map.nodes[e.node];
+    const f=document.createElement("div");
+    f.className="fx"; f.style.left=n.x+"%"; f.style.top=(n.y-4.5)+"%";
+    f.textContent = e.k==="barrier"?"▬":e.k==="bound"?"≈":e.k==="conceal"?"◌":e.k==="reveal"?"◇":"·";
+    map.appendChild(f);
+  }
+  // markers sit beside the dot, never above or below it — the labels live there
+  const you=$("you"), era=$("era");
+  const yn=S.map.nodes[S.you.at];
+  you.style.left=(yn.x+4.2)+"%"; you.style.top=yn.y+"%";
+  // the quiet leaves no signal: when it is not visible, only its last known place is drawn
+  const visible = S.era.seen || S.era.revealed>0;
+  if(visible) S.era.ghost = S.era.at;
+  if(S.era.ghost==null){ era.style.display="none"; }
+  else{
+    const en=S.map.nodes[S.era.ghost];
+    era.style.display="block";
+    era.style.left=(en.x-4.2)+"%"; era.style.top=en.y+"%";
+    era.className = visible?"":"hidden";
+  }
+}
+
+function drawHud(){
+  $("hTurn").textContent = `turn ${S.turn}/${S.maxTurns}`;
+  $("hActs").textContent = "•".repeat(S.acts)+"·".repeat(Math.max(0,ACTS-S.acts));
+  const y=S.you;
+  const state = y.erased ? "erased" : y.innocent ? "innocent" : "practitioner";
+  $("hState").textContent = `${state} · aura ${y.aura}`;
+  $("hKin").textContent = `kin ${y.kin} · ${"●".repeat(y.wounds)}${"○".repeat(3-y.wounds)}`;
+  const r=ROLES.find(r=>r.id===y.role);
+  const rl=$("roleline");
+  rl.className = y.roleBroken?"broken":"";
+  rl.textContent = y.roleBroken
+    ? `${r.name} — broken. no one will take your place.`
+    : `${r.name} — ${r.desc}`;
+}
+
+function drawDims(){
+  const box=$("dims"); box.innerHTML="";
+  const y=S.you;
+  const all=[y.aura, ...y.found.filter(d=>d!==y.aura)];
+  for(const name of all){
+    const on = y.held.includes(name);
+    const isAura = name===y.aura;
+    const locked = y.innocent || y.erased;         // axiom 14: innocence is holding only the aura
+    const b=document.createElement("div");
+    b.className="dim"+(on?" on":"")+(isAura?" aura":"")+(locked&&!isAura?" locked":"");
+    b.textContent=name;
+    b.onclick=()=>toggleDim(name);
+    box.appendChild(b);
+  }
+  if(!all.length) box.innerHTML='<span class="muted" style="font-size:11.5px">nothing held</span>';
+
+  const v=sumVec(y.held);
+  $("sum").textContent = y.held.length? vecStr(v) : "";
+  const res=resolve(v);
+  $("rules").textContent = y.held.length? res.map(effLabel).join("  ·  ") : "";
+  const strain=Math.max(0,y.held.length-1);
+  $("strain").textContent = strain? `strain ${strain} — ${strain*12}% chance it resolves wrong` : "";
+}
+
+function drawActs(){
+  const y=S.you, n=S.map.nodes[y.at], has=S.acts>0 && !S.over;
+  $("bShape").disabled   = !has || !y.held.length;
+  $("bShelter").disabled = !has || n.type!=="settlement" || n.erased || n.sheltered;
+  $("bSearch").disabled  = !has || n.type!=="site" || n.taken || !n.dim;
+  $("bSpeak").disabled   = !has || (n.type!=="settlement" && n.type!=="ground") || n.erased || n.spoken;
+  $("bPasu").disabled    = S.over || !y.innocent || y.erased;
+  $("bEnd").disabled     = S.over;
+}
+function draw(){ drawMap(); drawHud(); drawDims(); drawActs(); saveRun(); }
+
+/* ------------------------------------------------------------ role check */
+function roleName(){ return ROLES.find(r=>r.id===S.you.role).name; }
+function breakRole(why){
+  if(S.you.roleBroken) return;
+  S.you.roleBroken=true;
+  say(`<b>${roleName()}</b> — broken: ${why}. the kin will not replace you.`,"bad");
+}
+
+/* ------------------------------------------------------------- actions */
+function spend(){ S.acts--; if(S.acts<=0) endTurn(); else draw(); }
+
+function tapNode(id){
+  if(S.over) return;
+  if(id===S.you.at) return;
+  if(!S.map.adj[S.you.at].includes(id)) return;
+  if(S.acts<=0) return;
+  S.you.at=id;
+  const n=S.map.nodes[id];
+  if(!n.visited){ n.visited=true; n.visitedTurn=S.turn; }
+  if(n.type==="ground") S.you.sinceGround=0;
+  checkContact();
+  if(S.over) return;
+  spend();
+}
+
+function toggleDim(name){
+  const y=S.you;
+  if(S.over) return;
+  if(y.innocent||y.erased){
+    if(name!==y.aura) say("you hold only your aura. that is what innocence is.","");
+    return;
+  }
+  if(S.acts<=0) return;
+  const i=y.held.indexOf(name);
+  if(i>=0){ y.held.splice(i,1); say(`released <b>${name}</b>.`); }
+  else{
+    if(y.held.length>=4){ say("four is all you can hold at once."); return; }
+    y.held.push(name); say(`holding <b>${name}</b>.`);
+  }
+  spend();
+}
+
+function shape(){
+  const y=S.you, n=S.map.nodes[y.at];
+  if(!y.held.length) return;
+  // role constraints
+  if(y.role==="counts" && (n.visitedTurn<0 || n.visitedTurn>=S.turn))
+    breakRole("shaped somewhere you had only just arrived");
+  if(y.role==="repeat" && n.shaped) breakRole("shaped twice in one place");
+  if(y.role==="speaks" && n.type==="settlement" && !n.spoken) breakRole("shaped before speaking");
+
+  let v=sumVec(y.held);
+  const strain=Math.max(0,y.held.length-1);
+  let wrong=false;
+  if(strain && Math.random() < strain*0.12){          // strained holdings resolve wrong
+    wrong=true;
+    const p=pick(PROPS);
+    v={...v}; v[p] = v[p] + (Math.random()<.5?-1:1)*(1+rnd(3));
+  }
+  const res=resolve(v);
+  n.shaped=true;
+
+  say(`shaped ${y.held.join(" + ")} at <b>${n.name||"open ground"}</b>${wrong?" — <span class='bad'>it resolved wrong</span>":""}.`);
+  say("  " + (res.length?res.map(effLabel).join(" · "):"nothing at all"), res.length?"good":"");
+
+  applyEffects(res, y.at, v);
+  recordCombination(y.held, res);
+  if(res.length) wake("shaped something");
+  spend();
+}
+
+function applyEffects(res, node, v){
+  const transient = res.some(e=>e.k==="transient");
+  const travels   = res.some(e=>e.k==="travel");
+  for(const e of res){
+    if(e.k==="transient"||e.k==="travel") continue;
+    if(e.k==="strike"){
+      const d=bfs(node);
+      if(d[S.era.at]>=0 && d[S.era.at]<=e.range) hurtEraser(e.dmg, "struck");
+      else say("  nothing was in range.","");
+      continue;
+    }
+    if(e.k==="displace"){
+      const d=bfs(node);
+      if(d[S.era.at]>=0 && d[S.era.at]<=e.range) displaceEraser(e.dist);
+      else say("  nothing was in range.","");
+      continue;
+    }
+    if(e.k==="conceal"){
+      const n=S.map.nodes[node];
+      if(n.type==="settlement"){ n.conceal=e.turns; say(`  ${n.name} cannot be found for ${e.turns} turns.`,"good"); }
+      continue;
+    }
+    if(e.k==="reveal"){
+      S.era.revealed=Math.max(S.era.revealed,e.turns);
+      S.era.everSeen=true;
+      say("  it is visible now.","good");
+      continue;
+    }
+    S.effects.push({k:e.k, node, turns:transient?1:(e.turns||1), dmg:e.dmg||0, travels});
+  }
+  if(travels) say("  it will not stay where you put it.","");
+}
+
+/* A settlement can be sheltered once. People gather once; they do not gather
+   again because you asked twice. Speaking to them first buys a second turn.
+   This is what stops sheltering from being a wall instead of a triage cost. */
+function shelter(){
+  const n=S.map.nodes[S.you.at];
+  n.sheltered=true;
+  n.res += 2;
+  say(`sheltered <b>${n.name}</b> — it will cost ${n.res} turn${n.res>1?"s":""} to erase.`,"good");
+  if(!n.everSpoken) say("  they would have held longer if you had spoken to them first.","");
+  wake("sheltered");
+  spend();
+}
+function search(){
+  const n=S.map.nodes[S.you.at];
+  n.taken=true;
+  const d=n.dim;
+  if(!S.you.found.includes(d)) S.you.found.push(d);
+  mem.dims[d]=true; saveMem();
+  say(`found <b>${d}</b> at ${n.name}. ${vecStr(dimVec(d))}`,"good");
+  if(S.you.innocent) say("  you cannot hold it.","");
+  spend();
+}
+function speak(){
+  const n=S.map.nodes[S.you.at];
+  const first = !n.everSpoken;
+  n.spoken=true; n.everSpoken=true;
+  if(n.type==="ground") S.you.sinceGround=0;
+  if(first && n.type==="settlement" && !n.erased){
+    n.res += 1;                      // warned people hold a turn longer
+    say(`warned <b>${n.name}</b> — it will cost ${n.res} turn${n.res>1?"s":""} to erase.`,"good");
+  }
+  const hints=[
+    `they say the force came through ${pick(S.map.nodes.filter(x=>x.type==="settlement")).name} before.`,
+    `they know your kin. they know your role.`,
+    `they will hold a while longer if you shelter them.`,
+    `someone here has seen a holding that stood for days.`
+  ];
+  say(`spoke at <b>${n.name}</b> — ${pick(hints)}`);
+  spend();
+}
+
+/* ------------------------------------------------------------- the door */
+function doPasu(){
+  const y=S.you;
+  y.innocent=false;
+  say("you forwent your innocence. it does not come back.","bad");
+  say(`you may hold more than ${y.aura} now.`,"good");
+  wake("forwent your innocence");
+  draw();
+}
+
+/* ------------------------------------------------------------- eraser */
+function hurtEraser(d,verb){
+  if(S.era.id==="patient"){ say("  the patient does not take wounds.",""); return; }
+  S.era.hp-=d;
+  say(`  ${verb} it for ${d}. ${Math.max(0,S.era.hp)} left.`,"good");
+  S.era.ghost=S.era.at;
+  if(S.era.hp<=0) finish("stopped");
+}
+function displaceEraser(dist){
+  if(S.era.id==="patient"){ say("  the patient does not move for you.",""); return; }
+  const dg=bfs(S.you.at);
+  let best=S.era.at, bv=dg[S.era.at];
+  for(let i=0;i<dist;i++){
+    let nxt=best, nv=bv;
+    for(const m of S.map.adj[best]) if(dg[m]>nv){ nv=dg[m]; nxt=m; }
+    if(nxt===best) break;
+    best=nxt; bv=nv;
+  }
+  if(best!==S.era.at){ S.era.at=best; say("  it was pushed back.","good"); }
+  else say("  it did not move.","");
+}
+
+/* Axiom 2: it wants all of it, not one of it. A barrier across the way to the
+   nearest settlement does not stop it — it sends it at the next one. That is
+   why shaping is triage and not a wall. */
+function eraserTargets(){
+  const live = S.map.nodes.filter(n=>n.type==="settlement" && !n.erased && n.conceal<=0);
+  return live.length?live:S.map.nodes.filter(n=>n.type==="settlement" && !n.erased);
+}
+function targetOrder(){
+  const e=S.era, cands=eraserTargets();
+  if(!cands.length) return [];
+  if(e.id==="route"){
+    const byOrder=e.order.filter(id=>cands.some(c=>c.id===id));
+    const rest=cands.map(c=>c.id).filter(id=>!byOrder.includes(id));
+    return byOrder.concat(rest);
+  }
+  const from = (e.id==="answer") ? S.you.at : e.at;
+  const d=bfs(from);
+  return cands.slice()
+    .sort((a,b)=>(d[a.id]<0?99:d[a.id])-(d[b.id]<0?99:d[b.id]))
+    .map(c=>c.id);
+}
+/* The answer sleeps until it is opposed. Protecting is opposing. */
+function wake(why){
+  const e=S.era;
+  if(e.id!=="answer" || e.woken) return;
+  e.woken=true;
+  say(`the answer has been opposed — you ${why}. it begins.`,"bad");
+}
+
+function eraserTurn(){
+  const e=S.era;
+  if(S.over) return;
+  if(e.id==="answer" && !e.woken && S.turn>=6){
+    e.woken=true;
+    say("the answer stopped waiting.","bad");
+  }
+  if(e.id==="answer" && !e.woken){ say("it has not begun."); return; }
+  // the patient walks through anything you build; resistance is all that slows it
+  const blocked = (e.id==="patient") ? null : (id)=>isBarrier(id);
+  const here=S.map.nodes[e.at];
+
+  // at a live settlement: spend resistance, then erase
+  if(here.type==="settlement" && !here.erased){
+    if(here.res>0){ here.res--; say(`the force is held at <b>${here.name}</b>.`,"good"); checkContact(); return; }
+    here.erased=true; here.conceal=0;
+    S.era.ghost=S.era.at;
+    say(`<b>${here.name}</b> is erased. it cannot come back.`,"bad");
+    checkContact();
+    if(!S.map.nodes.some(n=>n.type==="settlement" && !n.erased)) finish("complete");
+    return;
+  }
+
+  // try each settlement in preference order; a blocked road redirects, never stops
+  const order=targetOrder();
+  let step=-1, redirected=false;
+  for(let i=0;i<order.length;i++){
+    step=stepToward(e.at,order[i],blocked);
+    if(step>=0){ redirected = i>0; break; }
+  }
+  if(step<0){ say("it cannot find a way through — this turn.","good"); return; }
+  e.at=step;
+  const n=S.map.nodes[step];
+  if(e.seen||e.revealed>0){
+    say(`the force moves to ${n.name||"open ground"}${redirected?" — it went around":""}.`);
+  }
+  checkContact();
+}
+
+function checkContact(){
+  const y=S.you;
+  if(S.playerGone || S.era.at!==y.at || S.over) return;
+  S.era.ghost=S.era.at;
+  if(y.innocent && !y.erased){
+    y.erased=true; y.innocent=false; y.held=[y.aura];
+    say("it reached you. your innocence is gone and you were given nothing for it.","bad");
+  }else if(!y.innocent && !y.erased){
+    if(y.held.length){ say("it tore what you were holding out of your hands.","bad"); y.held=[]; }
+  }
+  y.wounds--;
+  if(y.wounds<=0) die();
+}
+
+function die(){
+  const y=S.you;
+  y.kinSpent++;
+  if(y.roleBroken || y.kin<=1){
+    say("no one takes your place.","bad");
+    finish("kin");
+    return;
+  }
+  y.kin--;
+  const old=y.role;
+  const others=ROLES.filter(r=>r.id!==old);
+  y.role=pick(others).id;
+  y.roleBroken=false;
+  y.wounds=3;
+  y.innocent=true; y.erased=false;
+  y.held=[y.aura];
+  y.at=S.map.ground;
+  y.sinceGround=0;
+  say(`you died. your role vacated. another of your kin takes it — same aura, different role, innocent again.`,"bad");
+  if(S.era.at===S.map.ground) S.era.at = pick(S.map.adj[S.map.ground]);
+}
+
+/* --------------------------------------------------------------- turn */
+function endTurn(){
+  if(S.over) return;
+  const y=S.you, n=S.map.nodes[y.at];
+
+  // role checks at end of turn
+  if(y.role==="apart" && n.type==="site") breakRole("ended a turn away from any settlement");
+  if(y.role==="ground"){
+    y.sinceGround = (n.type==="ground") ? 0 : y.sinceGround+1;
+    if(y.sinceGround>3) breakRole("stayed away from kin ground");
+  }
+
+  // the force moves while everything you made is still standing
+  eraserTurn();
+  if(S.over) return;
+
+  // then effects tick: bound burns what is now beside it, travel moves, timers run down
+  const next=[];
+  for(const e of S.effects){
+    if(e.k==="bound"){
+      const d=bfs(e.node);
+      if(d[S.era.at]>=0 && d[S.era.at]<=1) hurtEraser(e.dmg,"the holding burned it");
+      if(S.over) return;
+    }
+    if(e.travels){
+      const s=stepToward(e.node,S.era.at,null);
+      if(s>=0) e.node=s;
+    }
+    e.turns--;
+    if(e.turns>0) next.push(e);
+  }
+  S.effects=next;
+  for(const nd of S.map.nodes) if(nd.conceal>0) nd.conceal--;
+  if(S.era.revealed>0) S.era.revealed--;
+
+  S.turn++;
+  if(S.turn>S.maxTurns){ finish("outlasted"); return; }
+  S.acts=ACTS;
+  for(const nd of S.map.nodes) nd.spoken=false;
+  draw();
+}
+
+/* ------------------------------------------------------------- codex */
+function combKey(names){ return names.slice().sort().join(" + "); }
+function recordCombination(names, res){
+  if(!names.length) return;
+  const k=combKey(names);
+  const kinds=res.map(e=>e.k).filter(x=>x!=="transient"&&x!=="travel");
+  const label = kinds.length?kinds.map(x=>RULENAME[x]).join(", "):"nothing";
+  if(!mem.comb[k]){ S.learned.push(k+"  →  "+label); }
+  mem.comb[k]=label; saveMem();
+}
+
+/* -------------------------------------------------------------- finish */
+/* Axiom 1 gives life its object; it does not make the erasure conditional on
+   anyone being there. If your kin is spent, what was coming still comes — so the
+   run is played out without you before it is scored. Ending early is not a way
+   to keep a number. */
+function resolveWithoutYou(){
+  S.resolving=true; S.playerGone=true;
+  let guard=0;
+  while(S.turn<=S.maxTurns && guard++<400){
+    if(!S.map.nodes.some(n=>n.type==="settlement" && !n.erased)) break;
+    eraserTurn();
+    for(const nd of S.map.nodes) if(nd.conceal>0) nd.conceal--;
+    S.effects = S.effects.map(e=>({...e,turns:e.turns-1})).filter(e=>e.turns>0);
+    S.turn++;
+  }
+  S.resolving=false;
+  say("with no one left to hold it, the rest followed.","bad");
+}
+
+function finish(how){
+  if(S.over || S.resolving) return;
+  if(how==="kin") resolveWithoutYou();
+  S.over=true;
+  const sett=S.map.nodes.filter(n=>n.type==="settlement");
+  const held=sett.filter(n=>!n.erased).length;
+  const y=S.you;
+  mem.eras[S.era.id]=true;
+  if(held>(mem.best||0)) mem.best=held;
+  saveMem(); clearRun();
+
+  $("eTitle").textContent =
+    how==="stopped"   ? "the force was stopped" :
+    how==="complete"  ? "nothing innocent remains" :
+    how==="kin"       ? "your kin is spent" :
+                        "it ran out of time";
+  $("eHeld").textContent  = `${held} / ${sett.length}`;
+  $("eYours").textContent = y.erased ? "taken from you" : y.innocent ? "kept" : "forgone";
+  $("eTurns").textContent = S.turn;
+  $("eKin").textContent   = y.kinSpent;
+  $("eLearn").innerHTML   = S.learned.length
+    ? S.learned.map(l=>`<div class="muted">${l}</div>`).join("")
+    : '<span class="muted">nothing new</span>';
+  show("scEnd");
+}
+
+/* -------------------------------------------------------------- screens */
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on", s.id===id));
+}
+function hideAll(){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on")); }
+
+function renderCodex(tab){
+  const b=$("codexBody");
+  if(tab==="comb"){
+    const keys=Object.keys(mem.comb).sort();
+    b.innerHTML = keys.length
+      ? keys.map(k=>`<div class="codexrow"><span>${k}</span><span>${mem.comb[k]}</span></div>`).join("")
+      : '<p class="muted">Nothing yet. Shape something and watch what the sum does.</p>';
+  }else if(tab==="dims"){
+    b.innerHTML = DIMNAMES.map(d=>{
+      const known=!!mem.dims[d];
+      return `<div class="codexrow"><span>${known?d:"—"}</span><span class="${known?"":"muted"}">${known?vecStr(dimVec(d)):"never held"}</span></div>`;
+    }).join("");
+  }else{
+    b.innerHTML = ERASERS.map(e=>{
+      const known=!!mem.eras[e.id];
+      return `<div class="codexrow"><span>${known?e.name:"—"}</span><span class="${known?"":"muted"}" style="text-align:right;flex:1">${known?e.desc:"never met"}</span></div>`;
+    }).join("");
+  }
+}
+
+function titleStats(){
+  const c=Object.keys(mem.comb).length, d=Object.values(mem.dims).length;
+  $("titleStats").textContent =
+    `${mem.runs||0} runs · ${c} combinations recorded · ${d}/${DIMNAMES.length} dimensions held · best held ${mem.best||0}`;
+  $("bResume").disabled = !localStorage.getItem(SAVE);
+}
+
+/* ----------------------------------------------------------------- wire */
+$("bNew").onclick=()=>{
+  const {eraser,aura,role}=newRun();
+  $("bAura").textContent=aura;
+  $("bAuraV").textContent=vecStr(dimVec(aura));
+  $("bKin").textContent=S.you.kin;
+  $("bRole").textContent=ROLES.find(r=>r.id===role.id).name;
+  $("bRoleD").textContent=role.desc;
+  const known=!!mem.eras[eraser.id];
+  $("bEraser").textContent = known?eraser.name:"unknown";
+  $("bEraserD").textContent = known?eraser.desc:"you have not met this one. you will find out by watching it work.";
+  show("scBirth");
+};
+$("bStart").onclick=()=>{
+  hideAll();
+  say(`you are ${ROLES.find(r=>r.id===S.you.role).name}. you hold ${S.you.aura}.`);
+  say("something is crossing the region.");
+  draw();
+};
+$("bResume").onclick=()=>{
+  try{ S=JSON.parse(localStorage.getItem(SAVE)); }catch(e){ return; }
+  if(!S) return;
+  hideAll(); drawLog(); draw();
+};
+$("bCodex").onclick=()=>{ renderCodex("comb"); show("scCodex"); };
+$("bEndCodex").onclick=()=>{ renderCodex("comb"); show("scCodex"); };
+$("bCodexBack").onclick=()=>{ titleStats(); show("scTitle"); };
+$("bHelp").onclick=()=>{
+  $("helpRules").innerHTML = RULES.map(r=>`<div class="muted" style="font-size:11.5px">${r.txt}</div>`).join("");
+  show("scHelp");
+};
+$("bHelpBack").onclick=()=>{ titleStats(); show("scTitle"); };
+$("bAgain").onclick=()=>{ titleStats(); show("scTitle"); };
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b));
+    renderCodex(b.dataset.tab);
+  };
+});
+
+$("bShape").onclick   = shape;
+$("bShelter").onclick = shelter;
+$("bSearch").onclick  = search;
+$("bSpeak").onclick   = speak;
+$("bEnd").onclick     = ()=>{ endTurn(); };
+$("bPasu").onclick    = ()=>show("scPasu");
+$("bPasuNo").onclick  = ()=>hideAll();
+$("bPasuYes").onclick = ()=>{ hideAll(); doPasu(); };
+
+window.addEventListener("resize", ()=>{ if(S && !S.over) drawMap(); });
+titleStats();
+</script>
+</body>
+</html>
