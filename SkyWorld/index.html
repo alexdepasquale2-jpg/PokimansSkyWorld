@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skyward Reach</title>
+<meta name="description" content="Raise a creature that learns from praise and punishment, farm a floating island, and grind your way up the Skyward Register.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-mark">⛅</span>
+      <div>
+        <b>Skyward Reach</b>
+        <span id="hud-day">Day 1</span><span id="hud-clock">dawn</span>
+      </div>
+    </div>
+
+    <div class="res">
+      <span class="r" title="Coin"><i>🪙</i><b id="res-coin">0</b></span>
+      <span class="r" title="Wood"><i>🪵</i><b id="res-wood">0</b></span>
+      <span class="r" title="Prayer"><i>🙏</i><b id="res-prayer">0</b></span>
+      <span class="r renown" title="Renown — the only score anyone counts"><i>👁️</i><b id="res-renown">0</b></span>
+      <span class="r focus" title="Focus — your own stamina; it regenerates">
+        <i>🕯️</i><b id="res-focus">0/24</b>
+        <span class="focus-track"><span id="focus-fill"></span></span>
+      </span>
+    </div>
+
+    <div class="rank">
+      <div class="rank-line"><b id="hud-rank">Unlisted</b><span id="hud-place">—</span></div>
+      <div class="rank-track"><div id="rank-fill"></div></div>
+      <div class="rank-next" id="rank-next"></div>
+    </div>
+
+    <div class="ctrl">
+      <button id="btn-pause" title="Pause (space)">❚❚</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="2">2×</button>
+      <button data-speed="4">4×</button>
+      <button id="btn-help" title="How this works">?</button>
+      <button id="btn-menu" title="Menu">☰</button>
+    </div>
+  </header>
+
+  <main>
+    <aside id="left">
+      <div id="card"></div>
+    </aside>
+
+    <section id="stage">
+      <canvas id="scene"></canvas>
+
+      <div id="judge">
+        <div id="judge-what"></div>
+        <div class="judge-track"><div id="judge-fill"></div></div>
+        <div class="judge-btns">
+          <button id="btn-praise" class="praise">❤ Praise <kbd>P</kbd></button>
+          <button id="btn-scold" class="scold">✋ Strike <kbd>S</kbd></button>
+        </div>
+      </div>
+
+      <div id="actionbar"></div>
+    </section>
+
+    <aside id="right">
+      <nav class="tabs">
+        <button class="tab on" data-tab="farm">🌾</button>
+        <button class="tab" data-tab="market">🪙</button>
+        <button class="tab" data-tab="village">🏘️</button>
+        <button class="tab" data-tab="powers">✨</button>
+        <button class="tab" data-tab="register">📜</button>
+        <button class="tab" data-tab="feats">🏆</button>
+      </nav>
+      <div id="panel-body"></div>
+    </aside>
+  </main>
+
+  <footer id="logbar"><div id="log"></div></footer>
+</div>
+
+<div id="modal"></div>
+
+<script src="js/core.js"></script>
+<script src="js/content.js"></script>
+<script src="js/state.js"></script>
+<script src="js/farm.js"></script>
+<script src="js/creature.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

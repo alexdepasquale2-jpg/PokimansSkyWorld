@@ -1,0 +1,3491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skyward Reach</title>
+<meta name="description" content="Raise a creature that learns from praise and punishment, farm a floating island, and grind your way up the Skyward Register.">
+<style>
+/* Skyward Reach — interface skin. */
+:root {
+  --bg: #080b13;
+  --panel: #111725;
+  --panel-2: #161d2e;
+  --line: #232c44;
+  --line-soft: #1a2134;
+  --ink: #e2e8f6;
+  --dim: #8b96b1;
+  --dimmer: #5d6782;
+  --gold: #e7c66a;
+  --good: #7ee787;
+  --bad: #ff8f8f;
+  --warn: #e6ac4d;
+  --great: #d2a8ff;
+  --radius: 10px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 var(--sans);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2 { font-family: var(--serif); font-weight: 600; letter-spacing: 0.01em; }
+button { font: inherit; color: inherit; cursor: pointer; }
+kbd {
+  font: 600 10px/1 var(--sans); background: rgba(255,255,255,0.12);
+  border-radius: 3px; padding: 2px 4px; margin-left: 5px; vertical-align: middle;
+}
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* ---------- top bar ---------- */
+#topbar {
+  display: flex; align-items: center; gap: 20px;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, #141b2c, #0d1220);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 9px; min-width: 168px; }
+.brand-mark { font-size: 22px; }
+.brand b { font-family: var(--serif); font-size: 16px; display: block; letter-spacing: 0.02em; }
+.brand span { color: var(--dim); font-size: 11px; margin-right: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.res { display: flex; gap: 6px; flex-wrap: wrap; }
+.res .r {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 11px 4px 8px; font-size: 13px;
+}
+.res .r i { font-style: normal; font-size: 13px; opacity: 0.95; }
+.res .r b { font-variant-numeric: tabular-nums; }
+.res .renown b { color: var(--gold); }
+.res .focus { position: relative; padding-bottom: 5px; }
+.focus-track {
+  position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px;
+  background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;
+}
+#focus-fill { display: block; height: 100%; background: var(--gold); transition: width 0.2s linear; }
+
+.rank { min-width: 178px; flex: 1; max-width: 300px; }
+.rank-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+.rank-line b { font-family: var(--serif); font-size: 15px; }
+.rank-line span { color: var(--dim); font-variant-numeric: tabular-nums; }
+.rank-track { height: 4px; background: rgba(255,255,255,0.08); border-radius: 3px; margin: 3px 0 2px; overflow: hidden; }
+#rank-fill { height: 100%; width: 0; background: var(--gold); transition: width 0.3s; }
+.rank-next { font-size: 10.5px; color: var(--dimmer); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.ctrl { display: flex; gap: 4px; margin-left: auto; }
+.ctrl button {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+  min-width: 34px; height: 30px; font-size: 12px; font-weight: 600;
+}
+.ctrl button:hover { border-color: #3d4a6c; background: var(--panel-2); }
+.ctrl button.on { background: rgba(231,198,106,0.16); border-color: var(--gold); color: var(--gold); }
+
+/* ---------- main columns ---------- */
+main {
+  display: grid;
+  grid-template-columns: 306px minmax(0, 1fr) 330px;
+  min-height: 0;
+}
+aside {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#right { border-right: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+aside::-webkit-scrollbar, #log::-webkit-scrollbar { width: 8px; }
+aside::-webkit-scrollbar-thumb, #log::-webkit-scrollbar-thumb { background: #263049; border-radius: 4px; }
+
+/* ---------- stage ---------- */
+#stage { position: relative; min-width: 0; background: #06080f; overflow: hidden; }
+#scene { display: block; width: 100%; height: 100%; }
+
+#actionbar {
+  position: absolute; left: 12px; right: 12px; bottom: 12px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: rgba(10,13,22,0.82);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 8px 10px; backdrop-filter: blur(6px);
+}
+.ab-title { font-family: var(--serif); font-size: 14px; margin-right: 4px; }
+.ab-hint { color: var(--dim); font-size: 12px; }
+
+#judge {
+  position: absolute; left: 50%; transform: translateX(-50%) translateY(-8px);
+  top: 14px; width: min(400px, 92%);
+  background: rgba(12,15,26,0.9); border: 1px solid var(--gold);
+  border-radius: var(--radius); padding: 10px 12px;
+  opacity: 0; pointer-events: none; transition: opacity 0.16s, transform 0.16s;
+  box-shadow: 0 10px 34px rgba(0,0,0,0.5);
+}
+#judge.on { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+#judge-what { font-size: 13px; text-align: center; margin-bottom: 7px; }
+.judge-track { height: 3px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+#judge-fill { height: 100%; background: var(--gold); }
+.judge-btns { display: flex; gap: 8px; }
+.judge-btns button {
+  flex: 1; border-radius: 8px; padding: 9px; font-weight: 600; font-size: 13px;
+  border: 1px solid var(--line); background: var(--panel-2);
+}
+.judge-btns .praise { border-color: #2f6b3d; background: rgba(126,231,135,0.13); color: #b6f0bd; }
+.judge-btns .praise:hover { background: rgba(126,231,135,0.24); }
+.judge-btns .scold { border-color: #6f2f36; background: rgba(255,143,143,0.12); color: #f5b7b7; }
+.judge-btns .scold:hover { background: rgba(255,143,143,0.23); }
+
+/* ---------- creature card ---------- */
+#card { padding: 12px; }
+.card-head { border-bottom: 1px solid var(--line-soft); padding-bottom: 9px; margin-bottom: 10px; }
+.card-title { display: flex; gap: 10px; align-items: center; }
+.lineage-glyph { font-size: 30px; line-height: 1; }
+.card-title h2 { margin: 0; font-size: 19px; }
+.card-title p { margin: 1px 0 0; font-size: 11.5px; color: var(--dim); }
+.doing {
+  margin-top: 8px; font-size: 12px; color: var(--gold);
+  background: rgba(231,198,106,0.08); border: 1px solid rgba(231,198,106,0.22);
+  border-radius: 6px; padding: 4px 8px;
+}
+
+.bars { display: grid; gap: 6px; margin-bottom: 10px; }
+.bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+.bar-label span:last-child { font-variant-numeric: tabular-nums; color: var(--ink); }
+.bar-track { height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--dim); transition: width 0.25s; }
+.bar.food .bar-fill { background: #e0b45c; }
+.bar.vigor .bar-fill { background: #6bbf8a; }
+.bar.mood .bar-fill { background: #74a9e6; }
+.bar.bond .bar-fill { background: #e08fb9; }
+.bar.faith .bar-fill { background: #f0d68a; }
+.bar.awe .bar-fill { background: #a58ce4; }
+.bar.danger .bar-fill { background: var(--bad); }
+
+.axis { margin-bottom: 9px; }
+.axis-head { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--dimmer); text-transform: uppercase; letter-spacing: 0.05em; }
+.axis-head b { color: var(--dim); }
+.axis-track { position: relative; height: 5px; margin-top: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, #6d2b34, #2b3145, #3d6b4a); }
+.axis-mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,0.25); }
+.axis-knob {
+  position: absolute; top: -3px; width: 11px; height: 11px; margin-left: -5.5px;
+  border-radius: 50%; background: var(--ink); border: 2px solid #0d1220; transition: left 0.3s;
+}
+
+.statline { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim);
+  padding: 7px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); margin-bottom: 10px; }
+.statline span { font-variant-numeric: tabular-nums; }
+
+.section-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.11em;
+  color: var(--dimmer); margin: 12px 0 6px;
+}
+.leash-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.leash-btn {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px;
+  padding: 6px 2px; font-size: 15px; display: grid; gap: 2px; line-height: 1.1;
+}
+.leash-btn span { font-size: 9px; color: var(--dim); }
+.leash-btn.on { border-color: var(--gold); background: rgba(231,198,106,0.14); }
+.leash-btn.on span { color: var(--gold); }
+.leash-desc { font-size: 11px; color: var(--dim); margin: 6px 0 0; }
+
+.trainlist { display: grid; gap: 3px; }
+.train { display: grid; grid-template-columns: 18px 1fr 54px 30px; align-items: center; gap: 6px; font-size: 11.5px; }
+.train-name { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.train-bar { height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; }
+.train-bar i { display: block; height: 100%; background: var(--good); transition: width 0.3s; }
+.train.vice .train-bar i { background: var(--bad); }
+.train-pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--dimmer); font-size: 10.5px; }
+
+.feedrow, .seedbag { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 10px; font-size: 12px;
+}
+.chip i { font-style: normal; color: var(--dimmer); font-size: 10.5px; }
+.chip:disabled, .chip.dim { opacity: 0.4; cursor: default; }
+.chip:not(:disabled):hover { border-color: var(--gold); }
+
+.tiny { font-size: 10.5px; color: var(--dimmer); margin: 8px 0 0; }
+.hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
+
+/* ---------- right panel ---------- */
+.tabs { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 10px 0; font-size: 16px; opacity: 0.55; }
+.tab:hover { opacity: 0.85; background: rgba(255,255,255,0.03); }
+.tab.on { opacity: 1; border-bottom-color: var(--gold); background: rgba(231,198,106,0.07); }
+#panel-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; }
+
+.btn {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 11px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 8px;
+}
+.btn:hover:not(:disabled) { border-color: var(--gold); background: #1c2439; }
+.btn:disabled, .btn.off { opacity: 0.42; cursor: default; }
+.btn.hot { border-color: var(--gold); background: rgba(231,198,106,0.15); color: #ffe9a8; }
+.btn.big { width: 100%; justify-content: center; padding: 11px; font-size: 14px; margin-top: 14px; }
+.btn.danger { border-color: #5c2a30; color: #f0a9a9; }
+.btn .cost { color: var(--dimmer); font-size: 10.5px; margin-left: auto; }
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.btnrow.col { flex-direction: column; }
+.btnrow.col .btn { width: 100%; }
+
+.plotlist { display: grid; gap: 2px; margin-bottom: 6px; }
+.plotrow {
+  display: grid; grid-template-columns: 20px 1fr 46px 44px; gap: 6px; align-items: center;
+  font-size: 11.5px; padding: 4px 6px; border-radius: 5px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.plotrow:hover { background: rgba(255,255,255,0.04); }
+.plotrow.sel { border-color: var(--gold); background: rgba(231,198,106,0.08); }
+.pr-i { color: var(--dimmer); font-variant-numeric: tabular-nums; }
+.pr-state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-prog { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+.pr-prog.ripe { color: var(--gold); font-weight: 700; }
+.pr-water { text-align: right; color: var(--dimmer); font-size: 10.5px; }
+
+table.register { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+.mkrow { border-top: 1px solid var(--line-soft); padding: 7px 0; }
+.mkrow.locked { opacity: 0.5; }
+.mk-top { display: flex; justify-content: space-between; align-items: baseline; }
+.mk-title { font-size: 13px; }
+.mk-price { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--gold); }
+.mk-price i { font-style: normal; font-size: 9.5px; color: var(--dimmer); margin-left: 4px; letter-spacing: 0.04em; }
+.mk-bot { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.mk-held { font-size: 11px; color: var(--dim); margin-right: 3px; }
+.mk-held b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.mk-lock { font-size: 10.5px; color: var(--dimmer); }
+.mini.seed { border-style: dashed; }
+.mini {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+  padding: 3px 6px; font-size: 11px; margin-right: 3px;
+}
+.mini i { font-style: normal; color: var(--dimmer); font-size: 9.5px; }
+.mini:hover:not(:disabled) { border-color: var(--gold); }
+.mini:disabled { opacity: 0.35; cursor: default; }
+.up { color: var(--good); font-size: 9px; }
+.down { color: var(--bad); font-size: 9px; }
+
+.miracles { display: grid; gap: 6px; }
+.miracle {
+  display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 9px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 11px; text-align: left;
+}
+.miracle:hover:not(:disabled) { border-color: var(--gold); }
+.miracle.off { opacity: 0.5; }
+.mi-glyph { font-size: 19px; }
+.mi-body b { display: block; font-size: 13px; }
+.mi-body i { font-style: normal; font-size: 11px; color: var(--dim); }
+.mi-cost { font-size: 12px; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+.fest { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--panel-2); }
+.fest-head { display: flex; align-items: baseline; gap: 7px; font-size: 14px; font-family: var(--serif); }
+.fest-head span { margin-left: auto; font-family: var(--sans); font-size: 11px; color: var(--gold); }
+.fest p { margin: 6px 0 0; font-size: 11.5px; color: var(--dim); }
+.fest-result { margin-top: 8px; font-size: 11.5px; color: var(--dim); border-left: 2px solid var(--gold); padding-left: 8px; }
+.fest-field { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.fest-field span { font-size: 10px; background: var(--panel-2); border-radius: 4px; padding: 2px 5px; }
+.fest-field .you { background: rgba(231,198,106,0.2); color: var(--gold); }
+
+table.register td { padding: 4px 3px; border-top: 1px solid var(--line-soft); }
+table.register tr.you td { background: rgba(231,198,106,0.1); color: var(--gold); font-weight: 600; }
+.rg-place { width: 22px; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+tr.you .rg-place { color: var(--gold); }
+.rg-renown { text-align: right; font-variant-numeric: tabular-nums; }
+
+.chatter { display: grid; gap: 5px; }
+.ch { font-size: 11.5px; color: var(--dim); border-left: 2px solid var(--line); padding-left: 7px; }
+.ch i { font-style: normal; color: var(--dimmer); font-size: 10px; margin-right: 5px; }
+.ch.behind { border-left-color: #3d7a4c; }
+.ch.ahead { border-left-color: #7a3d3d; }
+.ch.near { border-left-color: var(--gold); }
+
+.feats { display: grid; gap: 3px; }
+.feat { display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: center; opacity: 0.5; padding: 3px 0; }
+.feat.got { opacity: 1; }
+.ft-mark { color: var(--gold); }
+.ft-body b { display: block; font-size: 12px; }
+.ft-body i { font-style: normal; font-size: 10.5px; color: var(--dimmer); }
+.ft-renown { font-size: 11px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.trophies { display: flex; flex-wrap: wrap; gap: 4px; }
+.trophy { font-size: 10.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
+.trophy.p1 { border-color: var(--gold); }
+
+/* ---------- log ---------- */
+#logbar { border-top: 1px solid var(--line); background: #0c111c; }
+#log { height: 94px; overflow-y: auto; padding: 7px 14px; display: flex; flex-direction: column; }
+.li { font-size: 11.5px; color: var(--dim); padding: 1px 0; }
+.li i { font-style: normal; color: var(--dimmer); margin-right: 7px; font-size: 10px; }
+.li.good { color: #a5dcae; }
+.li.bad { color: #eda3a3; }
+.li.warn { color: var(--warn); }
+.li.great { color: var(--great); }
+.li.creature { color: #b9c6e4; }
+
+/* ---------- modal ---------- */
+#modal {
+  position: fixed; inset: 0; background: rgba(4,6,12,0.78);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+  z-index: 50; backdrop-filter: blur(4px);
+}
+#modal.on { display: flex; }
+.sheet {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px; width: min(460px, 100%); max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+}
+.sheet.wide { width: min(720px, 100%); }
+.sheet h1 { margin: 0 0 8px; font-size: 25px; }
+.lede { color: var(--dim); font-size: 13px; margin: 0 0 12px; }
+.help p { font-size: 12.5px; color: var(--dim); margin: 0 0 10px; }
+.help b { color: var(--ink); }
+
+.hatch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hatch-card {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 10px; text-align: center; display: grid; gap: 5px;
+}
+.hatch-card:hover { border-color: #46527a; }
+.hatch-card.on { border-color: var(--gold); background: rgba(231,198,106,0.1); }
+.hg { font-size: 30px; }
+.hatch-card b { font-family: var(--serif); font-size: 14px; }
+.hatch-card i { font-style: normal; font-size: 11px; color: var(--dim); }
+.hstat { font-size: 10.5px; color: var(--dimmer); }
+
+.namerow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.namerow label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dimmer); display: grid; gap: 4px; }
+.namerow input {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px;
+  color: var(--ink); padding: 8px 10px; font: 14px var(--sans); text-transform: none; letter-spacing: 0;
+}
+.namerow input:focus { outline: none; border-color: var(--gold); }
+
+.offgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.offgrid div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 12px; text-align: center; }
+.offgrid b { display: block; font-size: 21px; font-family: var(--serif); color: var(--gold); }
+.offgrid i { font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dimmer); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1180px) {
+  main { grid-template-columns: 268px minmax(0, 1fr) 288px; }
+}
+@media (max-width: 980px) {
+  body { overflow: auto; }
+  #app { height: auto; min-height: 100%; }
+  main { grid-template-columns: 1fr; }
+  aside { border-right: none; border-left: none; border-top: 1px solid var(--line); max-height: none; }
+  /* The scene is where you praise, strike and work plots, so it leads. */
+  #stage { order: -2; height: 62vh; min-height: 340px; }
+  #right { order: -1; }
+  #log { height: 74px; }
+  #topbar { gap: 10px; }
+  .rank { max-width: none; }
+  .ctrl { margin-left: 0; }
+}
+@media (max-width: 560px) {
+  /* Portrait phones: the island is width-bound, so a tall stage is just sky. */
+  #stage { height: 46vh; min-height: 270px; }
+  #actionbar { left: 8px; right: 8px; bottom: 8px; }
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-mark">⛅</span>
+      <div>
+        <b>Skyward Reach</b>
+        <span id="hud-day">Day 1</span><span id="hud-clock">dawn</span>
+      </div>
+    </div>
+
+    <div class="res">
+      <span class="r" title="Coin"><i>🪙</i><b id="res-coin">0</b></span>
+      <span class="r" title="Wood"><i>🪵</i><b id="res-wood">0</b></span>
+      <span class="r" title="Prayer"><i>🙏</i><b id="res-prayer">0</b></span>
+      <span class="r renown" title="Renown — the only score anyone counts"><i>👁️</i><b id="res-renown">0</b></span>
+      <span class="r focus" title="Focus — your own stamina; it regenerates">
+        <i>🕯️</i><b id="res-focus">0/24</b>
+        <span class="focus-track"><span id="focus-fill"></span></span>
+      </span>
+    </div>
+
+    <div class="rank">
+      <div class="rank-line"><b id="hud-rank">Unlisted</b><span id="hud-place">—</span></div>
+      <div class="rank-track"><div id="rank-fill"></div></div>
+      <div class="rank-next" id="rank-next"></div>
+    </div>
+
+    <div class="ctrl">
+      <button id="btn-pause" title="Pause (space)">❚❚</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="2">2×</button>
+      <button data-speed="4">4×</button>
+      <button id="btn-help" title="How this works">?</button>
+      <button id="btn-menu" title="Menu">☰</button>
+    </div>
+  </header>
+
+  <main>
+    <aside id="left">
+      <div id="card"></div>
+    </aside>
+
+    <section id="stage">
+      <canvas id="scene"></canvas>
+
+      <div id="judge">
+        <div id="judge-what"></div>
+        <div class="judge-track"><div id="judge-fill"></div></div>
+        <div class="judge-btns">
+          <button id="btn-praise" class="praise">❤ Praise <kbd>P</kbd></button>
+          <button id="btn-scold" class="scold">✋ Strike <kbd>S</kbd></button>
+        </div>
+      </div>
+
+      <div id="actionbar"></div>
+    </section>
+
+    <aside id="right">
+      <nav class="tabs">
+        <button class="tab on" data-tab="farm">🌾</button>
+        <button class="tab" data-tab="market">🪙</button>
+        <button class="tab" data-tab="village">🏘️</button>
+        <button class="tab" data-tab="powers">✨</button>
+        <button class="tab" data-tab="register">📜</button>
+        <button class="tab" data-tab="feats">🏆</button>
+      </nav>
+      <div id="panel-body"></div>
+    </aside>
+  </main>
+
+  <footer id="logbar"><div id="log"></div></footer>
+</div>
+
+<div id="modal"></div>
+
+<script>
+/* Skyward Reach — small shared helpers: RNG, math, formatting, persistence. */
+(function (SW) {
+  'use strict';
+
+  const SAVE_KEY = 'skyward-reach/save/v1';
+  const SAVE_VERSION = 1;
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const rndInt = (a, b) => Math.floor(rnd(a, b + 1));
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const chance = p => Math.random() < p;
+
+  /* Deterministic hash-based noise, so rivals behave the same across reloads
+   * without us having to persist their whole random walk. */
+  function hashNoise(seed, n) {
+    let h = (seed * 374761393 + n * 668265263) >>> 0;
+    h = (h ^ (h >>> 13)) >>> 0;
+    h = Math.imul(h, 1274126177) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function fmt(n) {
+    n = Math.floor(n);
+    if (n < 1000) return String(n);
+    if (n < 1e6) return (n / 1000).toFixed(n < 1e4 ? 2 : 1).replace(/\.0+$/, '') + 'k';
+    return (n / 1e6).toFixed(2).replace(/\.0+$/, '') + 'M';
+  }
+  const pct = v => Math.round(v * 100) + '%';
+
+  function titleCase(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // --- persistence -------------------------------------------------------
+  function save(game) {
+    try {
+      const payload = { v: SAVE_VERSION, t: Date.now(), g: game };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      return true;
+    } catch (e) {
+      console.warn('[skyward] save failed', e);
+      return false;
+    }
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const payload = JSON.parse(raw);
+      if (!payload || payload.v !== SAVE_VERSION || !payload.g) return null;
+      payload.g.__savedAt = payload.t || Date.now();
+      return payload.g;
+    } catch (e) {
+      console.warn('[skyward] load failed', e);
+      return null;
+    }
+  }
+
+  function wipe() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+  }
+
+  function exportSave(game) {
+    return btoa(unescape(encodeURIComponent(JSON.stringify({ v: SAVE_VERSION, t: Date.now(), g: game }))));
+  }
+
+  function importSave(text) {
+    const payload = JSON.parse(decodeURIComponent(escape(atob(text.trim()))));
+    if (!payload || payload.v !== SAVE_VERSION || !payload.g) throw new Error('unrecognised save');
+    return payload.g;
+  }
+
+  SW.core = {
+    SAVE_KEY, clamp, lerp, rnd, rndInt, pick, chance, hashNoise,
+    fmt, pct, titleCase, save, load, wipe, exportSave, importSave
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — static content tables.
+ * Everything designers would want to tune lives here. No game logic.
+ */
+(function (SW) {
+  'use strict';
+
+  const TICKS_PER_DAY = 60;
+
+  const CROPS = {
+    sunwheat: {
+      id: 'sunwheat', name: 'Sunwheat', glyph: '🌾', tint: '#e8c264',
+      seedCost: 4, growTicks: 40, thirst: 0.9, yield: 3, price: 8, feed: 14,
+      rank: 0, blurb: 'Hardy, cheap, forgiving. The grain every godling starts on.'
+    },
+    glimmerroot: {
+      id: 'glimmerroot', name: 'Glimmerroot', glyph: '🥕', tint: '#7fd1c2',
+      seedCost: 14, growTicks: 70, thirst: 1.15, yield: 3, price: 22, feed: 13,
+      rank: 1, blurb: 'Drinks light through its leaves and hoards it underground.'
+    },
+    duskberry: {
+      id: 'duskberry', name: 'Duskberry', glyph: '🫐', tint: '#9a86e0',
+      seedCost: 30, growTicks: 100, thirst: 1.3, yield: 4, price: 40, feed: 22,
+      rank: 2, blurb: 'Ripens only after nightfall. Sweet enough to spoil a beast.'
+    },
+    aetherbloom: {
+      id: 'aetherbloom', name: 'Aetherbloom', glyph: '🌸', tint: '#f19ac7',
+      seedCost: 70, growTicks: 140, thirst: 1.5, yield: 3, price: 130, feed: 30,
+      rank: 3, blurb: 'Grows toward whoever is watching. Judges adore it.'
+    }
+  };
+  const CROP_LIST = Object.values(CROPS);
+
+  // Rank ladder. Renown thresholds gate features — the whole social spine.
+  const RANKS = [
+    { id: 0, name: 'Unlisted',  renown: 0,    color: '#8b93a7', unlock: null },
+    { id: 1, name: 'Mote',      renown: 100,  color: '#79c0ff', unlock: 'Glimmerroot seed · 3rd farm plot · the Quickening' },
+    { id: 2, name: 'Ember',     renown: 600,  color: '#ffa657', unlock: 'Duskberry seed · Shrine tier II · the Storm' },
+    { id: 3, name: 'Beacon',    renown: 2200, color: '#e3b341', unlock: 'Aetherbloom seed · Shrine tier III' },
+    { id: 4, name: 'Luminary',  renown: 6000, color: '#d2a8ff', unlock: 'Shrine tier IV · the Festival crown' },
+    { id: 5, name: 'Ascendant', renown: 16000, color: '#7ee787', unlock: 'Nothing left above you.' }
+  ];
+
+  const MIRACLES = {
+    rain:       { id: 'rain',       name: 'Rain',        glyph: '🌧️', cost: 12, rank: 0, desc: 'Fills every plot to the brim.' },
+    quickening: { id: 'quickening', name: 'Quickening',  glyph: '✨', cost: 28, rank: 1, desc: 'Shoves all growing crops forward by a quarter.' },
+    bounty:     { id: 'bounty',     name: 'Bounty',      glyph: '🍞', cost: 22, rank: 0, desc: '+42 food straight into the granary.' },
+    mend:       { id: 'mend',       name: 'Mend',        glyph: '💗', cost: 18, rank: 0, desc: 'Restores your creature\'s vigour and fills its belly.' },
+    storm:      { id: 'storm',      name: 'Storm',       glyph: '⚡', cost: 34, rank: 2, desc: 'Terror in the sky. Awe up, faith down, mortals remember.' }
+  };
+  const MIRACLE_LIST = Object.values(MIRACLES);
+
+  // Creature lineages — starting stats and pre-wired instincts.
+  const LINEAGES = {
+    thistlebeak: {
+      id: 'thistlebeak', name: 'Thistlebeak', glyph: '🪶',
+      blurb: 'Quick, nosy, hollow-boned. Learns fastest, tires fastest.',
+      base: { strength: 4, cunning: 9, grace: 7, size: 0.85 },
+      wits: 1.30, appetite: 1.05, stamina: 0.85,
+      instinct: { forage: 1.5, play: 1.4, graze: 1.2 },
+      palette: { hide: '#c9d6a8', belly: '#eef3dc', mark: '#8fa86b' }
+    },
+    mossback: {
+      id: 'mossback', name: 'Mossback', glyph: '🐢',
+      blurb: 'Slow, patient, enormously durable. Forgets nothing, learns late.',
+      base: { strength: 9, cunning: 4, grace: 5, size: 1.15 },
+      wits: 0.78, appetite: 1.25, stamina: 1.35,
+      instinct: { rest: 1.6, water: 1.3, harvest: 1.1 },
+      palette: { hide: '#8fae8a', belly: '#d8e6cd', mark: '#5c7a58' }
+    },
+    emberwing: {
+      id: 'emberwing', name: 'Emberwing', glyph: '🦎',
+      blurb: 'Hot-tempered and magnificent. Villagers fear it before they love it.',
+      base: { strength: 8, cunning: 7, grace: 8, size: 1.0 },
+      wits: 1.0, appetite: 1.15, stamina: 1.0,
+      instinct: { terrorize: 1.5, perform: 1.4, feast: 1.2 },
+      palette: { hide: '#d99a6c', belly: '#f6dcc0', mark: '#a85c3a' }
+    }
+  };
+  const LINEAGE_LIST = Object.values(LINEAGES);
+
+  /* Creature behaviours. `weight` is what learning actually modifies.
+   * kind/diligent: how performing this act nudges the two alignment axes.
+   * teachable: whether praise/scold can move it at all (instincts like `rest` are).
+   */
+  const ACTS = {
+    water:     { id: 'water',     name: 'water a plot',        verb: 'waters',      icon: '💧', vigor: 4,  kind: 0.6,  diligent: 1.0, useful: true },
+    harvest:   { id: 'harvest',   name: 'bring in a harvest',  verb: 'harvests',    icon: '🧺', vigor: 6,  kind: 0.5,  diligent: 1.0, useful: true },
+    till:      { id: 'till',      name: 'break new soil',      verb: 'tills',       icon: '⛏️', vigor: 7,  kind: 0.2,  diligent: 1.0, useful: true },
+    sow:       { id: 'sow',       name: 'sow a seed',          verb: 'sows',        icon: '🌱', vigor: 3,  kind: 0.4,  diligent: 1.0, useful: true },
+    forage:    { id: 'forage',    name: 'gather wood',         verb: 'forages',     icon: '🪵', vigor: 5,  kind: 0.2,  diligent: 0.9, useful: true },
+    tithe:     { id: 'tithe',     name: 'feed the villagers',  verb: 'feeds',       icon: '🥣', vigor: 3,  kind: 1.0,  diligent: 0.6, useful: true },
+    play:      { id: 'play',      name: 'play with mortals',   verb: 'plays with',  icon: '🎈', vigor: 3,  kind: 0.9,  diligent: -0.3, useful: true },
+    perform:   { id: 'perform',   name: 'perform',             verb: 'performs for',icon: '🎭', vigor: 5,  kind: 0.5,  diligent: 0.4, useful: true },
+    graze:     { id: 'graze',     name: 'eat your crops',      verb: 'devours',     icon: '😋', vigor: -4, kind: -0.4, diligent: -0.8, useful: false },
+    feast:     { id: 'feast',     name: 'raid the granary',    verb: 'raids',       icon: '🍖', vigor: -6, kind: -0.5, diligent: -0.6, useful: false },
+    terrorize: { id: 'terrorize', name: 'terrorise the village', verb: 'terrorises', icon: '💀', vigor: 5, kind: -1.4, diligent: 0.2,  useful: false },
+    rest:      { id: 'rest',      name: 'sleep',               verb: 'sleeps by',   icon: '💤', vigor: -14, kind: 0,   diligent: -1.0, useful: false },
+    wander:    { id: 'wander',    name: 'wander',              verb: 'wanders past',icon: '🌀', vigor: 1,  kind: 0,    diligent: -0.4, useful: false }
+  };
+  const ACT_LIST = Object.values(ACTS);
+  // Acts shown in the training panel, in teaching order.
+  const TRAINABLE = ['water', 'harvest', 'sow', 'till', 'forage', 'tithe', 'play', 'perform', 'graze', 'feast', 'terrorize', 'rest'];
+
+  const LEASHES = {
+    none:       { id: 'none',       name: 'Unleashed',  glyph: '🌬️', desc: 'It does as it pleases. You can still praise and scold.' },
+    compassion: { id: 'compassion', name: 'Compassion', glyph: '💚', desc: 'Kind and useful acts are twice as likely. Cruelty is suppressed.' },
+    aggression: { id: 'aggression', name: 'Aggression', glyph: '🔥', desc: 'Cruelty and spectacle are twice as likely. Awe over love.' },
+    learning:   { id: 'learning',   name: 'Learning',   glyph: '👁️', desc: 'It watches you. Every chore you do by hand, it learns a little.' }
+  };
+  const LEASH_LIST = Object.values(LEASHES);
+
+  const SHRINE_TIERS = [
+    { tier: 0, name: 'Bare Stone',        wood: 0,   coin: 0,    grandeur: 0,  rank: 0 },
+    { tier: 1, name: 'Cairn',             wood: 12,  coin: 60,   grandeur: 4,  rank: 0 },
+    { tier: 2, name: 'Standing Ring',     wood: 40,  coin: 320,  grandeur: 14, rank: 1 },
+    { tier: 3, name: 'Sky Altar',         wood: 110, coin: 1400, grandeur: 38, rank: 2 },
+    { tier: 4, name: 'Cathedral of Cloud',wood: 260, coin: 5200, grandeur: 90, rank: 3 },
+    { tier: 5, name: 'The Reach Itself',  wood: 600, coin: 18000,grandeur: 210,rank: 4 }
+  ];
+
+  const HUT_COST = { wood: 8, coin: 40, scale: 1.32 };
+  const PLOT_COST = { wood: 6, coin: 50, scale: 1.45 };
+
+  // Festival categories rotate. Each scores a different half of your empire.
+  const FESTIVALS = [
+    { id: 'harvest', name: 'The Harvest Fair', glyph: '🧺',
+      blurb: 'Judges weigh the finest crate you can put on the table.',
+      par: d => 22 * Math.pow(d, 1.15) },
+    { id: 'beast', name: 'The Beast Trial', glyph: '🐾',
+      blurb: 'Your creature, alone in the ring, judged on what you made of it.',
+      par: d => 120 + 900 * (1 - Math.exp(-d / 38)) + 1.2 * d },
+    { id: 'rite', name: 'The Grand Rite', glyph: '🕯️',
+      blurb: 'Shrine, faith, awe. Pure standing, nothing to hide behind.',
+      par: d => 70 + 1500 * (1 - Math.exp(-d / 45)) + 1.5 * d }
+  ];
+
+  const RIVALS = [
+    { name: 'Vashti of the Nine Terraces', pace: 1.00, spike: 0.35, tone: 'proud' },
+    { name: 'Old Kellum',                  pace: 0.72, spike: 0.15, tone: 'kind' },
+    { name: 'The Pale Auditor',            pace: 1.18, spike: 0.10, tone: 'cold' },
+    { name: 'Bright Sisera',               pace: 0.88, spike: 0.45, tone: 'proud' },
+    { name: 'Hob of the Low Cloud',        pace: 0.55, spike: 0.55, tone: 'crude' },
+    { name: 'Mother Anneth',               pace: 0.95, spike: 0.20, tone: 'kind' },
+    { name: 'Sixfold Ryn',                 pace: 1.32, spike: 0.30, tone: 'cold' },
+    { name: 'The Gardener in Grey',        pace: 0.80, spike: 0.25, tone: 'kind' },
+    { name: 'Tallow Marrek',               pace: 1.05, spike: 0.50, tone: 'crude' },
+    { name: 'Ilsabet Ninewinds',           pace: 1.22, spike: 0.28, tone: 'proud' },
+    { name: 'The Quiet Thing Below',       pace: 1.45, spike: 0.12, tone: 'cold' }
+  ];
+
+  // Rival chatter, keyed by how they feel about you right now.
+  const BARBS = {
+    ahead: { // rival is above you
+      proud: ['{r} has not looked down once today.', '{r} lets it be known that the Register speaks for itself.'],
+      kind:  ['{r} says there is no shame in a slow climb.', '{r} sends a sack of seed and no comment.'],
+      cold:  ['{r} has recorded your position. That is all.', '{r} finds your rate of growth unremarkable.'],
+      crude: ['{r} asks if your island is the small one.', '{r} laughs at something. Probably you.']
+    },
+    near: { // within striking distance
+      proud: ['{r} has begun to watch you properly.', '{r} says the gap is a courtesy, not a fact.'],
+      kind:  ['{r} says you are doing well. {r} means it.', '{r} raises a cup in your direction.'],
+      cold:  ['{r} has revised your entry upward.', '{r} is now accounting for you.'],
+      crude: ['{r} is telling everyone you got lucky.', '{r} wants a word. Bring the creature.']
+    },
+    behind: { // you passed them
+      proud: ['{r} refuses to discuss the standings.', '{r} calls the Register a popularity contest now.'],
+      kind:  ['{r} congratulates you, loudly, twice.', '{r} says they always knew.'],
+      cold:  ['{r} has stopped commenting on the Register.', '{r} notes the change without emotion.'],
+      crude: ['{r} says the rankings are rigged.', '{r} demands a rematch at the next festival.']
+    }
+  };
+
+  const FEATS = [
+    { id: 'first_harvest',  name: 'First Bushel',        desc: 'Harvest anything at all.',                  renown: 10,   check: g => g.stats.harvests >= 1 },
+    { id: 'harvest_50',     name: 'Calloused Hands',     desc: 'Harvest 50 crops.',                         renown: 30,   check: g => g.stats.harvests >= 50 },
+    { id: 'harvest_400',    name: 'Grinder',             desc: 'Harvest 400 crops.',                        renown: 180,  check: g => g.stats.harvests >= 400 },
+    { id: 'harvest_2000',   name: 'The Long Furrow',     desc: 'Harvest 2000 crops.',                       renown: 900, check: g => g.stats.harvests >= 2000 },
+    { id: 'coin_500',       name: 'Coin in the Jar',     desc: 'Hold 500 coin at once.',                    renown: 25,   check: g => g.res.coin >= 500 },
+    { id: 'coin_5000',      name: 'Merchant God',        desc: 'Hold 5,000 coin at once.',                  renown: 150,  check: g => g.res.coin >= 5000 },
+    { id: 'coin_50000',     name: 'Obscene Wealth',      desc: 'Hold 50,000 coin at once.',                 renown: 900, check: g => g.res.coin >= 50000 },
+    { id: 'plots_8',        name: 'Enclosure',           desc: 'Own 8 farm plots.',                         renown: 60,  check: g => g.plots.length >= 8 },
+    { id: 'plots_16',       name: 'Horizon to Horizon',  desc: 'Own all 16 farm plots.',                    renown: 350,  check: g => g.plots.length >= 16 },
+    { id: 'village_6',      name: 'A Real Village',      desc: 'Shelter 6 villagers.',                      renown: 60,  check: g => g.village.villagers >= 6 },
+    { id: 'village_14',     name: 'Congregation',        desc: 'Shelter 14 villagers.',                     renown: 320,  check: g => g.village.villagers >= 14 },
+    { id: 'faith_80',       name: 'Beloved',             desc: 'Reach 80 Faith.',                           renown: 110,  check: g => g.village.faith >= 80 },
+    { id: 'awe_80',         name: 'Feared',              desc: 'Reach 80 Awe.',                             renown: 110,  check: g => g.village.awe >= 80 },
+    { id: 'both_60',        name: 'Loved and Feared',    desc: 'Hold 60 Faith and 60 Awe at the same time.', renown: 320,  check: g => g.village.faith >= 60 && g.village.awe >= 60 },
+    { id: 'taught_one',     name: 'It Understood',       desc: 'Teach any chore to 60% mastery.',           renown: 40,   check: g => SW.creature.masteredCount(g, 0.60) >= 1 },
+    { id: 'taught_three',   name: 'A Working Beast',     desc: 'Teach three chores to 60% mastery.',        renown: 160,  check: g => SW.creature.masteredCount(g, 0.60) >= 3 },
+    { id: 'taught_all',     name: 'Farmhand of the Gods',desc: 'Teach all five farm chores to 70%.',        renown: 600, check: g => SW.creature.farmChoresMastered(g, 0.70) },
+    { id: 'bond_90',        name: 'Inseparable',         desc: 'Reach 90 Bond with your creature.',         renown: 160,  check: g => g.creature.bond >= 90 },
+    { id: 'size_2',         name: 'It Blots the Sun',    desc: 'Grow your creature to twice its birth size.',renown: 150, check: g => g.creature.size >= 2.0 },
+    { id: 'saint',          name: 'Saint',               desc: 'Push your creature to +90 Kindness.',       renown: 130,  check: g => g.creature.kind >= 90 },
+    { id: 'monster',        name: 'Monster',             desc: 'Push your creature to -90 Kindness.',       renown: 130,  check: g => g.creature.kind <= -90 },
+    { id: 'shrine_3',       name: 'Something Permanent', desc: 'Raise the shrine to tier III.',             renown: 150,  check: g => g.shrine >= 3 },
+    { id: 'shrine_5',       name: 'The Reach Itself',    desc: 'Raise the shrine to its final tier.',       renown: 1200, check: g => g.shrine >= 5 },
+    { id: 'fest_win',       name: 'Crowned',             desc: 'Win a festival.',                           renown: 120,  check: g => g.stats.festivalWins >= 1 },
+    { id: 'fest_win_5',     name: 'Serial Winner',       desc: 'Win five festivals.',                       renown: 500, check: g => g.stats.festivalWins >= 5 },
+    { id: 'top_five',       name: 'Named in the Register',desc: 'Reach the top five of the Register.',      renown: 200,  check: g => g.lastStanding > 0 && g.lastStanding <= 5 },
+    { id: 'top_one',        name: 'Ascendant',           desc: 'Stand first in the Skyward Register.',      renown: 900, check: g => g.lastStanding === 1 },
+    { id: 'day_10',         name: 'Ten Days',            desc: 'Survive ten days.',                         renown: 30,   check: g => g.day >= 10 },
+    { id: 'day_40',         name: 'Forty Days',          desc: 'Survive forty days.',                       renown: 200,  check: g => g.day >= 40 }
+  ];
+
+  const HATCH_HINTS = [
+    'Whatever you praise, it will do again. Whatever you strike it for, it will hide from you.',
+    'A creature taught to water your plots is worth more than any miracle you can buy.',
+    'Love and terror both climb the Register. They just climb it differently.'
+  ];
+
+  SW.content = {
+    TICKS_PER_DAY, CROPS, CROP_LIST, RANKS, MIRACLES, MIRACLE_LIST,
+    LINEAGES, LINEAGE_LIST, ACTS, ACT_LIST, TRAINABLE, LEASHES, LEASH_LIST,
+    SHRINE_TIERS, HUT_COST, PLOT_COST, FESTIVALS, RIVALS, BARBS, FEATS, HATCH_HINTS
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — game state shape, new-game construction, save migration. */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const { clamp } = SW.core;
+
+  const GRID_W = 4, GRID_H = 4;
+  const MAX_PLOTS = GRID_W * GRID_H;
+  const START_PLOTS = 3;
+
+  function makePlot(index) {
+    return {
+      i: index,
+      gx: index % GRID_W,
+      gy: Math.floor(index / GRID_W),
+      state: 'raw',   // raw | tilled | growing | ripe
+      crop: null,
+      growth: 0,      // ticks accumulated
+      water: 0,       // 0..100
+      rot: 0          // wither pressure 0..100
+    };
+  }
+
+  function newCreature(lineageId, name) {
+    const L = C.LINEAGES[lineageId];
+    const weights = {};
+    for (const id of C.TRAINABLE) weights[id] = 1.0;
+    weights.wander = 1.0;
+    for (const k in L.instinct) weights[k] = L.instinct[k];
+    return {
+      lineage: lineageId,
+      name: name || L.name,
+      hunger: 70,      // 0 starving .. 100 stuffed
+      vigor: 90,       // 0 exhausted .. 100 fresh
+      mood: 70,        // 0 miserable .. 100 delighted
+      bond: 20,        // 0 .. 100
+      kind: 0,         // -100 cruel .. +100 kind
+      diligence: 0,    // -100 idle .. +100 industrious
+      size: 1.0,
+      stats: { strength: L.base.strength, cunning: L.base.cunning, grace: L.base.grace },
+      weights: weights,
+      leash: 'none',
+      // transient-ish, but persisted so a reload doesn't eat a pending praise
+      act: null,       // { id, tick, target, resolved }
+      actCooldown: 0,
+      pending: null,   // { act, expires } — the praise/scold window
+      // scene position, in the renderer's logical canvas pixels
+      x: 470, y: 452, tx: 470, ty: 452,
+      fed: 0, praised: 0, scolded: 0, chores: 0
+    };
+  }
+
+  function newGame(lineageId, creatureName, godName) {
+    const plots = [];
+    for (let i = 0; i < MAX_PLOTS; i++) plots.push(makePlot(i));
+
+    const rivals = C.RIVALS.map((r, i) => ({
+      name: r.name, pace: r.pace, spike: r.spike, tone: r.tone,
+      renown: 140 + i * 130, seed: 1000 + i * 77
+    }));
+
+    const prices = {};
+    for (const c of C.CROP_LIST) prices[c.id] = 1;
+
+    return {
+      version: 1,
+      godName: godName || 'the Nameless',
+      tick: 0,
+      day: 1,
+      dayTick: 0,
+      speed: 1,
+      paused: false,
+
+      res: { coin: 40, wood: 5, prayer: 0, focus: 24, focusMax: 24, renown: 0 },
+      seeds: { sunwheat: 6, glimmerroot: 0, duskberry: 0, aetherbloom: 0 },
+      stock: { sunwheat: 0, glimmerroot: 0, duskberry: 0, aetherbloom: 0 },
+      prices: prices,
+
+      plots: plots.slice(0, START_PLOTS),
+      lockedPlots: plots.slice(START_PLOTS),
+
+      village: { villagers: 3, huts: 3, faith: 20, awe: 5, food: 8, unrest: 0 },
+      shrine: 0,
+
+      creature: newCreature(lineageId, creatureName),
+
+      rivals: rivals,
+      lastStanding: 0,
+      feats: {},                 // id -> day earned
+      trophies: [],              // { fest, place, day }
+      festival: { nextDay: 5, index: 0, lastResult: null },
+      log: [],
+      chatter: [],
+      stats: { harvests: 0, sold: 0, coinEarned: 0, miracles: 0, festivals: 0, festivalWins: 0, days: 0 },
+      fx: [],
+      __savedAt: Date.now()
+    };
+  }
+
+  /* Bring an older/partial save up to the current shape without losing progress. */
+  function hydrate(g) {
+    if (!g || typeof g !== 'object') return null;
+    const fresh = newGame('mossback', 'x', 'x');
+    const fill = (target, source) => {
+      for (const k in source) {
+        if (target[k] === undefined) target[k] = source[k];
+        else if (source[k] && typeof source[k] === 'object' && !Array.isArray(source[k]) &&
+                 target[k] && typeof target[k] === 'object') fill(target[k], source[k]);
+      }
+    };
+    fill(g, fresh);
+    if (!C.LINEAGES[g.creature.lineage]) g.creature.lineage = 'mossback';
+    for (const id of C.TRAINABLE) if (typeof g.creature.weights[id] !== 'number') g.creature.weights[id] = 1;
+    g.creature.hunger = clamp(g.creature.hunger, 0, 100);
+    g.creature.vigor = clamp(g.creature.vigor, 0, 100);
+    g.fx = [];
+    return g;
+  }
+
+  SW.state = { GRID_W, GRID_H, MAX_PLOTS, makePlot, newCreature, newGame, hydrate };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — plots, crops and the market.
+ * Shared by the player's hand and by the creature, so both go through the
+ * same rules: whoever swings the hoe, the soil behaves identically.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const { clamp, chance } = SW.core;
+
+  // --- queries -----------------------------------------------------------
+  const plotsWhere = (g, fn) => g.plots.filter(fn);
+  const rawPlots     = g => plotsWhere(g, p => p.state === 'raw');
+  const tilledPlots  = g => plotsWhere(g, p => p.state === 'tilled');
+  const growingPlots = g => plotsWhere(g, p => p.state === 'growing');
+  const ripePlots    = g => plotsWhere(g, p => p.state === 'ripe');
+
+  function thirstiest(g) {
+    const cand = plotsWhere(g, p => (p.state === 'growing' || p.state === 'ripe') && p.water < 80);
+    if (!cand.length) return null;
+    return cand.reduce((a, b) => (a.water <= b.water ? a : b));
+  }
+
+  function bestSeed(g) {
+    // The creature sows the most valuable seed it has enough of.
+    let best = null;
+    for (const c of C.CROP_LIST) {
+      if ((g.seeds[c.id] | 0) > 0 && (!best || c.price > best.price)) best = c;
+    }
+    return best;
+  }
+
+  function seedCount(g) {
+    let n = 0;
+    for (const k in g.seeds) n += g.seeds[k] | 0;
+    return n;
+  }
+
+  function stockCount(g) {
+    let n = 0;
+    for (const k in g.stock) n += g.stock[k] | 0;
+    return n;
+  }
+
+  function bestStock(g) {
+    let best = null;
+    for (const c of C.CROP_LIST) {
+      if ((g.stock[c.id] | 0) > 0 && (!best || c.price > best.price)) best = c;
+    }
+    return best;
+  }
+
+  // --- mutations ---------------------------------------------------------
+  function till(g, plot) {
+    if (!plot || plot.state !== 'raw') return false;
+    plot.state = 'tilled';
+    plot.rot = 0;
+    return true;
+  }
+
+  function sow(g, plot, cropId) {
+    if (!plot || plot.state !== 'tilled') return false;
+    if ((g.seeds[cropId] | 0) <= 0) return false;
+    g.seeds[cropId]--;
+    plot.state = 'growing';
+    plot.crop = cropId;
+    plot.growth = 0;
+    plot.water = Math.max(plot.water, 45);
+    plot.rot = 0;
+    return true;
+  }
+
+  function water(g, plot) {
+    if (!plot || (plot.state !== 'growing' && plot.state !== 'ripe')) return false;
+    if (plot.water >= 99) return false;
+    plot.water = 100;
+    plot.rot = Math.max(0, plot.rot - 25);
+    return true;
+  }
+
+  /* Returns the crop definition harvested, or null. `bonus` scales the yield —
+   * a strong creature brings in more than a careless one. */
+  function harvest(g, plot, bonus) {
+    if (!plot || plot.state !== 'ripe') return null;
+    const crop = C.CROPS[plot.crop];
+    const spoil = plot.rot > 55 ? 0.5 : 1;
+    const amount = Math.max(1, Math.round(crop.yield * (bonus || 1) * spoil));
+    g.stock[crop.id] = (g.stock[crop.id] | 0) + amount;
+    g.stats.harvests += amount;
+    plot.state = 'tilled';
+    plot.crop = null;
+    plot.growth = 0;
+    plot.rot = 0;
+    plot.water = Math.max(0, plot.water - 20);
+    return { crop, amount };
+  }
+
+  /* Something ate the crop in the ground. Nobody gets paid. */
+  function devour(g, plot) {
+    if (!plot || (plot.state !== 'growing' && plot.state !== 'ripe')) return null;
+    const crop = C.CROPS[plot.crop];
+    const ripeness = plot.state === 'ripe' ? 1 : clamp(plot.growth / crop.growTicks, 0.2, 1);
+    plot.state = 'tilled';
+    plot.crop = null;
+    plot.growth = 0;
+    plot.rot = 0;
+    return { crop, ripeness };
+  }
+
+  // --- per-tick simulation ----------------------------------------------
+  function tickPlots(g, dt) {
+    for (const p of g.plots) {
+      if (p.state === 'growing' || p.state === 'ripe') {
+        const crop = C.CROPS[p.crop];
+        p.water = clamp(p.water - crop.thirst * dt, 0, 100);
+        if (p.state === 'growing') {
+          // Dry soil stalls growth rather than stopping it dead.
+          const rate = p.water > 20 ? 1 : p.water > 0 ? 0.35 : 0.1;
+          p.growth += rate * dt;
+          if (p.growth >= crop.growTicks) { p.state = 'ripe'; p.growth = crop.growTicks; }
+        } else {
+          // Ripe crops left in the field start to go over.
+          p.rot = clamp(p.rot + 0.55 * dt, 0, 100);
+        }
+        if (p.water <= 0) p.rot = clamp(p.rot + 0.8 * dt, 0, 100);
+        if (p.rot >= 100 && chance(0.05 * dt)) {
+          p.state = 'tilled'; p.crop = null; p.growth = 0; p.rot = 0;
+          SW.ui && SW.ui.log(g, 'A crop withered to nothing in the dry.', 'bad');
+        }
+      }
+    }
+  }
+
+  // --- market ------------------------------------------------------------
+  function price(g, cropId) {
+    return Math.max(1, Math.round(C.CROPS[cropId].price * (g.prices[cropId] || 1)));
+  }
+
+  function rollPrices(g) {
+    for (const c of C.CROP_LIST) {
+      const drift = (Math.random() - 0.5) * 0.34;
+      g.prices[c.id] = clamp((g.prices[c.id] || 1) * 0.55 + (1 + drift) * 0.45, 0.62, 1.55);
+    }
+  }
+
+  function sell(g, cropId, count) {
+    const have = g.stock[cropId] | 0;
+    const n = Math.min(have, count);
+    if (n <= 0) return 0;
+    const gain = price(g, cropId) * n;
+    g.stock[cropId] -= n;
+    g.res.coin += gain;
+    g.stats.sold += n;
+    g.stats.coinEarned += gain;
+    return gain;
+  }
+
+  function buySeed(g, cropId, count) {
+    const crop = C.CROPS[cropId];
+    const unit = Math.max(1, Math.round(crop.seedCost * (0.75 + 0.35 * (g.prices[cropId] || 1))));
+    const affordable = Math.min(count, Math.floor(g.res.coin / unit));
+    if (affordable <= 0) return 0;
+    g.res.coin -= unit * affordable;
+    g.seeds[cropId] = (g.seeds[cropId] | 0) + affordable;
+    return affordable;
+  }
+
+  function seedPrice(g, cropId) {
+    const crop = C.CROPS[cropId];
+    return Math.max(1, Math.round(crop.seedCost * (0.75 + 0.35 * (g.prices[cropId] || 1))));
+  }
+
+  /* Timber, bought rather than hauled. Coin needs a sink and wood is the
+   * bottleneck on every structure you actually want. */
+  const WOOD_PRICE = 12;
+  function buyWood(g, count) {
+    const affordable = Math.min(count, Math.floor(g.res.coin / WOOD_PRICE));
+    if (affordable <= 0) return 0;
+    g.res.coin -= WOOD_PRICE * affordable;
+    g.res.wood += affordable;
+    return affordable;
+  }
+
+  /* Crops into the granary. Villagers eat food, not raw duskberries. */
+  function mill(g, cropId, count) {
+    const have = g.stock[cropId] | 0;
+    const n = Math.min(have, count);
+    if (n <= 0) return 0;
+    g.stock[cropId] -= n;
+    const food = C.CROPS[cropId].feed * n;
+    g.village.food += food;
+    return food;
+  }
+
+  SW.farm = {
+    rawPlots, tilledPlots, growingPlots, ripePlots, thirstiest, bestSeed, bestStock,
+    seedCount, stockCount, till, sow, water, harvest, devour, tickPlots,
+    price, seedPrice, rollPrices, sell, buySeed, mill, buyWood, WOOD_PRICE
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — the creature's brain.
+ *
+ * The whole design rests here. The creature is never commanded. It picks an
+ * act by softmax over learned weights, does it in front of you, and then you
+ * get a short window to praise or scold. Praise multiplies the weight for
+ * that act; scolding divides it and makes the creature a little meaner.
+ * Everything you eventually get for free — a watered, harvested, self-running
+ * farm — is something you had to sit and teach.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const F = SW.farm;
+  const { clamp, rnd, rndInt, chance, pick } = SW.core;
+
+  const W_MIN = 0.08, W_MAX = 14;
+  const PRAISE_WINDOW = 9;   // ticks you have to react
+
+  const lineage = g => C.LINEAGES[g.creature.lineage];
+
+  /* Display value: how well it knows a chore, 0..1. */
+  function mastery(g, actId) {
+    const w = g.creature.weights[actId] || 0;
+    return clamp(1 - 1 / (1 + w / 2.5), 0, 1);
+  }
+
+  function masteredCount(g, threshold) {
+    let n = 0;
+    for (const id of C.TRAINABLE) {
+      if (C.ACTS[id].useful && mastery(g, id) >= threshold) n++;
+    }
+    return n;
+  }
+
+  const FARM_CHORES = ['water', 'harvest', 'sow', 'till', 'forage'];
+  function farmChoresMastered(g, threshold) {
+    return FARM_CHORES.every(id => mastery(g, id) >= threshold);
+  }
+
+  function learnRate(g) {
+    const c = g.creature;
+    const fear = c.mood < 25 ? 0.55 : 1;          // a terrified beast learns badly
+    return 1 + 0.26 * lineage(g).wits * (0.55 + c.bond / 140) * fear;
+  }
+
+  // --- feasibility -------------------------------------------------------
+  /* Each entry answers "can it do this right now, and at what". */
+  const FEASIBLE = {
+    water:   g => { const p = F.thirstiest(g); return p ? { kind: 'plot', i: p.i } : null; },
+    harvest: g => { const p = F.ripePlots(g)[0]; return p ? { kind: 'plot', i: p.i } : null; },
+    till:    g => { const p = F.rawPlots(g)[0]; return p ? { kind: 'plot', i: p.i } : null; },
+    sow:     g => { const p = F.tilledPlots(g)[0]; return p && F.bestSeed(g) ? { kind: 'plot', i: p.i } : null; },
+    forage:  g => ({ kind: 'wood' }),
+    tithe:   g => (F.stockCount(g) > 0 && g.village.food < 60 ? { kind: 'village' } : null),
+    play:    g => (g.village.villagers > 0 ? { kind: 'village' } : null),
+    perform: g => (g.village.villagers > 0 && g.creature.bond >= 25 ? { kind: 'shrine' } : null),
+    graze:   g => { const p = F.ripePlots(g)[0] || F.growingPlots(g)[0]; return p ? { kind: 'plot', i: p.i } : null; },
+    feast:   g => (g.village.food >= 4 ? { kind: 'village' } : null),
+    terrorize: g => (g.village.villagers > 0 ? { kind: 'village' } : null),
+    rest:    g => ({ kind: 'home' }),
+    wander:  g => ({ kind: 'roam' })
+  };
+
+  /* Situational multipliers layered on top of the learned weight. Needs win
+   * over training: a starving creature will eat your field no matter what it
+   * was taught, which is exactly the lesson. */
+  function drive(g, actId) {
+    const c = g.creature;
+    const a = C.ACTS[actId];
+    let m = 1;
+
+    if (a.vigor > 0 && c.vigor < a.vigor * 1.6) m *= 0.25;
+    if (a.vigor > 0 && c.vigor < a.vigor) return 0;
+
+    if (actId === 'graze' || actId === 'feast') {
+      m *= 1 + Math.pow(clamp((55 - c.hunger) / 55, 0, 1), 1.6) * 7;
+      if (c.hunger > 78) m *= 0.18;
+    }
+    if (actId === 'rest') {
+      m *= 1 + Math.pow(clamp((50 - c.vigor) / 50, 0, 1), 1.5) * 8;
+      if (c.vigor > 82) m *= 0.1;
+    }
+    if (actId === 'play' || actId === 'wander') {
+      m *= 1 + clamp((45 - c.mood) / 45, 0, 1) * 2.2;
+    }
+    if (actId === 'terrorize') {
+      m *= 1 + clamp(-c.kind / 100, 0, 1) * 2.2;
+      if (c.kind > 45) m *= 0.25;
+    }
+    if (a.useful) {
+      // Industriousness is its own appetite.
+      m *= 1 + clamp(c.diligence / 100, -0.7, 1) * 0.9;
+    }
+    if (actId === 'perform') m *= 1 + c.stats.grace / 30;
+
+    switch (c.leash) {
+      case 'compassion':
+        if (a.kind > 0.3 || a.useful) m *= 2.3;
+        if (a.kind < -0.2) m *= 0.14;
+        break;
+      case 'aggression':
+        if (a.kind < -0.2) m *= 2.4;
+        if (a.kind > 0.5) m *= 0.4;
+        if (actId === 'perform') m *= 1.8;
+        break;
+      case 'learning':
+        m *= 1.05;  // attentive, slightly more active
+        break;
+    }
+    return m;
+  }
+
+  function chooseAct(g) {
+    const c = g.creature;
+    const options = [];
+    let total = 0;
+    for (const id in c.weights) {
+      const fn = FEASIBLE[id];
+      if (!fn) continue;
+      const target = fn(g);
+      if (!target) continue;
+      const w = clamp(c.weights[id], W_MIN, W_MAX) * drive(g, id);
+      if (w <= 0) continue;
+      options.push({ id, target, w });
+      total += w;
+    }
+    if (!options.length) return { id: 'wander', target: { kind: 'roam' } };
+    let r = Math.random() * total;
+    for (const o of options) { r -= o.w; if (r <= 0) return o; }
+    return options[options.length - 1];
+  }
+
+  // --- doing the thing ---------------------------------------------------
+  function emit(g, text, tone) {
+    if (SW.ui) SW.ui.log(g, text, tone || 'creature');
+  }
+  function pop(g, text, tone) {
+    g.fx.push({ at: 'creature', text: text, tone: tone || 'neutral', life: 1.6, t: 0 });
+  }
+
+  function applyAct(g, actId, target) {
+    const c = g.creature;
+    const a = C.ACTS[actId];
+    const name = c.name;
+    let ok = true;
+
+    switch (actId) {
+      case 'water': {
+        const p = g.plots.find(p => p.i === target.i);
+        ok = F.water(g, p);
+        if (ok) { pop(g, '💧', 'good'); emit(g, `${name} waters the ${C.CROPS[p.crop] ? C.CROPS[p.crop].name.toLowerCase() : 'soil'}.`); }
+        break;
+      }
+      case 'harvest': {
+        const p = g.plots.find(p => p.i === target.i);
+        const r = F.harvest(g, p, 0.85 + c.stats.strength / 40);
+        ok = !!r;
+        if (ok) { pop(g, '🧺+' + r.amount, 'good'); emit(g, `${name} brings in ${r.amount} ${r.crop.name}.`); }
+        break;
+      }
+      case 'till': {
+        const p = g.plots.find(p => p.i === target.i);
+        ok = F.till(g, p);
+        if (ok) { pop(g, '⛏️', 'good'); emit(g, `${name} breaks the soil open.`); }
+        break;
+      }
+      case 'sow': {
+        const p = g.plots.find(p => p.i === target.i);
+        const seed = F.bestSeed(g);
+        ok = seed ? F.sow(g, p, seed.id) : false;
+        if (ok) { pop(g, '🌱', 'good'); emit(g, `${name} presses a ${seed.name} seed into the ground.`); }
+        break;
+      }
+      case 'forage': {
+        const n = 1 + Math.floor(c.stats.strength / 7);
+        g.res.wood += n;
+        pop(g, '🪵+' + n, 'good');
+        emit(g, `${name} drags ${n} wood back from the treeline.`);
+        break;
+      }
+      case 'tithe': {
+        const crop = F.bestStock(g);
+        ok = !!crop;
+        if (ok) {
+          const food = F.mill(g, crop.id, 1);
+          g.village.faith = clamp(g.village.faith + 1.6, 0, 100);
+          pop(g, '🥣', 'good');
+          emit(g, `${name} carries ${crop.name} down to the village. They eat because of your beast.`, 'good');
+        }
+        break;
+      }
+      case 'play': {
+        c.mood = clamp(c.mood + 9, 0, 100);
+        g.village.faith = clamp(g.village.faith + 0.9, 0, 100);
+        pop(g, '🎈', 'good');
+        emit(g, `${name} plays with the village children.`);
+        break;
+      }
+      case 'perform': {
+        const gain = 1 + c.stats.grace / 5 + c.bond / 40;
+        g.res.renown += gain;
+        g.village.faith = clamp(g.village.faith + 0.6, 0, 100);
+        c.mood = clamp(c.mood + 6, 0, 100);
+        pop(g, '🎭+' + Math.round(gain), 'good');
+        emit(g, `${name} performs. Word of it travels.`, 'good');
+        break;
+      }
+      case 'graze': {
+        const p = g.plots.find(p => p.i === target.i);
+        const r = F.devour(g, p);
+        ok = !!r;
+        if (ok) {
+          c.hunger = clamp(c.hunger + r.crop.feed * r.ripeness, 0, 130);
+          c.fed++;
+          pop(g, '😋', 'bad');
+          emit(g, `${name} eats your ${r.crop.name} straight out of the ground.`, 'bad');
+        }
+        break;
+      }
+      case 'feast': {
+        const take = Math.min(g.village.food, 14);
+        g.village.food -= take;
+        c.hunger = clamp(c.hunger + take * 1.6, 0, 130);
+        c.fed++;
+        g.village.faith = clamp(g.village.faith - 1.2, 0, 100);
+        pop(g, '🍖', 'bad');
+        emit(g, `${name} raids the granary. The village counts what is left.`, 'bad');
+        break;
+      }
+      case 'terrorize': {
+        g.village.awe = clamp(g.village.awe + 2.6, 0, 100);
+        g.village.faith = clamp(g.village.faith - 2.1, 0, 100);
+        g.village.unrest = clamp(g.village.unrest + 3, 0, 100);
+        c.mood = clamp(c.mood + (c.kind < 0 ? 8 : -4), 0, 100);
+        pop(g, '💀', 'bad');
+        emit(g, `${name} goes through the village roaring. They will remember it.`, 'bad');
+        break;
+      }
+      case 'rest': {
+        pop(g, '💤', 'neutral');
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (!ok) return false;
+
+    // Cost, drift, and slow physical growth.
+    c.vigor = clamp(c.vigor - a.vigor, 0, 100);
+    c.kind = clamp(c.kind + a.kind * 0.16, -100, 100);
+    c.diligence = clamp(c.diligence + a.diligent * 0.14, -100, 100);
+    if (a.useful) { c.chores++; c.bond = clamp(c.bond + 0.06, 0, 100); }
+
+    if (actId === 'till' || actId === 'forage' || actId === 'harvest') c.stats.strength += 0.022;
+    if (actId === 'sow' || actId === 'water' || actId === 'terrorize') c.stats.cunning += 0.022;
+    if (actId === 'play' || actId === 'perform' || actId === 'tithe') c.stats.grace += 0.022;
+
+    return true;
+  }
+
+  // --- the per-tick state machine ---------------------------------------
+  function beginAct(g) {
+    const c = g.creature;
+    const chosen = chooseAct(g);
+    const quick = 1 / (0.8 + c.stats.cunning / 45);
+    c.act = {
+      id: chosen.id,
+      anchor: chosen.target,
+      phase: 'travel',
+      t: 0,
+      travel: 2 * quick,
+      work: 2 * quick,
+      idle: rnd(1, 3) * quick
+    };
+  }
+
+  function tick(g, dt) {
+    const c = g.creature;
+    const L = lineage(g);
+
+    // Needs.
+    c.hunger = clamp(c.hunger - 0.22 * L.appetite * (0.7 + c.size * 0.4) * dt, 0, 130);
+    c.vigor = clamp(c.vigor + (c.act && c.act.id === 'rest' ? 2.2 : 0.42) * L.stamina * dt, 0, 100);
+    c.mood = clamp(c.mood - 0.12 * dt + (c.hunger < 20 ? -0.35 * dt : 0) + (c.bond > 60 ? 0.05 * dt : 0), 0, 100);
+    if (c.hunger <= 0) {
+      c.vigor = clamp(c.vigor - 0.5 * dt, 0, 100);
+      c.mood = clamp(c.mood - 0.3 * dt, 0, 100);
+    }
+    // Well-fed creatures grow. Growth is one-way; you cannot shrink a beast.
+    if (c.hunger > 78) c.size = clamp(c.size + 0.0009 * dt, 0.6, 3.2);
+
+    // Praise window expiry.
+    if (c.pending) {
+      c.pending.t += dt;
+      if (c.pending.t >= PRAISE_WINDOW) c.pending = null;
+    }
+
+    // Slow forgetting toward instinct — thistlebeaks lose it fastest.
+    const forget = 0.00035 * L.wits * dt;
+    for (const id in c.weights) {
+      const base = (L.instinct[id] || 1);
+      c.weights[id] += (base - c.weights[id]) * forget;
+      c.weights[id] = clamp(c.weights[id], W_MIN, W_MAX);
+    }
+
+    // Act state machine.
+    if (!c.act) { beginAct(g); return; }
+    const a = c.act;
+    a.t += dt;
+    if (a.phase === 'travel' && a.t >= a.travel) { a.phase = 'work'; a.t = 0; }
+    else if (a.phase === 'work' && a.t >= a.work) {
+      const done = applyAct(g, a.id, a.anchor);
+      if (done && a.id !== 'wander') {
+        c.pending = { act: a.id, t: 0 };
+      }
+      a.phase = 'idle'; a.t = 0;
+    } else if (a.phase === 'idle' && a.t >= a.idle) {
+      c.act = null;
+    }
+  }
+
+  // --- teaching ----------------------------------------------------------
+  function praise(g) {
+    const c = g.creature;
+    if (!c.pending) return false;
+    const id = c.pending.act;
+    const a = C.ACTS[id];
+    const mul = learnRate(g);
+    c.weights[id] = clamp(c.weights[id] * mul, W_MIN, W_MAX);
+    c.bond = clamp(c.bond + 2.4, 0, 100);
+    c.mood = clamp(c.mood + 7, 0, 100);
+    // You are not just reinforcing a chore, you are endorsing a character.
+    c.kind = clamp(c.kind + a.kind * 1.7, -100, 100);
+    c.diligence = clamp(c.diligence + a.diligent * 1.3, -100, 100);
+    c.praised++;
+    c.pending = null;
+    pop(g, '❤', 'good');
+    SW.ui && SW.ui.log(g, `You lay a hand on ${c.name}. It will ${a.name} again.`, 'good');
+    return true;
+  }
+
+  function scold(g) {
+    const c = g.creature;
+    if (!c.pending) return false;
+    const id = c.pending.act;
+    const a = C.ACTS[id];
+    const mul = learnRate(g) * 1.1;
+    c.weights[id] = clamp(c.weights[id] / mul, W_MIN, W_MAX);
+    c.bond = clamp(c.bond - 1.7, 0, 100);
+    c.mood = clamp(c.mood - 10, 0, 100);
+    c.vigor = clamp(c.vigor - 2, 0, 100);
+    c.kind = clamp(c.kind - a.kind * 1.1 - 0.7, -100, 100);
+    c.diligence = clamp(c.diligence - a.diligent * 0.8, -100, 100);
+    c.scolded++;
+    c.pending = null;
+    pop(g, '✋', 'bad');
+    SW.ui && SW.ui.log(g, `You strike ${c.name}. It flinches, and files the lesson away.`, 'bad');
+    return true;
+  }
+
+  /* Imitation. On the Leash of Learning, whatever you do with your own hands
+   * bleeds into the creature's weights. Slower than praise, but free. */
+  function observe(g, actId) {
+    const c = g.creature;
+    if (c.leash !== 'learning') return;
+    if (!c.weights[actId]) return;
+    const gain = 1 + 0.075 * lineage(g).wits * (0.6 + c.bond / 200);
+    c.weights[actId] = clamp(c.weights[actId] * gain, W_MIN, W_MAX);
+    if (chance(0.12)) {
+      g.fx.push({ at: 'creature', text: '👁️', tone: 'neutral', life: 1.2, t: 0 });
+    }
+  }
+
+  function feed(g, cropId) {
+    const c = g.creature;
+    if ((g.stock[cropId] | 0) <= 0) return false;
+    g.stock[cropId]--;
+    const crop = C.CROPS[cropId];
+    c.hunger = clamp(c.hunger + crop.feed, 0, 130);
+    c.mood = clamp(c.mood + 4, 0, 100);
+    c.bond = clamp(c.bond + 1.1, 0, 100);
+    c.fed++;
+    pop(g, crop.glyph, 'good');
+    SW.ui && SW.ui.log(g, `You feed ${c.name} a ${crop.name}. It leans into your hand.`, 'good');
+    return true;
+  }
+
+  // --- appearance --------------------------------------------------------
+  /* Everything visible about the creature is downstream of how you raised it.
+   * This is the payoff for all that praising and slapping. */
+  function look(g) {
+    const c = g.creature;
+    const L = lineage(g);
+    const k = c.kind / 100;          // -1 cruel .. +1 kind
+    const d = c.diligence / 100;
+    const plump = clamp((c.hunger - 40) / 90, -0.3, 0.7);
+    const hue = (base, target, t) => mixHex(base, target, clamp(t, 0, 1));
+    let hide = L.palette.hide;
+    if (k < 0) hide = hue(hide, '#8e2f3f', -k * 0.8);
+    else hide = hue(hide, '#f2e7b0', k * 0.55);
+    let mark = k < 0 ? hue(L.palette.mark, '#3b0d18', -k * 0.85) : hue(L.palette.mark, '#ffd97a', k * 0.6);
+    return {
+      hide, mark,
+      belly: hue(L.palette.belly, k < 0 ? '#7a2b34' : '#fffdf0', Math.abs(k) * 0.62),
+      size: c.size,
+      spikes: clamp(-k, 0, 1),
+      bloom: clamp(k, 0, 1),
+      plump,
+      posture: clamp(0.35 + d * 0.4 + c.vigor / 260, 0, 1),
+      eye: c.mood < 30 ? 'sad' : c.mood > 75 ? 'bright' : 'calm',
+      glow: clamp((c.bond - 50) / 60, 0, 1),
+      lineage: L.id
+    };
+  }
+
+  function mixHex(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const r = Math.round(((pa >> 16) & 255) * (1 - t) + ((pb >> 16) & 255) * t);
+    const gg = Math.round(((pa >> 8) & 255) * (1 - t) + ((pb >> 8) & 255) * t);
+    const bl = Math.round((pa & 255) * (1 - t) + (pb & 255) * t);
+    return '#' + ((1 << 24) | (r << 16) | (gg << 8) | bl).toString(16).slice(1);
+  }
+
+  /* A one-line read on the beast, for the creature card. */
+  function describe(g) {
+    const c = g.creature;
+    const k = c.kind, d = c.diligence;
+    const moral = k > 60 ? 'saintly' : k > 20 ? 'gentle' : k > -20 ? 'unformed' : k > -60 ? 'mean' : 'monstrous';
+    const work = d > 60 ? 'tireless' : d > 20 ? 'willing' : d > -20 ? 'aimless' : d > -60 ? 'lazy' : 'utterly indolent';
+    return `${SW.core.titleCase(moral)} and ${work}.`;
+  }
+
+  SW.creature = {
+    W_MIN, W_MAX, PRAISE_WINDOW, mastery, masteredCount, farmChoresMastered,
+    tick, praise, scold, observe, feed, look, describe, chooseAct, learnRate, lineage
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — the world tick: village, economy, rivals, festivals, feats,
+ * plus every action the player themself can take. */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const F = SW.farm;
+  const Cr = SW.creature;
+  const { clamp, hashNoise, chance, pick, fmt } = SW.core;
+
+  const OFFLINE_CAP_TICKS = 4 * 60 * 60;   // four hours of catch-up, at most
+  const FOCUS_REGEN = 0.55;
+
+  const COST = { till: 3, sow: 1, water: 1, harvest: 2, forage: 3 };
+
+  // --- rank --------------------------------------------------------------
+  function rankOf(g) {
+    let r = C.RANKS[0];
+    for (const rk of C.RANKS) if (g.res.renown >= rk.renown) r = rk;
+    return r;
+  }
+  function nextRank(g) {
+    const cur = rankOf(g);
+    return C.RANKS[Math.min(cur.id + 1, C.RANKS.length - 1)] === cur ? null : C.RANKS[cur.id + 1];
+  }
+  const grandeur = g => C.SHRINE_TIERS[g.shrine].grandeur;
+
+  // --- player actions ----------------------------------------------------
+  function spend(g, focus) {
+    if (g.res.focus < focus) return false;
+    g.res.focus -= focus;
+    return true;
+  }
+
+  function playerTill(g, plot) {
+    if (plot.state !== 'raw') return fail(g, 'That soil is already broken.');
+    if (!spend(g, COST.till)) return fail(g, 'Not enough focus.');
+    F.till(g, plot);
+    Cr.observe(g, 'till');
+    return true;
+  }
+
+  function playerSow(g, plot, cropId) {
+    if (plot.state !== 'tilled') return fail(g, 'Break the soil first.');
+    if ((g.seeds[cropId] | 0) <= 0) return fail(g, `No ${C.CROPS[cropId].name} seed left.`);
+    if (!spend(g, COST.sow)) return fail(g, 'Not enough focus.');
+    F.sow(g, plot, cropId);
+    Cr.observe(g, 'sow');
+    return true;
+  }
+
+  function playerWater(g, plot) {
+    if (plot.state !== 'growing' && plot.state !== 'ripe') return fail(g, 'Nothing there to water.');
+    if (!spend(g, COST.water)) return fail(g, 'Not enough focus.');
+    F.water(g, plot);
+    Cr.observe(g, 'water');
+    return true;
+  }
+
+  function playerHarvest(g, plot) {
+    if (plot.state !== 'ripe') return fail(g, 'Not ready.');
+    if (!spend(g, COST.harvest)) return fail(g, 'Not enough focus.');
+    const r = F.harvest(g, plot, 1);
+    Cr.observe(g, 'harvest');
+    if (r) SW.ui.log(g, `You gather ${r.amount} ${r.crop.name}.`);
+    return true;
+  }
+
+  function playerForage(g) {
+    if (!spend(g, COST.forage)) return fail(g, 'Not enough focus.');
+    const n = 3;
+    g.res.wood += n;
+    Cr.observe(g, 'forage');
+    SW.ui.log(g, `You haul ${n} wood out of the treeline.`);
+    return true;
+  }
+
+  function fail(g, msg) { SW.ui.log(g, msg, 'warn'); return false; }
+
+  // --- building ----------------------------------------------------------
+  function hutCost(g) {
+    const n = g.village.huts;
+    return {
+      wood: Math.ceil(C.HUT_COST.wood * Math.pow(C.HUT_COST.scale, n - 3)),
+      coin: Math.ceil(C.HUT_COST.coin * Math.pow(C.HUT_COST.scale, n - 3))
+    };
+  }
+  function plotCost(g) {
+    const n = g.plots.length;
+    return {
+      wood: Math.ceil(C.PLOT_COST.wood * Math.pow(C.PLOT_COST.scale, n - 3)),
+      coin: Math.ceil(C.PLOT_COST.coin * Math.pow(C.PLOT_COST.scale, n - 3))
+    };
+  }
+
+  function buildHut(g) {
+    const c = hutCost(g);
+    if (g.res.wood < c.wood || g.res.coin < c.coin) return fail(g, 'You cannot afford another hut.');
+    g.res.wood -= c.wood; g.res.coin -= c.coin;
+    g.village.huts++;
+    SW.ui.log(g, 'A new hut goes up. Somewhere below, someone hears about it.', 'good');
+    return true;
+  }
+
+  function clearPlot(g) {
+    if (!g.lockedPlots.length) return fail(g, 'There is no more island to break.');
+    const c = plotCost(g);
+    if (g.res.wood < c.wood || g.res.coin < c.coin) return fail(g, 'Not enough wood and coin.');
+    g.res.wood -= c.wood; g.res.coin -= c.coin;
+    g.plots.push(g.lockedPlots.shift());
+    SW.ui.log(g, 'New ground, cleared and claimed.', 'good');
+    return true;
+  }
+
+  function upgradeShrine(g) {
+    const next = C.SHRINE_TIERS[g.shrine + 1];
+    if (!next) return fail(g, 'The shrine is already everything it can be.');
+    if (rankOf(g).id < next.rank) return fail(g, `You must stand at ${C.RANKS[next.rank].name} before the stones will hold.`);
+    if (g.res.wood < next.wood || g.res.coin < next.coin) return fail(g, 'Not enough wood and coin.');
+    g.res.wood -= next.wood; g.res.coin -= next.coin;
+    g.shrine++;
+    g.village.faith = clamp(g.village.faith + 6, 0, 100);
+    SW.ui.log(g, `The shrine rises. It is a ${next.name} now, and it can be seen from other islands.`, 'great');
+    return true;
+  }
+
+  // --- miracles ----------------------------------------------------------
+  function castMiracle(g, id) {
+    const m = C.MIRACLES[id];
+    if (!m) return false;
+    if (rankOf(g).id < m.rank) return fail(g, 'That power is beyond your standing.');
+    if (g.res.prayer < m.cost) return fail(g, 'Not enough prayer.');
+    g.res.prayer -= m.cost;
+    g.stats.miracles++;
+    switch (id) {
+      case 'rain':
+        for (const p of g.plots) if (p.crop) { p.water = 100; p.rot = Math.max(0, p.rot - 30); }
+        g.fx.push({ at: 'sky', kind: 'rain', life: 6, t: 0 });
+        SW.ui.log(g, 'Rain, on your say-so. Every plot drinks.', 'good');
+        break;
+      case 'quickening':
+        for (const p of g.plots) if (p.state === 'growing') {
+          p.growth += C.CROPS[p.crop].growTicks * 0.25;
+          if (p.growth >= C.CROPS[p.crop].growTicks) { p.state = 'ripe'; p.growth = C.CROPS[p.crop].growTicks; }
+        }
+        g.fx.push({ at: 'sky', kind: 'shine', life: 2.5, t: 0 });
+        SW.ui.log(g, 'The fields lurch forward a season in a heartbeat.', 'good');
+        break;
+      case 'bounty':
+        g.village.food += 42;
+        g.village.faith = clamp(g.village.faith + 3, 0, 100);
+        SW.ui.log(g, 'Bread out of nothing. The granary is full and they know who filled it.', 'good');
+        break;
+      case 'mend':
+        g.creature.vigor = 100;
+        g.creature.hunger = clamp(g.creature.hunger + 45, 0, 130);
+        g.creature.mood = clamp(g.creature.mood + 12, 0, 100);
+        g.creature.bond = clamp(g.creature.bond + 1.5, 0, 100);
+        g.fx.push({ at: 'creature', text: '💗', tone: 'good', life: 1.8, t: 0 });
+        SW.ui.log(g, `${g.creature.name} straightens up, whole again.`, 'good');
+        break;
+      case 'storm':
+        g.village.awe = clamp(g.village.awe + 14, 0, 100);
+        g.village.faith = clamp(g.village.faith - 6, 0, 100);
+        g.village.unrest = clamp(g.village.unrest + 8, 0, 100);
+        g.creature.mood = clamp(g.creature.mood - 6, 0, 100);
+        g.fx.push({ at: 'sky', kind: 'storm', life: 4, t: 0 });
+        SW.ui.log(g, 'You break the sky over their heads. Nobody will forget the date.', 'bad');
+        break;
+    }
+    return true;
+  }
+
+  // --- world tick --------------------------------------------------------
+  function tickVillage(g, dt) {
+    const v = g.village;
+    const eaten = v.villagers * 0.085 * dt;
+    if (v.food >= eaten) {
+      v.food -= eaten;
+      v.faith = clamp(v.faith + 0.028 * dt, 0, 100);
+      v.unrest = clamp(v.unrest - 0.05 * dt, 0, 100);
+    } else {
+      v.food = 0;
+      v.faith = clamp(v.faith - 0.13 * dt, 0, 100);
+      v.unrest = clamp(v.unrest + 0.09 * dt, 0, 100);
+    }
+    // Faith settles toward what you visibly provide — a shrine to look at, a
+    // full granary, neighbours who stayed — less whatever they are afraid of.
+    // A people who fear you do not also love you, so the two paths compete
+    // instead of stacking.
+    const pull = clamp(18 + grandeur(g) * 1.8 + (v.food > 40 ? 18 : 0) + v.villagers * 0.8
+      - v.awe * 0.62 - v.unrest * 0.45, 0, 100);
+    v.faith += (pull - v.faith) * 0.0022 * dt;
+    v.faith = clamp(v.faith, 0, 100);
+    v.awe = clamp(v.awe - 0.022 * dt, 0, 100);
+    // Living under a terror is exhausting. Awe keeps unrest topped up on its
+    // own, so a fear empire steadily bleeds the villagers it multiplies.
+    v.unrest = clamp(v.unrest + v.awe * 0.0042 * dt, 0, 100);
+
+    // Prayer: love gives it freely, terror gives it grudgingly.
+    const rate = v.villagers * (v.faith / 100 * 0.055 + v.awe / 100 * 0.03);
+    g.res.prayer += rate * dt;
+
+    // Standing compounds. A congregation is worth what it feels about you,
+    // multiplied by how far away your shrine can be seen. Neither half alone
+    // gets you up the Register — this is the engine the whole grind feeds.
+    const devotion = v.villagers * (v.faith + v.awe) / 100;
+    g.res.renown += (1 + grandeur(g) * 0.05) * devotion * 0.09 * dt;
+  }
+
+  function checkFeats(g) {
+    for (const f of C.FEATS) {
+      if (g.feats[f.id]) continue;
+      let ok = false;
+      try { ok = f.check(g); } catch (e) { ok = false; }
+      if (ok) {
+        g.feats[f.id] = g.day;
+        g.res.renown += f.renown;
+        SW.ui.log(g, `Feat — ${f.name}. +${f.renown} renown.`, 'great');
+        g.fx.push({ at: 'banner', text: 'FEAT · ' + f.name, life: 4, t: 0 });
+      }
+    }
+  }
+
+  // A rival's ceiling on daily growth. Their curve accelerates for the first
+  // ~70 days and then levels off for good: an established god is not getting
+  // any more established. A fully built island out-earns even the fastest of
+  // them, which is what makes first place reachable instead of a treadmill.
+  const RIVAL_MAX_GAIN = 650;
+
+  function tickRivals(g) {
+    // Rivals climb their own curve and never chase you. Nothing rubber-bands,
+    // which is the whole reason passing one of them means anything.
+    for (const r of g.rivals) {
+      const n = hashNoise(r.seed, g.day);
+      const curve = Math.min(25 + 4.5 * Math.pow(g.day, 1.15), RIVAL_MAX_GAIN);
+      let gain = r.pace * curve * (0.72 + n * 0.62);
+      if (hashNoise(r.seed + 5, g.day) < r.spike * 0.25) gain *= 2.2;    // a good week
+      r.renown += gain;
+    }
+  }
+
+  function standings(g) {
+    const rows = g.rivals.map(r => ({ name: r.name, renown: Math.floor(r.renown), you: false, tone: r.tone }));
+    rows.push({ name: g.godName, renown: Math.floor(g.res.renown), you: true, tone: 'you' });
+    rows.sort((a, b) => b.renown - a.renown);
+    rows.forEach((r, i) => { r.place = i + 1; });
+    return rows;
+  }
+
+  function tickChatter(g) {
+    const rows = standings(g);
+    const me = rows.find(r => r.you);
+    g.lastStanding = me.place;
+    if (!chance(0.75)) return;
+    const rival = pick(g.rivals);
+    const rel = rival.renown > g.res.renown * 1.15 ? 'ahead'
+      : rival.renown < g.res.renown * 0.85 ? 'behind' : 'near';
+    const line = pick(C.BARBS[rel][rival.tone]).replace(/\{r\}/g, rival.name);
+    g.chatter.unshift({ day: g.day, text: line, rel });
+    if (g.chatter.length > 40) g.chatter.length = 40;
+  }
+
+  // --- festivals ---------------------------------------------------------
+  function festivalScore(g, cat) {
+    const c = g.creature;
+    switch (cat.id) {
+      case 'harvest': {
+        let best = 0, total = 0;
+        for (const cr of C.CROP_LIST) {
+          const n = g.stock[cr.id] | 0;
+          total += n;
+          best = Math.max(best, F.price(g, cr.id) * n);
+        }
+        return best + total * 3;
+      }
+      case 'beast': {
+        let m = 0;
+        for (const id of C.TRAINABLE) if (C.ACTS[id].useful) m += Cr.mastery(g, id);
+        return (c.stats.strength + c.stats.cunning + c.stats.grace) * 8
+          + c.bond * 2.2 + c.size * 55 + m * 34 + Math.abs(c.kind) * 0.7;
+      }
+      case 'rite':
+      default:
+        return grandeur(g) * 6.5 + g.village.faith * 2.2 + g.village.awe * 1.7 + g.village.villagers * 9;
+    }
+  }
+
+  function runFestival(g) {
+    const cat = C.FESTIVALS[g.festival.index % C.FESTIVALS.length];
+    const mine = festivalScore(g, cat);
+    // Rivals are scored against a par curve for the category, not against their
+    // renown — otherwise a runaway leader would sweep every event forever.
+    const par = cat.par(g.day);
+    const field = g.rivals.map(r => ({
+      name: r.name,
+      score: par * (0.5 + r.pace * 0.5) * (0.6 + hashNoise(r.seed + 31, g.day) * 0.8)
+    }));
+    field.push({ name: g.godName, score: mine, you: true });
+    field.sort((a, b) => b.score - a.score);
+    const place = field.findIndex(f => f.you) + 1;
+
+    const payout = place === 1 ? Math.round(150 + g.day * 14)
+      : place === 2 ? Math.round(85 + g.day * 8)
+      : place === 3 ? Math.round(50 + g.day * 5)
+      : Math.round(8 + g.day);
+    g.res.renown += payout;
+    g.stats.festivals++;
+    if (place === 1) g.stats.festivalWins++;
+    if (place <= 3) g.trophies.push({ fest: cat.id, name: cat.name, place, day: g.day });
+
+    g.festival.lastResult = { cat: cat.id, name: cat.name, place, score: Math.round(mine), payout, day: g.day, field: field.slice(0, 5).map(f => ({ name: f.name, score: Math.round(f.score), you: !!f.you })) };
+    g.festival.index++;
+    g.festival.nextDay = g.day + 5;
+
+    const tone = place === 1 ? 'great' : place <= 3 ? 'good' : 'warn';
+    const ord = place === 1 ? 'first' : place === 2 ? 'second' : place === 3 ? 'third' : `${place}th`;
+    SW.ui.log(g, `${cat.name}: you place ${ord}. +${payout} renown.`, tone);
+    g.fx.push({ at: 'banner', text: `${cat.glyph} ${cat.name} — ${ord}`, life: 5, t: 0 });
+    return g.festival.lastResult;
+  }
+
+  // --- day rollover ------------------------------------------------------
+  function newDay(g) {
+    g.day++;
+    g.stats.days++;
+    F.rollPrices(g);
+    tickRivals(g);
+    tickChatter(g);
+
+    // Arrivals: people move toward a god who feeds them and has room.
+    const v = g.village;
+    if (v.huts > v.villagers && v.faith > 42 && v.food > 12 && chance(0.6)) {
+      v.villagers++;
+      SW.ui.log(g, 'Someone new climbs up out of the cloud and asks to stay.', 'good');
+    }
+    if (v.unrest > 75 && v.villagers > 1 && chance(0.5)) {
+      v.villagers--;
+      v.unrest -= 25;
+      SW.ui.log(g, 'A family leaves in the night. Word of that travels too.', 'bad');
+    }
+
+    const before = rankOf(g).id;
+    checkFeats(g);
+    if (g.day >= g.festival.nextDay) runFestival(g);
+    checkFeats(g);
+    const after = rankOf(g).id;
+    if (after > before) {
+      const rk = C.RANKS[after];
+      SW.ui.log(g, `The Register lists you as ${rk.name}. ${rk.unlock || ''}`, 'great');
+      g.fx.push({ at: 'banner', text: 'RANK · ' + rk.name, life: 5, t: 0 });
+    }
+  }
+
+  function tick(g, dt) {
+    g.tick += dt;
+    g.dayTick += dt;
+    g.res.focus = clamp(g.res.focus + FOCUS_REGEN * dt, 0, g.res.focusMax);
+
+    F.tickPlots(g, dt);
+    Cr.tick(g, dt);
+    tickVillage(g, dt);
+
+    while (g.dayTick >= C.TICKS_PER_DAY) {
+      g.dayTick -= C.TICKS_PER_DAY;
+      newDay(g);
+    }
+  }
+
+  /* Catch-up when the tab has been closed. Coarse but honest: the same rules,
+   * just stepped in bigger chunks. */
+  function runOffline(g) {
+    const now = Date.now();
+    const elapsed = Math.max(0, Math.floor((now - (g.__savedAt || now)) / 1000));
+    const ticks = Math.min(elapsed, OFFLINE_CAP_TICKS);
+    if (ticks < 30) return null;
+    const before = { renown: g.res.renown, coin: g.res.coin, harvests: g.stats.harvests, day: g.day };
+    // Step one tick at a time. Bigger batches skip phases of the creature's
+    // act loop, which quietly starves the farm it was trained to run — and the
+    // whole point of training it is that it keeps working while you are gone.
+    // Four hours is 14,400 iterations, a few tens of milliseconds.
+    const quiet = SW.ui.log;
+    SW.ui.log = () => {};
+    try {
+      for (let t = 0; t < ticks; t++) tick(g, 1);
+    } finally {
+      SW.ui.log = quiet;
+    }
+    const mins = Math.round(ticks / 60);
+    return {
+      minutes: mins,
+      days: g.day - before.day,
+      renown: Math.floor(g.res.renown - before.renown),
+      coin: Math.floor(g.res.coin - before.coin),
+      harvests: g.stats.harvests - before.harvests
+    };
+  }
+
+  /* What a competent rival is expected to score at this festival today. Shown
+   * to the player so an entry is a decision, not a coin flip. */
+  function festivalPar(g, cat) { return cat.par(g.day); }
+
+  SW.sim = {
+    COST, rankOf, nextRank, grandeur, tick, newDay, runOffline, festivalPar,
+    playerTill, playerSow, playerWater, playerHarvest, playerForage,
+    hutCost, plotCost, buildHut, clearPlot, upgradeShrine, castMiracle,
+    standings, checkFeats, festivalScore, runFestival
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — canvas scene.
+ * Everything is drawn procedurally: no image assets, so the creature can
+ * physically change shape as you raise it.
+ */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const Cr = SW.creature;
+  const { clamp, lerp, hashNoise } = SW.core;
+
+  const W = 960, H = 540;
+  // The part of the frame worth guaranteeing on screen, and its centre.
+  const FIT = { w: 790, h: 476, cx: 476, cy: 316 };
+
+  // Island furniture, in logical canvas pixels.
+  const GRID = { ox: 408, oy: 232, ax: 46, ay: 23 };
+  const WOOD = { x: 214, y: 330 };
+  const VILLAGE = { x: 730, y: 344 };
+  const SHRINE = { x: 618, y: 240 };
+  const DEN = { x: 492, y: 432 };
+
+  let canvas = null, ctx = null, dpr = 1, scale = 1, offX = 0, offY = 0;
+  let time = 0;
+  let hover = -1;
+  let selected = -1;
+
+  let attached = false;
+  function attach(el) {
+    canvas = el;
+    ctx = canvas.getContext('2d');
+    resize();
+    if (!attached) { attached = true; window.addEventListener('resize', resize); }
+  }
+
+  function resize() {
+    if (!canvas) return;
+    const box = canvas.parentElement.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cw = Math.max(320, box.width);
+    const ch = Math.max(200, box.height);
+    canvas.width = Math.floor(cw * dpr);
+    canvas.height = Math.floor(ch * dpr);
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+    // Fit the island's bounding box rather than the whole 960x540 frame: the
+    // design frame has generous sky margins, and on a narrow phone stage those
+    // margins would shrink the island to a thumbnail. The sky is painted over
+    // whatever falls outside, so cropping the margins costs nothing.
+    scale = Math.min(cw / FIT.w, ch / FIT.h);
+    offX = cw / 2 - FIT.cx * scale;
+    offY = ch / 2 - FIT.cy * scale;
+  }
+
+  function toWorld(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (clientX - r.left - offX) / scale, y: (clientY - r.top - offY) / scale };
+  }
+
+  /* Inverse of toWorld: scene coordinates back to viewport coordinates. */
+  function toScreen(wx, wy) {
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + offX + wx * scale, y: r.top + offY + wy * scale };
+  }
+
+  /* Unlock order, centre-out, so three plots read as a small farm rather than
+   * a diagonal stripe and the field stays compact as it grows to sixteen. */
+  const PLOT_CELL = [
+    [1, 1], [2, 1], [1, 2], [2, 2],
+    [1, 0], [0, 1], [2, 0], [3, 1],
+    [0, 2], [3, 2], [1, 3], [2, 3],
+    [0, 0], [3, 0], [0, 3], [3, 3]
+  ];
+  function plotCenter(p) {
+    const cell = PLOT_CELL[p.i] || [p.gx, p.gy];
+    const gx = cell[0] + 0.5, gy = cell[1] + 0.5;
+    return {
+      x: GRID.ox + gx * GRID.ax - gy * GRID.ax,
+      y: GRID.oy + gx * GRID.ay + gy * GRID.ay
+    };
+  }
+
+  function anchorPoint(g, a) {
+    if (!a) return { x: DEN.x, y: DEN.y };
+    switch (a.kind) {
+      case 'plot': {
+        const p = g.plots.find(p => p.i === a.i) || g.plots[0];
+        return p ? plotCenter(p) : { x: DEN.x, y: DEN.y };
+      }
+      case 'wood': return { x: WOOD.x + 30, y: WOOD.y + 10 };
+      case 'village': return { x: VILLAGE.x - 40, y: VILLAGE.y + 8 };
+      case 'shrine': return { x: SHRINE.x, y: SHRINE.y + 46 };
+      case 'home': return { x: DEN.x, y: DEN.y };
+      default: return { x: 480 + Math.sin(time * 0.3) * 90, y: 400 + Math.cos(time * 0.21) * 30 };
+    }
+  }
+
+  // --- sky ---------------------------------------------------------------
+  const SKY_KEYS = [
+    { t: 0.00, top: '#2a2f52', mid: '#7d5f7a', low: '#e6a172', sun: '#ffd9a0', amb: 0.55 },
+    { t: 0.18, top: '#4d8fd6', mid: '#9fd0f0', low: '#e9f3fb', sun: '#fff6d8', amb: 1.00 },
+    { t: 0.52, top: '#3f81cc', mid: '#8fc6ec', low: '#ecf4fa', sun: '#fff3cf', amb: 1.00 },
+    { t: 0.72, top: '#2c3a68', mid: '#a8628a', low: '#f0a86a', sun: '#ffcf94', amb: 0.62 },
+    { t: 0.86, top: '#111634', mid: '#222a52', low: '#3a3f68', sun: '#cfd8ff', amb: 0.34 },
+    { t: 1.00, top: '#2a2f52', mid: '#7d5f7a', low: '#e6a172', sun: '#ffd9a0', amb: 0.55 }
+  ];
+
+  function mix(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const r = Math.round(((pa >> 16) & 255) * (1 - t) + ((pb >> 16) & 255) * t);
+    const gg = Math.round(((pa >> 8) & 255) * (1 - t) + ((pb >> 8) & 255) * t);
+    const bl = Math.round((pa & 255) * (1 - t) + (pb & 255) * t);
+    return '#' + ((1 << 24) | (r << 16) | (gg << 8) | bl).toString(16).slice(1);
+  }
+
+  function skyAt(t) {
+    let a = SKY_KEYS[0], b = SKY_KEYS[1];
+    for (let i = 0; i < SKY_KEYS.length - 1; i++) {
+      if (t >= SKY_KEYS[i].t && t <= SKY_KEYS[i + 1].t) { a = SKY_KEYS[i]; b = SKY_KEYS[i + 1]; break; }
+    }
+    const k = (t - a.t) / Math.max(0.0001, b.t - a.t);
+    return {
+      top: mix(a.top, b.top, k), mid: mix(a.mid, b.mid, k), low: mix(a.low, b.low, k),
+      sun: mix(a.sun, b.sun, k), amb: lerp(a.amb, b.amb, k)
+    };
+  }
+
+  function drawSky(g, sky, t, vw) {
+    const grad = ctx.createLinearGradient(0, vw.y0, 0, vw.y1);
+    grad.addColorStop(0, sky.top);
+    grad.addColorStop(0.55, sky.mid);
+    grad.addColorStop(1, sky.low);
+    ctx.fillStyle = grad;
+    ctx.fillRect(vw.x0, vw.y0, vw.x1 - vw.x0, vw.y1 - vw.y0);
+
+    // Stars fade in after dusk.
+    const night = clamp((t - 0.62) / 0.2, 0, 1) * clamp((1.02 - t) / 0.12, 0, 1) + clamp((0.08 - t) / 0.08, 0, 1);
+    if (night > 0.01) {
+      ctx.save();
+      ctx.globalAlpha = clamp(night, 0, 1) * 0.9;
+      for (let i = 0; i < 70; i++) {
+        const x = vw.x0 + hashNoise(7, i) * (vw.x1 - vw.x0);
+        const y = vw.y0 + hashNoise(13, i) * (vw.y1 - vw.y0) * 0.62;
+        const s = 0.6 + hashNoise(19, i) * 1.4;
+        ctx.globalAlpha = clamp(night, 0, 1) * (0.35 + 0.65 * Math.abs(Math.sin(time * 0.7 + i)));
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, s, s);
+      }
+      ctx.restore();
+    }
+
+    // Rival islands, far off. A reminder there are other gods.
+    ctx.save();
+    for (let i = 0; i < 5; i++) {
+      const span = vw.x1 - vw.x0 + 300;
+      const bx = vw.x0 - 150 + ((i * 231 + time * (2 + i)) % span);
+      const by = vw.y0 + 40 + hashNoise(3, i) * 140;
+      const s = 0.28 + hashNoise(5, i) * 0.3;
+      ctx.globalAlpha = 0.13 + 0.1 * s;
+      ctx.fillStyle = mix(sky.top, '#000000', 0.25);
+      farIsland(bx, by, 120 * s);
+    }
+    ctx.restore();
+
+    // Clouds.
+    ctx.save();
+    for (let i = 0; i < 7; i++) {
+      const span = vw.x1 - vw.x0 + 400;
+      const bx = vw.x0 - 200 + ((i * 173 + time * (5 + i * 1.7)) % span);
+      const by = vw.y0 + 20 + hashNoise(11, i) * (vw.y1 - vw.y0) * 0.55;
+      const s = 0.5 + hashNoise(17, i) * 0.8;
+      ctx.globalAlpha = 0.16 + 0.12 * hashNoise(23, i);
+      ctx.fillStyle = '#ffffff';
+      cloud(bx, by, 70 * s);
+    }
+    ctx.restore();
+
+    // Sun / moon on an arc, glared over everything else in the sky.
+    const ang = Math.PI * (t * 2 - 0.15);
+    const cx = W * 0.5 - Math.cos(ang) * W * 0.42;
+    const cy = H * 0.72 - Math.sin(ang) * H * 0.62;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.85;
+    const glow = ctx.createRadialGradient(cx, cy, 2, cx, cy, 86);
+    glow.addColorStop(0, sky.sun);
+    glow.addColorStop(0.45, 'rgba(255,240,200,0.18)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, 86, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = sky.sun;
+    ctx.beginPath(); ctx.arc(cx, cy, t > 0.66 || t < 0.06 ? 13 : 19, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  function farIsland(x, y, r) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * 0.24, 0, Math.PI, 0);
+    ctx.moveTo(x - r, y);
+    ctx.quadraticCurveTo(x - r * 0.3, y + r * 0.9, x, y + r * 1.1);
+    ctx.quadraticCurveTo(x + r * 0.4, y + r * 0.8, x + r, y);
+    ctx.fill();
+  }
+
+  function cloud(x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.5, 0, 7);
+    ctx.arc(x + r * 0.42, y + r * 0.08, r * 0.36, 0, 7);
+    ctx.arc(x - r * 0.4, y + r * 0.1, r * 0.3, 0, 7);
+    ctx.arc(x + r * 0.06, y + r * 0.24, r * 0.42, 0, 7);
+    ctx.fill();
+  }
+
+  // --- island ------------------------------------------------------------
+  function drawIsland(g, sky) {
+    const amb = sky.amb;
+    const grassTop = mix('#7fb56a', '#1c2740', 1 - amb);
+    const grassLow = mix('#5d9450', '#141c30', 1 - amb);
+    const rock = mix('#8a7560', '#241f2e', 1 - amb);
+    const rockDark = mix('#5d4c3d', '#161320', 1 - amb);
+
+    // underside
+    ctx.beginPath();
+    ctx.moveTo(120, 348);
+    ctx.bezierCurveTo(180, 470, 300, 560, 430, 545);
+    ctx.bezierCurveTo(560, 560, 700, 470, 830, 352);
+    ctx.closePath();
+    ctx.fillStyle = rockDark;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(140, 344);
+    ctx.bezierCurveTo(210, 440, 330, 500, 450, 492);
+    ctx.bezierCurveTo(560, 496, 690, 430, 812, 348);
+    ctx.closePath();
+    ctx.fillStyle = rock;
+    ctx.fill();
+
+    // hanging roots
+    ctx.strokeStyle = mix('#4c6b40', '#141c2c', 1 - amb);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 12; i++) {
+      const x = 190 + i * 52 + Math.sin(i) * 12;
+      const y = 380 + Math.sin(i * 1.7) * 40;
+      const len = 30 + hashNoise(29, i) * 60;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + Math.sin(time * 0.6 + i) * 8, y + len * 0.6, x + Math.sin(time * 0.6 + i) * 14, y + len);
+      ctx.stroke();
+    }
+
+    // grass surface
+    ctx.beginPath();
+    ctx.moveTo(120, 348);
+    ctx.bezierCurveTo(150, 250, 300, 186, 480, 186);
+    ctx.bezierCurveTo(660, 186, 806, 252, 830, 352);
+    ctx.bezierCurveTo(700, 412, 560, 432, 470, 432);
+    ctx.bezierCurveTo(370, 432, 232, 410, 120, 348);
+    ctx.closePath();
+    const gGrad = ctx.createLinearGradient(0, 186, 0, 432);
+    gGrad.addColorStop(0, grassTop);
+    gGrad.addColorStop(1, grassLow);
+    ctx.fillStyle = gGrad;
+    ctx.fill();
+    ctx.strokeStyle = mix('#94c97e', '#243252', 1 - amb);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // --- plots -------------------------------------------------------------
+  function plotPath(c) {
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y - GRID.ay);
+    ctx.lineTo(c.x + GRID.ax, c.y);
+    ctx.lineTo(c.x, c.y + GRID.ay);
+    ctx.lineTo(c.x - GRID.ax, c.y);
+    ctx.closePath();
+  }
+
+  function drawPlots(g, sky) {
+    const amb = sky.amb;
+    // locked ground first, as faint outlines
+    for (const p of g.lockedPlots) {
+      const c = plotCenter(p);
+      plotPath(c);
+      ctx.fillStyle = 'rgba(0,0,0,0.10)';
+      ctx.fill();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    for (const p of g.plots) {
+      const c = plotCenter(p);
+      plotPath(c);
+      let soil;
+      if (p.state === 'raw') soil = '#6f8a56';
+      else soil = mix('#6b4c33', '#3a2a1c', clamp(p.water / 100, 0, 1) * 0.55);
+      ctx.fillStyle = mix(soil, '#101828', 1 - amb);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      if (p.state !== 'raw' && p.state !== 'tilled') drawCrop(g, p, c, amb);
+      if (p.state === 'tilled') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(c.x - GRID.ax * 0.6 + i * 12, c.y + GRID.ay * 0.3 + i * 6);
+          ctx.lineTo(c.x + GRID.ax * 0.6 + i * 12, c.y - GRID.ay * 0.3 + i * 6);
+          ctx.stroke();
+        }
+      }
+
+      // water / rot readouts
+      if (p.crop) {
+        const bw = 34;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(c.x - bw / 2, c.y + GRID.ay - 4, bw, 3);
+        ctx.fillStyle = p.water < 25 ? '#e0625a' : '#59a6e8';
+        ctx.fillRect(c.x - bw / 2, c.y + GRID.ay - 4, bw * clamp(p.water / 100, 0, 1), 3);
+        if (p.rot > 30) {
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.fillRect(c.x - bw / 2, c.y + GRID.ay, bw, 3);
+          ctx.fillStyle = '#c78b3d';
+          ctx.fillRect(c.x - bw / 2, c.y + GRID.ay, bw * clamp(p.rot / 100, 0, 1), 3);
+        }
+      }
+
+      if (p.i === hover || p.i === selected) {
+        plotPath(c);
+        ctx.strokeStyle = p.i === selected ? '#ffe08a' : 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = p.i === selected ? 2.5 : 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawCrop(g, p, c, amb) {
+    const crop = C.CROPS[p.crop];
+    const prog = p.state === 'ripe' ? 1 : clamp(p.growth / crop.growTicks, 0.05, 1);
+    const n = 5;
+    const tint = mix(crop.tint, '#0d1424', 1 - amb);
+    const stem = mix('#4f8b45', '#101c2c', 1 - amb);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + p.i;
+      const px = c.x + Math.cos(a) * GRID.ax * 0.44;
+      const py = c.y + Math.sin(a) * GRID.ay * 0.5;
+      const h = 6 + prog * 22;
+      const sway = Math.sin(time * 1.6 + i + p.i) * (1 + prog * 2);
+      ctx.strokeStyle = stem;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.quadraticCurveTo(px + sway * 0.5, py - h * 0.6, px + sway, py - h);
+      ctx.stroke();
+      if (prog > 0.55) {
+        const r = (prog - 0.55) / 0.45 * 3.6 + 1;
+        ctx.fillStyle = tint;
+        ctx.beginPath();
+        ctx.arc(px + sway, py - h, r, 0, 7);
+        ctx.fill();
+      }
+    }
+    if (p.state === 'ripe') {
+      const pulse = 0.4 + 0.35 * Math.sin(time * 3 + p.i);
+      ctx.save();
+      ctx.globalAlpha = pulse * (p.rot > 55 ? 0.4 : 1);
+      ctx.fillStyle = p.rot > 55 ? '#c78b3d' : '#fff3c0';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y - 30, 3.2, 0, 7);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // --- structures --------------------------------------------------------
+  function drawTrees(sky) {
+    const amb = sky.amb;
+    for (let i = 0; i < 7; i++) {
+      const x = WOOD.x + Math.sin(i * 2.1) * 44;
+      const y = WOOD.y + Math.cos(i * 1.4) * 30;
+      const s = 0.8 + hashNoise(31, i) * 0.5;
+      ctx.fillStyle = mix('#4a3524', '#15111c', 1 - amb);
+      ctx.fillRect(x - 2 * s, y - 14 * s, 4 * s, 16 * s);
+      ctx.fillStyle = mix(i % 2 ? '#3f7a42' : '#4e8f4a', '#111c2a', 1 - amb);
+      ctx.beginPath();
+      ctx.arc(x, y - 22 * s, 13 * s, 0, 7);
+      ctx.arc(x - 9 * s, y - 15 * s, 9 * s, 0, 7);
+      ctx.arc(x + 9 * s, y - 16 * s, 10 * s, 0, 7);
+      ctx.fill();
+    }
+  }
+
+  function drawHuts(g, sky) {
+    const amb = sky.amb;
+    const n = Math.min(g.village.huts, 14);
+    for (let i = 0; i < n; i++) {
+      const a = i * 1.9;
+      const x = VILLAGE.x + Math.cos(a) * (18 + i * 8.5);
+      const y = VILLAGE.y + Math.sin(a) * (11 + i * 4.4);
+      const s = 0.9;
+      ctx.fillStyle = mix('#c9b08c', '#1d1b2a', 1 - amb);
+      ctx.fillRect(x - 11 * s, y - 12 * s, 22 * s, 14 * s);
+      ctx.fillStyle = mix('#8c5f42', '#171320', 1 - amb);
+      ctx.beginPath();
+      ctx.moveTo(x - 14 * s, y - 12 * s);
+      ctx.lineTo(x, y - 25 * s);
+      ctx.lineTo(x + 14 * s, y - 12 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(x - 3 * s, y - 6 * s, 6 * s, 8 * s);
+    }
+  }
+
+  function drawVillagers(g, sky) {
+    const amb = sky.amb;
+    const n = Math.min(g.village.villagers, 18);
+    const scared = g.village.unrest > 45;
+    for (let i = 0; i < n; i++) {
+      const sp = 0.25 + hashNoise(37, i) * 0.3 + (scared ? 0.5 : 0);
+      const r = 28 + hashNoise(41, i) * 62;
+      const a = time * sp + i * 2.4;
+      const x = VILLAGE.x - 20 + Math.cos(a) * r;
+      const y = VILLAGE.y + 10 + Math.sin(a) * r * 0.42;
+      const bob = Math.abs(Math.sin(time * 5 + i)) * 1.6;
+      ctx.fillStyle = 'rgba(0,0,0,0.20)';
+      ctx.beginPath(); ctx.ellipse(x, y + 1, 4, 1.8, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = mix(['#c85b52', '#4a6ea8', '#caa24e', '#6d9a5a'][i % 4], '#181528', 1 - amb);
+      ctx.fillRect(x - 2.2, y - 8 - bob, 4.4, 7);
+      ctx.fillStyle = mix('#e8c6a0', '#201c30', 1 - amb);
+      ctx.beginPath(); ctx.arc(x, y - 10.5 - bob, 2.6, 0, 7); ctx.fill();
+    }
+  }
+
+  function drawShrine(g, sky) {
+    const amb = sky.amb;
+    const tier = g.shrine;
+    const x = SHRINE.x, y = SHRINE.y + 44;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath(); ctx.ellipse(x, y + 3, 26 + tier * 6, 8 + tier * 2, 0, 0, 7); ctx.fill();
+    const stone = mix('#b9b3a6', '#242238', 1 - amb);
+    const stoneD = mix('#8d8779', '#191828', 1 - amb);
+    if (tier === 0) {
+      ctx.fillStyle = stone;
+      ctx.beginPath(); ctx.ellipse(x, y - 4, 16, 7, 0, 0, 7); ctx.fill();
+      return;
+    }
+    // stacked cairn / pillars
+    const pillars = Math.min(tier, 4);
+    for (let i = 0; i < pillars; i++) {
+      const px = x + (i - (pillars - 1) / 2) * (17 + tier * 1.6);
+      const h = 20 + tier * 9 - Math.abs(i - (pillars - 1) / 2) * 6;
+      ctx.fillStyle = i % 2 ? stone : stoneD;
+      ctx.fillRect(px - 5.5, y - h, 11, h);
+      ctx.fillStyle = stone;
+      ctx.fillRect(px - 7.5, y - h - 5, 15, 5);
+    }
+    if (tier >= 3) {
+      ctx.fillStyle = stone;
+      ctx.fillRect(x - (pillars * 10), y - 30 - tier * 9, pillars * 20, 6);
+    }
+    if (tier >= 2) {
+      // votive light
+      const p = 0.6 + 0.4 * Math.sin(time * 2);
+      const gl = ctx.createRadialGradient(x, y - 26 - tier * 6, 1, x, y - 26 - tier * 6, 26 + tier * 5);
+      gl.addColorStop(0, `rgba(255,225,150,${0.55 * p})`);
+      gl.addColorStop(1, 'rgba(255,225,150,0)');
+      ctx.fillStyle = gl;
+      ctx.beginPath(); ctx.arc(x, y - 26 - tier * 6, 26 + tier * 5, 0, 7); ctx.fill();
+    }
+  }
+
+  // --- the creature ------------------------------------------------------
+  function drawCreature(g, sky) {
+    const c = g.creature;
+    const L = Cr.look(g);
+    const amb = sky.amb;
+    const s = clamp(L.size, 0.6, 3.2) * 1.3;
+    const x = c.x, y = c.y;
+    const moving = c.act && c.act.phase === 'travel';
+    const stride = moving ? Math.sin(time * 7) : Math.sin(time * 1.6) * 0.25;
+    const bob = moving ? Math.abs(Math.sin(time * 7)) * 2.2 * s : Math.sin(time * 1.6) * 1.1 * s;
+    const asleep = c.act && c.act.id === 'rest' && c.act.phase !== 'travel';
+
+    const hide = mix(L.hide, '#141a2c', 1 - amb);
+    const belly = mix(L.belly, '#1a2038', 1 - amb);
+    const mark = mix(L.mark, '#0e1424', 1 - amb);
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath(); ctx.ellipse(0, 2, 26 * s, 9 * s, 0, 0, 7); ctx.fill();
+
+    // bond aura
+    if (L.glow > 0.02) {
+      const gl = ctx.createRadialGradient(0, -18 * s, 2, 0, -18 * s, 54 * s);
+      gl.addColorStop(0, `rgba(255,236,170,${0.30 * L.glow})`);
+      gl.addColorStop(1, 'rgba(255,236,170,0)');
+      ctx.fillStyle = gl;
+      ctx.beginPath(); ctx.arc(0, -18 * s, 54 * s, 0, 7); ctx.fill();
+    }
+
+    ctx.translate(0, -bob);
+    if (asleep) ctx.translate(0, 5 * s);
+    const lean = asleep ? 0 : (1 - L.posture) * 5 * s;
+
+    // hind + fore legs
+    ctx.strokeStyle = mix(hide, '#000000', 0.22);
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 5.4 * s;
+    const legY = asleep ? -4 * s : 0;
+    for (const [lx, ph] of [[-14, 0], [-8, Math.PI], [11, Math.PI * 0.6], [17, Math.PI * 1.6]]) {
+      const sw = stride * 5 * s * Math.cos(ph);
+      ctx.beginPath();
+      ctx.moveTo(lx * s, -14 * s);
+      ctx.lineTo(lx * s + sw, legY);
+      ctx.stroke();
+    }
+
+    // tail
+    ctx.strokeStyle = hide;
+    ctx.lineWidth = 4.5 * s;
+    ctx.beginPath();
+    ctx.moveTo(-18 * s, -20 * s);
+    ctx.quadraticCurveTo(-32 * s, (-26 + Math.sin(time * 3) * 3) * s, -38 * s, (-34 + Math.sin(time * 3) * 5) * s);
+    ctx.stroke();
+
+    // body
+    const plump = 1 + L.plump * 0.28;
+    ctx.fillStyle = hide;
+    ctx.beginPath();
+    ctx.ellipse(-2 * s, (-22 + lean * 0.4) * s, 21 * s * plump, 14 * s * plump, -0.06, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = belly;
+    ctx.beginPath();
+    ctx.ellipse(-2 * s, (-17 + lean * 0.4) * s, 15 * s * plump, 8 * s * plump, -0.04, 0, 7);
+    ctx.fill();
+
+    // back ridge — spikes when cruel, blossoms when kind
+    if (L.spikes > 0.08) {
+      ctx.fillStyle = mark;
+      for (let i = 0; i < 4; i++) {
+        const bx = (-14 + i * 9) * s;
+        const h = (5 + L.spikes * 11) * s;
+        ctx.beginPath();
+        ctx.moveTo(bx - 3.4 * s, -33 * s);
+        ctx.lineTo(bx, -33 * s - h);
+        ctx.lineTo(bx + 3.4 * s, -33 * s);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    if (L.bloom > 0.08) {
+      for (let i = 0; i < 3; i++) {
+        const bx = (-12 + i * 11) * s;
+        ctx.fillStyle = mark;
+        for (let k = 0; k < 5; k++) {
+          const a = k / 5 * Math.PI * 2 + time * 0.4;
+          ctx.beginPath();
+          ctx.arc(bx + Math.cos(a) * 3.2 * s, -35 * s + Math.sin(a) * 3.2 * s, 2.1 * s * L.bloom + 0.6, 0, 7);
+          ctx.fill();
+        }
+      }
+    }
+
+    // neck + head
+    const headX = (18 + lean * 0.2) * s, headY = (-38 + lean) * s + (asleep ? 12 * s : 0);
+    ctx.strokeStyle = hide;
+    ctx.lineWidth = 9 * s;
+    ctx.beginPath();
+    ctx.moveTo(8 * s, -28 * s);
+    ctx.quadraticCurveTo(15 * s, -36 * s, headX, headY);
+    ctx.stroke();
+
+    ctx.fillStyle = hide;
+    ctx.beginPath();
+    ctx.ellipse(headX, headY, 11 * s, 9 * s, 0.12, 0, 7);
+    ctx.fill();
+    // snout / beak
+    ctx.fillStyle = L.lineage === 'thistlebeak' ? mark : hide;
+    ctx.beginPath();
+    ctx.moveTo(headX + 6 * s, headY - 1 * s);
+    ctx.lineTo(headX + (L.lineage === 'thistlebeak' ? 20 : 15) * s, headY + 2 * s);
+    ctx.lineTo(headX + 6 * s, headY + 5 * s);
+    ctx.closePath();
+    ctx.fill();
+
+    // horns / ears
+    ctx.strokeStyle = mark;
+    ctx.lineWidth = 2.6 * s;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(headX - 3 * s, headY - 6 * s);
+      const len = (7 + L.spikes * 9) * s;
+      ctx.quadraticCurveTo(headX - 6 * s + dir * 2 * s, headY - 6 * s - len, headX - 9 * s + dir * 5 * s, headY - 6 * s - len * 1.1);
+      ctx.stroke();
+    }
+
+    // eye
+    if (asleep || L.eye === 'sad') {
+      ctx.strokeStyle = '#20222e';
+      ctx.lineWidth = 1.6 * s;
+      ctx.beginPath();
+      ctx.arc(headX + 3 * s, headY - 1 * s, 2.4 * s, asleep ? 0.2 : 3.4, asleep ? 2.9 : 6.1);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(headX + 3 * s, headY - 1.5 * s, 2.9 * s, 0, 7); ctx.fill();
+      ctx.fillStyle = c.kind < -40 ? '#c0342c' : '#20222e';
+      const look = moving ? 1 : Math.sin(time * 0.9) * 0.9;
+      ctx.beginPath(); ctx.arc(headX + (3 + look) * s, headY - 1.5 * s, L.eye === 'bright' ? 1.7 * s : 1.3 * s, 0, 7); ctx.fill();
+    }
+
+    ctx.restore();
+
+    // name plate
+    ctx.save();
+    ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    const label = c.name;
+    const wLab = ctx.measureText(label).width + 12;
+    ctx.fillRect(x - wLab / 2, y - 66 * s - 14, wLab, 16);
+    ctx.fillStyle = '#f2f5ff';
+    ctx.fillText(label, x, y - 66 * s - 2);
+    ctx.restore();
+
+    // the praise/scold window, drawn on the creature so your eyes stay here
+    if (c.pending) {
+      const left = 1 - c.pending.t / Cr.PRAISE_WINDOW;
+      const bw = 62, bx = x - bw / 2, by = y - 66 * s - 26;
+      ctx.fillStyle = 'rgba(10,12,20,0.6)';
+      ctx.fillRect(bx, by, bw, 5);
+      ctx.fillStyle = left > 0.35 ? '#7ee787' : '#e0a33d';
+      ctx.fillRect(bx, by, bw * clamp(left, 0, 1), 5);
+      ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffe9a8';
+      ctx.fillText(C.ACTS[c.pending.act].icon + ' judge it', x, by - 4);
+    }
+  }
+
+  function moveCreature(g, dt) {
+    const c = g.creature;
+    const a = anchorPoint(g, c.act && c.act.anchor);
+    c.tx = a.x; c.ty = a.y;
+    const k = clamp(dt * 2.2, 0, 1);
+    c.x += (c.tx - c.x) * k;
+    c.y += (c.ty - c.y) * k;
+  }
+
+  // --- effects -----------------------------------------------------------
+  function drawFx(g, dt) {
+    const c = g.creature;
+    for (let i = g.fx.length - 1; i >= 0; i--) {
+      const f = g.fx[i];
+      f.t += dt;
+      const life = f.life || 1.5;
+      if (f.t >= life) { g.fx.splice(i, 1); continue; }
+      const k = f.t / life;
+      if (f.at === 'creature') {
+        ctx.save();
+        ctx.globalAlpha = 1 - k * k;
+        ctx.font = '700 20px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = f.tone === 'good' ? '#8ff0a4' : f.tone === 'bad' ? '#ff8e8e' : '#dfe7ff';
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 3;
+        const fy = c.y - 78 - k * 42;
+        ctx.strokeText(f.text, c.x, fy);
+        ctx.fillText(f.text, c.x, fy);
+        ctx.restore();
+      } else if (f.at === 'banner') {
+        ctx.save();
+        const inK = clamp(f.t / 0.4, 0, 1) * clamp((life - f.t) / 0.7, 0, 1);
+        ctx.globalAlpha = inK;
+        ctx.font = '800 30px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(8,10,18,0.55)';
+        ctx.fillRect(W / 2 - 250, 62, 500, 46);
+        ctx.fillStyle = '#ffe9a8';
+        ctx.fillText(f.text, W / 2, 94);
+        ctx.restore();
+      } else if (f.at === 'sky') {
+        if (f.kind === 'rain') {
+          ctx.save();
+          ctx.globalAlpha = 0.45 * clamp((life - f.t) / 1.2, 0, 1);
+          ctx.strokeStyle = '#bcd8f5';
+          ctx.lineWidth = 1.2;
+          for (let n = 0; n < 220; n++) {
+            const rx = -W + ((n * 61 + f.t * 620) % (W * 3));
+            const ry = -H + ((n * 137 + f.t * 900) % (H * 3));
+            ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 3, ry + 13); ctx.stroke();
+          }
+          ctx.restore();
+        } else if (f.kind === 'storm') {
+          const flash = Math.sin(f.t * 22) > 0.85 ? 0.55 : 0;
+          if (flash) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(-W, -H, W * 3, H * 3); }
+          ctx.save();
+          ctx.globalAlpha = 0.35 * clamp((life - f.t) / 1.2, 0, 1);
+          ctx.fillStyle = '#1b2036';
+          ctx.fillRect(-W, -H, W * 3, H * 3);
+          ctx.restore();
+        } else if (f.kind === 'shine') {
+          ctx.save();
+          ctx.globalAlpha = 0.5 * clamp((life - f.t) / life, 0, 1);
+          ctx.fillStyle = '#fff4c2';
+          ctx.fillRect(-W, -H, W * 3, H * 3);
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // --- overlay HUD on canvas --------------------------------------------
+  function drawSceneLabels(g, sky) {
+    ctx.save();
+    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText('WOODLAND', WOOD.x, WOOD.y + 46);
+    ctx.fillText('VILLAGE · ' + g.village.villagers, VILLAGE.x, VILLAGE.y + 62);
+    ctx.fillText(C.SHRINE_TIERS[g.shrine].name.toUpperCase(), SHRINE.x, SHRINE.y + 66);
+    ctx.restore();
+  }
+
+  // --- main --------------------------------------------------------------
+  function frame(g, dt) {
+    if (!ctx) return;
+    time += dt;
+    const t = (g.dayTick % C.TICKS_PER_DAY) / C.TICKS_PER_DAY;
+    const sky = skyAt(t);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#080b14';
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    ctx.save();
+    ctx.translate(offX, offY);
+    ctx.scale(scale, scale);
+
+    // The visible world rectangle, which is wider or taller than the 960x540
+    // design frame whenever the stage aspect differs. The sky is painted over
+    // all of it so the scene never letterboxes to black.
+    const vw = {
+      x0: -offX / scale, y0: -offY / scale,
+      x1: (canvas.width / dpr - offX) / scale,
+      y1: (canvas.height / dpr - offY) / scale
+    };
+    drawSky(g, sky, t, vw);
+    drawIsland(g, sky);
+    drawTrees(sky);
+    drawPlots(g, sky);
+    drawShrine(g, sky);
+    drawHuts(g, sky);
+    drawVillagers(g, sky);
+    moveCreature(g, dt);
+    drawCreature(g, sky);
+    drawSceneLabels(g, sky);
+    drawFx(g, dt);
+
+    ctx.restore();
+  }
+
+  // --- hit testing -------------------------------------------------------
+  function hitPlot(g, wx, wy) {
+    for (const p of g.plots) {
+      const c = plotCenter(p);
+      if (Math.abs(wx - c.x) / GRID.ax + Math.abs(wy - c.y) / GRID.ay <= 1) return p;
+    }
+    return null;
+  }
+  function hitLockedPlot(g, wx, wy) {
+    for (const p of g.lockedPlots) {
+      const c = plotCenter(p);
+      if (Math.abs(wx - c.x) / GRID.ax + Math.abs(wy - c.y) / GRID.ay <= 1) return p;
+    }
+    return null;
+  }
+  function hitCreature(g, wx, wy) {
+    const c = g.creature;
+    return Math.hypot(wx - c.x, wy - (c.y - 26 * c.size)) < 40 * clamp(c.size, 0.7, 2.4);
+  }
+  const setHover = i => { hover = i; };
+  const setSelected = i => { selected = i; };
+  const getSelected = () => selected;
+
+  SW.render = {
+    W, H, attach, resize, frame, toWorld, toScreen, hitPlot, hitLockedPlot, hitCreature,
+    setHover, setSelected, getSelected, plotCenter, anchorPoint,
+    WOOD, VILLAGE, SHRINE, DEN
+  };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — DOM interface: panels, tabs, modals, input. */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+  const F = SW.farm;
+  const Cr = SW.creature;
+  const S = SW.sim;
+  const { clamp, fmt, titleCase } = SW.core;
+
+  let G = null;
+  let tab = 'farm';
+  let lastFestivalShown = -1;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function log(g, text, tone) {
+    if (!g) return;
+    g.log.unshift({ day: g.day, text: text, tone: tone || 'info' });
+    if (g.log.length > 140) g.log.length = 140;
+    dirty.log = true;
+  }
+
+  const dirty = { log: true, panel: true, card: true };
+
+  /* Panels are rebuilt several times a second. Only touch the DOM when the
+   * markup actually changed, so hover states and scroll positions survive. */
+  function setHTML(el, html) {
+    if (el._last === html) return;
+    el._last = html;
+    el.innerHTML = html;
+  }
+
+  // --- bars --------------------------------------------------------------
+  function bar(label, value, max, cls, extra) {
+    const p = clamp(value / max, 0, 1) * 100;
+    return `<div class="bar ${cls || ''}">
+      <div class="bar-label"><span>${label}</span><span>${extra !== undefined ? extra : Math.round(value)}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${p.toFixed(1)}%"></div></div>
+    </div>`;
+  }
+
+  function axis(label, value, lowLabel, highLabel) {
+    const p = (value + 100) / 200 * 100;
+    return `<div class="axis">
+      <div class="axis-head"><span>${lowLabel}</span><b>${label}</b><span>${highLabel}</span></div>
+      <div class="axis-track"><div class="axis-mid"></div><div class="axis-knob" style="left:${p.toFixed(1)}%"></div></div>
+    </div>`;
+  }
+
+  // --- top bar -----------------------------------------------------------
+  function renderTop(g) {
+    const rank = S.rankOf(g);
+    const nxt = C.RANKS[Math.min(rank.id + 1, C.RANKS.length - 1)];
+    const prog = nxt === rank ? 1 : clamp((g.res.renown - rank.renown) / (nxt.renown - rank.renown), 0, 1);
+    $('res-coin').textContent = fmt(g.res.coin);
+    $('res-wood').textContent = fmt(g.res.wood);
+    $('res-prayer').textContent = fmt(g.res.prayer);
+    $('res-renown').textContent = fmt(g.res.renown);
+    $('res-focus').textContent = Math.floor(g.res.focus) + '/' + g.res.focusMax;
+    $('focus-fill').style.width = (g.res.focus / g.res.focusMax * 100) + '%';
+    $('hud-day').textContent = 'Day ' + g.day;
+    const phase = g.dayTick / C.TICKS_PER_DAY;
+    $('hud-clock').textContent = phase < 0.18 ? 'dawn' : phase < 0.52 ? 'midday' : phase < 0.72 ? 'dusk' : 'night';
+    $('hud-rank').textContent = rank.name;
+    $('hud-rank').style.color = rank.color;
+    $('hud-place').textContent = g.lastStanding ? '#' + g.lastStanding + ' of ' + (g.rivals.length + 1) : '—';
+    $('rank-fill').style.width = (prog * 100) + '%';
+    $('rank-fill').style.background = rank.color;
+    $('rank-next').textContent = nxt === rank ? 'the top' : `${fmt(nxt.renown - g.res.renown)} to ${nxt.name}`;
+  }
+
+  // --- creature card -----------------------------------------------------
+  function renderCard(g) {
+    const c = g.creature;
+    const L = Cr.lineage(g);
+    const rows = C.TRAINABLE.map(id => {
+      const a = C.ACTS[id];
+      const m = Cr.mastery(g, id);
+      const good = a.useful;
+      return `<div class="train ${good ? 'good' : 'vice'}" title="${esc(a.name)}">
+        <span class="train-icon">${a.icon}</span>
+        <span class="train-name">${esc(titleCase(a.name))}</span>
+        <span class="train-bar"><i style="width:${(m * 100).toFixed(0)}%"></i></span>
+        <span class="train-pct">${Math.round(m * 100)}%</span>
+      </div>`;
+    }).join('');
+
+    const doing = c.act ? `${C.ACTS[c.act.id].icon} ${c.act.phase === 'travel' ? 'heading off to ' : ''}${C.ACTS[c.act.id].name}` : 'thinking';
+
+    setHTML($('card'), `
+      <div class="card-head">
+        <div class="card-title">
+          <span class="lineage-glyph">${L.glyph}</span>
+          <div>
+            <h2>${esc(c.name)}</h2>
+            <p>${esc(L.name)} · ${esc(Cr.describe(g))}</p>
+          </div>
+        </div>
+        <div class="doing">${esc(doing)}</div>
+      </div>
+      <div class="bars">
+        ${bar('Belly', c.hunger, 130, c.hunger < 25 ? 'danger' : 'food')}
+        ${bar('Vigour', c.vigor, 100, c.vigor < 25 ? 'danger' : 'vigor')}
+        ${bar('Mood', c.mood, 100, c.mood < 25 ? 'danger' : 'mood')}
+        ${bar('Bond', c.bond, 100, 'bond')}
+      </div>
+      ${axis('Nature', c.kind, 'cruel', 'kind')}
+      ${axis('Habit', c.diligence, 'idle', 'diligent')}
+      <div class="statline">
+        <span title="Strength — yields and hauling">💪 ${c.stats.strength.toFixed(1)}</span>
+        <span title="Cunning — speed and precision">🧠 ${c.stats.cunning.toFixed(1)}</span>
+        <span title="Grace — performance and renown">✨ ${c.stats.grace.toFixed(1)}</span>
+        <span title="Size — grows while well fed">📏 ${c.size.toFixed(2)}×</span>
+      </div>
+      <div class="leash">
+        <div class="section-label">Leash</div>
+        <div class="leash-row">
+          ${C.LEASH_LIST.map(l => `<button class="leash-btn ${c.leash === l.id ? 'on' : ''}" data-leash="${l.id}" title="${esc(l.desc)}">${l.glyph}<span>${esc(l.name)}</span></button>`).join('')}
+        </div>
+        <p class="leash-desc">${esc(C.LEASHES[c.leash].desc)}</p>
+      </div>
+      <div class="section-label">What it has learned</div>
+      <div class="trainlist">${rows}</div>
+      <div class="section-label">Feed it</div>
+      <div class="feedrow">
+        ${C.CROP_LIST.map(cr => `<button class="chip" data-feed="${cr.id}" ${(g.stock[cr.id] | 0) > 0 ? '' : 'disabled'}>${cr.glyph} ${g.stock[cr.id] | 0}</button>`).join('')}
+      </div>
+      <p class="tiny">Taught ${c.praised} times, struck ${c.scolded}. ${c.chores} chores done.</p>
+    `);
+  }
+
+  // --- right panel tabs --------------------------------------------------
+  function renderPanel(g) {
+    const body = $('panel-body');
+    switch (tab) {
+      case 'farm': setHTML(body, tabFarm(g)); break;
+      case 'market': setHTML(body, tabMarket(g)); break;
+      case 'village': setHTML(body, tabVillage(g)); break;
+      case 'powers': setHTML(body, tabPowers(g)); break;
+      case 'register': setHTML(body, tabRegister(g)); break;
+      case 'feats': setHTML(body, tabFeats(g)); break;
+    }
+  }
+
+  function tabFarm(g) {
+    const cost = S.plotCost(g);
+    const rows = g.plots.map(p => {
+      const crop = p.crop ? C.CROPS[p.crop] : null;
+      const prog = crop && p.state === 'growing' ? Math.round(p.growth / crop.growTicks * 100) + '%' : p.state === 'ripe' ? 'RIPE' : '';
+      return `<div class="plotrow ${SW.render.getSelected() === p.i ? 'sel' : ''}" data-plot="${p.i}">
+        <span class="pr-i">${p.i + 1}</span>
+        <span class="pr-state">${crop ? crop.glyph + ' ' + esc(crop.name) : p.state === 'tilled' ? 'tilled soil' : 'wild ground'}</span>
+        <span class="pr-prog ${p.state === 'ripe' ? 'ripe' : ''}">${prog}</span>
+        <span class="pr-water">${p.crop ? '💧' + Math.round(p.water) : ''}</span>
+      </div>`;
+    }).join('');
+    return `
+      <p class="hint">Click any plot in the scene to work it. Everything you do by hand, a creature on the <b>Leash of Learning</b> is watching.</p>
+      <div class="plotlist">${rows}</div>
+      <div class="btnrow">
+        <button class="btn" data-act="forage">🪵 Gather wood <span class="cost">${S.COST.forage} focus</span></button>
+        <button class="btn" data-act="clearplot" ${g.lockedPlots.length ? '' : 'disabled'}>
+          ⛏️ Break new ground <span class="cost">${cost.wood}🪵 ${cost.coin}🪙</span>
+        </button>
+      </div>
+      <div class="section-label">Seed bag</div>
+      <div class="seedbag">
+        ${C.CROP_LIST.map(cr => `<span class="chip ${(g.seeds[cr.id] | 0) ? '' : 'dim'}">${cr.glyph} ${g.seeds[cr.id] | 0}</span>`).join('')}
+      </div>`;
+  }
+
+  function tabMarket(g) {
+    const rank = S.rankOf(g).id;
+    const row = cr => {
+      const locked = rank < cr.rank;
+      const held = g.stock[cr.id] | 0;
+      const mod = g.prices[cr.id] || 1;
+      const arrow = mod > 1.12 ? '<span class="up">▲</span>' : mod < 0.9 ? '<span class="down">▼</span>' : '';
+      return `<div class="mkrow ${locked ? 'locked' : ''}">
+        <div class="mk-top">
+          <span class="mk-title" title="${esc(cr.blurb)}">${cr.glyph} ${esc(cr.name)}</span>
+          <span class="mk-price">${F.price(g, cr.id)}${arrow}<i>coin each</i></span>
+        </div>
+        <div class="mk-bot">
+          <span class="mk-held">held <b>${held}</b></span>
+          ${locked ? `<span class="mk-lock">needs ${esc(C.RANKS[cr.rank].name)}</span>` : `
+            <button class="mini" data-sell="${cr.id}" data-n="1" ${held ? '' : 'disabled'}>sell 1</button>
+            <button class="mini" data-sell="${cr.id}" data-n="999999" ${held ? '' : 'disabled'}>sell all</button>
+            <button class="mini seed" data-buy="${cr.id}" data-n="1">seed <i>${F.seedPrice(g, cr.id)}🪙</i></button>
+            <button class="mini seed" data-buy="${cr.id}" data-n="10">×10</button>`}
+        </div>
+      </div>`;
+    };
+    return `<p class="hint">Prices drift every dawn. Sell high, sow the difference.</p>
+      ${C.CROP_LIST.map(row).join('')}
+      <div class="mkrow">
+        <div class="mk-top">
+          <span class="mk-title">🪵 Timber</span>
+          <span class="mk-price">${F.WOOD_PRICE}<i>coin each</i></span>
+        </div>
+        <div class="mk-bot">
+          <span class="mk-held">held <b>${fmt(g.res.wood)}</b></span>
+          <button class="mini seed" data-wood="1">buy 1</button>
+          <button class="mini seed" data-wood="25">buy 25</button>
+          <span class="mk-lock">or send the creature foraging</span>
+        </div>
+      </div>
+      <p class="tiny">Lifetime: ${fmt(g.stats.harvests)} harvested · ${fmt(g.stats.sold)} sold · ${fmt(g.stats.coinEarned)} coin earned.</p>`;
+  }
+
+  function tabVillage(g) {
+    const v = g.village;
+    const hc = S.hutCost(g);
+    const next = C.SHRINE_TIERS[g.shrine + 1];
+    return `
+      <div class="bars">
+        ${bar('Faith', v.faith, 100, 'faith')}
+        ${bar('Awe', v.awe, 100, 'awe')}
+        ${bar('Granary', v.food, 200, v.food < 10 ? 'danger' : 'food', Math.round(v.food))}
+        ${bar('Unrest', v.unrest, 100, 'danger')}
+      </div>
+      <p class="hint">${v.villagers} living in ${v.huts} huts. They eat ${(v.villagers * 0.085 * C.TICKS_PER_DAY).toFixed(0)} food a day, and pray in proportion to what they feel about you.</p>
+      <div class="section-label">Tithe — crops into the granary</div>
+      <div class="btnrow wrap">
+        ${C.CROP_LIST.map(cr => `<button class="chip" data-mill="${cr.id}" ${(g.stock[cr.id] | 0) ? '' : 'disabled'}>${cr.glyph} mill 1 <i>+${cr.feed}</i></button>`).join('')}
+        <button class="chip" data-mill-all="1">mill everything</button>
+      </div>
+      <div class="section-label">Build</div>
+      <div class="btnrow">
+        <button class="btn" data-act="hut">🛖 Raise a hut <span class="cost">${hc.wood}🪵 ${hc.coin}🪙</span></button>
+      </div>
+      <div class="section-label">Shrine — ${esc(C.SHRINE_TIERS[g.shrine].name)} (grandeur ${S.grandeur(g)})</div>
+      ${next ? `<div class="btnrow">
+        <button class="btn" data-act="shrine">🕯️ Raise to ${esc(next.name)} <span class="cost">${next.wood}🪵 ${fmt(next.coin)}🪙 · ${esc(C.RANKS[next.rank].name)}</span></button>
+      </div>` : '<p class="hint">There is nothing higher to build.</p>'}`;
+  }
+
+  function tabPowers(g) {
+    const rank = S.rankOf(g).id;
+    return `<p class="hint">Prayer accrues from faith and awe alike. Terror is cheaper to farm, and costs you later.</p>
+      <div class="miracles">
+        ${C.MIRACLE_LIST.map(m => {
+          const locked = rank < m.rank;
+          const poor = g.res.prayer < m.cost;
+          return `<button class="miracle ${locked || poor ? 'off' : ''}" data-miracle="${m.id}" ${locked ? 'disabled' : ''}>
+            <span class="mi-glyph">${m.glyph}</span>
+            <span class="mi-body"><b>${esc(m.name)}</b><i>${esc(locked ? 'Requires ' + C.RANKS[m.rank].name : m.desc)}</i></span>
+            <span class="mi-cost">${m.cost}🙏</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <p class="tiny">${g.stats.miracles} miracles worked.</p>`;
+  }
+
+  function tabRegister(g) {
+    const rows = S.standings(g);
+    const fest = C.FESTIVALS[g.festival.index % C.FESTIVALS.length];
+    const daysTo = Math.max(0, g.festival.nextDay - g.day);
+    const last = g.festival.lastResult;
+    return `
+      <div class="fest">
+        <div class="fest-head">${fest.glyph} <b>${esc(fest.name)}</b> <span>${daysTo === 0 ? 'today' : 'in ' + daysTo + ' day' + (daysTo === 1 ? '' : 's')}</span></div>
+        <p>${esc(fest.blurb)}</p>
+        <p class="tiny">Your entry would score <b>${fmt(S.festivalScore(g, fest))}</b>.
+          A strong rival is expected around <b>${fmt(S.festivalPar(g, fest))}</b>.</p>
+      </div>
+      ${last ? `<div class="fest-result"><b>${esc(last.name)}, day ${last.day}</b> — you placed ${last.place}${ordSuffix(last.place)} for +${last.payout} renown.
+        <div class="fest-field">${last.field.map(f => `<span class="${f.you ? 'you' : ''}">${esc(f.name)} ${fmt(f.score)}</span>`).join('')}</div></div>` : ''}
+      <div class="section-label">The Skyward Register</div>
+      <table class="register">
+        ${rows.map(r => `<tr class="${r.you ? 'you' : ''}">
+          <td class="rg-place">${r.place}</td>
+          <td class="rg-name">${esc(r.name)}</td>
+          <td class="rg-renown">${fmt(r.renown)}</td>
+        </tr>`).join('')}
+      </table>
+      <div class="section-label">What they are saying</div>
+      <div class="chatter">
+        ${g.chatter.length ? g.chatter.slice(0, 14).map(ch => `<div class="ch ${ch.rel}"><i>day ${ch.day}</i> ${esc(ch.text)}</div>`).join('')
+          : '<p class="hint">Nobody has mentioned you yet.</p>'}
+      </div>`;
+  }
+
+  function ordSuffix(n) {
+    if (n === 1) return 'st'; if (n === 2) return 'nd'; if (n === 3) return 'rd'; return 'th';
+  }
+
+  function tabFeats(g) {
+    const earned = C.FEATS.filter(f => g.feats[f.id]);
+    const open = C.FEATS.filter(f => !g.feats[f.id]);
+    const row = (f, got) => `<div class="feat ${got ? 'got' : ''}">
+      <span class="ft-mark">${got ? '★' : '☆'}</span>
+      <span class="ft-body"><b>${esc(f.name)}</b><i>${esc(f.desc)}</i></span>
+      <span class="ft-renown">+${f.renown}</span>
+    </div>`;
+    const trophies = g.trophies.slice(-12).reverse();
+    return `<p class="hint">${earned.length} of ${C.FEATS.length} feats. Renown is the only thing anyone up here actually counts.</p>
+      ${trophies.length ? `<div class="section-label">Trophy shelf</div><div class="trophies">
+        ${trophies.map(t => `<span class="trophy p${t.place}" title="${esc(t.name)} — day ${t.day}">${t.place === 1 ? '🥇' : t.place === 2 ? '🥈' : '🥉'} ${esc(t.name.replace('The ', ''))}</span>`).join('')}
+      </div>` : ''}
+      <div class="feats">${earned.map(f => row(f, true)).join('')}${open.map(f => row(f, false)).join('')}</div>`;
+  }
+
+  // --- plot action bar ---------------------------------------------------
+  function renderActionBar(g) {
+    const el = $('actionbar');
+    const i = SW.render.getSelected();
+    const p = g.plots.find(pp => pp.i === i);
+    if (!p) { setHTML(el, '<span class="ab-hint">Click a plot, the woodland, or your creature.</span>'); return; }
+    const crop = p.crop ? C.CROPS[p.crop] : null;
+    let html = `<span class="ab-title">Plot ${p.i + 1} — ${crop ? esc(crop.name) : p.state === 'tilled' ? 'tilled' : 'wild'}</span>`;
+    if (p.state === 'raw') {
+      html += `<button class="btn" data-act="till">⛏️ Break soil <span class="cost">${S.COST.till}</span></button>`;
+    } else if (p.state === 'tilled') {
+      const rank = S.rankOf(g).id;
+      html += C.CROP_LIST.map(cr => {
+        const has = (g.seeds[cr.id] | 0) > 0;
+        return `<button class="btn ${has ? '' : 'off'}" data-act="sow" data-crop="${cr.id}" ${has && rank >= cr.rank ? '' : 'disabled'}>${cr.glyph} Sow ${esc(cr.name)} <span class="cost">${g.seeds[cr.id] | 0} left</span></button>`;
+      }).join('');
+    } else {
+      html += `<button class="btn" data-act="water" ${p.water > 95 ? 'disabled' : ''}>💧 Water <span class="cost">${S.COST.water}</span></button>`;
+      if (p.state === 'ripe') html += `<button class="btn hot" data-act="harvest">🧺 Harvest <span class="cost">${S.COST.harvest}</span></button>`;
+      else html += `<span class="ab-hint">${Math.round(p.growth / crop.growTicks * 100)}% grown · ${Math.round(p.water)}% watered</span>`;
+    }
+    setHTML(el, html);
+  }
+
+  function renderJudge(g) {
+    const el = $('judge');
+    const c = g.creature;
+    if (!c.pending) { el.classList.remove('on'); return; }
+    el.classList.add('on');
+    const a = C.ACTS[c.pending.act];
+    $('judge-what').innerHTML = `${a.icon} ${esc(c.name)} just chose to <b>${esc(a.name)}</b>`;
+    const left = 1 - c.pending.t / Cr.PRAISE_WINDOW;
+    $('judge-fill').style.width = (clamp(left, 0, 1) * 100) + '%';
+  }
+
+  // --- log ---------------------------------------------------------------
+  function renderLog(g) {
+    setHTML($('log'), g.log.slice(0, 40).map(l =>
+      `<div class="li ${l.tone}"><i>d${l.day}</i>${esc(l.text)}</div>`).join(''));
+  }
+
+  // --- modals ------------------------------------------------------------
+  function showModal(html, opts) {
+    const m = $('modal');
+    m.innerHTML = `<div class="sheet ${opts && opts.wide ? 'wide' : ''}">${html}</div>`;
+    m.classList.add('on');
+  }
+  function hideModal() { $('modal').classList.remove('on'); $('modal').innerHTML = ''; }
+
+  function showHatch(onDone) {
+    showModal(`
+      <h1>Skyward Reach</h1>
+      <p class="lede">You are a very small god with one floating island, three believers and no reputation whatsoever.
+      Below you, eleven other godlings are already listed in the Register. Grow things. Raise a beast. Be spoken of.</p>
+      <div class="section-label">Choose what hatches</div>
+      <div class="hatch">
+        ${C.LINEAGE_LIST.map((l, i) => `<button class="hatch-card ${i === 0 ? 'on' : ''}" data-lineage="${l.id}">
+          <span class="hg">${l.glyph}</span><b>${esc(l.name)}</b>
+          <i>${esc(l.blurb)}</i>
+          <span class="hstat">💪${l.base.strength} 🧠${l.base.cunning} ✨${l.base.grace}</span>
+        </button>`).join('')}
+      </div>
+      <div class="namerow">
+        <label>Your name <input id="in-god" maxlength="30" value="Alethe of the Small Isle"></label>
+        <label>Its name <input id="in-beast" maxlength="18" value="Pim"></label>
+      </div>
+      <p class="tiny">${esc(C.HATCH_HINTS[0])}</p>
+      <button class="btn big" id="btn-begin">Open your eyes</button>
+    `, { wide: true });
+    let chosen = C.LINEAGE_LIST[0].id;
+    $('modal').querySelectorAll('[data-lineage]').forEach(b => {
+      b.onclick = () => {
+        chosen = b.dataset.lineage;
+        $('modal').querySelectorAll('[data-lineage]').forEach(x => x.classList.toggle('on', x === b));
+      };
+    });
+    $('btn-begin').onclick = () => {
+      const god = ($('in-god').value || 'the Nameless').trim().slice(0, 30);
+      const beast = ($('in-beast').value || C.LINEAGES[chosen].name).trim().slice(0, 18);
+      hideModal();
+      onDone(chosen, beast, god);
+    };
+  }
+
+  function showOffline(rep) {
+    if (!rep) return;
+    showModal(`
+      <h1>While you were gone</h1>
+      <p class="lede">${rep.minutes} minutes passed on the island — ${rep.days} day${rep.days === 1 ? '' : 's'}.</p>
+      <div class="offgrid">
+        <div><b>${fmt(rep.renown)}</b><i>renown</i></div>
+        <div><b>${fmt(rep.coin)}</b><i>coin</i></div>
+        <div><b>${fmt(rep.harvests)}</b><i>harvested</i></div>
+      </div>
+      <p class="tiny">Your creature kept doing whatever you last taught it. For better or worse.</p>
+      <button class="btn big" onclick="SW.ui.hideModal()">Back to work</button>
+    `);
+  }
+
+  function showFestival(g) {
+    const r = g.festival.lastResult;
+    if (!r) return;
+    showModal(`
+      <h1>${esc(r.name)}</h1>
+      <p class="lede">You placed <b>${r.place}${ordSuffix(r.place)}</b> with a score of ${fmt(r.score)}. +${r.payout} renown.</p>
+      <table class="register">
+        ${r.field.map((f, i) => `<tr class="${f.you ? 'you' : ''}"><td class="rg-place">${i + 1}</td><td class="rg-name">${esc(f.name)}</td><td class="rg-renown">${fmt(f.score)}</td></tr>`).join('')}
+      </table>
+      <button class="btn big" onclick="SW.ui.hideModal()">Close</button>
+    `);
+  }
+
+  function showHelp() {
+    showModal(`
+      <h1>How this works</h1>
+      <div class="help">
+        <p><b>You never command the creature.</b> It acts on its own, out of learned weights. When it finishes an act,
+        you get a few seconds to <b>praise</b> (P) or <b>strike</b> (S) it. Praise multiplies that behaviour's weight;
+        striking divides it and makes the creature meaner and less bonded. That is the entire training system.</p>
+        <p><b>The Leash of Learning</b> means it copies chores you do by hand. Slower than praise, but it costs nothing
+        and it works while you are busy farming.</p>
+        <p><b>Needs beat training.</b> A starving beast will eat your ripe field no matter how well you taught it not to.
+        Feed it, or it teaches itself bad habits.</p>
+        <p><b>Focus</b> is your own stamina, and it is deliberately scarce. Everything you cannot do by hand, the creature
+        eventually does for free — that is what you are working toward.</p>
+        <p><b>Faith and Awe</b> both make prayer and renown. Faith comes from feeding and helping; awe comes from storms
+        and a terrorising creature. Awe decays and breeds unrest; faith compounds. Pick a god to be.</p>
+        <p><b>Festivals</b> every five days, rotating between crops, creature and shrine. <b>Feats</b> and placement in
+        <b>the Register</b> are where renown really comes from.</p>
+        <p class="tiny">Keys — <b>P</b> praise · <b>S</b> strike · <b>Space</b> pause · <b>1/2/3</b> speed · <b>F</b> festival panel</p>
+      </div>
+      <button class="btn big" onclick="SW.ui.hideModal()">Understood</button>
+    `, { wide: true });
+  }
+
+  function showMenu() {
+    showModal(`
+      <h1>Menu</h1>
+      <div class="btnrow col">
+        <button class="btn" id="mn-help">How this works</button>
+        <button class="btn" id="mn-export">Copy save to clipboard</button>
+        <button class="btn" id="mn-import">Paste a save</button>
+        <button class="btn danger" id="mn-wipe">Abandon this island and start again</button>
+        <button class="btn" onclick="SW.ui.hideModal()">Back</button>
+      </div>
+      <p class="tiny" id="mn-note">Progress saves to this browser automatically.</p>
+    `);
+    $('mn-help').onclick = showHelp;
+    $('mn-export').onclick = () => {
+      const txt = SW.core.exportSave(G);
+      navigator.clipboard && navigator.clipboard.writeText(txt);
+      $('mn-note').textContent = 'Copied. Keep it somewhere safe.';
+    };
+    $('mn-import').onclick = () => {
+      const txt = prompt('Paste a save string:');
+      if (!txt) return;
+      try {
+        const g = SW.state.hydrate(SW.core.importSave(txt));
+        SW.main.replace(g);
+        hideModal();
+      } catch (e) { $('mn-note').textContent = 'That was not a save.'; }
+    };
+    $('mn-wipe').onclick = () => {
+      if (!confirm('Erase this island for good?')) return;
+      SW.core.wipe();
+      location.reload();
+    };
+  }
+
+  // --- input -------------------------------------------------------------
+  function onCanvasMove(e) {
+    const w = SW.render.toWorld(e.clientX, e.clientY);
+    const p = SW.render.hitPlot(G, w.x, w.y);
+    SW.render.setHover(p ? p.i : -1);
+    $('stage').style.cursor = p || SW.render.hitCreature(G, w.x, w.y) ? 'pointer' : 'default';
+  }
+
+  function onCanvasClick(e) {
+    const w = SW.render.toWorld(e.clientX, e.clientY);
+    if (SW.render.hitCreature(G, w.x, w.y)) {
+      if (G.creature.pending) Cr.praise(G);
+      else log(G, `${G.creature.name} looks up at you.`);
+      dirty.card = true;
+      return;
+    }
+    const p = SW.render.hitPlot(G, w.x, w.y);
+    if (p) {
+      SW.render.setSelected(p.i);
+      quickAct(p);
+      dirty.panel = true;
+      return;
+    }
+    const lp = SW.render.hitLockedPlot(G, w.x, w.y);
+    if (lp) { setTab('farm'); return; }
+    const R = SW.render;
+    if (Math.hypot(w.x - R.WOOD.x, w.y - R.WOOD.y) < 70) { S.playerForage(G); return; }
+    if (Math.hypot(w.x - R.VILLAGE.x, w.y - R.VILLAGE.y) < 90) { setTab('village'); return; }
+    if (Math.hypot(w.x - R.SHRINE.x, w.y - R.SHRINE.y) < 70) { setTab('village'); return; }
+    SW.render.setSelected(-1);
+  }
+
+  /* One click does the obvious thing to a plot. Shift-click just selects. */
+  function quickAct(p) {
+    if (p.state === 'raw') S.playerTill(G, p);
+    else if (p.state === 'ripe') S.playerHarvest(G, p);
+    else if (p.state === 'growing') S.playerWater(G, p);
+    else if (p.state === 'tilled') {
+      const seed = F.bestSeed(G);
+      if (seed && S.rankOf(G).id >= seed.rank) S.playerSow(G, p, seed.id);
+      else log(G, 'No seed in the bag. Buy some at market.', 'warn');
+    }
+  }
+
+  function setTab(t) {
+    tab = t;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    dirty.panel = true;
+    renderPanel(G);
+  }
+
+  function onPanelClick(e) {
+    const t = e.target.closest('button, [data-plot]');
+    if (!t) return;
+    const d = t.dataset;
+    if (d.plot !== undefined) { SW.render.setSelected(+d.plot); renderActionBar(G); renderPanel(G); return; }
+    if (d.sell) { const gain = F.sell(G, d.sell, +d.n); if (gain) log(G, `Sold for ${fmt(gain)} coin.`); }
+    else if (d.buy) { const n = F.buySeed(G, d.buy, +d.n); log(G, n ? `Bought ${n} ${C.CROPS[d.buy].name} seed.` : 'Not enough coin.', n ? 'info' : 'warn'); }
+    else if (d.wood) { const n = F.buyWood(G, +d.wood); log(G, n ? `${n} timber delivered.` : 'Not enough coin.', n ? 'info' : 'warn'); }
+    else if (d.mill) { const f = F.mill(G, d.mill, 1); if (f) log(G, `Milled into ${f} food.`); }
+    else if (d.millAll !== undefined) {
+      let total = 0;
+      for (const cr of C.CROP_LIST) total += F.mill(G, cr.id, G.stock[cr.id] | 0);
+      log(G, total ? `The granary takes ${total} food.` : 'Nothing to mill.', total ? 'good' : 'warn');
+    }
+    else if (d.miracle) S.castMiracle(G, d.miracle);
+    else if (d.feed) Cr.feed(G, d.feed);
+    else if (d.leash) { G.creature.leash = d.leash; log(G, `Leash of ${C.LEASHES[d.leash].name}.`); }
+    else if (d.act) {
+      const p = G.plots.find(pp => pp.i === SW.render.getSelected());
+      switch (d.act) {
+        case 'till': p && S.playerTill(G, p); break;
+        case 'sow': p && S.playerSow(G, p, d.crop); break;
+        case 'water': p && S.playerWater(G, p); break;
+        case 'harvest': p && S.playerHarvest(G, p); break;
+        case 'forage': S.playerForage(G); break;
+        case 'clearplot': S.clearPlot(G); break;
+        case 'hut': S.buildHut(G); break;
+        case 'shrine': S.upgradeShrine(G); break;
+      }
+    }
+    dirty.panel = true; dirty.card = true;
+    renderPanel(G);
+    renderActionBar(G);
+    renderCard(G);
+  }
+
+  function onKey(e) {
+    if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'p') { Cr.praise(G); renderCard(G); }
+    else if (k === 's') { Cr.scold(G); renderCard(G); }
+    else if (k === ' ') { e.preventDefault(); SW.main.togglePause(); }
+    else if (k === '1') SW.main.setSpeed(1);
+    else if (k === '2') SW.main.setSpeed(2);
+    else if (k === '3') SW.main.setSpeed(4);
+    else if (k === 'f') setTab('register');
+    else if (k === '?') showHelp();
+  }
+
+  // --- wiring ------------------------------------------------------------
+  function init(game) {
+    G = game;
+    document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+    // pointerdown, not click: these containers are rebuilt several times a
+    // second and a click needs mousedown+mouseup on the same live element.
+    $('panel-body').addEventListener('pointerdown', onPanelClick);
+    $('card').addEventListener('pointerdown', onPanelClick);
+    $('actionbar').addEventListener('pointerdown', onPanelClick);
+    $('stage').addEventListener('mousemove', onCanvasMove);
+    $('stage').addEventListener('click', onCanvasClick);
+    $('btn-praise').onclick = () => { Cr.praise(G); renderCard(G); };
+    $('btn-scold').onclick = () => { Cr.scold(G); renderCard(G); };
+    $('btn-menu').onclick = showMenu;
+    $('btn-help').onclick = showHelp;
+    document.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => SW.main.setSpeed(+b.dataset.speed));
+    $('btn-pause').onclick = () => SW.main.togglePause();
+    window.addEventListener('keydown', onKey);
+    lastFestivalShown = G.festival.index;
+    setTab('farm');
+    renderCard(G);
+    renderLog(G);
+  }
+
+  function setGame(g) { G = g; lastFestivalShown = g.festival.index; }
+
+  let acc = 0;
+  function frame(g, dt) {
+    G = g;
+    acc += dt;
+    renderJudge(g);
+    if (acc > 0.2) {
+      acc = 0;
+      renderTop(g);
+      renderCard(g);
+      renderPanel(g);
+      renderActionBar(g);
+      if (dirty.log) { renderLog(g); dirty.log = false; }
+      document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('on', +b.dataset.speed === g.speed && !g.paused));
+      $('btn-pause').textContent = g.paused ? '▶' : '❚❚';
+    }
+    if (g.festival.index !== lastFestivalShown) {
+      lastFestivalShown = g.festival.index;
+      showFestival(g);
+    }
+  }
+
+  SW.ui = { init, setGame, frame, log, showHatch, showOffline, showHelp, hideModal, setTab };
+})(window.SW = window.SW || {});
+
+</script>
+<script>
+/* Skyward Reach — bootstrap and the game loop. */
+(function (SW) {
+  'use strict';
+  const C = SW.content;
+
+  let G = null;
+  let last = 0;
+  let acc = 0;
+  let saveAcc = 0;
+  const TICK = 1;               // one simulation tick = one second at 1×
+
+  function setSpeed(n) { if (G) { G.speed = n; G.paused = false; } }
+  function togglePause() { if (G) G.paused = !G.paused; }
+
+  function replace(g) {
+    G = g;
+    SW.ui.setGame(G);
+    SW.ui.log(G, 'Save loaded.', 'good');
+  }
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (!G) return;
+    const dt = Math.min(0.1, (now - last) / 1000 || 0);
+    last = now;
+
+    if (!G.paused) {
+      acc += dt * G.speed;
+      let guard = 0;
+      while (acc >= TICK && guard++ < 120) {
+        acc -= TICK;
+        SW.sim.tick(G, TICK);
+      }
+      // Feats are cheap to test and much better felt immediately.
+      G.__featAcc = (G.__featAcc || 0) + dt;
+      if (G.__featAcc > 1.5) { G.__featAcc = 0; SW.sim.checkFeats(G); }
+    }
+
+    SW.render.frame(G, dt);
+    SW.ui.frame(G, dt);
+
+    saveAcc += dt;
+    if (saveAcc > 12) { saveAcc = 0; G.__savedAt = Date.now(); SW.core.save(G); }
+  }
+
+  function begin(game, offlineReport) {
+    G = game;
+    SW.render.attach(document.getElementById('scene'));
+    SW.ui.init(G);
+    if (offlineReport) SW.ui.showOffline(offlineReport);
+    last = performance.now();
+    requestAnimationFrame(loop);
+    window.addEventListener('beforeunload', () => { G.__savedAt = Date.now(); SW.core.save(G); });
+
+    /* A backgrounded tab stops getting animation frames, so the sim stops with
+     * it. Credit that time on the way back, the same way a closed tab is
+     * credited on reload — otherwise switching tabs quietly costs you an hour
+     * that closing the game would have paid out. */
+    document.addEventListener('visibilitychange', () => {
+      if (!G) return;
+      if (document.hidden) {
+        G.__savedAt = Date.now();
+        SW.core.save(G);
+      } else {
+        const report = SW.sim.runOffline(G);
+        last = performance.now();
+        acc = 0;
+        // Resync first: festivals resolved during catch-up are summarised in
+        // the report, not replayed as a stack of modals.
+        SW.ui.setGame(G);
+        if (report) SW.ui.showOffline(report);
+      }
+    });
+  }
+
+  function boot() {
+    const loaded = SW.state.hydrate(SW.core.load());
+    if (loaded) {
+      const report = SW.sim.runOffline(loaded);
+      begin(loaded, report);
+      SW.ui.log(loaded, 'You return to the island.', 'info');
+    } else {
+      SW.render.attach(document.getElementById('scene'));
+      SW.ui.showHatch((lineage, beastName, godName) => {
+        const g = SW.state.newGame(lineage, beastName, godName);
+        SW.ui.log(g, `The egg opens. ${beastName} looks at you and waits to be told what it is.`, 'great');
+        SW.ui.log(g, 'Click a plot to work it. Praise or strike the creature after it acts — that is how it learns.', 'info');
+        begin(g);
+      });
+    }
+  }
+
+  SW.main = { boot, setSpeed, togglePause, replace, get game() { return G; } };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})(window.SW = window.SW || {});
+
+</script>
+</body>
+</html>
