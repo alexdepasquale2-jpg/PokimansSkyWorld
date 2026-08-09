@@ -155,7 +155,39 @@ a repeat of a bad experience, and the pitch has to account for it.
 Open-ended close. Sometimes contradicts everything above — when it does, believe
 this answer over the earlier ones.
 
-### 10. The referral ask — never skip
+### 10. The two file asks — and they are two, not one
+
+Both feed Gate 2, they have completely different lead times, and collapsing them into "would
+you share some files?" is how the sprint quietly grows three weeks
+([`../08-critical-path.md`](../08-critical-path.md)).
+
+**Ask everyone, in the interview** — this one exists already and arrives in days:
+
+> "Could you send me two or three of last year's filed reports? Whatever actually went to
+> the AHJ. I'm trying to understand what the format really looks like in your jurisdiction,
+> not what the standard says it should."
+
+Low friction, and it is what the procedure library gets scoped from. Redacted is fine; the
+structure is what matters, not the addresses.
+
+**Ask the two or three warmest** — this one does not exist yet and takes weeks:
+
+> "Bigger favour. Over the next few weeks, could someone record themselves on their next few
+> inspections? Just phone voice memo while they work, plus the photos they'd normally take.
+> Nobody does this today, which is exactly why I need it."
+
+Say plainly that it is a favour and that you will show them what comes out of it — that
+return visit *is* the Gate 3 conversation.
+
+Ask three shops, not one. You need five inspections, and the most likely way this fails is a
+warm yes that never happens because they got busy. Redundancy costs nothing here.
+
+Then brief them on how to narrate, which matters more than it sounds — see the capture
+section of [`../08-critical-path.md`](../08-critical-path.md). Short version: **do not give
+them a script.** Ask for messy and mean it. A tidied-up narration measures the wrong thing and
+will make the harness look better than the product will be.
+
+### 11. The referral ask — never skip
 
 > "This was really useful. Who else should I talk to — ideally someone whose
 > setup is different from yours? And would you be willing to introduce me?"

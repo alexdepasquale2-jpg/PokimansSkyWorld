@@ -14,10 +14,11 @@ NicheSaaS/
   01-candidates.md       three candidates scored against the rubric
   02-stack-and-costs.md  Part A — stack, unit economics, infrastructure, sales/marketing budget
   03-product-concept.md  Part B — the product, feature by feature, each tied to what makes it newly possible
-  04-validation-sprint.md  the three-week gate that runs before any code is written
+  04-validation-sprint.md  the four gates that run before any code is written
   05-competitors.md      incumbent teardown — pricing, gaps, what it changes
   06-risks.md            what the gates don't test, ranked. Read R1 first
   07-financials.md       the money joined up — cash at risk, break-even, what the return actually is
+  08-critical-path.md    the real schedule — dependencies, lead times, and what to do while waiting
   gate1-recruiting/      target list, outreach sequences, interview guide, scorecard
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
   gate3-pilot/           pilot offer, walkthrough, objections, term sheet, ROI calculator
@@ -81,10 +82,15 @@ sitting on Gate 2's critical path. Reasoning and controls: [`06-risks.md`](06-ri
 
 ## The single most important sequencing decision
 
-**No product code until the validation sprint passes.** Three weeks, four gates
+**No product code until the validation sprint passes.** Four gates
 ([`04-validation-sprint.md`](04-validation-sprint.md)). If the first gate fails, the correct
 response is to switch candidates — so any week spent building the product beforehand is a
 week spent building the wrong thing.
+
+Three weeks of work, but **nine to ten weeks of calendar** — the difference is waiting on
+other people, and [`08-critical-path.md`](08-critical-path.md) sequences it so the waits run
+in parallel instead of end to end. It also answers the question that period actually poses:
+what to do with the slack, given that the obvious answer is forbidden.
 
 The sprint costs roughly **$4,150** — $50 of model spend and about $4,100 of procedure
 library and tooling, worked through in [`07-financials.md`](07-financials.md). That is the

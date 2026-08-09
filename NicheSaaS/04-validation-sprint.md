@@ -1,6 +1,11 @@
 # The Validation Sprint
 
-Three weeks. Roughly **$4,150** of spend. Four gates, each with an explicit stop condition.
+Three weeks of work — **nine to ten weeks of calendar**. Roughly **$4,150** of spend. Four
+gates, each with an explicit stop condition.
+
+The gap between those two numbers is waiting, not working: on replies, on somebody's
+inspection schedule, on a contractor, on an underwriter. [`08-critical-path.md`](08-critical-path.md)
+sequences it and names the one change that takes three weeks back out.
 
 Earlier versions of this document said $50. That was the model spend and it was not the
 cost of the sprint — Gate 2 cannot run without a procedure library, and the library is
@@ -101,6 +106,15 @@ Obtain five real inspections' worth of audio and photos from a Gate 1 interviewe
 also a useful commitment test on that relationship. If nobody will share files with you after
 a good interview, that is itself a finding about how the paid-pilot conversation will go.
 
+**That audio does not exist yet.** Nobody records themselves narrating an inspection today —
+that is the product's premise. So this is not a file transfer; it is five inspections someone
+has to perform while recording, on their schedule, over two to four weeks. It is the longest
+wait on the critical path and the most likely thing to slip. Ask three shops, and brief them
+properly: **do not hand them a script**, because a narration tidied up for you measures a
+speaking version of the form this product exists to replace. Both asks are written out in
+[`08-critical-path.md`](08-critical-path.md) and
+[`gate1-recruiting/03-interview-guide.md`](gate1-recruiting/03-interview-guide.md).
+
 ### The prerequisite nobody has scheduled: library coverage
 
 Gate 2 grounds every finding in the authored procedure library. **A thin library fails this
@@ -127,6 +141,12 @@ the procedures those five actually touch — perhaps 40–80 of them, days of wo
 $1,500–2,500, instead of several hundred at $4,000–8,000. Commission the rest once somebody
 has paid. This is the largest single improvement available to the plan's risk profile and it
 costs nothing but sequencing ([`07-financials.md`](07-financials.md)).
+
+**Scope it from prior-year filed reports, not from the recordings.** Filed reports exist
+today and arrive within days of an interview, so library authoring can start weeks before
+the recordings do — which is what keeps this off the longest wait on the path
+([`08-critical-path.md`](08-critical-path.md)). They are also the better scope source: they
+show what the AHJ actually accepted.
 
 The catch to avoid tripping on: build the scope file from those same five inspections, and
 do not read the resulting coverage figure as product readiness. A gate-scoped library is

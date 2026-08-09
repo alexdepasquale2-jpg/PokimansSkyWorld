@@ -101,10 +101,17 @@ is the part you will be most tempted to leave blank.
 |---|---|
 | Referrals given | |
 | Intro offered | yes / name-drop only / no |
-| Would share real inspection files for Gate 2 | yes / no / maybe |
+| **Prior-year filed reports** — sent? | yes / promised / no |
+| **Will record inspections** for Gate 2 | yes / maybe / no — how many? |
 | Plausible paid pilot (Gate 3) | yes / no / unclear |
 | Next action | |
 
-The "would share real files" line is the bridge to Gate 2 — the harness needs
-five real inspections and this is where they come from. Ask it in every
-interview that goes well.
+Those two file lines are the bridge to Gate 2 and they are deliberately
+separate. **Prior-year reports already exist** and arrive in days; they scope the
+procedure library and they are the gating input on the whole critical path.
+**Recorded inspections do not exist yet** — someone has to perform five while
+recording, on their schedule, over two to four weeks.
+
+Track them apart, because a week where three shops promised reports and nobody
+agreed to record is not the same week as the reverse, and only one of those
+leaves Gate 2 blocked. See [`../08-critical-path.md`](../08-critical-path.md).
