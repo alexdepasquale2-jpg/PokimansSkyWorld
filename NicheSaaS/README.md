@@ -23,6 +23,7 @@ NicheSaaS/
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
   gate3-pilot/           pilot offer, walkthrough, objections, term sheet, ROI calculator
   gate4-retention/       health signals, renewal script, churn post-mortem, scorecard
+  prototype/             clickable capture-and-attest app — built out of sequence, read its README
 ```
 
 ## The thesis
@@ -104,6 +105,12 @@ All four gates are equipped, and none of it is product code.
 ask for money, and read whether they stay. [`gate2-harness/`](gate2-harness/) is a runnable
 feasibility pipeline, deliberately disposable: no UI, no database, nothing that survives
 contact with the answer.
+
+There is also a [`prototype/`](prototype/) — a working capture-and-attest app, built
+**out of sequence and against the rule above**. It demonstrates the two things no document
+can settle: that capture completes with the radio off, and that a reviewer is forced to
+attest rather than rubber-stamp. Treat it as a prop, not evidence, and read its README
+before showing it to anyone — in particular, do not demo it during a Gate 1 interview.
 
 What is *not* built, and cannot be from a keyboard: twelve interviews, and a real procedure
 library written by someone who knows the trade.
