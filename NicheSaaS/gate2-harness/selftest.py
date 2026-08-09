@@ -122,10 +122,10 @@ def test_gate_verdict() -> None:
 
 def test_corpus_and_cache() -> None:
     print("\ncorpus and cache guards")
-    corpus = load_corpus(HERE / "fixtures" / "standards")
+    corpus = load_corpus(HERE / "fixtures" / "library")
     check("corpus loads", corpus.approx_tokens > 0, f"{corpus.approx_tokens} tokens")
     check("README excluded from corpus", "README" not in " ".join(corpus.sources))
-    check("fingerprint is stable", corpus.sha256 == load_corpus(HERE / "fixtures" / "standards").sha256)
+    check("fingerprint is stable", corpus.sha256 == load_corpus(HERE / "fixtures" / "library").sha256)
 
     zero_usage = SimpleNamespace(cache_read_input_tokens=0, cache_creation_input_tokens=0)
     warned = cache_warning("claude-opus-5", corpus, zero_usage)
@@ -135,6 +135,34 @@ def test_corpus_and_cache() -> None:
     small = type(corpus)(text="x" * 400, sha256="x", sources=[])
     check("warns when corpus is below the model's cache floor",
           cache_warning("claude-haiku-4-5", small, warm) is not None)
+
+
+def test_reproduction_guard() -> None:
+    """The control that keeps published standard wording out of our output.
+
+    The model has read NFPA in training. Without this check it will happily
+    supply remembered standard text where the library is silent — which is
+    exactly the material an unlicensed product must not reproduce.
+    """
+    print("\nreproduction guard")
+    from harness.pipeline import _grounded_in
+
+    library = load_corpus(HERE / "fixtures" / "library").text
+
+    drawn = ("Read the calibration date on the gauge tag. Replace or recalibrate "
+             "at intervals no longer than five years.")
+    check("passes text drawn from the library", _grounded_in(drawn, library))
+
+    lightly_reworded = ("Check the gauge tag calibration date and replace or "
+                        "recalibrate at intervals no longer than five years.")
+    check("tolerates light rewording", _grounded_in(lightly_reworded, library))
+
+    invented = ("Emergency egress illumination shall provide not less than one "
+                "footcandle measured along the path of egress travel.")
+    check("flags requirement language absent from the library",
+          not _grounded_in(invented, library))
+
+    check("empty claim is not flagged", _grounded_in("", library))
 
 
 def test_fixture() -> None:
@@ -151,7 +179,7 @@ def test_fixture() -> None:
           any(d.source == "photo" for d in reference.deficiencies))
     check("fixture carries the ambiguity trap", len(reference.uncertain_items) > 0)
 
-    corpus = load_corpus(HERE / "fixtures" / "standards")
+    corpus = load_corpus(HERE / "fixtures" / "library")
     unknown = [d.standard_clause for d in reference.deficiencies
                if d.standard_clause and d.standard_clause not in corpus.text]
     check("every reference citation exists in the corpus", not unknown, str(unknown))
@@ -210,7 +238,7 @@ def test_corpus_tools() -> None:
           refs.index("13.2.10") > refs.index("13.2.9"), str(refs))
 
     # Provenance must never land inside a clause body — it would end up in the
-    # model's clause_quote, inside a filed compliance document.
+    # model's requirement_basis, inside a filed compliance document.
     body = "\n".join(amended.files().values())
     clause_line = [l for l in body.splitlines() if l.startswith("**13.2.5**")][0]
     check("amendment marker stays out of the clause text",
@@ -249,6 +277,7 @@ def main() -> int:
     test_gate_verdict()
     test_corpus_and_cache()
     test_corpus_tools()
+    test_reproduction_guard()
     test_fixture()
     print(f"\n{'FAILED: ' + ', '.join(FAILURES) if FAILURES else 'all checks passed'}")
     return 1 if FAILURES else 0

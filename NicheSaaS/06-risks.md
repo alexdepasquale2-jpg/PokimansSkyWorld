@@ -7,98 +7,82 @@ something on this list.
 > Nothing here is legal advice. R1 in particular needs a lawyer before a paid
 > pilot, not after.
 
-## R1 — Standards licensing · **assumed resolved — see the conditions**
+## R1 — Content authorship · **reshaped, not eliminated**
 
-> **Status: the plan now assumes a negotiated NFPA licence is available.**
-> The analysis below is retained because it defines what that licence has to
-> cover, and because the assumption is not yet a signed agreement. Two things
-> still have to be true — see *What the licence must actually permit* and
-> *The commercial shape that matters* at the end of this section.
+> **Status: the plan no longer seeks an NFPA licence.** The product ships an
+> independently authored procedure library that cites clause references and
+> describes what to check in our own words. The customer's own licensed copy of
+> the standard remains the authoritative text.
+>
+> This removes the licensing risk and replaces it with a smaller one: proving the
+> library is genuinely ours.
 
+### Why this is the better position, not just the cheaper one
 
-The product's core feature is citing NFPA 25 and 72 clauses, and quoting the
-governing sentence, inside a document delivered commercially to a paying
-customer. **NFPA standards are copyrighted.** This has surfaced three times
-across these documents as "settle before a paid pilot," and it is still open.
+**The library is an asset we own.** A licensed corpus is a commodity — a
+competitor writes the same cheque and is at parity on day one. An authored
+library improves with every inspection processed, encodes what customers actually
+get pulled up on by their AHJ, and cannot be bought. It is a second moat
+alongside multi-year customer history, and it is the one that accrues fastest.
 
-**Why the obvious escape hatch does not apply.** NFPA, ASTM and ASHRAE sued
-Public.Resource.Org over posting standards incorporated by reference into law.
-A district court initially upheld copyright; an appeals court later held that
-Public Resource's posting was **fair use** — resting explicitly on the use being
-**nonprofit and educational**, serving a different purpose from the standards
-bodies' own.
+**It removes a counterparty who could have ended the business.** No negotiation,
+no per-seat fee eating the margin, nobody able to change terms once we have
+customers depending on us.
 
-That reasoning does not obviously extend to a commercial product embedding the
-same text in a paid deliverable. Its use is neither nonprofit nor educational,
-and it is arguably a substitute for the standards body's own licensed offering —
-the two fair-use factors that carried the ruling both point the other way here.
-**Do not treat the Public.Resource.Org outcome as cover.** The Pro Codes Act,
-which would alter this landscape, has been before Congress and is not settled
-law.
+**It is more honest about the product.** The value was never "here is the
+standard" — the contractor already owns the standard. It is "here is what to
+check, and here is a draft finding written up." That is our work.
 
-**The plausible path** is a commercial licence. NFPA LiNK is the digital
-delivery product, and an Enterprise tier exists that has been integrated into
-third-party content management systems — there is precedent for NFPA licensing
-content into someone else's software. That precedent is the thing to pull on.
+### The line that matters
 
-**Do this, in order, before Gate 3:**
+**Clause references are facts.** Citing `NFPA 25 § 13.2.5` is like citing a case
+number; that is not the protected part.
 
-1. Contact NFPA licensing directly. Describe the actual use: clause references
-   and short quotations, inside customer-specific reports, delivered
-   commercially. Get the terms and the per-seat or per-report cost in writing.
-2. Have a lawyer read the answer against the product as designed.
-3. Model the licence cost into
-   [`02-stack-and-costs.md`](02-stack-and-costs.md). At ~$0.85 COGS per report
-   there is room, but a per-seat standards licence at incumbent-like rates
-   changes the picture materially.
+**Expression is protected.** Copying the standard's sentences — or paraphrasing
+closely enough that ours is recognisably a rewrite — is where risk lives. And
+systematically shadowing an entire standard clause-for-clause can be a derivative
+work even when no single sentence matches. Volume and structure matter, not just
+wording.
 
-**Fallback if licensing proves impossible or prohibitive:** cite clause
-*references* without quoting text, and let the customer's own licensed
-subscription supply the language. Weaker product — the quoted sentence is what
-makes review fast — but it survives. Design the corpus loader so this is a
-configuration change, not a rewrite. It already is: the harness reads a
-user-supplied corpus directory.
+### Controls, in place
 
-**Kill condition:** licensing is refused *and* reference-only output fails to
-satisfy Gate 3 buyers.
+| Control | Where |
+|---|---|
+| Authoring discipline — write from practice, never rewrite alongside the page | [`gate2-harness/fixtures/library/README.md`](gate2-harness/fixtures/library/README.md) |
+| Extraction prompt forbids reproducing or paraphrasing published wording | `harness/pipeline.py` → `EXTRACT_ROLE` |
+| Runtime guard flags requirement language not drawn from the library | `harness/pipeline.py` → `_grounded_in`, tested in `selftest.py` |
+| Authorship provenance recorded per library version | `corpus.py ingest --author` → manifest |
 
-### What the licence must actually permit
+The runtime guard matters more than it looks. **The model has read NFPA in
+training.** Without an explicit check it will supply remembered standard wording
+wherever the library is silent — reproducing, from memory, exactly the material
+we chose not to license. That check is the technical enforcement of the whole
+strategy.
 
-Get these four in writing. A licence to *read* the standard is not a licence to
-do any of them, and "we have a subscription" is the most common way this goes
-wrong:
+### What this costs
 
-1. **Reproduce short clause quotations** inside customer-specific deliverables —
-   the `clause_quote` field is what makes review fast, and without it the product
-   degrades to reference-only.
-2. **Store the text** in a processing corpus and transmit it to a model provider
-   as prompt context.
-3. **Distribute the resulting report** to the customer, their AHJ, their insurer,
-   and the building owner.
-4. **Cover every edition you ingest**, not just the current one. Jurisdictions
-   adopt on their own schedule, so you will be running several editions at once.
+**Someone has to write and maintain the library.** Across two standards, multiple
+editions, and per-jurisdiction amendments. This is the recurring cost that
+replaces the licence fee, and it is not small — but it is *labour we control*
+rather than a fee someone else sets, and it is labour that compounds into the
+asset.
 
-### The commercial shape that matters more than the number
+**One real product degradation.** Reviewers lose the verbatim clause quote, which
+was the thing that made review fast. Our procedure text has to be precise enough
+that a reviewer can check it against their own copy without hunting. Watch this
+specifically at Gate 3 — "is reviewing faster than writing" is already the
+question the walkthrough turns on, and this change makes it harder to answer yes.
 
-**Per-report licensing is survivable. Per-seat licensing probably is not.**
+### Still to do
 
-At a $25 report price against ~$0.85 COGS, a licence at $2/report still leaves
-~89% gross margin. Even $5/report leaves ~77%. There is real room.
+1. **Lawyer review** of the library and the authoring discipline before a paid
+   pilot. This section describes the shape of the problem; it is not legal advice.
+2. **Decide the AHJ-facing position.** Some jurisdictions may expect the filed
+   report to quote the standard. If so, the customer's licensed copy supplies it —
+   confirm during the AHJ interviews in R2.
 
-A per-seat licence is a different story: against ~$129/seat/month revenue, a
-$50/seat/month standards licence is 39% of revenue before any other cost, and
-the CAC ceiling in [`02-stack-and-costs.md`](02-stack-and-costs.md) stops working.
-
-**Negotiate for per-report or a flat annual fee. Resist per-seat**, and if
-per-seat is the only option, get the number before committing to the pricing
-model rather than after.
-
-### Now unblocked
-
-With the licence assumed, [`gate2-harness/corpus_tools/`](gate2-harness/corpus_tools/)
-turns licensed source into the clause-addressable, cache-stable corpus the
-harness reads, with jurisdiction overlays as configuration. That path did not
-exist before and Gate 2 could not have run on real material without it.
+**Kill condition:** authored-library output fails to satisfy Gate 3 buyers *and*
+licensing turns out to be unobtainable. Both would have to be true.
 
 ## R2 — AHJ acceptance
 
@@ -182,7 +166,7 @@ non-discretionary-spend filter.
 
 | # | Risk | Severity | Resolvable now? | Owner action |
 |---|---|---|---|---|
-| R1 | Standards licensing | **Kill** | Yes | Contact NFPA licensing this week |
+| R1 | Content authorship | Medium | Controls in place | Lawyer review of the library before Gate 3 |
 | R3 | Professional liability | High | Yes | Lawyer + broker before Gate 3 |
 | R4 | Fabricated citations | High | Mitigated | Carry harness controls into product |
 | R2 | AHJ acceptance | Medium | Yes, cheaply | Interview two AHJs in Gate 1 |
@@ -191,9 +175,9 @@ non-discretionary-spend filter.
 | R7 | Cohort concentration | Medium | Partly | Keep recruiting past two |
 | R8 | Cyclicality | Low (C1) | n/a | Only if switching to C2 |
 
-**R1 is the one to act on this week.** It is the only kill-condition risk, it is
-resolvable by a phone call and a lawyer, and every other asset in this repo
-assumes an answer nobody has yet asked for.
+**R3 is now the one to act on.** With the licensing dependency gone, professional
+liability is the highest live risk — the review clause needs a lawyer and the E&O
+premium needs to enter the cost model, where it is currently absent entirely.
 
 ---
 

@@ -50,23 +50,26 @@ reads ~0.1×. Batch API 50% off.
 | Generate report (Opus 5) — transcript, photo findings, standard excerpts, prior-year report | ~60k input, mostly cache reads; ~12k output | ~$0.35 |
 | Deficiency → priced repair proposal (Opus 5, short) | ~8k in, ~2k out | ~$0.10 |
 | Storage and compute, amortised | — | ~$0.05 |
-| Standards licence | **negotiated — insert the real figure** | **$0.00–5.00** |
-| **Total COGS per report** | | **~$0.85 + licence** |
+| **Total COGS per report** | | **~$0.85** |
 
-**The licence line is the one that can move this.** Everything above it is model
-and storage spend that scales predictably; the standards licence is a negotiated
-term, and its *shape* matters more than its price:
+**No standards licence line.** The product ships an independently authored
+procedure library rather than licensed standards text, so there is no per-report
+or per-seat fee eating the margin — see [`06-risks.md`](06-risks.md) R1.
 
-| Licence shape | At $25/report | Verdict |
+That trade is not free. It moves the cost from **variable** to **fixed**:
+
+| | Licensed corpus | Authored library |
 |---|---|---|
-| $2 / report | ~89% gross margin | Comfortable |
-| $5 / report | ~77% gross margin | Workable |
-| Flat annual fee | Amortises to near zero at volume | Best case — push for this |
-| $50 / seat / month | ~39% of a $129 seat, before any other cost | Breaks the CAC ceiling |
+| Per report | $2–5, forever | $0 |
+| Fixed | — | Authoring and maintenance labour |
+| Scales with | Revenue | Standards editions × jurisdictions |
+| Owned by | The standards body | **Us** |
 
-Negotiate for per-report or flat-annual. See [`06-risks.md`](06-risks.md) R1 for
-the four permissions the licence has to grant, which are separate from its price
-and easier to get wrong.
+Budget the authoring as a real recurring line — roughly a part-time
+subject-matter contractor, ongoing, to cover new editions and each new
+jurisdiction. At volume this is dramatically cheaper than per-report licensing
+and it compounds into an asset. At *low* volume it is the more expensive
+choice, which is worth being honest about: it is a bet on reaching scale.
 
 **Price:** $20–30 per report, or seat-based at $99–149 per technician per month with an
 included report volume. A 12-technician shop lands at roughly **$14–21k ACV**.

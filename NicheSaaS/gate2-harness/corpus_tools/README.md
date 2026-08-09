@@ -1,38 +1,40 @@
 # Corpus tooling
 
-Licensed standards source → the clause-addressable corpus the harness reads.
+Authored procedure library → the clause-addressable corpus the harness reads.
 
 Driven by `../corpus.py`. Nothing here touches the API or costs money.
 
 ```sh
-# 1. Base edition
-python corpus.py ingest --source raw/nfpa25-2023.txt \
+# 1. Base library version
+python corpus.py ingest --source drafts/itm-v2.md \
                         --standard NFPA25 --edition 2023 \
-                        --out ~/gate2/corpus-nfpa25-2023
+                        --out ~/gate2/library-v2
 
 # 2. Jurisdiction overlay
-python corpus.py overlay --base ~/gate2/corpus-nfpa25-2023 \
+python corpus.py overlay --base ~/gate2/library-v2 \
                          --amendments jurisdictions/travis-county.txt \
                          --jurisdiction travis-county \
-                         --out ~/gate2/corpus-travis-county
+                         --out ~/gate2/library-travis-county
 
 # 3. Check before use
-python corpus.py validate ~/gate2/corpus-travis-county
+python corpus.py validate ~/gate2/library-travis-county
 
 # 4. Run the harness against it
-python run.py --all ~/gate2/inspections --standards ~/gate2/corpus-travis-county
+python run.py --all ~/gate2/inspections --library ~/gate2/library-travis-county
 ```
 
-**Write corpora outside the repository.** `.gitignore` blocks licensed text, but
-the safer habit is never putting it in the working tree at all.
+**The library belongs in version control.** It is authored content we own — the
+asset, not a liability. What must never land in the repo is customer inspection
+data, or licensed standards text if you ever convert a purchased copy for
+reference.
 
-## The corpus is a matrix, not a document
+## The library is a matrix, not a document
 
-A base standard at an edition, plus the amendments the local AHJ actually
-enforces. `NFPA25 2023` and `NFPA25 2023 + Travis County` are different corpora
-producing different correct answers, and citing the wrong one yields a reference
-that is technically grounded and practically useless — the failure incumbents
-are known for.
+A base library version mapped to a standard edition, plus the amendments the
+local AHJ actually enforces. `NFPA25 2023` and `NFPA25 2023 + Travis County` are
+different libraries producing different correct answers, and citing the wrong one
+yields a reference that is technically grounded and practically useless — the
+failure incumbents are known for.
 
 This is why the plan claims adding a jurisdiction is a configuration change:
 `overlay` is that change. One amendments file per jurisdiction, no code.
@@ -74,7 +76,7 @@ corpus grows.
 ## Provenance is not stored in clause text
 
 An amendment marker rendered inline (`**13.2.5** _(amended: x)_ Control valves…`)
-ends up inside the model's `clause_quote` — putting "(amended: travis-county)"
+ends up inside the model's `requirement_basis` — putting "(amended: travis-county)"
 into the quoted sentence of a filed compliance document. It also breaks the
 parse → render round trip, so the fingerprint drifts and caching cold-starts.
 

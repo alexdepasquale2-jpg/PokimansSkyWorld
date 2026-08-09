@@ -71,7 +71,7 @@ class Chapter:
 
         Amendment provenance goes in the header, never inline with a clause.
         A marker inside the clause line ends up inside the model's
-        `clause_quote` — putting "(amended: travis-county)" into the quoted
+        `requirement_basis` — putting "(amended: travis-county)" into the quoted
         sentence of a filed compliance document — and it also breaks the
         parse → render round trip, so the corpus fingerprint drifts.
         """

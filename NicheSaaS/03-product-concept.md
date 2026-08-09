@@ -55,21 +55,32 @@ a thumb in the corner.
 impossible at this market's size — nobody was going to build and maintain that for three
 thousand sprinkler contractors.
 
-### 3. Standard-grounded citation
+### 3. Procedure-grounded findings with clause references
 
-Every deficiency cites the exact clause of the governing standard plus any local amendment.
-The full corpus lives in the prompt, cached.
+Every deficiency is grounded in a procedure from our own authored library, and
+carries the clause reference that procedure maps to — plus any local amendment.
+The whole library sits in the prompt, cached.
 
-**Enabled by:** a 1M-token context window with prompt caching, which makes cache reads
-roughly a tenth the cost of fresh input. The whole of NFPA 25 plus jurisdiction amendments
-can be present on every request without the cost being absurd.
+**Enabled by:** a 1M-token context window with prompt caching, which makes cache
+reads roughly a tenth the cost of fresh input. The entire procedure library plus
+jurisdiction amendments can be present on every request without the cost being
+absurd.
 
-**Previously:** a hand-maintained rules engine that had to be rewritten every code cycle.
-This is precisely why incumbents lag jurisdictions by years — the maintenance burden of
-encoding a standard as rules scales with the standard, and the standard keeps changing.
+**Previously:** a hand-maintained rules engine rewritten every code cycle. This
+is precisely why incumbents lag jurisdictions by years — encoding requirements as
+rules scales with the standard, and the standard keeps changing.
 
-**Why it matters commercially:** citation is what converts model output from a draft into
-something a reviewer can verify quickly. Without it, review takes as long as writing.
+**The library is ours, not licensed.** It states what to check and what makes a
+finding a deficiency, in our own words, and cites the clause so a reviewer can
+turn to their own copy of the standard for the authoritative text. See
+[`06-risks.md`](06-risks.md) R1 for why this is the stronger position and what it
+costs.
+
+**The honest tradeoff:** a reviewer does not get the standard's sentence quoted
+back at them, which was the fastest possible way to verify a finding. Our
+procedure text has to be precise enough that checking it against their own copy
+is quick. This is the single thing most likely to weaken the review-speed claim,
+and it is what to watch at Gate 3.
 
 ### 4. One capture, N required outputs
 
@@ -111,9 +122,14 @@ just the current inspection.
 **Previously:** the data existed, as PDFs nobody could query. Every inspection started from
 zero because the prior one was an artifact rather than a record.
 
-**This is the moat.** By month 12 the multi-year history is the reason they cannot leave —
-not the UI, not the price. Nobody migrates three years of device history to save fifteen
-percent.
+**This is one of two moats.** By month 12 the multi-year history is the reason they cannot
+leave — not the UI, not the price. Nobody migrates three years of device history to save
+fifteen percent.
+
+The other is the procedure library itself. A competitor can license the same standard and be
+at parity on day one; they cannot buy a library that has been sharpened by every inspection
+we have processed and every AHJ rejection our customers have hit. Licensed content is a
+commodity. Authored content compounds.
 
 ### 7. Review-and-attest, never auto-file
 

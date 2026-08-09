@@ -72,9 +72,15 @@ Nothing here limits liability that cannot be limited by law.
 
 ## Standards material
 
-Any codes or standards text used in producing your reports is licensed
-appropriately, or supplied by you. Neither of us redistributes copyrighted
-standards material to the other beyond what that licence permits.
+Our reports are produced from our own inspection procedure library. That library
+describes what to check in our own words and cites the clause of the published
+standard each procedure relates to. It is not the standard, does not reproduce
+the standard's text, and is not a substitute for it.
+
+You hold your own licensed copy of the applicable standards, and your reviewer
+relies on that copy — not on us — for authoritative wording.
+
+Neither of us sends the other copyrighted standards text.
 
 ## Confidentiality
 
@@ -115,11 +121,11 @@ Date: ______________            Date: ______________
 - **The review clause is the load-bearing one.** It's what keeps you out of the
   professional-liability chain. Have a lawyer confirm the wording holds in your
   jurisdiction and check it against your insurance.
-- **The standards clause matters more than it looks.** Per
-  [`../gate2-harness/fixtures/standards/README.md`](../gate2-harness/fixtures/standards/README.md),
-  NFPA text is copyrighted. Settle your licensing position *before* a paid pilot,
-  not after — a customer asking "are you allowed to do that?" mid-pilot is a bad
-  moment to start finding out.
+- **The standards clause is now a positive claim, not a disclaimer.** It states
+  that the library is ours. Make sure that is actually true before signing it —
+  see the authoring discipline in
+  [`../gate2-harness/fixtures/library/README.md`](../gate2-harness/fixtures/library/README.md)
+  and get a lawyer's eyes on the library itself, not just the wording here.
 - **Deliberately easy to leave.** Thirty days, no lock-in, keep your reports.
   That is the honest offer at this stage and it removes the objection that
   otherwise kills the deal. The switching cost you eventually want comes from

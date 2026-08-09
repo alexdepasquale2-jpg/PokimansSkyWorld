@@ -1,1 +1,1 @@
-"""Licensed standards source -> the clause-addressable corpus the harness reads."""
+"""Authored procedure library -> the corpus the harness reads."""

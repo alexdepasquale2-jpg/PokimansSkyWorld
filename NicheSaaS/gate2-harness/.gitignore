@@ -2,13 +2,18 @@
 # than commit the images.
 fixtures/inspections/
 
-# Pipeline output, including the corpus fingerprint from the last run.
+# Pipeline output, including the library fingerprint from the last run.
 out/
 
-# Real inspections and licensed standards must never land in git.
-fixtures/standards/*.md
-!fixtures/standards/README.md
-!fixtures/standards/SYNTHETIC-placeholder.md
+# The procedure library is authored content we own — it belongs in version
+# control, where it gets history and review. It is the asset, not a liability.
+#
+# What must never land here: customer inspection data, and any licensed
+# standards text. If you ever convert a purchased standard to text for
+# reference, keep it outside the working tree entirely.
+raw/
+*-licensed.md
+*-licensed.txt
 
 .venv*/
 __pycache__/

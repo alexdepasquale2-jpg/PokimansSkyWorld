@@ -92,12 +92,18 @@ class Deficiency(BaseModel):
     device: str = Field(description="Device or system the deficiency applies to.")
     description: str = Field(description="One sentence, in the inspector's terms.")
     standard_clause: str = Field(
-        description="Clause reference from the supplied standards corpus, e.g. "
-        "'25-13.2.5'. Empty string if no supplied clause applies — never invent one."
+        description="Clause reference the procedure maps to, e.g. '25-13.2.5'. A "
+        "bare citation. Empty string if no procedure in the library applies — "
+        "never invent a reference."
     )
-    clause_quote: str = Field(
-        description="The sentence from the corpus the clause reference points at. "
-        "Empty string if standard_clause is empty."
+    procedure_id: str = Field(
+        description="Id of the procedure in the supplied library that this finding "
+        "is grounded in. Empty string if standard_clause is empty."
+    )
+    requirement_basis: str = Field(
+        description="The requirement in the library's own words, copied from the "
+        "procedure text. Do NOT reproduce or paraphrase the published standard's "
+        "wording — use only what the supplied library says."
     )
     severity: Severity
     evidence_photo_ids: list[str] = Field(

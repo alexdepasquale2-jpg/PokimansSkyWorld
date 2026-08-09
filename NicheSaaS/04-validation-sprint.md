@@ -75,14 +75,17 @@ directory of audio and photos in, five draft reports out.
 
 **The harness is built: [`gate2-harness/`](gate2-harness/).** It runs the five stages,
 scores against a human-written reference, and prints the verdict below. Point it at real
-inspections and a licensed corpus:
+inspections and the procedure library:
 
 ```sh
 cd gate2-harness
 pip install -r requirements.txt
 python selftest.py                  # offline, no key, no spend
-python run.py --all ~/gate2/inspections --standards ~/gate2/nfpa-corpus
+python run.py --all ~/gate2/inspections --library ~/gate2/library
 ```
+
+Grounding is our own authored procedure library, not licensed standards text — see
+[`06-risks.md`](06-risks.md) R1.
 
 It ships a synthetic fixture so the plumbing can be checked before real files arrive.
 That fixture proves wiring only — clean narration, captioned diagrams instead of

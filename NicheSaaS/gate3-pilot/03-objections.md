@@ -95,6 +95,27 @@ specific follow-up date. "I'll circle back" is where pilots go to die.
 
 ---
 
+**"Where does your guidance come from? Is that NFPA text?"**
+
+The question the pivot creates. Answer it straight — a compliance buyer who
+suspects you are quietly redistributing licensed content will not sign.
+
+> "No, and deliberately not. What you're reading is our own procedure library —
+> what to check, what makes it a deficiency, what to photograph. We wrote it. Each
+> procedure cites the clause it relates to so your reviewer can turn to your copy
+> of the standard, which is the authoritative text. We're not reselling you NFPA;
+> you already have NFPA. We're telling you what to do with it."
+
+If they push on accuracy of the mapping: *"If a citation is ever wrong, that's a
+bug and I want to hear about it — the system flags any reference it can't find in
+our library, and I'd rather show you a gap than a plausible-looking error."*
+
+**Do not oversell this as a feature.** It is the honest position, and framing it
+as a competitive advantage to a buyer who has not raised it invites a question
+about whether the guidance is authoritative. It isn't — theirs is.
+
+---
+
 **"What happens to my data?"**
 
 > "Your inspections stay yours. I use them to produce your reports and to check

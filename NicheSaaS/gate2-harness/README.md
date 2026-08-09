@@ -22,10 +22,10 @@ export ANTHROPIC_API_KEY=sk-ant-...
 python run.py --all fixtures/inspections
 ```
 
-Against real inspections with a licensed corpus:
+Against real inspections:
 
 ```sh
-python run.py --all ~/gate2/inspections --standards ~/gate2/nfpa-corpus --out ~/gate2/out
+python run.py --all ~/gate2/inspections --library ~/gate2/library --out ~/gate2/out
 ```
 
 `DEEPGRAM_API_KEY` is only needed when an inspection ships audio rather than a
@@ -50,7 +50,7 @@ demo-001/
 |---|---|---|
 | 1. transcribe | Deepgram (or committed transcript) | `transcript.txt` |
 | 2. classify photos | `claude-haiku-4-5`, effort low | `photo-findings.json` |
-| 3. extract deficiencies | `claude-opus-5`, effort high, corpus cached | `deficiencies.json` |
+| 3. extract deficiencies | `claude-opus-5`, effort high, library cached | `deficiencies.json` |
 | 4. write report | `claude-opus-5`, effort medium | `report.md` |
 | 5. price proposal | `claude-opus-5`, effort medium | `proposal.json` |
 | score | `claude-opus-5` — **measurement, excluded from COGS** | `score.json` |
@@ -58,7 +58,7 @@ demo-001/
 ### Why the stages are split this way
 
 Photos report what is **visible**. Extraction decides **compliance**, grounded
-only in the supplied corpus. The report writes prose from **decided** findings
+only in the supplied procedure library. The report writes prose from **decided** findings
 and adds nothing.
 
 Collapsing these produces a vision model inventing code violations from a blurry
@@ -84,37 +84,42 @@ because nothing errors. So the corpus is fingerprinted and compared across runs,
 below the model's cache floor (512 tokens on Opus 5, 4,096 on Haiku 4.5) is
 called out rather than left to look like a cheap run.
 
-Extraction also cross-checks every cited clause against the corpus text and warns
-on any citation it cannot find. A fabricated citation is worse than a missing
-one: a reviewer can see a gap, but a plausible-looking wrong clause reads as
-correct.
+Extraction runs two guards. It cross-checks every cited clause against the
+library and warns on any it cannot find — a fabricated citation is worse than a
+missing one, because a reviewer sees a gap but reads a plausible wrong clause as
+correct. And it checks that requirement language was actually drawn from the
+library: **the model has read NFPA in training**, and without that check it will
+supply remembered standard wording wherever the library is silent — reproducing
+from memory exactly the text we chose not to license.
 
-## Building a corpus from licensed source
+## The procedure library
 
-`corpus.py` turns a licensed standard into the clause-addressable corpus the
-harness reads, and applies jurisdiction amendments as configuration rather than
-code:
+The harness is grounded in **our own authored procedure library**, not licensed
+standards text. Each procedure says what a technician checks and what makes a
+finding a deficiency, in our words, and carries a `maps_to` clause reference so a
+reviewer can turn to their own licensed copy for the authoritative wording.
+
+That is a deliberate strategic choice, not a workaround — a licensed corpus is a
+commodity any competitor can buy, while an authored library compounds with every
+inspection processed. See [`06-risks.md`](../06-risks.md) R1 for the reasoning,
+the legal line, and what it costs.
+
+`corpus.py` manages the library and applies jurisdiction amendments as
+configuration rather than code:
 
 ```sh
-python corpus.py ingest  --source raw/nfpa25-2023.txt --standard NFPA25 \
-                         --edition 2023 --out ~/gate2/corpus-nfpa25-2023
-python corpus.py overlay --base ~/gate2/corpus-nfpa25-2023 \
+python corpus.py ingest  --source drafts/itm-v2.md --standard NFPA25 \
+                         --edition 2023 --out ~/gate2/library-v2
+python corpus.py overlay --base ~/gate2/library-v2 \
                          --amendments jurisdictions/travis-county.txt \
-                         --jurisdiction travis-county --out ~/gate2/corpus-travis
-python corpus.py validate ~/gate2/corpus-travis
+                         --jurisdiction travis-county --out ~/gate2/library-travis
+python corpus.py validate ~/gate2/library-travis
 ```
 
-Full documentation: [`corpus_tools/README.md`](corpus_tools/README.md).
-
-## The standards corpus is not in this repo
-
-NFPA 25 and 72 are copyrighted. `fixtures/standards/SYNTHETIC-placeholder.md`
-holds invented clause numbers and paraphrased generic requirements so the harness
-runs end to end — it is not NFPA text. See
-[`fixtures/standards/README.md`](fixtures/standards/README.md).
-
-Licensing the corpus for redistribution is a real cost line and a question to
-settle **before** a paid pilot, not after. It belongs in the Gate 3 conversation.
+Full documentation: [`corpus_tools/README.md`](corpus_tools/README.md) and
+[`fixtures/library/README.md`](fixtures/library/README.md) — the latter carries
+the authoring discipline, which is the control that keeps the library defensibly
+ours.
 
 ## What the fixture does and does not prove
 
@@ -162,10 +167,12 @@ harness/
   config.py            model ids, pricing, thresholds, token budgets
   cost.py              cache-aware per-stage cost and timing
   schemas.py           Pydantic models + the JSON-Schema strictifier
-  llm.py               streaming call wrappers, corpus loading, cache guards
   pipeline.py          the five production stages and their prompts
   score.py             semantic alignment, gate verdict
+  llm.py               streaming call wrappers, library loading, cache guards
+corpus.py              library ingest / jurisdiction overlay / validate
+corpus_tools/          library model, overlay, validation
 fixtures/
   make_fixtures.py     generates the synthetic inspection
-  standards/           corpus — synthetic placeholder only
+  library/             authored procedure library
 ```

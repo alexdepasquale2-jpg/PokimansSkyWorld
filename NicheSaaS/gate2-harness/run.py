@@ -192,7 +192,7 @@ def main() -> int:
     source.add_argument("--inspection", type=Path, help="one inspection directory")
     source.add_argument("--all", type=Path, help="directory of inspection directories")
     parser.add_argument("--out", type=Path, default=HERE / "out")
-    parser.add_argument("--standards", type=Path, default=HERE / "fixtures" / "standards")
+    parser.add_argument("--library", type=Path, default=HERE / "fixtures" / "library")
     parser.add_argument("--no-score", action="store_true", help="skip scoring")
     parser.add_argument("--dry-run", action="store_true",
                         help="validate inputs and corpus, make no API calls")
@@ -207,7 +207,7 @@ def main() -> int:
         return 2
 
     try:
-        corpus = load_corpus(args.standards)
+        corpus = load_corpus(args.library)
     except CorpusError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

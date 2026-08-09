@@ -14,6 +14,7 @@ photo, which is the failure mode this product cannot have.
 from __future__ import annotations
 
 import base64
+import re
 import json
 from pathlib import Path
 from typing import Any
@@ -59,16 +60,24 @@ this image" is worth more than a confident guess.\
 
 EXTRACT_ROLE = """\
 You convert a fire and life-safety inspection into a list of deficiencies, each
-grounded in the standards corpus supplied below.
+grounded in the inspection procedure library supplied below.
+
+The library is independently authored. It maps each procedure to the clause of
+the published standard it relates to, but it is not the standard and does not
+reproduce its wording.
 
 Rules:
 
-1. Cite only clauses that appear in the supplied corpus. If nothing in the corpus
-   covers an observation, leave standard_clause empty and still record the
-   deficiency. Never invent, guess at, or reconstruct a clause number from memory
-   — a fabricated citation is worse than a missing one, because a reviewer can
-   see a gap but cannot see a plausible-looking error.
-2. Quote the corpus sentence your citation points at, verbatim, in clause_quote.
+1. Ground every finding in a procedure from the supplied library, and record its
+   procedure_id and the clause reference that procedure maps to. If no procedure
+   covers an observation, leave both empty and still record the deficiency. Never
+   invent, guess at, or reconstruct a clause number from memory — a fabricated
+   citation is worse than a missing one, because a reviewer can see a gap but
+   cannot see a plausible-looking error.
+2. In requirement_basis, use the library's own wording. Do **not** reproduce or
+   paraphrase the published standard's text, and do not supply remembered
+   standard wording where the library is silent. The library is the only source
+   of requirement language you may use.
 3. The inspector's narration is the primary record. Photos corroborate it. A
    photo alone can support a deficiency only for plainly visible physical
    conditions (obstruction, damage, missing signage).
@@ -245,14 +254,40 @@ def extract_deficiencies(
     if (warning := cache_warning(REASONING_MODEL, corpus, usage)):
         warnings.append(warning)
 
-    # A clause the corpus does not contain is the failure this product cannot ship.
+    # Two checks, guarding two different failures the product cannot ship.
     for deficiency in result.deficiencies:
+        # 1. A reference the library does not contain — a fabricated citation.
         if deficiency.standard_clause and deficiency.standard_clause not in corpus.text:
             warnings.append(
                 f"{deficiency.id}: cited clause '{deficiency.standard_clause}' does not "
-                "appear in the corpus — possible fabricated citation"
+                "appear in the library — possible fabricated citation"
+            )
+        # 2. Requirement language that did not come from the library. The model
+        #    has read the published standards in training; without this check it
+        #    can supply remembered standard wording, which is precisely the text
+        #    an unlicensed product must not reproduce.
+        if deficiency.requirement_basis and not _grounded_in(deficiency.requirement_basis, corpus.text):
+            warnings.append(
+                f"{deficiency.id}: requirement_basis does not track the library text — "
+                "may be reproducing published standard wording from memory"
             )
     return result, warnings
+
+
+def _grounded_in(claim: str, library: str, *, threshold: float = 0.6) -> bool:
+    """Is this requirement language actually drawn from the supplied library?
+
+    Substring first (the honest case), then a distinctive-word overlap so light
+    rewording still passes while wholesale invention does not. Deliberately
+    lenient — it raises a reviewer warning, it does not block a report.
+    """
+    if claim.strip().lower() in library.lower():
+        return True
+    words = {w for w in re.findall(r"[a-z]{5,}", claim.lower())}
+    if not words:
+        return True
+    library_words = set(re.findall(r"[a-z]{5,}", library.lower()))
+    return len(words & library_words) / len(words) >= threshold
 
 
 # --- 4. write report --------------------------------------------------------

@@ -52,12 +52,12 @@ def load_corpus(directory: Path) -> Corpus:
     invalidates every cache entry downstream of it.
     """
     if not directory.is_dir():
-        raise CorpusError(f"standards corpus directory not found: {directory}")
+        raise CorpusError(f"procedure library directory not found: {directory}")
     files = sorted(p for p in directory.glob("*.md") if p.name != "README.md")
     if not files:
         raise CorpusError(
-            f"no .md clause files in {directory}. See {directory / 'README.md'} — "
-            "the corpus is licensed material you must supply."
+            f"no .md procedure files in {directory}. See {directory / 'README.md'} — "
+            "the library is authored content you must supply."
         )
     parts = [f"<<< {p.name} >>>\n{p.read_text()}" for p in files]
     text = "\n\n".join(parts)
