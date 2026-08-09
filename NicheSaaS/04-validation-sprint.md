@@ -196,6 +196,15 @@ fixes:
 Design partners still using the product in month 3 without being prompted, and renewing at
 full price when the discount expires.
 
+**The retention assets are built: [`gate4-retention/`](gate4-retention/).** Five weekly
+health signals that predict the answer weeks early, the month-2 renewal script, a churn
+post-mortem, and the scorecard.
+
+They are deliberately built to **detect the truth rather than maximise conversion** — no
+save offers, because a discount that rescues a renewal converts the logo and destroys the
+measurement, and at this stage the measurement is worth more. Fix defects; never buy
+loyalty.
+
 ### Pass condition
 
 **≥70% of pilots convert to paid annual contracts.**

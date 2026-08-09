@@ -20,6 +20,7 @@ NicheSaaS/
   gate1-recruiting/      target list, outreach sequences, interview guide, scorecard
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
   gate3-pilot/           pilot offer, walkthrough, objections, term sheet, ROI calculator
+  gate4-retention/       health signals, renewal script, churn post-mortem, scorecard
 ```
 
 ## The thesis
@@ -84,8 +85,12 @@ four gates ([`04-validation-sprint.md`](04-validation-sprint.md)). If the first 
 the correct response is to switch candidates — so any week spent building the product
 beforehand is a week spent building the wrong thing.
 
-Three things are built and none of them is product code. [`gate1-recruiting/`](gate1-recruiting/)
-and [`gate3-pilot/`](gate3-pilot/) are paper — how to find the buyers, how to interview
-them, and how to ask for money afterwards. [`gate2-harness/`](gate2-harness/) is a runnable
+All four gates are equipped, and none of it is product code.
+[`gate1-recruiting/`](gate1-recruiting/), [`gate3-pilot/`](gate3-pilot/) and
+[`gate4-retention/`](gate4-retention/) are paper — how to find the buyers, interview them,
+ask for money, and read whether they stay. [`gate2-harness/`](gate2-harness/) is a runnable
 feasibility pipeline, deliberately disposable: no UI, no database, nothing that survives
 contact with the answer.
+
+What is *not* built, and cannot be from a keyboard: twelve interviews, and a real procedure
+library written by someone who knows the trade.
