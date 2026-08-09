@@ -157,12 +157,98 @@ def test_fixture() -> None:
     check("every reference citation exists in the corpus", not unknown, str(unknown))
 
 
+SOURCE = """\
+Chapter 13 Valves
+
+13.2.5 Control valves shall be inspected quarterly to verify they are open.
+13.2.6 Each control valve shall have a permanently marked identification sign.
+13.2.10 Valves shall be operated through their full range annually.
+"""
+
+AMENDMENTS = """\
+# Test County amendments
+
+## replace 13.2.5
+Control valves shall be inspected monthly within Test County.
+
+## add 13.2.9
+A Knox-box key shall be verified at each annual inspection.
+"""
+
+
+def test_corpus_tools() -> None:
+    print("\ncorpus tooling")
+    from corpus_tools import overlay as ov
+    from corpus_tools.model import parse
+    from corpus_tools.validate import has_errors, validate as validate_corpus
+
+    corpus, warnings = parse(SOURCE, standard="NFPA25", edition="2023")
+    check("parses clauses", len(corpus.clauses) == 3, f"got {len(corpus.clauses)}")
+    check("multi-line clause bodies join", all(len(c.text) > 20 for c in corpus.clauses))
+    check("no parse warnings on clean source", not warnings, str(warnings))
+
+    # The round trip is what keeps the cache fingerprint stable.
+    rendered = "\n\n".join(
+        "<<< x >>>\n" + c for c in corpus.files().values()
+    ).replace("**", "")
+    reparsed, _ = parse(rendered, standard="NFPA25", edition="2023")
+    check("render -> parse round trip preserves clause count",
+          len(reparsed.clauses) == len(corpus.clauses))
+    check("round trip preserves clause text",
+          [c.text for c in reparsed.clauses] == [c.text for c in corpus.clauses])
+
+    amended, notes = ov.apply(
+        corpus, ov.parse_amendments(AMENDMENTS)[1], jurisdiction="test-county"
+    )
+    check("overlay applies both directives", len(notes) == 2, str(notes))
+    check("base corpus is not mutated",
+          corpus.clause_index()["13.2.5"].text.startswith("Control valves shall be inspected quarterly"))
+    check("amended clause replaced",
+          "monthly" in amended.clause_index()["13.2.5"].text.lower())
+    refs = [c.ref for c in amended.chapters[0].clauses]
+    check("numeric sort puts 13.2.10 after 13.2.9",
+          refs.index("13.2.10") > refs.index("13.2.9"), str(refs))
+
+    # Provenance must never land inside a clause body — it would end up in the
+    # model's clause_quote, inside a filed compliance document.
+    body = "\n".join(amended.files().values())
+    clause_line = [l for l in body.splitlines() if l.startswith("**13.2.5**")][0]
+    check("amendment marker stays out of the clause text",
+          "amended" not in clause_line.lower(), clause_line[:70])
+    check("amendment provenance appears in the chapter header",
+          "Locally amended" in body)
+
+    check("validator flags duplicate refs",
+          has_errors(validate_corpus(parse(
+              "Chapter 5 X\n5.1.1 First requirement text.\n5.1.1 Second requirement text.\n",
+              standard="S", edition="1")[0])))
+
+    for bad, label in [
+        ("# t\n\n## replace 13.2.5\n", "replace with no body"),
+        ("# t\n\n## delete 13.2.5\nunexpected body\n", "delete with a body"),
+        ("# t\n\n## rewrite 13.2.5\nx\n", "unknown directive"),
+        ("# t\n\nnothing here\n", "no directives"),
+    ]:
+        try:
+            ov.parse_amendments(bad)
+            check(f"rejects {label}", False)
+        except ov.OverlayError:
+            check(f"rejects {label}", True)
+
+    try:
+        ov.apply(corpus, [ov.Amendment("replace", "99.9.9", "x")], jurisdiction="t")
+        check("rejects replace of a missing clause", False)
+    except ov.OverlayError:
+        check("rejects replace of a missing clause", True)
+
+
 def main() -> int:
     print("Gate 2 harness self-test (offline)")
     test_schemas()
     test_cost()
     test_gate_verdict()
     test_corpus_and_cache()
+    test_corpus_tools()
     test_fixture()
     print(f"\n{'FAILED: ' + ', '.join(FAILURES) if FAILURES else 'all checks passed'}")
     return 1 if FAILURES else 0

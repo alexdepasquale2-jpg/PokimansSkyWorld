@@ -89,6 +89,23 @@ on any citation it cannot find. A fabricated citation is worse than a missing
 one: a reviewer can see a gap, but a plausible-looking wrong clause reads as
 correct.
 
+## Building a corpus from licensed source
+
+`corpus.py` turns a licensed standard into the clause-addressable corpus the
+harness reads, and applies jurisdiction amendments as configuration rather than
+code:
+
+```sh
+python corpus.py ingest  --source raw/nfpa25-2023.txt --standard NFPA25 \
+                         --edition 2023 --out ~/gate2/corpus-nfpa25-2023
+python corpus.py overlay --base ~/gate2/corpus-nfpa25-2023 \
+                         --amendments jurisdictions/travis-county.txt \
+                         --jurisdiction travis-county --out ~/gate2/corpus-travis
+python corpus.py validate ~/gate2/corpus-travis
+```
+
+Full documentation: [`corpus_tools/README.md`](corpus_tools/README.md).
+
 ## The standards corpus is not in this repo
 
 NFPA 25 and 72 are copyrighted. `fixtures/standards/SYNTHETIC-placeholder.md`

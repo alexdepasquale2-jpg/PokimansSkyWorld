@@ -7,7 +7,14 @@ something on this list.
 > Nothing here is legal advice. R1 in particular needs a lawyer before a paid
 > pilot, not after.
 
-## R1 — Standards licensing · **highest, and unresolved**
+## R1 — Standards licensing · **assumed resolved — see the conditions**
+
+> **Status: the plan now assumes a negotiated NFPA licence is available.**
+> The analysis below is retained because it defines what that licence has to
+> cover, and because the assumption is not yet a signed agreement. Two things
+> still have to be true — see *What the licence must actually permit* and
+> *The commercial shape that matters* at the end of this section.
+
 
 The product's core feature is citing NFPA 25 and 72 clauses, and quoting the
 governing sentence, inside a document delivered commercially to a paying
@@ -54,6 +61,44 @@ user-supplied corpus directory.
 
 **Kill condition:** licensing is refused *and* reference-only output fails to
 satisfy Gate 3 buyers.
+
+### What the licence must actually permit
+
+Get these four in writing. A licence to *read* the standard is not a licence to
+do any of them, and "we have a subscription" is the most common way this goes
+wrong:
+
+1. **Reproduce short clause quotations** inside customer-specific deliverables —
+   the `clause_quote` field is what makes review fast, and without it the product
+   degrades to reference-only.
+2. **Store the text** in a processing corpus and transmit it to a model provider
+   as prompt context.
+3. **Distribute the resulting report** to the customer, their AHJ, their insurer,
+   and the building owner.
+4. **Cover every edition you ingest**, not just the current one. Jurisdictions
+   adopt on their own schedule, so you will be running several editions at once.
+
+### The commercial shape that matters more than the number
+
+**Per-report licensing is survivable. Per-seat licensing probably is not.**
+
+At a $25 report price against ~$0.85 COGS, a licence at $2/report still leaves
+~89% gross margin. Even $5/report leaves ~77%. There is real room.
+
+A per-seat licence is a different story: against ~$129/seat/month revenue, a
+$50/seat/month standards licence is 39% of revenue before any other cost, and
+the CAC ceiling in [`02-stack-and-costs.md`](02-stack-and-costs.md) stops working.
+
+**Negotiate for per-report or a flat annual fee. Resist per-seat**, and if
+per-seat is the only option, get the number before committing to the pricing
+model rather than after.
+
+### Now unblocked
+
+With the licence assumed, [`gate2-harness/corpus_tools/`](gate2-harness/corpus_tools/)
+turns licensed source into the clause-addressable, cache-stable corpus the
+harness reads, with jurisdiction overlays as configuration. That path did not
+exist before and Gate 2 could not have run on real material without it.
 
 ## R2 — AHJ acceptance
 
