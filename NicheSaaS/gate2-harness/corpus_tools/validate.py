@@ -1,11 +1,11 @@
-"""Corpus integrity checks.
+"""Library integrity and coverage checks.
 
 Everything here guards a failure that is silent in production: a duplicate
-clause reference makes the extraction stage's fabricated-citation check
-ambiguous, a corpus under the cache floor triples per-report cost without
-erroring, and unstable filename ordering cold-starts the cache on every run.
+reference makes the fabricated-citation check ambiguous, a library under the
+cache floor triples per-report cost without erroring, and unstable filename
+ordering cold-starts the cache on every run.
 
-None of these raise at request time. They just cost money or credibility.
+None of these raise at request time. They cost money or credibility instead.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from harness.config import CACHE_MINIMUM_TOKENS, REASONING_MODEL
 
-from .model import Corpus
+from .library import Library
 
 
 @dataclass
@@ -23,66 +23,116 @@ class Finding:
     message: str
 
 
-def validate(corpus: Corpus, *, model: str = REASONING_MODEL) -> list[Finding]:
+def validate(library: Library, *, model: str = REASONING_MODEL) -> list[Finding]:
     findings: list[Finding] = []
 
-    if not corpus.clauses:
-        findings.append(Finding("error", "corpus contains no clauses"))
+    if not library.procedures:
+        findings.append(Finding("error", "library contains no procedures"))
         return findings
 
-    # 1. Duplicate references break the fabricated-citation substring check.
+    # 1. Duplicate ids break the procedure_id the extraction stage records.
     seen: dict[str, int] = {}
-    for clause in corpus.clauses:
-        seen[clause.ref] = seen.get(clause.ref, 0) + 1
-    for ref, count in sorted(seen.items()):
+    for procedure in library.procedures:
+        seen[procedure.id] = seen.get(procedure.id, 0) + 1
+    for pid, count in sorted(seen.items()):
         if count > 1:
-            findings.append(Finding("error", f"clause {ref} appears {count} times"))
+            findings.append(Finding("error", f"procedure id {pid} appears {count} times"))
 
-    # 2. A clause whose reference does not survive rendering cannot be verified.
-    rendered = "\n".join(corpus.files().values())
-    for clause in corpus.clauses:
-        if clause.ref not in rendered:
+    # 2. Two procedures claiming the same clause makes the citation ambiguous.
+    by_ref: dict[str, list[str]] = {}
+    for procedure in library.procedures:
+        if procedure.maps_to:
+            by_ref.setdefault(procedure.maps_to, []).append(procedure.id)
+    for ref, ids in sorted(by_ref.items()):
+        if len(ids) > 1:
             findings.append(
-                Finding("error", f"clause {clause.ref} is not greppable in rendered output")
+                Finding("warn", f"clause {ref} is claimed by {len(ids)} procedures: {ids}")
             )
 
-    # 3. Empty or stub clause bodies produce citations with nothing to quote.
-    for clause in corpus.clauses:
-        if len(clause.text.strip()) < 12:
+    # 3. A procedure with no reference cannot be cited in a filing.
+    for procedure in library.procedures:
+        if not procedure.maps_to:
+            findings.append(Finding("error", f"{procedure.id} has no maps_to reference"))
+
+    # 4. Ids and references must survive rendering, or the guard cannot check them.
+    rendered = "\n".join(library.files().values())
+    for procedure in library.procedures:
+        if procedure.id not in rendered:
+            findings.append(Finding("error", f"{procedure.id} is not greppable after render"))
+        if procedure.maps_to and procedure.maps_to not in rendered:
             findings.append(
-                Finding("warn", f"clause {clause.ref} has a very short body: {clause.text[:40]!r}")
+                Finding("error", f"{procedure.id}: reference {procedure.maps_to} not greppable")
             )
 
-    # 4. Filename ordering must be deterministic and collision-free.
-    names = list(corpus.files().keys())
+    # 5. A stub body gives the model nothing to ground a finding in.
+    for procedure in library.procedures:
+        if len(procedure.body.strip()) < 40:
+            findings.append(
+                Finding("warn", f"{procedure.id} has a very short body "
+                                f"({len(procedure.body.strip())} chars)")
+            )
+
+    # 6. Ordering must be deterministic and collision-free.
+    names = list(library.files().keys())
     if names != sorted(names):
         findings.append(Finding("error", "file ordering is not sorted — cache prefix unstable"))
     if len(set(names)) != len(names):
-        findings.append(Finding("error", "duplicate filenames — chapters would overwrite"))
+        findings.append(Finding("error", "duplicate filenames — sections would overwrite"))
 
-    # 5. Below the model's cache floor, caching silently never engages.
+    # 7. Below the cache floor, caching silently never engages.
     floor = CACHE_MINIMUM_TOKENS.get(model)
-    if floor and corpus.approx_tokens < floor:
+    if floor and library.approx_tokens < floor:
         findings.append(Finding(
             "warn",
-            f"~{corpus.approx_tokens:,} tokens is below the {floor:,}-token cache floor "
+            f"~{library.approx_tokens:,} tokens is below the {floor:,}-token cache floor "
             f"for {model}; caching will not engage and cost will not reflect production",
         ))
 
-    # 6. Chapter coverage — a gap usually means a parse failure, not a real gap.
-    numbers = sorted({ch.number for ch in corpus.chapters})
-    missing = [n for n in range(numbers[0], numbers[-1] + 1) if n not in numbers]
-    if missing:
+    if not library.author:
         findings.append(Finding(
-            "info", f"no clauses parsed for chapter(s) {missing} — verify against the source"
+            "warn",
+            "no author recorded — provenance you can produce later is worth having "
+            "(corpus.py ingest --author)",
         ))
 
     findings.append(Finding(
         "info",
-        f"{len(corpus.clauses):,} clauses across {len(corpus.chapters)} chapters, "
-        f"~{corpus.approx_tokens:,} tokens, fingerprint {corpus.fingerprint()[:12]}",
+        f"{len(library.procedures)} procedures across {len(library.sections)} sections, "
+        f"~{library.approx_tokens:,} tokens, fingerprint {library.fingerprint()[:12]}",
     ))
     return findings
+
+
+# --- coverage ---------------------------------------------------------------
+
+
+@dataclass
+class Coverage:
+    covered: list[str]
+    missing: list[str]
+    out_of_scope: list[str]
+
+    @property
+    def ratio(self) -> float:
+        total = len(self.covered) + len(self.missing)
+        return len(self.covered) / total if total else 0.0
+
+
+def coverage(library: Library, scope: list[str]) -> Coverage:
+    """Which in-scope clauses have a procedure, and which do not.
+
+    This is the readiness measure. A library that grounds 40% of the clauses an
+    inspection touches will silently under-report deficiencies — the model has
+    nothing to cite, so it records fewer findings and Gate 2 reads as a model
+    failure when it is a content gap.
+    """
+    mapped = {p.maps_to for p in library.procedures if p.maps_to}
+    scope_set = set(scope)
+    return Coverage(
+        covered=sorted(scope_set & mapped),
+        missing=sorted(scope_set - mapped),
+        out_of_scope=sorted(mapped - scope_set),
+    )
 
 
 def has_errors(findings: list[Finding]) -> bool:

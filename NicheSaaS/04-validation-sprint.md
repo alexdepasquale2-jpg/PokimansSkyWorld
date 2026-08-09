@@ -96,6 +96,33 @@ Obtain five real inspections' worth of audio and photos from a Gate 1 interviewe
 also a useful commitment test on that relationship. If nobody will share files with you after
 a good interview, that is itself a finding about how the paid-pilot conversation will go.
 
+### The prerequisite nobody has scheduled: library coverage
+
+Gate 2 grounds every finding in the authored procedure library. **A thin library fails this
+gate as though the model were at fault** — with nothing to cite, it records fewer findings,
+and extraction accuracy reads as a capability problem when it is a content gap.
+
+The shipped library is 24 procedures. A library covering what an annual NFPA 25 + 72
+inspection actually touches is realistically **several hundred**, and it has to be written by
+someone who knows the trade, under the authoring discipline in
+[`gate2-harness/fixtures/library/README.md`](gate2-harness/fixtures/library/README.md).
+
+That is **weeks of subject-matter time on the critical path**, and it was not in any earlier
+version of this plan. Check it before running the gate:
+
+```sh
+python corpus.py coverage ~/gate2/library --scope scope/nfpa25-annual.txt
+```
+
+Build the scope file from the inspection forms your customers actually file, not from the
+standard's contents page — coverage against the whole standard is the wrong denominator.
+
+**This cannot be generated from a language model.** Asking one to write the library produces
+paraphrased standard text from training data, which is precisely the derivative work the
+authored-library strategy exists to avoid. It has to come from field practice: an
+experienced inspector, your customers' filed reports, and the AHJ rejections they have
+actually received.
+
 ### Measure
 
 | Metric | Target |

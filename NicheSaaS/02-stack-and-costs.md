@@ -71,6 +71,14 @@ jurisdiction. At volume this is dramatically cheaper than per-report licensing
 and it compounds into an asset. At *low* volume it is the more expensive
 choice, which is worth being honest about: it is a bet on reaching scale.
 
+**And there is an up-front slug of it before Gate 2 can run at all.** The initial
+library — several hundred procedures covering what an annual inspection actually
+touches — is weeks of experienced-inspector time and belongs in the months 1–3
+budget, not the ongoing line. It is the one item on the critical path that money
+cannot obviously accelerate, because it needs someone who has done the work. Add
+**$4,000–8,000** for the initial authoring engagement and treat the delivery date
+as the real Gate 2 start date.
+
 **Price:** $20–30 per report, or seat-based at $99–149 per technician per month with an
 included report volume. A 12-technician shop lands at roughly **$14–21k ACV**.
 

@@ -1,6 +1,6 @@
 # Corpus tooling
 
-Authored procedure library → the clause-addressable corpus the harness reads.
+Authored procedure library → the corpus the harness reads, plus jurisdiction overlays and coverage.
 
 Driven by `../corpus.py`. Nothing here touches the API or costs money.
 
@@ -61,49 +61,85 @@ that is missing.
 `replace` on a clause that does not exist, or `add` on one that does, both fail
 loudly. They are usually a sign the base edition is wrong.
 
+## Coverage — the readiness measure
+
+```sh
+python corpus.py coverage ~/gate2/library-v2 --scope scope/nfpa25-annual.txt
+```
+
+**A thin library fails Gate 2 as though the model were at fault.** If a library
+grounds 40% of the clauses an inspection touches, the model has nothing to cite
+for the rest, records fewer findings, and extraction accuracy reads as a
+capability problem when it is a content gap. `coverage` separates the two, and
+exits non-zero below the threshold so it can gate a run.
+
+Build the scope file from **the inspection forms your customers actually file**,
+not from the standard's table of contents. Coverage against the whole standard
+is the wrong denominator and will read as failure forever. Worked example:
+`fixtures/library/SCOPE-example.txt`.
+
 ## Two invariants everything depends on
 
-**Clause references stay literal and greppable.** The extraction stage
-substring-checks every cited clause against the corpus to catch fabricated
-citations. Reformatting a reference breaks that check silently, so refs are
-copied through verbatim and `validate` confirms each one survives rendering.
+**Ids and references stay literal and greppable.** The extraction stage
+substring-checks every cited reference against the library to catch fabricated
+citations. Reformatting breaks that check silently, so `validate` confirms every
+id and `maps_to` survives rendering.
 
 **Filenames are generated and never hand-edited.** Sorted filename order *is*
 the cached prompt prefix; a rename reshuffles the corpus and cold-starts every
 cache entry. Chapter numbers are zero-padded so ordering stays stable as the
 corpus grows.
 
-## Provenance is not stored in clause text
+## Provenance is not stored in procedure text
 
-An amendment marker rendered inline (`**13.2.5** _(amended: x)_ Control valves…`)
-ends up inside the model's `requirement_basis` — putting "(amended: travis-county)"
-into the quoted sentence of a filed compliance document. It also breaks the
-parse → render round trip, so the fingerprint drifts and caching cold-starts.
+An amendment marker rendered inline ends up inside the model's
+`requirement_basis` — putting "(amended: travis-county)" into a filed compliance
+document. It also breaks the parse → render round trip, so the fingerprint drifts
+and caching cold-starts.
 
-Provenance therefore lives in the chapter header and in `manifest.json`, and the
+Provenance therefore lives in the section header and in `manifest.json`, and the
 round trip is asserted in `selftest.py`.
+
+**Section membership is recorded in the manifest too**, for the same reason: each
+rendered file's H1 is indistinguishable from an authored document title, so a
+reload would collapse every section into one and the fingerprint would drift.
 
 ## What `validate` catches
 
 | Check | Why it is silent otherwise |
 |---|---|
-| Duplicate clause refs | Makes the fabricated-citation check ambiguous |
-| Refs not greppable after render | Disables that check entirely |
-| Very short clause bodies | Citations with nothing useful to quote |
+| Duplicate procedure ids | Breaks the `procedure_id` recorded on every finding |
+| Two procedures claiming one clause | Makes the citation ambiguous |
+| Missing `maps_to` | A procedure that cannot be cited in a filing |
+| Ids/refs not greppable after render | Disables the fabricated-citation check |
+| Very short procedure bodies | Nothing for the model to ground a finding in |
 | Unsorted or colliding filenames | Unstable cache prefix |
-| Corpus below the model's cache floor | Caching never engages; ~3× cost, no error |
-| Chapter gaps | Usually a parse failure, not a real gap |
+| Library below the model's cache floor | Caching never engages; ~3× cost, no error |
+| No author recorded | Provenance you cannot produce later |
 | Fingerprint ≠ manifest | Files edited by hand since ingest |
 
-## Source formats
+## Authored format
 
-`ingest` reads plain text with NFPA-style numbering (`13.2.5 Control valves
-shall…`), one clause per line, continuation lines indented or wrapped. Markdown
-headings and italic metadata lines are treated as structure, so an
-already-rendered corpus re-ingests cleanly.
+```markdown
+## Water-based suppression
 
-**PDF is not handled.** Extracting clause structure from a standards PDF is its
-own problem — two-column layouts, running headers, and tables all produce
-plausible-looking garbage. Convert to text first, eyeball the result, then
-ingest. `validate`'s chapter-gap check is the fastest way to spot an extraction
-that quietly dropped a section.
+### P-25-08-2-2 · Gauge calibration interval
+**maps_to:** SYN-25-08.2.2
+
+Read the calibration date on the gauge tag. Replace or recalibrate at intervals
+no longer than five years.
+
+**Deficiency when:** the tag date is more than five years old, or no date can be
+established.
+**Severity:** major.
+```
+
+`##` opens a section, `### <id> · <title>` opens a procedure, `**maps_to:**`
+carries the clause reference, and everything else is body. A rendered library
+re-ingests cleanly, so `ingest → overlay → ingest` is safe.
+
+**There is no importer for published standards text, deliberately.** The library
+is authored, not converted. A tool that ingests a standard and emits "our"
+procedures would produce a derivative work with extra steps — see
+[`../fixtures/library/README.md`](../fixtures/library/README.md) for the
+authoring discipline.

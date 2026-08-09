@@ -185,76 +185,97 @@ def test_fixture() -> None:
     check("every reference citation exists in the corpus", not unknown, str(unknown))
 
 
-SOURCE = """\
-Chapter 13 Valves
+LIBRARY_SOURCE = """\
+# Test library v1
 
-13.2.5 Control valves shall be inspected quarterly to verify they are open.
-13.2.6 Each control valve shall have a permanently marked identification sign.
-13.2.10 Valves shall be operated through their full range annually.
+## Valves
+
+### P-13-2-5 · Control valve inspection
+**maps_to:** SYN-13.2.5
+
+Inspect each control valve quarterly. Confirm it is open, supervised, reachable,
+and free of leakage.
+**Severity:** critical if closed.
+
+### P-13-2-6 · Control valve identification
+**maps_to:** SYN-13.2.6
+
+Confirm each valve carries a durable sign naming what it controls.
+**Severity:** minor.
 """
 
 AMENDMENTS = """\
 # Test County amendments
 
-## replace 13.2.5
-Control valves shall be inspected monthly within Test County.
+## replace P-13-2-5
+Inspect control valves monthly within Test County, confirming the same five
+checks as the base procedure.
+**Severity:** critical if closed.
 
-## add 13.2.9
-A Knox-box key shall be verified at each annual inspection.
+## add P-TC-1 · Knox-box key
+**maps_to:** TC-4.2
+Verify the Knox-box key is present and turns the box at each annual visit.
 """
 
 
-def test_corpus_tools() -> None:
-    print("\ncorpus tooling")
+def test_library_tools() -> None:
+    print("\nlibrary tooling")
     from corpus_tools import overlay as ov
-    from corpus_tools.model import parse
-    from corpus_tools.validate import has_errors, validate as validate_corpus
+    from corpus_tools.library import parse
+    from corpus_tools.validate import coverage, has_errors, validate as validate_lib
 
-    corpus, warnings = parse(SOURCE, standard="NFPA25", edition="2023")
-    check("parses clauses", len(corpus.clauses) == 3, f"got {len(corpus.clauses)}")
-    check("multi-line clause bodies join", all(len(c.text) > 20 for c in corpus.clauses))
-    check("no parse warnings on clean source", not warnings, str(warnings))
+    library, warnings = parse(LIBRARY_SOURCE, standard="TEST", version="v1")
+    check("parses procedures", len(library.procedures) == 2, f"got {len(library.procedures)}")
+    check("captures maps_to references",
+          [p.maps_to for p in library.procedures] == ["SYN-13.2.5", "SYN-13.2.6"])
+    check("captures multi-line bodies", all(len(p.body) > 40 for p in library.procedures))
+    check("no parse warnings on clean source", not warnings, str(warnings[:2]))
 
     # The round trip is what keeps the cache fingerprint stable.
-    rendered = "\n\n".join(
-        "<<< x >>>\n" + c for c in corpus.files().values()
-    ).replace("**", "")
-    reparsed, _ = parse(rendered, standard="NFPA25", edition="2023")
-    check("render -> parse round trip preserves clause count",
-          len(reparsed.clauses) == len(corpus.clauses))
-    check("round trip preserves clause text",
-          [c.text for c in reparsed.clauses] == [c.text for c in corpus.clauses])
+    rendered = "\n\n".join(library.files().values())
+    reparsed, _ = parse(rendered, standard="TEST", version="v1")
+    check("render -> parse round trip preserves procedures",
+          [p.id for p in reparsed.procedures] == [p.id for p in library.procedures])
+    check("round trip preserves bodies",
+          [p.body for p in reparsed.procedures] == [p.body for p in library.procedures])
 
-    amended, notes = ov.apply(
-        corpus, ov.parse_amendments(AMENDMENTS)[1], jurisdiction="test-county"
-    )
+    amended, notes = ov.apply(library, ov.parse_amendments(AMENDMENTS)[1],
+                              jurisdiction="test-county")
     check("overlay applies both directives", len(notes) == 2, str(notes))
-    check("base corpus is not mutated",
-          corpus.clause_index()["13.2.5"].text.startswith("Control valves shall be inspected quarterly"))
-    check("amended clause replaced",
-          "monthly" in amended.clause_index()["13.2.5"].text.lower())
-    refs = [c.ref for c in amended.chapters[0].clauses]
-    check("numeric sort puts 13.2.10 after 13.2.9",
-          refs.index("13.2.10") > refs.index("13.2.9"), str(refs))
+    check("base library is not mutated",
+          "quarterly" in library.index()["P-13-2-5"].body)
+    check("replaced procedure keeps its id and reference",
+          amended.index()["P-13-2-5"].maps_to == "SYN-13.2.5"
+          and "monthly" in amended.index()["P-13-2-5"].body)
+    check("local additions go in their own section",
+          any("Local requirements" in s.title for s in amended.sections))
 
-    # Provenance must never land inside a clause body — it would end up in the
-    # model's requirement_basis, inside a filed compliance document.
+    # Provenance must never land inside a procedure body — it would reach the
+    # model's requirement_basis and into a filed compliance document.
     body = "\n".join(amended.files().values())
-    clause_line = [l for l in body.splitlines() if l.startswith("**13.2.5**")][0]
-    check("amendment marker stays out of the clause text",
-          "amended" not in clause_line.lower(), clause_line[:70])
-    check("amendment provenance appears in the chapter header",
-          "Locally amended" in body)
+    proc_line = [l for l in body.splitlines() if l.startswith("### P-13-2-5")][0]
+    check("amendment marker stays out of the procedure heading",
+          "amended" not in proc_line.lower(), proc_line[:60])
+    check("provenance appears in the section header", "Locally amended" in body)
 
-    check("validator flags duplicate refs",
-          has_errors(validate_corpus(parse(
-              "Chapter 5 X\n5.1.1 First requirement text.\n5.1.1 Second requirement text.\n",
-              standard="S", edition="1")[0])))
+    result = coverage(library, ["SYN-13.2.5", "SYN-13.2.6", "SYN-99.9.9"])
+    check("coverage counts covered", len(result.covered) == 2)
+    check("coverage counts missing", result.missing == ["SYN-99.9.9"])
+    check("coverage ratio", abs(result.ratio - 2/3) < 1e-9, f"got {result.ratio}")
+
+    dupe, _ = parse(LIBRARY_SOURCE.replace("P-13-2-6", "P-13-2-5"), standard="T", version="v")
+    check("validator flags duplicate procedure ids", has_errors(validate_lib(dupe)))
+
+    no_ref, _ = parse(LIBRARY_SOURCE.replace("**maps_to:** SYN-13.2.6", ""),
+                      standard="T", version="v")
+    check("validator flags a missing maps_to", has_errors(validate_lib(no_ref)))
 
     for bad, label in [
-        ("# t\n\n## replace 13.2.5\n", "replace with no body"),
-        ("# t\n\n## delete 13.2.5\nunexpected body\n", "delete with a body"),
-        ("# t\n\n## rewrite 13.2.5\nx\n", "unknown directive"),
+        ("# t\n\n## replace P-1\n", "replace with no body"),
+        ("# t\n\n## delete P-1\nunexpected body\n", "delete with a body"),
+        ("# t\n\n## rewrite P-1\nx\n", "unknown directive"),
+        ("# t\n\n## add P-1\n**maps_to:** X\nbody\n", "add without a title"),
+        ("# t\n\n## add P-1 · Title\nbody only\n", "add without maps_to"),
         ("# t\n\nnothing here\n", "no directives"),
     ]:
         try:
@@ -264,10 +285,26 @@ def test_corpus_tools() -> None:
             check(f"rejects {label}", True)
 
     try:
-        ov.apply(corpus, [ov.Amendment("replace", "99.9.9", "x")], jurisdiction="t")
-        check("rejects replace of a missing clause", False)
+        ov.apply(library, [ov.Amendment("replace", "P-NOPE", body="x")], jurisdiction="t")
+        check("rejects replace of a missing procedure", False)
     except ov.OverlayError:
-        check("rejects replace of a missing clause", True)
+        check("rejects replace of a missing procedure", True)
+
+
+def test_shipped_library() -> None:
+    print("\nshipped library")
+    from corpus_tools.library import parse
+    from corpus_tools.validate import has_errors, validate as validate_lib
+
+    source = (HERE / "fixtures" / "library" / "nfpa25-72-itm-v1.md").read_text()
+    library, _ = parse(source, standard="NFPA25-72", version="v1")
+    check("shipped library parses", len(library.procedures) > 20,
+          f"got {len(library.procedures)}")
+    check("every procedure carries a reference",
+          all(p.maps_to for p in library.procedures))
+    findings = validate_lib(library)
+    check("shipped library validates", not has_errors(findings),
+          str([f.message for f in findings if f.level == "error"][:2]))
 
 
 def main() -> int:
@@ -276,7 +313,8 @@ def main() -> int:
     test_cost()
     test_gate_verdict()
     test_corpus_and_cache()
-    test_corpus_tools()
+    test_library_tools()
+    test_shipped_library()
     test_reproduction_guard()
     test_fixture()
     print(f"\n{'FAILED: ' + ', '.join(FAILURES) if FAILURES else 'all checks passed'}")
