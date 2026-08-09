@@ -106,6 +106,11 @@ Obtain five real inspections' worth of audio and photos from a Gate 1 interviewe
 also a useful commitment test on that relationship. If nobody will share files with you after
 a good interview, that is itself a finding about how the paid-pilot conversation will go.
 
+**And ask for their own report on those same five inspections.** That report is the answer
+key — the gate scores against it, so without it the run produces five drafts nobody can
+grade. It cannot be collected afterwards without contaminating it, because by then they know
+they are being marked. `--dry-run` reports a missing reference before you spend anything.
+
 **That audio does not exist yet.** Nobody records themselves narrating an inspection today —
 that is the product's premise. So this is not a file transfer; it is five inspections someone
 has to perform while recording, on their schedule, over two to four weeks. It is the longest

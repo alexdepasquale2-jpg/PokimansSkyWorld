@@ -349,6 +349,71 @@ def test_shipped_library() -> None:
           str([f.message for f in findings if f.level == "error"][:2]))
 
 
+def test_photo_preparation() -> None:
+    """What a phone produces vs. what the API accepts.
+
+    Every failure here is silent in production: an unsupported format, a
+    sideways gauge, or a request too large to send all look like a model that
+    missed the deficiency.
+    """
+    print("\nphoto preparation")
+    from PIL import Image
+
+    from harness import images
+
+    tmp = HERE / "fixtures" / ".selftest-photos"
+    tmp.mkdir(parents=True, exist_ok=True)
+
+    small = tmp / "small.jpg"
+    Image.new("RGB", (800, 600), "gray").save(small, quality=90)
+    prepared = images.prepare(small)
+    check("small jpeg passes through untouched",
+          prepared.data == small.read_bytes() and prepared.note is None)
+
+    big = tmp / "phone.jpg"
+    Image.new("RGB", (4032, 3024), "gray").save(big, quality=90)
+    prepared = images.prepare(big)
+    with Image.open(__import__("io").BytesIO(prepared.data)) as out:
+        long_edge = max(out.size)
+    check("oversized photo is downscaled to the model's ceiling",
+          long_edge == images.LONG_EDGE_MAX, f"got {long_edge}")
+    check("downscaling shrinks the upload",
+          len(prepared.data) < len(big.read_bytes()))
+
+    png = tmp / "shot.png"
+    Image.new("RGB", (100, 100), "white").save(png)
+    check("png is accepted as-is",
+          images.prepare(png).media_type == "image/png")
+
+    # A .bmp stands in for any format the API does not accept: the point is
+    # that it is converted rather than skipped.
+    bmp = tmp / "scan.bmp"
+    Image.new("RGB", (100, 100), "white").save(bmp)
+    converted = images.prepare(bmp)
+    check("unsupported format is converted, not dropped",
+          converted.media_type == "image/jpeg" and converted.note)
+
+    check("every prepared media type is one the API accepts",
+          converted.media_type in set(images.ACCEPTED_MEDIA_TYPES.values()))
+
+    broken = tmp / "corrupt.jpg"
+    broken.write_bytes(b"not an image")
+    try:
+        images.prepare(broken)
+        check("unreadable file raises rather than returning junk", False)
+    except images.UnreadableImage as exc:
+        check("unreadable file raises rather than returning junk",
+              "corrupt.jpg" in str(exc), "error should name the file")
+
+    check("camera-roll junk is ignored without a warning",
+          images.is_ignorable(tmp / ".DS_Store")
+          and not images.is_ignorable(tmp / "riser.jpg"))
+
+    for path in tmp.iterdir():
+        path.unlink()
+    tmp.rmdir()
+
+
 def main() -> int:
     print("Gate 2 harness self-test (offline)")
     test_schemas()
@@ -359,6 +424,7 @@ def main() -> int:
     test_shipped_library()
     test_documented_commands()
     test_reproduction_guard()
+    test_photo_preparation()
     test_fixture()
     print(f"\n{'FAILED: ' + ', '.join(FAILURES) if FAILURES else 'all checks passed'}")
     return 1 if FAILURES else 0

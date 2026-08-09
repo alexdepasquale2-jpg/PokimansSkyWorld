@@ -39,10 +39,52 @@ demo-001/
   meta.json                    building, date, jurisdiction, scope
   transcript.txt               narration — or audio/ and let the harness transcribe
   audio/*.wav|m4a              optional if transcript.txt exists
-  photos/*.jpg                 field photos
+  photos/                      field photos — any format a phone produces
   price-book.json              optional; without it the proposal stage is skipped
   reference-deficiencies.json  ground truth — or reference-report.md to parse one
 ```
+
+Check a real directory before spending anything:
+
+```sh
+python run.py --all ~/gate2/inspections --library ~/gate2/library --dry-run
+```
+
+It counts photos the way the paid run will and names anything it cannot read.
+
+### The reference is not optional, and it has to be collected up front
+
+**Without `reference-report.md` or `reference-deficiencies.json`, the gate cannot
+score at all** — there is nothing to compare against, and the run produces reports
+nobody can grade.
+
+The reference is **the report the shop wrote for that same inspection**, in their
+normal format. So the ask for recordings is really two asks, and the second is
+the one that gets forgotten: *record five inspections* **and** *send the reports
+you write for those five*. Asking afterwards is worse than asking up front — by
+then they know you are checking, which changes how carefully the report gets
+written. Say plainly that you want it exactly as they normally write it, sent
+whether or not they are happy with it.
+
+Prior-year reports for *other* buildings are not references — those are for
+scoping the procedure library, a different job with a different lead time
+([`../08-critical-path.md`](../08-critical-path.md)).
+
+### Photos: send what the phone produced
+
+Drop the camera roll in as-is. The harness handles what field photos actually
+look like ([`harness/images.py`](harness/images.py)):
+
+- **HEIC is converted.** iPhones shoot HEIC by default and the API does not
+  accept it. Without conversion, a default-configured phone contributes *zero*
+  usable photos and the gate reads as a capability failure.
+- **EXIF rotation is applied**, because a sideways photo of a gauge is harder to
+  read and nothing warns you.
+- **Oversized photos are downscaled** to the long edge the photo model actually
+  uses. A 12MP original is ~4000px; sending eight of those per call is tens of
+  megabytes of upload for pixels that get discarded.
+- **Unreadable files are named, never skipped silently** — a missing photo looks
+  exactly like a model that failed to find the deficiency it evidenced.
 
 ## Pipeline
 

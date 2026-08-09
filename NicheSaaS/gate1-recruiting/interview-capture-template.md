@@ -103,6 +103,7 @@ is the part you will be most tempted to leave blank.
 | Intro offered | yes / name-drop only / no |
 | **Prior-year filed reports** — sent? | yes / promised / no |
 | **Will record inspections** for Gate 2 | yes / maybe / no — how many? |
+| **…and send their own report** for those same ones | yes / no |
 | Plausible paid pilot (Gate 3) | yes / no / unclear |
 | Next action | |
 
@@ -115,3 +116,7 @@ recording, on their schedule, over two to four weeks.
 Track them apart, because a week where three shops promised reports and nobody
 agreed to record is not the same week as the reverse, and only one of those
 leaves Gate 2 blocked. See [`../08-critical-path.md`](../08-critical-path.md).
+
+A "yes" to recording without a "yes" to the third line is **not a usable yes** —
+their own report for those same inspections is what Gate 2 scores against, and
+it cannot be collected retroactively without contaminating it.

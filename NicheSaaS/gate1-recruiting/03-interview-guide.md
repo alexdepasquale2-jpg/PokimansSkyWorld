@@ -172,12 +172,21 @@ structure is what matters, not the addresses.
 
 **Ask the two or three warmest** — this one does not exist yet and takes weeks:
 
-> "Bigger favour. Over the next few weeks, could someone record themselves on their next few
-> inspections? Just phone voice memo while they work, plus the photos they'd normally take.
-> Nobody does this today, which is exactly why I need it."
+> "Bigger favour, and it's really two things. Over the next few weeks, could someone record
+> themselves on their next few inspections — just a phone voice memo while they work, plus
+> the photos they'd normally take? And then send me the report you write for those same
+> inspections, exactly as you'd normally write it."
 
-Say plainly that it is a favour and that you will show them what comes out of it — that
-return visit *is* the Gate 3 conversation.
+**The second half is not optional and it is the half people forget.** The report they write
+is the answer key: without it Gate 2 has nothing to score against and produces five drafts
+nobody can grade. Discovering that weeks later, after the recordings are done, is unfixable —
+asking for the reports afterwards means asking someone who now knows you are marking them.
+
+Say it in those terms: *"send it however it normally goes out, whether or not you're happy
+with it — a tidied-up version is worse than useless to me."*
+
+Say plainly that the whole thing is a favour and that you will show them what comes out of
+it — that return visit *is* the Gate 3 conversation.
 
 Ask three shops, not one. You need five inspections, and the most likely way this fails is a
 warm yes that never happens because they got busy. Redundancy costs nothing here.
@@ -186,6 +195,10 @@ Then brief them on how to narrate, which matters more than it sounds — see the
 section of [`../08-critical-path.md`](../08-critical-path.md). Short version: **do not give
 them a script.** Ask for messy and mean it. A tidied-up narration measures the wrong thing and
 will make the harness look better than the product will be.
+
+Photos need no instructions at all — whatever the phone shoots is fine, HEIC included. Tell
+them not to convert or resize anything; the harness handles it
+([`../gate2-harness/README.md`](../gate2-harness/README.md)).
 
 ### 11. The referral ask — never skip
 

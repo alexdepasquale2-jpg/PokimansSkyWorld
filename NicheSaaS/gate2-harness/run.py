@@ -22,12 +22,36 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from harness import pipeline, score as scoring
+from harness import images, pipeline, score as scoring
 from harness.config import CHEAP_MODEL, REASONING_MODEL
 from harness.cost import CostMeter
 from harness.llm import CorpusError, check_corpus_stability, load_corpus
 
 HERE = Path(__file__).parent
+
+
+def count_photos(inspection_dir: Path, problems: list[str]) -> tuple[int, int]:
+    """Count photos the way the real run will, not the way the folder looks.
+
+    A dry run that counts every file in `photos/` reports a number the paid run
+    will not match — the whole point of --dry-run is finding out that half the
+    camera roll is HEIC *before* spending anything.
+    """
+    photo_dir = inspection_dir / "photos"
+    if not photo_dir.is_dir():
+        return 0, 0
+
+    readable = unreadable = 0
+    for path in sorted(photo_dir.glob("*")):
+        if not path.is_file() or images.is_ignorable(path):
+            continue
+        try:
+            images.prepare(path)
+            readable += 1
+        except images.UnreadableImage as exc:
+            unreadable += 1
+            problems.append(f"{inspection_dir.name}: {exc}")
+    return readable, unreadable
 
 
 @dataclass
@@ -219,14 +243,25 @@ def main() -> int:
 
     if args.dry_run:
         print(f"\ndry run — {len(inspections)} inspection(s), no API calls")
+        problems: list[str] = []
         for path in inspections:
             has_transcript = (path / "transcript.txt").exists()
             audio = len(list((path / "audio").glob("*"))) if (path / "audio").is_dir() else 0
-            photos = len(list((path / "photos").glob("*"))) if (path / "photos").is_dir() else 0
+            readable, unreadable = count_photos(path, problems)
             reference = ((path / "reference-deficiencies.json").exists()
                          or (path / "reference-report.md").exists())
+            photos = f"{readable}" + (f" (+{unreadable} unreadable)" if unreadable else "")
             print(f"  {path.name:<24} transcript={has_transcript} audio={audio} "
                   f"photos={photos} reference={reference}")
+            if not reference:
+                problems.append(
+                    f"{path.name}: no reference — nothing to score against. "
+                    "The gate needs the report the shop wrote for this same inspection."
+                )
+        for problem in problems[:12]:
+            print(f"  ! {problem}")
+        if len(problems) > 12:
+            print(f"  ! ...and {len(problems) - 12} more")
         print(f"\nmodels: {REASONING_MODEL} (reasoning), {CHEAP_MODEL} (photos)")
         return 0
 

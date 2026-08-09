@@ -31,15 +31,12 @@ from .config import (
     MAX_TOKENS_REPORT,
     REASONING_MODEL,
 )
+from . import images
 from .cost import CostMeter
 from .llm import Corpus, cache_warning, structured_call, system_blocks, text_call
 from .schemas import DeficiencyList, PhotoBatch, Proposal
 
 PHOTOS_PER_CALL = 8
-_MEDIA_TYPES = {
-    ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-    ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif",
-}
 
 # --- prompts ----------------------------------------------------------------
 
@@ -172,26 +169,43 @@ def classify_photos(
     client, inspection_dir: Path, meter: CostMeter
 ) -> tuple[PhotoBatch, list[str]]:
     photo_dir = inspection_dir / "photos"
-    photos = [
+    candidates = [
         p for p in sorted(photo_dir.glob("*"))
-        if p.suffix.lower() in _MEDIA_TYPES
+        if p.is_file() and not images.is_ignorable(p)
     ] if photo_dir.is_dir() else []
 
-    findings, warnings = [], []
+    warnings: list[str] = []
+
+    # Prepare everything first. A photo we cannot read is reported by name —
+    # never dropped quietly, because a silently missing photo looks exactly
+    # like a model that failed to find the deficiency it evidenced.
+    photos: list[tuple[Path, images.Prepared]] = []
+    for path in candidates:
+        try:
+            photos.append((path, images.prepare(path)))
+        except images.UnreadableImage as exc:
+            warnings.append(f"photo skipped — {exc}")
+
+    converted = sum(1 for _, p in photos if p.note)
+    if converted:
+        warnings.append(f"{converted} of {len(photos)} photos converted for upload")
+
+    findings = []
     if not photos:
-        return PhotoBatch(findings=[]), ["no photos found — running transcript-only"]
+        warnings.append("no readable photos found — running transcript-only")
+        return PhotoBatch(findings=[]), warnings
 
     for start in range(0, len(photos), PHOTOS_PER_CALL):
         batch = photos[start : start + PHOTOS_PER_CALL]
         content: list[dict[str, Any]] = []
-        for path in batch:
+        for path, prepared in batch:
             content.append({"type": "text", "text": f"photo_id: {path.name}"})
             content.append({
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": _MEDIA_TYPES[path.suffix.lower()],
-                    "data": base64.standard_b64encode(path.read_bytes()).decode(),
+                    "media_type": prepared.media_type,
+                    "data": base64.standard_b64encode(prepared.data).decode(),
                 },
             })
         content.append({
@@ -212,7 +226,7 @@ def classify_photos(
         findings.extend(result.findings)
 
     seen = {f.photo_id for f in findings}
-    missing = [p.name for p in photos if p.name not in seen]
+    missing = [path.name for path, _ in photos if path.name not in seen]
     if missing:
         warnings.append(f"no finding returned for {len(missing)} photo(s): {missing[:5]}")
     return PhotoBatch(findings=findings), warnings
