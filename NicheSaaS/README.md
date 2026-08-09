@@ -66,15 +66,16 @@ per-artifact economics and is the designated fallback, but its sales motion is s
 its professional-liability surface larger. That combination makes it the wrong *first*
 product for a small team, not a worse business.
 
-## Before any of that: one unanswered question
+## The content decision that shapes everything downstream
 
-[`06-risks.md`](06-risks.md) R1. The product cites and quotes NFPA 25 and 72 inside a
-commercial deliverable, and NFPA standards are copyrighted. The Public.Resource.Org fair-use
-ruling rested on *nonprofit, educational* use and does not obviously cover this.
+The product does not ship licensed standards text. It ships an **independently authored
+procedure library** — what to check and what makes a finding a deficiency, in our words —
+with each procedure citing the clause it maps to. Clause references are facts; the
+customer's own copy of the standard stays authoritative.
 
-It is resolvable — NFPA licenses content into third-party software via LiNK Enterprise — but
-it needs a phone call and a lawyer, and **every other asset in this repo assumes an answer
-nobody has asked for.** It is the only kill-condition risk on the register. Do it this week.
+That removes a dependency that could have ended the business, and turns the library into an
+asset a competitor cannot buy. It costs authoring labour, and that authoring is now the item
+sitting on Gate 2's critical path. Reasoning and controls: [`06-risks.md`](06-risks.md) R1.
 
 ## The single most important sequencing decision
 

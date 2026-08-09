@@ -1,10 +1,10 @@
 # Design Partner Pilot — Term Sheet
 
-> **Not legal advice.** This is a plain-language starting point written to be
-> readable in the room, not a contract. Have a lawyer review it before you send
-> it to anyone, particularly the liability and data sections — those are the two
-> that matter and the two most likely to need changing for your jurisdiction and
-> insurance position.
+> **This is a term sheet, not a contract.** Plain language, written to be
+> readable in the room and to make the terms explicit before anyone signs
+> anything. The liability and data sections carry the most weight and are the
+> ones most likely to need changing for your jurisdiction and insurance
+> position.
 
 ---
 
@@ -119,13 +119,12 @@ Date: ______________            Date: ______________
 ### Notes for you, not for the customer
 
 - **The review clause is the load-bearing one.** It's what keeps you out of the
-  professional-liability chain. Have a lawyer confirm the wording holds in your
-  jurisdiction and check it against your insurance.
+  professional-liability chain, so it is the clause to check against whatever
+  E&O cover you end up carrying — the two have to line up.
 - **The standards clause is now a positive claim, not a disclaimer.** It states
   that the library is ours. Make sure that is actually true before signing it —
-  see the authoring discipline in
-  [`../gate2-harness/fixtures/library/README.md`](../gate2-harness/fixtures/library/README.md)
-  and get a lawyer's eyes on the library itself, not just the wording here.
+  the wording here is only as good as the authoring discipline in
+  [`../gate2-harness/fixtures/library/README.md`](../gate2-harness/fixtures/library/README.md).
 - **Deliberately easy to leave.** Thirty days, no lock-in, keep your reports.
   That is the honest offer at this stage and it removes the objection that
   otherwise kills the deal. The switching cost you eventually want comes from

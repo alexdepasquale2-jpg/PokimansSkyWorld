@@ -56,8 +56,9 @@ Authoring discipline that keeps this clean:
    ours.
 4. **Record authorship.** `corpus.py ingest --author` writes it into the
    manifest. Provenance you can produce later is worth having.
-5. **Have a lawyer review the library and this discipline** before a paid pilot.
-   This document is a description of the shape of the problem, not legal advice.
+5. **Audit the library against this discipline periodically.** The controls are
+   worth exactly what the practice is; a procedure written by rewriting alongside
+   the page defeats all of them, and nothing downstream can detect that.
 
 ## Format
 

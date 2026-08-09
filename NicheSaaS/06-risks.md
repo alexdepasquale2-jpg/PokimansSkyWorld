@@ -4,8 +4,8 @@ Risks the four gates do not test. The gates measure demand, feasibility,
 pricing, and retention — a business can clear all four and still be killed by
 something on this list.
 
-> Nothing here is legal advice. R1 in particular needs a lawyer before a paid
-> pilot, not after.
+> This file records exposure and the controls in place against it. What to do
+> about any of it is the owner's call.
 
 ## R1 — Content authorship · **reshaped, not eliminated**
 
@@ -75,8 +75,10 @@ question the walkthrough turns on, and this change makes it harder to answer yes
 
 ### Still to do
 
-1. **Lawyer review** of the library and the authoring discipline before a paid
-   pilot. This section describes the shape of the problem; it is not legal advice.
+1. **Keep the authoring discipline actually enforced.** The controls above are
+   only worth what the practice is — a library written by rewriting alongside the
+   page defeats all of them, and no amount of process documentation fixes that
+   after the fact.
 2. **Decide the AHJ-facing position.** Some jurisdictions may expect the filed
    report to quote the standard. If so, the customer's licensed copy supplies it —
    confirm during the AHJ interviews in R2.
@@ -103,10 +105,10 @@ Reports feed filings that carry a licensed person's attestation. The review
 clause in [`gate3-pilot/pilot-agreement.md`](gate3-pilot/pilot-agreement.md) is
 the primary control, and it is load-bearing rather than boilerplate.
 
-**Before a paid pilot:** lawyer review of that clause, and a conversation with
-an insurance broker about E&O / tech E&O cover for a vendor in this position.
-Get the premium into the cost model — it is a fixed cost the plan currently
-omits entirely.
+**Before a paid pilot:** get an E&O / tech E&O quote for a vendor in this
+position and put the premium into the cost model — it is a fixed cost the plan
+otherwise omits entirely. Insurance is the control that actually absorbs this
+risk if the review clause is ever tested.
 
 **Never offer indemnity.** It cannot be backed at this stage, and offering it
 signals to a compliance buyer that the risk has not been thought about.
@@ -166,8 +168,8 @@ non-discretionary-spend filter.
 
 | # | Risk | Severity | Resolvable now? | Owner action |
 |---|---|---|---|---|
-| R1 | Content authorship | Medium | Controls in place | Lawyer review of the library before Gate 3 |
-| R3 | Professional liability | High | Yes | Lawyer + broker before Gate 3 |
+| R1 | Content authorship | Medium | Controls in place | Hold the authoring discipline; audit the library against it |
+| R3 | Professional liability | High | Yes | E&O quote into the cost model before Gate 3 |
 | R4 | Fabricated citations | High | Mitigated | Carry harness controls into product |
 | R2 | AHJ acceptance | Medium | Yes, cheaply | Interview two AHJs in Gate 1 |
 | R5 | Technician adoption | Medium | Gate 1 tests it | Flip trigger already in scorecard |
@@ -176,8 +178,10 @@ non-discretionary-spend filter.
 | R8 | Cyclicality | Low (C1) | n/a | Only if switching to C2 |
 
 **R3 is now the one to act on.** With the licensing dependency gone, professional
-liability is the highest live risk — the review clause needs a lawyer and the E&O
-premium needs to enter the cost model, where it is currently absent entirely.
+liability is the highest live risk, and the E&O premium needs to enter the cost
+model where it is currently absent entirely. The review-and-sign-off clause is
+the control that keeps you out of the liability chain; insurance is what absorbs
+it if that clause is ever tested.
 
 ---
 

@@ -8,7 +8,7 @@ versions, and ask for money.
 01-pilot-offer.md      what you're selling, at what price, on what terms
 02-walkthrough.md      the script for presenting the five reports
 03-objections.md       the predictable objections, answered honestly
-pilot-agreement.md     plain-language term sheet — have a lawyer read it
+pilot-agreement.md     plain-language term sheet
 roi-calculator.html    their numbers in, their dollar figure out (offline, no deps)
 ```
 
