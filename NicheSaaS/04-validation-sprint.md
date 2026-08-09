@@ -15,6 +15,16 @@ Twelve recorded discovery interviews with the target buyer — owners and operat
 at fire-protection shops of 5–40 technicians. Recruit through state association member
 lists, LinkedIn, and by asking each interviewee for one introduction.
 
+**The recruiting assets are built: [`gate1-recruiting/`](gate1-recruiting/).** Named
+associations, chapters and events; outreach sequences per channel; the expanded interview
+guide; a per-interview capture template; and the scorecard that produces the verdict.
+
+Two things there that this section does not say and should: sample **at least four owners
+and four operations managers**, because the most common cause of a Gate 3 failure is
+interviewing the person who feels the pain while a different person controls the spend —
+and ask every interviewee whether they would share real inspection files, because Gate 2
+needs five of them and this is where they come from.
+
 **Do not describe the product.** The moment you do, the interview becomes a politeness
 exercise and the data is worthless. You are mapping their workflow, not testing your idea.
 

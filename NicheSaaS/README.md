@@ -15,6 +15,7 @@ NicheSaaS/
   02-stack-and-costs.md  Part A — stack, unit economics, infrastructure, sales/marketing budget
   03-product-concept.md  Part B — the product, feature by feature, each tied to what makes it newly possible
   04-validation-sprint.md  the three-week gate that runs before any code is written
+  gate1-recruiting/      target list, outreach sequences, interview guide, scorecard
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
 ```
 
@@ -69,7 +70,8 @@ four gates ([`04-validation-sprint.md`](04-validation-sprint.md)). If the first 
 the correct response is to switch candidates — so any week spent building the product
 beforehand is a week spent building the wrong thing.
 
-The one thing that *is* built is the Gate 2 feasibility harness
-([`gate2-harness/`](gate2-harness/)), and it is deliberately disposable: no UI, no
-database, nothing that survives contact with the answer. Gate 1 is twelve interviews and
-needs no software at all.
+Two things are built, and neither is product code. [`gate1-recruiting/`](gate1-recruiting/)
+is paper — the target list, outreach sequences, interview guide, and scorecard for the
+twelve discovery interviews. [`gate2-harness/`](gate2-harness/) is a runnable feasibility
+pipeline, deliberately disposable: no UI, no database, nothing that survives contact with
+the answer.
