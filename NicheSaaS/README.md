@@ -15,6 +15,8 @@ NicheSaaS/
   02-stack-and-costs.md  Part A — stack, unit economics, infrastructure, sales/marketing budget
   03-product-concept.md  Part B — the product, feature by feature, each tied to what makes it newly possible
   04-validation-sprint.md  the three-week gate that runs before any code is written
+  05-competitors.md      incumbent teardown — pricing, gaps, what it changes
+  06-risks.md            what the gates don't test, ranked. Read R1 first
   gate1-recruiting/      target list, outreach sequences, interview guide, scorecard
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
   gate3-pilot/           pilot offer, walkthrough, objections, term sheet, ROI calculator
@@ -63,6 +65,16 @@ Due-diligence report production (Property Condition Assessments, Phase I ESA) ha
 per-artifact economics and is the designated fallback, but its sales motion is slower and
 its professional-liability surface larger. That combination makes it the wrong *first*
 product for a small team, not a worse business.
+
+## Before any of that: one unanswered question
+
+[`06-risks.md`](06-risks.md) R1. The product cites and quotes NFPA 25 and 72 inside a
+commercial deliverable, and NFPA standards are copyrighted. The Public.Resource.Org fair-use
+ruling rested on *nonprofit, educational* use and does not obviously cover this.
+
+It is resolvable — NFPA licenses content into third-party software via LiNK Enterprise — but
+it needs a phone call and a lawyer, and **every other asset in this repo assumes an answer
+nobody has asked for.** It is the only kill-condition risk on the register. Do it this week.
 
 ## The single most important sequencing decision
 
