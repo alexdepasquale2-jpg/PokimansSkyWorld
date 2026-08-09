@@ -17,6 +17,7 @@ NicheSaaS/
   04-validation-sprint.md  the three-week gate that runs before any code is written
   gate1-recruiting/      target list, outreach sequences, interview guide, scorecard
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
+  gate3-pilot/           pilot offer, walkthrough, objections, term sheet, ROI calculator
 ```
 
 ## The thesis
@@ -70,8 +71,8 @@ four gates ([`04-validation-sprint.md`](04-validation-sprint.md)). If the first 
 the correct response is to switch candidates — so any week spent building the product
 beforehand is a week spent building the wrong thing.
 
-Two things are built, and neither is product code. [`gate1-recruiting/`](gate1-recruiting/)
-is paper — the target list, outreach sequences, interview guide, and scorecard for the
-twelve discovery interviews. [`gate2-harness/`](gate2-harness/) is a runnable feasibility
-pipeline, deliberately disposable: no UI, no database, nothing that survives contact with
-the answer.
+Three things are built and none of them is product code. [`gate1-recruiting/`](gate1-recruiting/)
+and [`gate3-pilot/`](gate3-pilot/) are paper — how to find the buyers, how to interview
+them, and how to ask for money afterwards. [`gate2-harness/`](gate2-harness/) is a runnable
+feasibility pipeline, deliberately disposable: no UI, no database, nothing that survives
+contact with the answer.

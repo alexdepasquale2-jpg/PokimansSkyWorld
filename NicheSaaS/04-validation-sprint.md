@@ -129,6 +129,15 @@ Missing a target narrowly (say, 80% extraction) is worth one iteration, not five
 Take the five generated reports back to the interviewee they came from. Show them side by
 side with the human-written versions. Then ask for a paid pilot: **$500–1,500 per month**.
 
+**The pilot assets are built: [`gate3-pilot/`](gate3-pilot/).** Offer structure, the
+walkthrough script, honest answers to the predictable objections, a plain-language term
+sheet, and an offline ROI calculator you fill in from their own capture sheet.
+
+The walkthrough deliberately **leads with the misses**. A compliance buyer who later finds
+an error you glossed over stops trusting the whole demo — their licence signs the filing.
+One who watches you point at your own errors first concludes you understand the stakes,
+and that is the conversation that produces a cheque.
+
 ### Pass condition
 
 At least **2 signed paid pilots with payment collected**. Not a verbal yes, not a signed
