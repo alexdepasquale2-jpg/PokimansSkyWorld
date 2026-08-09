@@ -37,11 +37,11 @@
   }
   label { display: block; margin-bottom: .8rem; }
   label span { display: block; font-size: .84rem; color: var(--muted); margin-bottom: .22rem; }
-  input[type=number] {
+  input[type=number], select {
     width: 100%; padding: .45rem .6rem; font: inherit; color: var(--ink);
     background: var(--field); border: 1px solid var(--line); border-radius: 6px;
   }
-  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
   .out { margin-top: 1.25rem; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -98,17 +98,25 @@
       <label><span>Loaded bill rate ($/hr)</span>
         <input type="number" id="rate" value="128" min="0" step="1"></label>
     </div>
+    <label><span>Can they fill the freed hours?</span>
+      <select id="backlog">
+        <option value="85">Capacity-constrained — turning work away</option>
+        <option value="50" selected>Mixed — some slack, some backlog</option>
+        <option value="15">Demand-constrained — room in the schedule</option>
+      </select></label>
     <div class="row">
       <label><span>Writeup time removed (%)</span>
         <input type="number" id="removed" value="70" min="0" max="100" step="5"></label>
       <label><span>Value realisation (%)</span>
         <input type="number" id="realise" value="50" min="0" max="100" step="5"></label>
     </div>
+    <p class="note" id="backlogNote">—</p>
     <p class="note">
-      <strong>Value realisation</strong> is the honest discount. Saving a salaried
-      inspector's Sunday evening does not reduce payroll unless those hours are
-      redeployed to billable work or stop being paid. 100% only if the hours are
-      genuinely billable or backfill real overtime.
+      <strong>Ask the backlog question.</strong> Freed hours become billable
+      inspections only if there is work waiting for them. Without a backlog they
+      are worth roughly nothing unless they remove overtime, a contractor, or
+      admin headcount. Same hours, same product, value differing by an order of
+      magnitude — which is why it is question 4b in the interview guide.
     </p>
   </div>
 
@@ -216,7 +224,26 @@
 
   var last = {};
 
+  var BACKLOG_NOTES = {
+    "85": "Freed hours convert to billable inspections. Value them near the full "
+        + "bill rate — this is the strongest version of the paperwork case.",
+    "50": "Some freed hours fill, some don't. Suggested realisation 50%. If they "
+        + "can tell you which, split it and be specific.",
+    "15": "Freed hours are worth little on their own. Ask what they'd stop paying "
+        + "for — overtime, a contractor, admin hours. If the answer is nothing, "
+        + "the paperwork case is weak and the conversion lift has to carry it."
+  };
+
+  // Selecting a backlog state proposes a realisation figure; the field stays
+  // editable because the operator's own answer beats the default.
+  document.getElementById("backlog").addEventListener("change", function () {
+    document.getElementById("realise").value = this.value;
+    calc();
+  });
+
   function calc() {
+    document.getElementById("backlogNote").textContent =
+      BACKLOG_NOTES[document.getElementById("backlog").value] || "";
     var perYear = num("perWeek") * num("weeks");
 
     // Paperwork: hours removed, discounted by what actually converts to money.

@@ -7,6 +7,7 @@
 | **Price** | $500–1,500 per month |
 | **Term** | 3 months, paid monthly, cancel any time with 30 days' notice |
 | **Volume** | Up to 40 inspections/month |
+| **Rollout** | Start with **one technician**, expand at month 2 |
 | **Onboarding** | Waived for design partners (normally $1,500–3,000) |
 | **Commitment from them** | A named contact, inspection files within 48h, 30 min of feedback a week |
 | **Commitment from you** | Drafts back within one business day, direct line to you |
@@ -22,6 +23,24 @@ land at roughly **10–20% of the annual value** the pilot recovers, divided by 
 
 Below $500 stops being a qualification filter and starts being a favour people
 grant to be polite — which defeats the entire purpose of charging.
+
+### Start with one technician
+
+Not the shop. One volunteer, ideally one who already dictates texts rather than
+types them.
+
+Many of these shops have a failed rollout behind them — a tool that was pushed
+to the whole field team and quietly died. A team carrying that scar tissue is
+not evaluating your product, it is evaluating a repeat of a bad experience, and
+a whole-shop rollout to them is the highest-risk possible start.
+
+One technician for a month gives you an internal champion with a real story
+instead of a mandate from the office, and it makes the month-2 expansion a
+decision the field team makes rather than one made at them. It also caps the
+blast radius if the capture flow turns out to need work.
+
+Price the pilot on the shop, not the seat — you are not selling seats yet, and
+a per-seat pilot price gives them a reason to keep it at one forever.
 
 ### Why paid, when free would convert better
 

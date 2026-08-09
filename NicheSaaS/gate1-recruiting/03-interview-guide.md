@@ -78,6 +78,23 @@ team?"* Get the number.
 Both figures. The spread matters more than the average — the bad ones are where
 the pain lives and where the willingness to pay is.
 
+### 4b. Backlog — **the question that converts hours into money**
+
+> "If you got those hours back tomorrow, could you fill them? Are you turning
+> work away right now, or is there room in the schedule?"
+
+Without this answer the writeup-time figure cannot be priced at all, and the
+gate's pass condition requires a dollar figure.
+
+- **Capacity-constrained** (turning work away, booked out weeks): freed hours
+  become billable inspections. Value them near the full bill rate.
+- **Demand-constrained** (room in the schedule): freed hours are worth roughly
+  nothing unless they remove overtime, a contractor, or admin headcount. Ask
+  which: *"would that let you stop paying someone for something?"*
+
+Same hours, same product, value differing by an order of magnitude. Ask it every
+time.
+
 ### 5. Rejections
 
 > "What happens when a jurisdiction rejects a filing? How often does that
@@ -118,6 +135,18 @@ signal arriving early.
 The third part is the one that matters. "What would make you leave" surfaces
 switching costs and the real evaluation criteria far better than asking what
 they like.
+
+Then, always:
+
+> "Has anything been rolled out to the techs that didn't stick? What happened?"
+
+A failed rollout is the most useful story you will hear all day. It names the
+incumbent, tells you what field staff actually rejected, and hands you the exact
+objection you will face at every other shop in the region. Probe: *what broke,
+who championed it, how did it die.*
+
+Shops carrying that scar tissue are not evaluating a tool — they are evaluating
+a repeat of a bad experience, and the pitch has to account for it.
 
 ### 9. The magic wand
 
