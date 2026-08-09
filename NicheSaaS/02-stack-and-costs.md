@@ -103,6 +103,18 @@ show up here long before it shows up in aggregate margin.
 Figures are current list prices at time of writing; verify at signup. None of these are
 large enough to optimise before there is revenue.
 
+**Add professional liability cover from the pilot phase onward: ~$200/month**, modelled as a
+placeholder for a combined tech E&O and cyber package. [`06-risks.md`](06-risks.md) R3 puts
+this at the top of the live-risk list, and the reason to price it early is not the premium.
+It is that a life-safety compliance product may be underwritten quite differently from
+ordinary B2B software, and **declination or a scenario-shaped exclusion is a business-model
+problem, not a budget problem** — see [`07-financials.md`](07-financials.md).
+
+There is also a real fixed cost this table has never carried: **the people.** Founder time at
+a loaded market rate dwarfs every line above it combined. It is priced in
+[`07-financials.md`](07-financials.md), which joins this section to A2 and A4 and answers what
+the whole thing returns.
+
 ## A4. Sales and marketing
 
 The motion is **founder-led sales into a trade-association-shaped market**. Not self-serve,
@@ -154,6 +166,7 @@ waiting to be approached.
 | CAC ceiling | $4,000–6,000 (≈ one third of first-year ACV) |
 | Payback | <12 months, ideally <9 |
 | Logo churn | <8%/year |
+| Break-even | ~6–7 customers on cash, ~15 with a founder salary ([`07-financials.md`](07-financials.md)) |
 
 **The churn number is the most important line in this document.** A product built on
 mandatory, calendar-driven spend should churn far below SaaS norms. If it doesn't, the

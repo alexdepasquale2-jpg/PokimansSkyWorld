@@ -1,6 +1,11 @@
 # The Validation Sprint
 
-Three weeks. Roughly $50 of spend. Four gates, each with an explicit stop condition.
+Three weeks. Roughly **$4,150** of spend. Four gates, each with an explicit stop condition.
+
+Earlier versions of this document said $50. That was the model spend and it was not the
+cost of the sprint — Gate 2 cannot run without a procedure library, and the library is
+subject-matter time that has to be paid for. [`07-financials.md`](07-financials.md) has the
+breakdown and the sequencing that keeps the figure at $4,150 rather than $8,000.
 
 **No production code until Gates 1–3 pass.** If Gate 1 fails the right response is to switch
 candidates, so any week spent building beforehand is a week spent building the wrong thing.
@@ -68,7 +73,7 @@ the capture premise is dead and the rest of the product depends on it.
 
 ## Gate 2 — Technical feasibility
 
-**Week 3. Cost: ~$50 of model spend.**
+**Week 3. Cost: ~$50 of model spend, on top of the procedure library below.**
 
 Build a **throwaway script**. No UI, no database, no auth, nothing that survives. A
 directory of audio and photos in, five draft reports out.
@@ -116,6 +121,16 @@ python corpus.py coverage ~/gate2/library --scope scope/nfpa25-annual.txt
 
 Build the scope file from the inspection forms your customers actually file, not from the
 standard's contents page — coverage against the whole standard is the wrong denominator.
+
+**Do not author the full library to run this gate.** Gate 2 reads five inspections. It needs
+the procedures those five actually touch — perhaps 40–80 of them, days of work and roughly
+$1,500–2,500, instead of several hundred at $4,000–8,000. Commission the rest once somebody
+has paid. This is the largest single improvement available to the plan's risk profile and it
+costs nothing but sequencing ([`07-financials.md`](07-financials.md)).
+
+The catch to avoid tripping on: build the scope file from those same five inspections, and
+do not read the resulting coverage figure as product readiness. A gate-scoped library is
+*supposed* to score badly against a full annual-inspection scope.
 
 **This cannot be generated from a language model.** Asking one to write the library produces
 paraphrased standard text from training data, which is precisely the derivative work the

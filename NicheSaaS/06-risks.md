@@ -106,9 +106,17 @@ clause in [`gate3-pilot/pilot-agreement.md`](gate3-pilot/pilot-agreement.md) is
 the primary control, and it is load-bearing rather than boilerplate.
 
 **Before a paid pilot:** get an E&O / tech E&O quote for a vendor in this
-position and put the premium into the cost model — it is a fixed cost the plan
-otherwise omits entirely. Insurance is the control that actually absorbs this
-risk if the review clause is ever tested.
+position. Insurance is the control that actually absorbs this risk if the review
+clause is ever tested. It now carries a placeholder of ~$200/month in
+[`02-stack-and-costs.md`](02-stack-and-costs.md) A3 and
+[`07-financials.md`](07-financials.md).
+
+**The quote is not really about the premium.** A product whose output enters
+life-safety filings will not be underwritten like ordinary B2B software, and the
+outcome that matters is binary: declination, or a cover carrying an exclusion
+that removes precisely the scenario it was bought for. Either lands on the
+business model rather than the budget, which is why the quote belongs before a
+paid pilot and not after one.
 
 **Never offer indemnity.** It cannot be backed at this stage, and offering it
 signals to a compliance buyer that the risk has not been thought about.
@@ -169,7 +177,7 @@ non-discretionary-spend filter.
 | # | Risk | Severity | Resolvable now? | Owner action |
 |---|---|---|---|---|
 | R1 | Content authorship | Medium | Controls in place | Hold the authoring discipline; audit the library against it |
-| R3 | Professional liability | High | Yes | E&O quote into the cost model before Gate 3 |
+| R3 | Professional liability | High | Yes | Costed as a placeholder; real E&O quote before Gate 3 |
 | R4 | Fabricated citations | High | Mitigated | Carry harness controls into product |
 | R2 | AHJ acceptance | Medium | Yes, cheaply | Interview two AHJs in Gate 1 |
 | R5 | Technician adoption | Medium | Gate 1 tests it | Flip trigger already in scorecard |

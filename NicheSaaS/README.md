@@ -17,6 +17,7 @@ NicheSaaS/
   04-validation-sprint.md  the three-week gate that runs before any code is written
   05-competitors.md      incumbent teardown — pricing, gaps, what it changes
   06-risks.md            what the gates don't test, ranked. Read R1 first
+  07-financials.md       the money joined up — cash at risk, break-even, what the return actually is
   gate1-recruiting/      target list, outreach sequences, interview guide, scorecard
   gate2-harness/         runnable Gate 2 feasibility pipeline (disposable by design)
   gate3-pilot/           pilot offer, walkthrough, objections, term sheet, ROI calculator
@@ -80,10 +81,16 @@ sitting on Gate 2's critical path. Reasoning and controls: [`06-risks.md`](06-ri
 
 ## The single most important sequencing decision
 
-**No product code until the validation sprint passes.** Three weeks, roughly $50 of spend,
-four gates ([`04-validation-sprint.md`](04-validation-sprint.md)). If the first gate fails,
-the correct response is to switch candidates — so any week spent building the product
-beforehand is a week spent building the wrong thing.
+**No product code until the validation sprint passes.** Three weeks, four gates
+([`04-validation-sprint.md`](04-validation-sprint.md)). If the first gate fails, the correct
+response is to switch candidates — so any week spent building the product beforehand is a
+week spent building the wrong thing.
+
+The sprint costs roughly **$4,150** — $50 of model spend and about $4,100 of procedure
+library and tooling, worked through in [`07-financials.md`](07-financials.md). That is the
+whole cost of finding out whether this business exists, against the ~$235,000 of cash and
+founder time the full plan asks for. Most plans cannot be falsified that cheaply, and that
+asymmetry is the reason to run this one in gate order.
 
 All four gates are equipped, and none of it is product code.
 [`gate1-recruiting/`](gate1-recruiting/), [`gate3-pilot/`](gate3-pilot/) and
