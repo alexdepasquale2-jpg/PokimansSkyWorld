@@ -291,6 +291,48 @@ def test_library_tools() -> None:
         check("rejects replace of a missing procedure", True)
 
 
+def test_documented_commands() -> None:
+    """Every `corpus.py` / `run.py` invocation in the docs must actually parse.
+
+    Docs drift silently: a renamed flag leaves a copy-pasteable command that
+    fails with "unrecognized arguments", and nothing catches it until someone
+    follows the README. This walks the shell blocks and checks each command
+    against the real argument parser.
+    """
+    print("\ndocumented commands")
+    import re
+    import shlex
+
+    docs = [HERE / "README.md", HERE / "corpus_tools" / "README.md",
+            HERE / "fixtures" / "library" / "README.md",
+            HERE.parent / "04-validation-sprint.md"]
+    text = "\n".join(d.read_text() for d in docs if d.exists())
+
+    # Join backslash continuations, then pull out the tool invocations.
+    joined = re.sub(r"\\\n\s*", " ", text)
+    commands = re.findall(r"^\s*python (corpus\.py|run\.py) ([^\n`]+)$", joined, re.M)
+    check("found documented commands", len(commands) >= 5, f"found {len(commands)}")
+
+    known = {tool: _known_flags(HERE / tool) for tool in ("corpus.py", "run.py")}
+
+    bad = []
+    for tool, rest in commands:
+        try:
+            args = shlex.split(rest)
+        except ValueError:
+            continue
+        unknown = [a for a in args if a.startswith("--") and a not in known[tool]]
+        if unknown:
+            bad.append(f"{tool} {rest[:44]}… -> unknown {unknown}")
+    check("every documented flag exists in its parser", not bad, "; ".join(bad[:3]))
+
+
+def _known_flags(path: Path) -> set[str]:
+    """Every --flag the script's parser accepts, across all subcommands."""
+    import re
+    return set(re.findall(r'add_argument\("(--[a-z\-]+)"', path.read_text()))
+
+
 def test_shipped_library() -> None:
     print("\nshipped library")
     from corpus_tools.library import parse
@@ -315,6 +357,7 @@ def main() -> int:
     test_corpus_and_cache()
     test_library_tools()
     test_shipped_library()
+    test_documented_commands()
     test_reproduction_guard()
     test_fixture()
     print(f"\n{'FAILED: ' + ', '.join(FAILURES) if FAILURES else 'all checks passed'}")

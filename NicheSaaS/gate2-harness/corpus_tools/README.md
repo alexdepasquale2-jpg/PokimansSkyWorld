@@ -7,7 +7,8 @@ Driven by `../corpus.py`. Nothing here touches the API or costs money.
 ```sh
 # 1. Base library version
 python corpus.py ingest --source drafts/itm-v2.md \
-                        --standard NFPA25 --edition 2023 \
+                        --standard NFPA25-72 --version v2 \
+                        --author "J. Doe" \
                         --out ~/gate2/library-v2
 
 # 2. Jurisdiction overlay
@@ -18,6 +19,8 @@ python corpus.py overlay --base ~/gate2/library-v2 \
 
 # 3. Check before use
 python corpus.py validate ~/gate2/library-travis-county
+python corpus.py coverage ~/gate2/library-travis-county \
+                          --scope scope/nfpa25-annual.txt --threshold 0.9
 
 # 4. Run the harness against it
 python run.py --all ~/gate2/inspections --library ~/gate2/library-travis-county
@@ -30,36 +33,44 @@ reference.
 
 ## The library is a matrix, not a document
 
-A base library version mapped to a standard edition, plus the amendments the
-local AHJ actually enforces. `NFPA25 2023` and `NFPA25 2023 + Travis County` are
-different libraries producing different correct answers, and citing the wrong one
-yields a reference that is technically grounded and practically useless — the
-failure incumbents are known for.
+A base library version, plus the amendments the local AHJ actually enforces.
+`library v2` and `library v2 + Travis County` are different libraries producing
+different correct answers, and citing the wrong one yields a reference that is
+technically grounded and practically useless — the failure incumbents are known
+for.
 
 This is why the plan claims adding a jurisdiction is a configuration change:
 `overlay` is that change. One amendments file per jurisdiction, no code.
 
 ## Amendment format
 
+Amendments address **procedure ids**, not clause references — the procedure is
+the thing being changed.
+
 ```
-# Travis County amendments to NFPA 25 (2023)
+# Travis County amendments to the ITM library
 
-## replace 13.2.5
-Control valves shall be inspected monthly rather than quarterly.
+## replace P-25-13-2-5
+Inspect control valves monthly rather than quarterly within Travis County.
+**Severity:** critical if closed or unsupervised; major otherwise.
 
-## add 13.2.9
-A local Knox-box key shall be verified at each annual inspection.
+## add P-TC-KNOX-1 · Knox-box key verification
+**maps_to:** TC-FIRE-4.2
+Verify the Knox-box key is present and turns the box at each annual visit.
 
-## delete 5.2.1
+## delete P-25-05-2-1
 ```
 
-`replace` and `add` take body text; `delete` takes none. Anything malformed is a
-hard error rather than a silent skip — an amendment that quietly fails to apply
-produces a citation that is wrong for the jurisdiction, which is worse than one
-that is missing.
+`replace` keeps the existing id, title and reference and swaps the body. `add`
+needs a title on the directive line and a `**maps_to:**` in the body, and lands
+in a `Local requirements — <jurisdiction>` section so a reviewer can see at a
+glance what is local. `delete` takes neither title nor body.
 
-`replace` on a clause that does not exist, or `add` on one that does, both fail
-loudly. They are usually a sign the base edition is wrong.
+Anything malformed is a hard error rather than a silent skip — an amendment that
+quietly fails to apply produces a citation that is wrong for the jurisdiction,
+which is worse than one that is missing. `replace` on a procedure that does not
+exist, or `add` on one that does, both fail loudly; usually a sign the base
+version is wrong.
 
 ## Coverage — the readiness measure
 
@@ -86,9 +97,9 @@ citations. Reformatting breaks that check silently, so `validate` confirms every
 id and `maps_to` survives rendering.
 
 **Filenames are generated and never hand-edited.** Sorted filename order *is*
-the cached prompt prefix; a rename reshuffles the corpus and cold-starts every
-cache entry. Chapter numbers are zero-padded so ordering stays stable as the
-corpus grows.
+the cached prompt prefix; a rename reshuffles the library and cold-starts every
+cache entry. Section indices are zero-padded so ordering stays stable as the
+library grows.
 
 ## Provenance is not stored in procedure text
 

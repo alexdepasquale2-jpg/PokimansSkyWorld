@@ -108,13 +108,19 @@ the legal line, and what it costs.
 configuration rather than code:
 
 ```sh
-python corpus.py ingest  --source drafts/itm-v2.md --standard NFPA25 \
-                         --edition 2023 --out ~/gate2/library-v2
+python corpus.py ingest  --source drafts/itm-v2.md --standard NFPA25-72 \
+                         --version v2 --author "J. Doe" --out ~/gate2/library-v2
 python corpus.py overlay --base ~/gate2/library-v2 \
                          --amendments jurisdictions/travis-county.txt \
                          --jurisdiction travis-county --out ~/gate2/library-travis
 python corpus.py validate ~/gate2/library-travis
+python corpus.py coverage ~/gate2/library-travis --scope scope/nfpa25-annual.txt
 ```
+
+**Check coverage before running the gate.** A library that grounds only part of
+what an inspection touches fails Gate 2 as though the model were at fault — with
+nothing to cite it records fewer findings, and accuracy reads as a capability
+problem when it is a content gap.
 
 Full documentation: [`corpus_tools/README.md`](corpus_tools/README.md) and
 [`fixtures/library/README.md`](fixtures/library/README.md) — the latter carries
