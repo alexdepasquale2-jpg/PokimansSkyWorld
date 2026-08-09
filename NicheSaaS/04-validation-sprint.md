@@ -63,6 +63,22 @@ the capture premise is dead and the rest of the product depends on it.
 Build a **throwaway script**. No UI, no database, no auth, nothing that survives. A
 directory of audio and photos in, five draft reports out.
 
+**The harness is built: [`gate2-harness/`](gate2-harness/).** It runs the five stages,
+scores against a human-written reference, and prints the verdict below. Point it at real
+inspections and a licensed corpus:
+
+```sh
+cd gate2-harness
+pip install -r requirements.txt
+python selftest.py                  # offline, no key, no spend
+python run.py --all ~/gate2/inspections --standards ~/gate2/nfpa-corpus
+```
+
+It ships a synthetic fixture so the plumbing can be checked before real files arrive.
+That fixture proves wiring only — clean narration, captioned diagrams instead of
+photographs, and a reference written alongside the transcript rather than independently.
+**This gate passes on real inspections or it does not pass.**
+
 Obtain five real inspections' worth of audio and photos from a Gate 1 interviewee — this is
 also a useful commitment test on that relationship. If nobody will share files with you after
 a good interview, that is itself a finding about how the paid-pilot conversation will go.
