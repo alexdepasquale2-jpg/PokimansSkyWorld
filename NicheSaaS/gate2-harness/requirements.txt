@@ -1,0 +1,10 @@
+anthropic>=0.121.0
+pydantic>=2.0
+
+# Reading field photos: EXIF orientation, downscaling, format conversion.
+# Also used to generate the synthetic fixture.
+pillow>=10.0
+
+# iPhones shoot HEIC by default and the API does not accept it. Without this,
+# every photo from a default-configured phone is unreadable.
+pillow-heif>=0.16

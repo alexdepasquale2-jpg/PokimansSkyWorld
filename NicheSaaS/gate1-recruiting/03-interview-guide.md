@@ -1,0 +1,234 @@
+# Interview guide
+
+Twenty-five minutes. One copy of
+[`interview-capture-template.md`](interview-capture-template.md) per interview,
+filled in within an hour of the call while it is still fresh.
+
+## Before you start
+
+Say this, on the recording:
+
+> "Thanks for the time. Quick housekeeping — I'd like to record this so I'm not
+> typing while you talk. It's just for my own notes, nothing goes anywhere. Is
+> that alright?"
+
+If they decline, take notes. A declined recording is not a lost interview.
+
+Then set the frame:
+
+> "I want to be upfront that I'm not selling anything and there's nothing to
+> demo. I'm trying to understand how inspection reporting actually works day to
+> day, because I keep hearing it's a mess and I want to know whether that's
+> true. So mostly I'm going to ask you to walk me through what you actually do."
+
+## The discipline
+
+**Ask about the last time, not the general case.** "Walk me through your last
+inspection" gets you behaviour. "How do you usually handle reports" gets you a
+policy statement that may not describe anything that happens.
+
+**Shut up after a question.** The useful half of the answer usually arrives after
+a silence the interviewer wanted to fill. Count to five.
+
+**Never validate an idea.** If they say "you should build X," write it down and
+ask *"what would that let you do that you can't do now?"* — the answer is data;
+agreeing that X is a great idea is not.
+
+**Chase numbers, not adjectives.** "It's a huge pain" is not a finding. "About
+two hours a building, fifteen buildings a week, and my senior guy does it on
+Sunday" is. Every time you hear an adjective, ask for the number under it.
+
+## The script
+
+### 1. Warm-up — the shape of the business
+
+> "How many technicians do you have doing ITM right now, and roughly how many
+> inspections a week does that come to?"
+
+Records shop size for the sampling quota. Also relaxes them — it's a question
+they can answer without thinking.
+
+### 2. Walk me through the last one
+
+> "Think about the last inspection your team completed. Walk me through it start
+> to finish — from when the tech arrives to when it's filed."
+
+The core question. Let it run. Do not interrupt to clarify; note the gaps and
+come back.
+
+Probes, only if they stall: *"Then what?"* · *"Who does that part?"* ·
+*"What's happening while that's going on?"*
+
+### 3. Who writes the report, and when
+
+> "Who actually writes it up? And when — during the day, or after?"
+
+Probe hard on **when**. "After hours" is the emotional centre of this problem
+and people mention it flatly, as if it were normal.
+
+> "Is that time billable?"
+
+If the answer is no, follow with: *"So how many hours a week is that across the
+team?"* Get the number.
+
+### 4. How long
+
+> "For a typical building, how long does the writeup take? What about a bad one?"
+
+Both figures. The spread matters more than the average — the bad ones are where
+the pain lives and where the willingness to pay is.
+
+### 4b. Backlog — **the question that converts hours into money**
+
+> "If you got those hours back tomorrow, could you fill them? Are you turning
+> work away right now, or is there room in the schedule?"
+
+Without this answer the writeup-time figure cannot be priced at all, and the
+gate's pass condition requires a dollar figure.
+
+- **Capacity-constrained** (turning work away, booked out weeks): freed hours
+  become billable inspections. Value them near the full bill rate.
+- **Demand-constrained** (room in the schedule): freed hours are worth roughly
+  nothing unless they remove overtime, a contractor, or admin headcount. Ask
+  which: *"would that let you stop paying someone for something?"*
+
+Same hours, same product, value differing by an order of magnitude. Ask it every
+time.
+
+### 5. Rejections
+
+> "What happens when a jurisdiction rejects a filing? How often does that
+> happen, and what does it cost you when it does?"
+
+Probes: *"Who catches it?"* · *"Does the tech have to go back out?"* ·
+*"Does that ever hit a deadline you had with the building owner?"*
+
+The re-inspection truck roll is a hard number most owners know.
+
+### 6. From deficiency to quote
+
+> "When your tech finds a deficiency, what happens next? How does that turn into
+> a quote for the building owner?"
+
+Probes: *"Who prices it?"* · *"How long after the inspection does the owner
+usually get it?"* · *"Has one ever just… not gone out?"*
+
+### 7. Conversion — **press hardest here**
+
+> "Of the deficiencies you find, roughly what share turn into paid repair work?"
+
+Most operators have never calculated this. Expect hesitation; sit through it.
+
+If they don't know: *"Rough guess — is it closer to a quarter or closer to
+three-quarters?"* Then: *"Does that change depending on how fast the quote goes
+out?"*
+
+This is the question that sizes the ROI hook, and asking it frequently generates
+the interest that later becomes a paid pilot. It also tends to be the moment the
+interviewee gets genuinely curious — note it if they do, because that's a Gate 3
+signal arriving early.
+
+### 8. Current tooling
+
+> "What are you using now? What made you pick it? What would make you leave it?"
+
+The third part is the one that matters. "What would make you leave" surfaces
+switching costs and the real evaluation criteria far better than asking what
+they like.
+
+Then, always:
+
+> "Has anything been rolled out to the techs that didn't stick? What happened?"
+
+A failed rollout is the most useful story you will hear all day. It names the
+incumbent, tells you what field staff actually rejected, and hands you the exact
+objection you will face at every other shop in the region. Probe: *what broke,
+who championed it, how did it die.*
+
+Shops carrying that scar tissue are not evaluating a tool — they are evaluating
+a repeat of a bad experience, and the pitch has to account for it.
+
+### 9. The magic wand
+
+> "If you could delete one part of this whole process, which part goes?"
+
+Open-ended close. Sometimes contradicts everything above — when it does, believe
+this answer over the earlier ones.
+
+### 10. The two file asks — and they are two, not one
+
+Both feed Gate 2, they have completely different lead times, and collapsing them into "would
+you share some files?" is how the sprint quietly grows three weeks
+([`../08-critical-path.md`](../08-critical-path.md)).
+
+**Ask everyone, in the interview** — this one exists already and arrives in days:
+
+> "Could you send me two or three of last year's filed reports? Whatever actually went to
+> the AHJ. I'm trying to understand what the format really looks like in your jurisdiction,
+> not what the standard says it should."
+
+Low friction, and it is what the procedure library gets scoped from. Redacted is fine; the
+structure is what matters, not the addresses.
+
+**Ask the two or three warmest** — this one does not exist yet and takes weeks:
+
+> "Bigger favour, and it's really two things. Over the next few weeks, could someone record
+> themselves on their next few inspections — just a phone voice memo while they work, plus
+> the photos they'd normally take? And then send me the report you write for those same
+> inspections, exactly as you'd normally write it."
+
+**The second half is not optional and it is the half people forget.** The report they write
+is the answer key: without it Gate 2 has nothing to score against and produces five drafts
+nobody can grade. Discovering that weeks later, after the recordings are done, is unfixable —
+asking for the reports afterwards means asking someone who now knows you are marking them.
+
+Say it in those terms: *"send it however it normally goes out, whether or not you're happy
+with it — a tidied-up version is worse than useless to me."*
+
+Say plainly that the whole thing is a favour and that you will show them what comes out of
+it — that return visit *is* the Gate 3 conversation.
+
+Ask three shops, not one. You need five inspections, and the most likely way this fails is a
+warm yes that never happens because they got busy. Redundancy costs nothing here.
+
+Then brief them on how to narrate, which matters more than it sounds — see the capture
+section of [`../08-critical-path.md`](../08-critical-path.md). Short version: **do not give
+them a script.** Ask for messy and mean it. A tidied-up narration measures the wrong thing and
+will make the harness look better than the product will be.
+
+Photos need no instructions at all — whatever the phone shoots is fine, HEIC included. Tell
+them not to convert or resize anything; the harness handles it
+([`../gate2-harness/README.md`](../gate2-harness/README.md)).
+
+### 11. The referral ask — never skip
+
+> "This was really useful. Who else should I talk to — ideally someone whose
+> setup is different from yours? And would you be willing to introduce me?"
+
+See [`02-outreach.md`](02-outreach.md) Track D.
+
+## Traps to watch for in yourself
+
+**Leading.** "So the writeup takes a long time, right?" invites agreement.
+"How long does the writeup take?" doesn't.
+
+**Feature-shopping.** If you catch yourself asking "would it help if…", stop.
+You have started designing, and you cannot design and listen simultaneously.
+
+**Counting a polite yes.** Enthusiasm without a number is not a signal. The pass
+condition requires a dollar figure specifically, because enthusiasm is free and
+abundant in every market including the dead ones.
+
+**Interviewing one archetype twelve times.** Check the quota in
+[`README.md`](README.md) after every fourth interview, not at the end.
+
+## Right after the call
+
+Fill in the capture template within the hour. Specifically:
+
+- The **verbatim quote** that best captures their pain. Verbatim, not
+  paraphrased — you will want their words for the Gate 3 conversation.
+- The **numbers**, even approximate ones.
+- Whether pain was **volunteered or extracted**. A problem they raised on their
+  own is worth several that you had to dig for, and after twelve interviews you
+  will not remember which was which.

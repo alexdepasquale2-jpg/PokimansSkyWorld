@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ITM pilot — value calculator</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #fff; --ink: #1c1f23; --muted: #5d646c;
+    --line: #ddd9d2; --accent: #9a4a2f; --good: #2f6b46; --warn: #8a6d1f;
+    --field: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191c; --panel: #1f2226; --ink: #e8e6e3; --muted: #9aa2ab;
+      --line: #333840; --accent: #d98b6a; --good: #7fc39a; --warn: #d9be74;
+      --field: #16181b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.45rem; margin: 0 0 .3rem; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 1.75rem; max-width: 60ch; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.15rem 1.25rem;
+  }
+  .panel h2 {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--muted); margin: 0 0 .9rem; font-weight: 600;
+  }
+  label { display: block; margin-bottom: .8rem; }
+  label span { display: block; font-size: .84rem; color: var(--muted); margin-bottom: .22rem; }
+  input[type=number], select {
+    width: 100%; padding: .45rem .6rem; font: inherit; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line); border-radius: 6px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .out { margin-top: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: .42rem .3rem; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  tbody tr:last-child td { border-bottom: none; }
+  .total td { font-weight: 700; border-top: 2px solid var(--line); }
+  .big { font-size: 1.7rem; font-weight: 700; letter-spacing: -.02em; }
+  .verdict { margin-top: 1rem; padding: .85rem 1rem; border-radius: 8px; border: 1px solid var(--line); }
+  .verdict.ok { border-color: var(--good); }
+  .verdict.no { border-color: var(--accent); }
+  .note {
+    font-size: .84rem; color: var(--muted); margin-top: .9rem;
+    border-left: 3px solid var(--line); padding-left: .75rem;
+  }
+  .note strong { color: var(--ink); }
+  .founder { border-style: dashed; }
+  button {
+    font: inherit; padding: .5rem .9rem; border-radius: 6px; cursor: pointer;
+    background: var(--accent); color: #fff; border: none;
+  }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .actions { display: flex; gap: .6rem; margin-top: 1.25rem; flex-wrap: wrap; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .actions, .founder { display: none; }
+    .panel { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>ITM pilot — value calculator</h1>
+<p class="sub">
+  Fill this in from the customer's own Gate 1 capture sheet, in front of them.
+  Their numbers, not yours. Everything is annual unless stated.
+</p>
+
+<div class="grid">
+
+  <div class="panel">
+    <h2>Their operation</h2>
+    <div class="row">
+      <label><span>Inspections per week</span>
+        <input type="number" id="perWeek" value="15" min="0" step="1"></label>
+      <label><span>Working weeks per year</span>
+        <input type="number" id="weeks" value="50" min="1" step="1"></label>
+    </div>
+    <div class="row">
+      <label><span>Writeup hours per building</span>
+        <input type="number" id="hours" value="2" min="0" step="0.25"></label>
+      <label><span>Loaded bill rate ($/hr)</span>
+        <input type="number" id="rate" value="128" min="0" step="1"></label>
+    </div>
+    <label><span>Can they fill the freed hours?</span>
+      <select id="backlog">
+        <option value="85">Capacity-constrained — turning work away</option>
+        <option value="50" selected>Mixed — some slack, some backlog</option>
+        <option value="15">Demand-constrained — room in the schedule</option>
+      </select></label>
+    <div class="row">
+      <label><span>Writeup time removed (%)</span>
+        <input type="number" id="removed" value="70" min="0" max="100" step="5"></label>
+      <label><span>Value realisation (%)</span>
+        <input type="number" id="realise" value="50" min="0" max="100" step="5"></label>
+    </div>
+    <p class="note" id="backlogNote">—</p>
+    <p class="note">
+      <strong>Ask the backlog question.</strong> Freed hours become billable
+      inspections only if there is work waiting for them. Without a backlog they
+      are worth roughly nothing unless they remove overtime, a contractor, or
+      admin headcount. Same hours, same product, value differing by an order of
+      magnitude — which is why it is question 4b in the interview guide.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h2>Their deficiency revenue</h2>
+    <div class="row">
+      <label><span>Deficiencies per inspection</span>
+        <input type="number" id="defs" value="3" min="0" step="0.5"></label>
+      <label><span>Average repair job ($)</span>
+        <input type="number" id="jobValue" value="850" min="0" step="50"></label>
+    </div>
+    <div class="row">
+      <label><span>Current conversion (%)</span>
+        <input type="number" id="conv" value="35" min="0" max="100" step="5"></label>
+      <label><span>Gross margin on repairs (%)</span>
+        <input type="number" id="margin" value="35" min="0" max="100" step="5"></label>
+    </div>
+    <label><span>Conversion lift from same-day quoting (percentage points)</span>
+      <input type="number" id="lift" value="8" min="0" max="100" step="1"></label>
+    <p class="note">
+      <strong>The lift is the assumption doing all the work.</strong> It is the one
+      number here you have not measured. Ask them for it rather than supplying it,
+      and read the conservative row below before leaning on it.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h2>Your price</h2>
+    <div class="row">
+      <label><span>Pilot ($/month)</span>
+        <input type="number" id="pilot" value="1000" min="0" step="100"></label>
+      <label><span>Annual price after pilot ($)</span>
+        <input type="number" id="annual" value="14000" min="0" step="1000"></label>
+    </div>
+    <p class="note">
+      Anchor the pilot at roughly 10–20% of annual value ÷ 12. Below $500/month it
+      stops being a qualification filter.
+    </p>
+  </div>
+
+  <div class="panel out">
+    <h2>Annual value</h2>
+    <table>
+      <thead><tr><th>Source</th><th>Conservative</th><th>With lift</th></tr></thead>
+      <tbody>
+        <tr><td>Writeup time recovered</td><td id="v-paper-c">—</td><td id="v-paper-l">—</td></tr>
+        <tr><td>Extra repair margin</td><td id="v-conv-c">—</td><td id="v-conv-l">—</td></tr>
+        <tr class="total"><td>Total value</td><td id="v-total-c">—</td><td id="v-total-l">—</td></tr>
+        <tr><td>Less annual price</td><td id="v-cost-c">—</td><td id="v-cost-l">—</td></tr>
+        <tr class="total"><td>Net</td><td id="v-net-c">—</td><td id="v-net-l">—</td></tr>
+        <tr><td>Return multiple</td><td id="v-mult-c">—</td><td id="v-mult-l">—</td></tr>
+      </tbody>
+    </table>
+    <div class="verdict" id="verdict">—</div>
+    <p class="note">
+      <strong>Show the conservative column first.</strong> If it pays for itself on
+      paperwork alone, the conversion upside is a bonus rather than the case — and
+      they can see you are not resting the argument on the number that flatters you.
+    </p>
+  </div>
+
+  <div class="panel founder">
+    <h2>For you — not for the customer</h2>
+    <table>
+      <tbody>
+        <tr><td>Reports per year</td><td id="f-reports">—</td></tr>
+        <tr><td>Value per report (conservative)</td><td id="f-perreport">—</td></tr>
+        <tr><td>Price as % of value (conservative)</td><td id="f-pct">—</td></tr>
+        <tr><td>Implied ACV</td><td id="f-acv">—</td></tr>
+        <tr><td>vs. $12–18k plan target</td><td id="f-target">—</td></tr>
+        <tr><td>CAC ceiling (⅓ of ACV)</td><td id="f-cac">—</td></tr>
+        <tr><td>Est. model COGS @ $0.85/report</td><td id="f-cogs">—</td></tr>
+        <tr><td>Gross margin after COGS</td><td id="f-gm">—</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      If implied ACV lands well under $12k, founder-led sales cannot pay for itself
+      at the CAC ceiling in <strong>02-stack-and-costs.md</strong>. That is a
+      pricing-model finding, not a reason to discount.
+    </p>
+  </div>
+
+</div>
+
+<div class="actions">
+  <button id="copy">Copy summary</button>
+  <button class="ghost" id="print">Print</button>
+  <button class="ghost" id="reset">Reset</button>
+</div>
+
+<script>
+(function () {
+  var ids = ["perWeek","weeks","hours","rate","removed","realise","defs","jobValue",
+             "conv","margin","lift","pilot","annual"];
+  var defaults = {};
+  ids.forEach(function (id) { defaults[id] = document.getElementById(id).value; });
+
+  function num(id) {
+    var v = parseFloat(document.getElementById(id).value);
+    return isFinite(v) ? v : 0;
+  }
+  function money(n) {
+    return (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-US");
+  }
+
+  var last = {};
+
+  var BACKLOG_NOTES = {
+    "85": "Freed hours convert to billable inspections. Value them near the full "
+        + "bill rate — this is the strongest version of the paperwork case.",
+    "50": "Some freed hours fill, some don't. Suggested realisation 50%. If they "
+        + "can tell you which, split it and be specific.",
+    "15": "Freed hours are worth little on their own. Ask what they'd stop paying "
+        + "for — overtime, a contractor, admin hours. If the answer is nothing, "
+        + "the paperwork case is weak and the conversion lift has to carry it."
+  };
+
+  // Selecting a backlog state proposes a realisation figure; the field stays
+  // editable because the operator's own answer beats the default.
+  document.getElementById("backlog").addEventListener("change", function () {
+    document.getElementById("realise").value = this.value;
+    calc();
+  });
+
+  function calc() {
+    document.getElementById("backlogNote").textContent =
+      BACKLOG_NOTES[document.getElementById("backlog").value] || "";
+    var perYear = num("perWeek") * num("weeks");
+
+    // Paperwork: hours removed, discounted by what actually converts to money.
+    var paper = perYear * num("hours") * (num("removed") / 100)
+              * num("rate") * (num("realise") / 100);
+
+    // Conversion: incremental jobs at gross margin, not revenue.
+    var defsPerYear = perYear * num("defs");
+    var conv = defsPerYear * (num("lift") / 100) * num("jobValue") * (num("margin") / 100);
+
+    var annual = num("annual");
+    var rows = {
+      "paper": [paper, paper],
+      "conv":  [0, conv],
+      "total": [paper, paper + conv],
+      "cost":  [-annual, -annual],
+      "net":   [paper - annual, paper + conv - annual]
+    };
+    ["paper","conv","total","cost","net"].forEach(function (k) {
+      document.getElementById("v-" + k + "-c").textContent = money(rows[k][0]);
+      document.getElementById("v-" + k + "-l").textContent = money(rows[k][1]);
+    });
+    document.getElementById("v-mult-c").textContent =
+      annual > 0 ? (rows.total[0] / annual).toFixed(1) + "x" : "—";
+    document.getElementById("v-mult-l").textContent =
+      annual > 0 ? (rows.total[1] / annual).toFixed(1) + "x" : "—";
+
+    var v = document.getElementById("verdict");
+    if (rows.net[0] > 0) {
+      v.className = "verdict ok";
+      v.innerHTML = "<span class='big'>" + money(rows.net[0]) + "</span> net, "
+        + "<strong>on paperwork time alone</strong> — before any conversion lift.";
+    } else if (rows.net[1] > 0) {
+      v.className = "verdict";
+      v.innerHTML = "<span class='big'>" + money(rows.net[1]) + "</span> net, but "
+        + "<strong>only if the conversion lift holds</strong>. Paperwork alone does not "
+        + "cover the price. Press hard on the lift number before relying on this.";
+    } else {
+      v.className = "verdict no";
+      v.innerHTML = "<span class='big'>" + money(rows.net[1]) + "</span> — "
+        + "<strong>does not pay for itself</strong> at this price, even with the lift. "
+        + "Either the price is wrong or this shop is too small.";
+    }
+
+    // Founder panel
+    var perReport = perYear > 0 ? rows.total[0] / perYear : 0;
+    var acv = num("annual");
+    document.getElementById("f-reports").textContent = Math.round(perYear).toLocaleString("en-US");
+    document.getElementById("f-perreport").textContent = money(perReport);
+    document.getElementById("f-pct").textContent =
+      rows.total[0] > 0 ? (acv / rows.total[0] * 100).toFixed(0) + "%" : "—";
+    document.getElementById("f-acv").textContent = money(acv);
+    var t = document.getElementById("f-target");
+    t.textContent = acv >= 18000 ? "above" : acv >= 12000 ? "in range" : "BELOW TARGET";
+    t.style.color = acv >= 12000 ? "var(--good)" : "var(--accent)";
+    document.getElementById("f-cac").textContent = money(acv / 3);
+    var cogs = perYear * 0.85;
+    document.getElementById("f-cogs").textContent = money(cogs);
+    document.getElementById("f-gm").textContent =
+      acv > 0 ? ((acv - cogs) / acv * 100).toFixed(0) + "%" : "—";
+
+    last = { perYear: perYear, paper: paper, conv: conv, annual: annual,
+             netC: rows.net[0], netL: rows.net[1] };
+  }
+
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calc);
+  });
+
+  document.getElementById("copy").addEventListener("click", function () {
+    var txt = [
+      "ITM pilot value — " + Math.round(last.perYear).toLocaleString("en-US") + " reports/yr",
+      "Writeup time recovered:   " + money(last.paper),
+      "Extra repair margin:      " + money(last.conv) + "  (assumption)",
+      "Annual price:             " + money(last.annual),
+      "Net, paperwork only:      " + money(last.netC),
+      "Net, with lift:           " + money(last.netL)
+    ].join("\n");
+    navigator.clipboard.writeText(txt).then(function () {
+      var b = document.getElementById("copy");
+      b.textContent = "Copied";
+      setTimeout(function () { b.textContent = "Copy summary"; }, 1400);
+    });
+  });
+
+  document.getElementById("print").addEventListener("click", function () { window.print(); });
+  document.getElementById("reset").addEventListener("click", function () {
+    ids.forEach(function (id) { document.getElementById(id).value = defaults[id]; });
+    calc();
+  });
+
+  calc();
+})();
+</script>
+</div>
+</body>
+</html>
