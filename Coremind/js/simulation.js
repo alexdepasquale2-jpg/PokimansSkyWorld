@@ -23,6 +23,9 @@
   const PREY_TARGET = 70, PRED_TARGET = 22, MIN_PREY_FOR_PRED = 14;
   const WILD_CAP = 380;
   const PLAYER_REPRO_SOFT_CAP = 60;
+  const WATER_SPEED_MUL = 0.4;
+  const DRINK_DIST = 1.6;
+  const BURROW_DURATION = 4.5, BURROW_COOLDOWN = 14;
 
   // -- population seeding ---------------------------------------------------
   function randomLandSpot(world, minDistFromCore, maxTries) {
@@ -95,13 +98,22 @@
   /* Camouflage/burrowing probabilistically keep an organism off a sensing
    * organism's radar — a mechanical payoff for those traits, not just flavour. */
   function isDetected(watcher, target) {
-    const cam = target.stats.camouflage || 0;
+    if (target.burrowed) return false; // underground and out of play
+    // Chemical sensing tracks a scent trail, which visual concealment does
+    // nothing about — the counter that makes camouflage a choice, not a
+    // strictly-correct default.
+    if (watcher.behaviors.has('sense_through_walls')) return true;
+    const cam = target.behaviors.has('reduce_detection') ? (target.stats.camouflage || 0) : 0;
     if (cam <= 0) return true;
     return Math.random() > cam / 140;
   }
 
   function gatherContext(game, org) {
-    const near = game.world.grid.queryRadius(org.x, org.y, org.stats.sense_radius, []);
+    // Vibration sensing reaches further for *threats* specifically: it feels
+    // footfalls through the ground rather than perceiving the whole scene.
+    const senseR = org.stats.sense_radius;
+    const threatR = org.behaviors.has('early_warning') ? senseR * 1.5 : senseR;
+    const near = game.world.grid.queryRadius(org.x, org.y, Math.max(senseR, threatR), []);
     let nearestThreat = null, nearestPrey = null, nearestCuriosity = null;
     let bestThreatD = Infinity, bestPreyD = Infinity, bestCurD = Infinity;
     const newSightings = [];
@@ -111,49 +123,73 @@
       const d = K.dist(org.x, org.y, other.x, other.y);
       if (!isDetected(org, other)) continue;
 
-      if (isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
-      if (validHuntTarget(org, other) && d < bestPreyD) {
+      if (d <= threatR && isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
+      if (d <= senseR && validHuntTarget(org, other) && d < bestPreyD) {
         const canHuntNow = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
         if (canHuntNow) { bestPreyD = d; nearestPrey = { dist: d, entity: other }; }
       }
-      if (other.ownerId === 'wild' && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
+      if (d <= senseR && other.ownerId === 'wild' && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
     }
 
     for (const sample of game.discovery.samples) {
       const d = K.dist(org.x, org.y, sample.x, sample.y);
-      if (d <= org.stats.sense_radius && d < bestCurD) { bestCurD = d; nearestCuriosity = { dist: d, x: sample.x, y: sample.y, ref: sample }; }
+      if (d <= senseR && d < bestCurD) { bestCurD = d; nearestCuriosity = { dist: d, x: sample.x, y: sample.y, ref: sample }; }
     }
 
     const canEatPlants = org.diet !== 'carnivore';
     const canHunt = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
-    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, org.stats.sense_radius, 4) : null;
+    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, senseR, 4) : null;
+    // Water is only looked up when the organism actually cares — this is a
+    // grid scan, and running it for every organism every decision would cost
+    // far more than the thirst system is worth.
+    // Search range widens with thirst: a desperate animal ranges much further
+    // for water than a comfortable one bothers to.
+    const nearestWater = org.thirst > 25
+      ? W.findNearestWater(game.world, org.x, org.y, senseR * (1.6 + K.clamp01(org.thirst / 100) * 2.6))
+      : null;
 
-    return { nearestThreat, nearestPrey, nearestFood, nearestCuriosity, canEatPlants, canHunt, newSightings, defendRadius: org.stats.sense_radius };
+    return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt, newSightings, defendRadius: senseR };
   }
 
   // -- movement ---------------------------------------------------------------
-  function moveToward(org, tx, ty, dt, mul) {
+  /* Open water is crossable but expensive, rather than a hard wall. A wall
+   * needs pathfinding to look anything but stupid (organisms grinding along a
+   * shoreline); a movement cost gets the same read — creatures go around
+   * lakes, and the map's water genuinely shapes where life goes — with none
+   * of the stuck-against-geometry failure modes. */
+  function moveToward(world, org, tx, ty, dt, mul) {
     const dx = tx - org.x, dy = ty - org.y;
     const d = Math.hypot(dx, dy);
     if (d < 1e-4) return 0;
     const desired = Math.atan2(dy, dx);
     org.heading = K.turnToward(org.heading, desired, 5 * dt);
-    const spd = (org.stats.speed / SPEED_DIV) * (mul || 1);
+    const terrain = W.biomeAt(world, org.x, org.y) === W.BIOME.WATER ? WATER_SPEED_MUL : 1;
+    const spd = (org.stats.speed / SPEED_DIV) * (mul || 1) * terrain;
     const step = Math.min(d, spd * dt);
     org.x += Math.cos(org.heading) * step;
     org.y += Math.sin(org.heading) * step;
     return d - step;
   }
 
+  /* Wandering is random, except when the organism is thirsty — then it walks
+   * up the humidity gradient. Large inland stretches of this map hold no
+   * open water at all, so without a gradient to follow a thirsty organism
+   * out there has no strategy but luck, and quietly dies. Following moisture
+   * is both a real thing animals do and the reason droughts here produce
+   * migration toward the wet regions rather than a silent die-off. */
   function pickWanderTarget(org, world, radius) {
+    const thirsty = org.thirst > 55;
+    let best = null, bestMoisture = -1;
     for (let i = 0; i < 6; i++) {
       const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * radius;
       const x = K.clamp(org.x + Math.cos(a) * r, 1, world.size - 1);
       const y = K.clamp(org.y + Math.sin(a) * r, 1, world.size - 1);
-      const b = W.biomeAt(world, x, y);
-      if (b !== W.BIOME.WATER) return { x, y };
+      if (W.biomeAt(world, x, y) === W.BIOME.WATER) continue;
+      if (!thirsty) return { x, y };
+      const m = W.moistureAt(world, x, y);
+      if (m > bestMoisture) { bestMoisture = m; best = { x, y }; }
     }
-    return { x: org.x, y: org.y };
+    return best || { x: org.x, y: org.y };
   }
 
   // -- combat / death -----------------------------------------------------
@@ -185,14 +221,22 @@
 
     const retaliates = (target.ownerId === 'wild' && T.WILD_BY_ID[target.speciesId].diet === 'carnivore')
       || (target.ownerId === 'player' && (target.directive === 'DEFEND' || target.directive === 'HUNT'));
+    let retaliationDealt = 0;
     if (retaliates && target.health > 0) {
       const rEffDef = org.stats.defense;
       const rDmg = Math.max(1, target.stats.attack - rEffDef * 0.5) * dt;
       org.health -= rDmg;
+      retaliationDealt = rDmg;
     }
 
     if (target.health <= 0) { resolveDeath(game, bus, target, org); org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; }
-    if (org.health <= 0) resolveDeath(game, bus, org, target);
+    // Credit the kill to the target only if it actually fought back. An
+    // attacker that was already starving or dehydrated can cross zero during
+    // its own attack, and blaming whatever it happened to be biting produced
+    // reports like "Grazer killed Scout" — a herbivore that never deals
+    // damage. Those reports are the evidence the player designs from, so a
+    // false one is worse than none.
+    if (org.health <= 0) resolveDeath(game, bus, org, retaliationDealt > 0 ? target : null);
   }
 
   // -- per-organism step ------------------------------------------------------
@@ -204,13 +248,13 @@
           const radius = (org.ownerId === 'player' && org.directive === 'EXPLORE') ? 26 : 10;
           org.actionTarget = pickWanderTarget(org, world, radius);
         }
-        moveToward(org, org.actionTarget.x, org.actionTarget.y, dt, 0.55);
+        moveToward(world, org, org.actionTarget.x, org.actionTarget.y, dt, 0.55);
         break;
       }
       case S.SEEK_FOOD: {
         const tgt = org.actionTarget;
         if (!tgt) { org.state = S.EXPLORE; break; }
-        const d = moveToward(org, tgt.x, tgt.y, dt, 0.8);
+        const d = moveToward(world, org, tgt.x, tgt.y, dt, 0.8);
         if (d < ARRIVE_DIST) {
           const taken = W.consumeFood(world, tgt.x, tgt.y, 16);
           org.hunger = Math.max(0, org.hunger - taken * 3.2);
@@ -222,6 +266,18 @@
         }
         break;
       }
+      case S.SEEK_WATER: {
+        const tgt = org.actionTarget;
+        if (!tgt) { org.state = S.EXPLORE; break; }
+        // Drinking happens from the shore, so arriving *next to* the water
+        // cell is enough — walking into the lake would only cost speed.
+        moveToward(world, org, tgt.x, tgt.y, dt, 0.85);
+        if (W.atWaterEdge(world, org.x, org.y) || K.dist(org.x, org.y, tgt.x, tgt.y) < DRINK_DIST) {
+          org.thirst = Math.max(0, org.thirst - 55 * dt);
+          if (org.thirst <= 0) { org.actionTarget = null; org.aiCounter = 0; }
+        }
+        break;
+      }
       case S.HUNT: {
         const tgt = org.actionTarget && org.actionTarget.ref;
         if (!tgt || !O.isAlive(tgt)) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; break; }
@@ -229,7 +285,7 @@
         org.huntTimer = (org.huntTimer || 0) + dt;
         if (d <= ATTACK_RANGE) { org.state = S.ATTACK; org.huntTimer = 0; break; }
         if (org.huntTimer > HUNT_GIVEUP) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; org.huntTimer = 0; break; }
-        moveToward(org, tgt.x, tgt.y, dt, 1.05);
+        moveToward(world, org, tgt.x, tgt.y, dt, 1.05);
         break;
       }
       case S.ATTACK:
@@ -237,9 +293,19 @@
         break;
       case S.FLEE: {
         const away = org.actionTarget;
+        // A digger that can't outrun the threat goes under instead. This is
+        // what `digging` buys: burrowing beats being slow, which is the whole
+        // reason the trait's speed penalty is affordable.
+        if (org.behaviors.has('can_burrow_flee') && !org.burrowed && org.burrowCooldown <= 0
+            && away && K.dist(org.x, org.y, away.x, away.y) < 7
+            && W.biomeAt(world, org.x, org.y) !== W.BIOME.WATER) {
+          org.burrowed = true;
+          org.burrowTimer = BURROW_DURATION * (0.6 + org.stats.digging / 90);
+          break;
+        }
         if (away) {
           const a = Math.atan2(org.y - away.y, org.x - away.x);
-          moveToward(org, org.x + Math.cos(a) * 6, org.y + Math.sin(a) * 6, dt, 1.15);
+          moveToward(world, org, org.x + Math.cos(a) * 6, org.y + Math.sin(a) * 6, dt, 1.15);
         }
         break;
       }
@@ -248,7 +314,7 @@
         org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.02 * dt);
         break;
       case S.RETURN_TO_CORE: {
-        const d = moveToward(org, game.core.x, game.core.y, dt, 1);
+        const d = moveToward(world, org, game.core.x, game.core.y, dt, 1);
         if (d < game.core.radius) {
           if (org.carrying > 0) {
             CM.coremind.deposit(game, org.carrying, org.carrying * 0.25);
@@ -270,7 +336,7 @@
       case S.INVESTIGATE: {
         const tgt = org.actionTarget;
         if (!tgt) { org.state = S.EXPLORE; break; }
-        const d = moveToward(org, tgt.x, tgt.y, dt, 0.7);
+        const d = moveToward(world, org, tgt.x, tgt.y, dt, 0.7);
         if (d < ARRIVE_DIST) { org.directiveTarget = null; org.actionTarget = null; org.aiCounter = 0; }
         break;
       }
@@ -358,16 +424,44 @@
       const distCam = K.dist(org.x, org.y, camX, camY);
       org.lod = distCam < NEAR_R ? 'near' : distCam < MID_R ? 'mid' : 'far';
 
+      // A burrowed organism is out of play: safe, still, and recovering. It
+      // skips sensing, deciding and acting entirely, which also makes
+      // burrowing the cheapest thing in the sim rather than the priciest.
+      if (org.burrowed) {
+        org.burrowTimer -= dt;
+        org.energy = Math.min(org.stats.energyMax, org.energy + org.stats.energyMax * 0.03 * dt);
+        org.hunger = K.clamp(org.hunger + (org.stats.metabolism / 11) * 0.4 * dt, 0, 100);
+        if (org.burrowTimer <= 0) {
+          org.burrowed = false;
+          org.burrowCooldown = BURROW_COOLDOWN;
+          org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0;
+        }
+        playerPop += org.ownerId === 'player' ? 1 : 0;
+        if (org.ownerId === 'wild') {
+          const sp = T.WILD_BY_ID[org.speciesId];
+          if (sp && sp.tier === 'predator') predatorPop++; else herbivorePop++;
+        }
+        continue;
+      }
+      if (org.burrowCooldown > 0) org.burrowCooldown -= dt;
+
       // needs
       const metaRate = org.stats.metabolism / 11;
       org.hunger = K.clamp(org.hunger + metaRate * 1.05 * dt, 0, 100);
-      const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.RETURN_TO_CORE;
+      org.thirst = K.clamp(org.thirst + metaRate * org.stats.water_requirement * 1.6 * dt, 0, 100);
+      const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.SEEK_WATER || org.state === S.RETURN_TO_CORE;
       org.energy = K.clamp(org.energy - metaRate * (moving ? 0.9 : 0.35) * dt, 0, org.stats.energyMax);
       if (org.hunger >= 100) org.health -= org.stats.health * 0.03 * dt;
+      if (org.thirst >= 100) org.health -= org.stats.health * 0.035 * dt;
       if (org.energy <= 0) org.health -= org.stats.health * 0.015 * dt;
 
       const stress = O.tempStress(org, W.tempAt(game.world, org.x, org.y));
-      if (stress > 1) org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
+      if (stress > 1) {
+        org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
+        // Heat drives thirst: a badly-adapted organism in the wrong climate
+        // dies of the heat *and* of the water it costs to cope with it.
+        org.thirst = K.clamp(org.thirst + (stress - 1) * 1.2 * dt, 0, 100);
+      }
 
       if (org.behaviors.has('passive_heal') && org.hunger < 85 && !org.__attackedThisTick) {
         org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.045 * dt);
@@ -375,6 +469,11 @@
       org.__attackedThisTick = false;
 
       if (org.reproCooldown > 0) org.reproCooldown -= dt;
+
+      // Resolve a needs death here, before the organism gets to sense, decide
+      // or act. Letting a corpse take another swing is both wrong and the
+      // source of misattributed kills further down.
+      if (org.health <= 0) { resolveDeath(game, bus, org, null); continue; }
 
       // AI re-decision, throttled by LOD
       org.aiCounter = (org.aiCounter || 0) - 1;

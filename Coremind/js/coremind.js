@@ -82,12 +82,21 @@
   }
 
   // --- genome designer draft ---------------------------------------------
+  /* Returns true if the slot was set. Refuses undiscovered traits and traits
+   * that declare an incompatibility with something already in the draft —
+   * the designer disables those options too, but the rule is enforced here so
+   * an invalid genome cannot be built by any path. */
   function setDesignSlot(game, category, traitId) {
-    if (!T.CATEGORIES.includes(category)) return;
-    if (traitId && !game.discovery.discoveredTraits[traitId]) return; // must be discovered first
-    game.designerDraft[category] = traitId || null;
+    if (!T.CATEGORIES.includes(category)) return false;
+    if (!traitId) { game.designerDraft[category] = null; return true; }
+    if (!game.discovery.discoveredTraits[traitId]) return false; // must be discovered first
+    const others = T.CATEGORIES.filter(c => c !== category).map(c => game.designerDraft[c]);
+    if (T.conflictsWith(others, traitId)) return false;
+    game.designerDraft[category] = traitId;
+    return true;
   }
   function draftTraitIds(game) { return T.CATEGORIES.map(c => game.designerDraft[c]).filter(Boolean); }
+  function draftCombination(game) { return T.checkCombination(draftTraitIds(game)); }
   function draftStats(game) { return T.resolveStats(draftTraitIds(game)); }
   function draftCost(game) { return T.resolveCost(draftTraitIds(game)); }
 
@@ -112,15 +121,45 @@
     return org;
   }
 
+  const MAX_SAVED_DESIGNS = 8;
+
+  /* Saved designs are how the player re-runs an experiment. Once a genome
+   * has proven itself the loop should be "deploy that one again", not
+   * "rebuild it from memory slot by slot". */
   function saveDesign(game, name) {
-    const design = { id: 'design_' + (game.nextDesignId++), name: name || ('Design ' + game.designs.length), traits: Object.assign({}, game.designerDraft) };
-    game.designs.push(design);
+    const traitIds = draftTraitIds(game);
+    if (!traitIds.length) return null;
+    const design = {
+      id: 'design_' + (game.nextDesignId++),
+      name: name || ('Strain ' + (game.designs.length + 1)),
+      traits: Object.assign({}, game.designerDraft)
+    };
+    game.designs.unshift(design);
+    if (game.designs.length > MAX_SAVED_DESIGNS) game.designs.length = MAX_SAVED_DESIGNS;
     return design;
+  }
+
+  /* Load a saved design back into the draft, dropping any trait that is no
+   * longer valid. A save file predating a rules change should degrade to a
+   * partial design the player can repair, never refuse to load. */
+  function loadDesign(game, designId) {
+    const design = game.designs.find(d => d.id === designId);
+    if (!design) return false;
+    for (const cat of T.CATEGORIES) game.designerDraft[cat] = null;
+    for (const cat of T.CATEGORIES) setDesignSlot(game, cat, design.traits[cat] || null);
+    return true;
+  }
+
+  function deleteDesign(game, designId) {
+    const i = game.designs.findIndex(d => d.id === designId);
+    if (i < 0) return false;
+    game.designs.splice(i, 1);
+    return true;
   }
 
   CM.coremind = {
     newGame, addOrganism, removeOrganism, canAfford, spend, deposit,
     selectOrganism, issueDirective, setDesignSlot, draftTraitIds, draftStats, draftCost,
-    createOrganismFromDraft, saveDesign
+    draftCombination, createOrganismFromDraft, saveDesign, loadDesign, deleteDesign
   };
 })(window.CM = window.CM || {});

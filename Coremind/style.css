@@ -159,6 +159,42 @@ body{
 .bigbtn:disabled{opacity:.35;}
 .bigbtn.secondary{background:var(--panel2);color:var(--fg);border:1px solid var(--line);}
 
+/* designer: conflicts / synergies / saved strains */
+#designer-actions{flex:0 0 auto;display:flex;gap:0;padding-bottom:var(--safe-bottom);}
+#designer-actions .bigbtn{flex:1;}
+#btn-save-design{flex:0 0 38%;}
+
+#designer-combo{flex:0 0 auto;padding:0 10px;background:var(--panel);}
+#designer-combo:empty{display:none;}
+.combo-note{
+  display:flex;gap:6px;align-items:flex-start;font-size:11.5px;padding:6px 8px;border-radius:8px;margin-bottom:6px;
+}
+.combo-note.synergy{background:rgba(51,230,176,.1);border:1px solid var(--accent-dim);color:var(--accent);}
+.combo-note.conflict{background:rgba(239,91,91,.12);border:1px solid var(--danger);color:var(--danger);}
+
+#designer-designs{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;padding:8px 10px;background:var(--panel);border-top:1px solid var(--line);}
+#designer-designs:empty{display:none;}
+.strain-chip{
+  flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+  padding:7px 12px;font-size:11.5px;color:var(--fg);white-space:nowrap;min-height:34px;
+}
+.strain-chip:active{border-color:var(--accent);color:var(--accent);}
+.strain-chip .del{color:var(--fg-dim);margin-left:6px;}
+
+/* analyze: research backlog */
+#research-list{margin-bottom:10px;}
+#research-list:empty{display:none;}
+.research-head{font-size:10.5px;letter-spacing:.08em;color:var(--fg-dim);margin-bottom:6px;}
+.research-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;}
+.research-row .rname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.research-row .rbar{width:74px;height:7px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;flex:0 0 auto;}
+.research-row .rbar > i{display:block;height:100%;background:var(--warn);}
+.research-row .rcount{width:30px;text-align:right;color:var(--fg-dim);font-size:10.5px;flex:0 0 auto;}
+
+/* observation report inside an event row */
+.obs{margin-top:5px;padding-top:5px;border-top:1px dashed var(--line);font-size:11px;color:var(--fg-dim);}
+.obs b{color:var(--fg);font-weight:600;}
+
 /* inspect */
 #inspect-body{flex:1;overflow-y:auto;padding:12px;}
 .kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;}

@@ -8,6 +8,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Coremind</title>
 <meta name="description" content="COREMIND — a single-player biological evolution sandbox. Discover, analyze, extract, design, deploy, adapt.">
+<!-- Inline so the page stays a single self-contained bundle (see tools/build.mjs)
+     and so no request 404s when it is opened straight off the filesystem. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%230f2e26' stroke='%2333e6b0' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2333e6b0'/%3E%3C/svg%3E">
 <style>
 /* Coremind — mobile-first dark UI. Large touch targets, portrait layout. */
 :root{
@@ -170,6 +173,42 @@ body{
 .bigbtn:disabled{opacity:.35;}
 .bigbtn.secondary{background:var(--panel2);color:var(--fg);border:1px solid var(--line);}
 
+/* designer: conflicts / synergies / saved strains */
+#designer-actions{flex:0 0 auto;display:flex;gap:0;padding-bottom:var(--safe-bottom);}
+#designer-actions .bigbtn{flex:1;}
+#btn-save-design{flex:0 0 38%;}
+
+#designer-combo{flex:0 0 auto;padding:0 10px;background:var(--panel);}
+#designer-combo:empty{display:none;}
+.combo-note{
+  display:flex;gap:6px;align-items:flex-start;font-size:11.5px;padding:6px 8px;border-radius:8px;margin-bottom:6px;
+}
+.combo-note.synergy{background:rgba(51,230,176,.1);border:1px solid var(--accent-dim);color:var(--accent);}
+.combo-note.conflict{background:rgba(239,91,91,.12);border:1px solid var(--danger);color:var(--danger);}
+
+#designer-designs{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;padding:8px 10px;background:var(--panel);border-top:1px solid var(--line);}
+#designer-designs:empty{display:none;}
+.strain-chip{
+  flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+  padding:7px 12px;font-size:11.5px;color:var(--fg);white-space:nowrap;min-height:34px;
+}
+.strain-chip:active{border-color:var(--accent);color:var(--accent);}
+.strain-chip .del{color:var(--fg-dim);margin-left:6px;}
+
+/* analyze: research backlog */
+#research-list{margin-bottom:10px;}
+#research-list:empty{display:none;}
+.research-head{font-size:10.5px;letter-spacing:.08em;color:var(--fg-dim);margin-bottom:6px;}
+.research-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;}
+.research-row .rname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.research-row .rbar{width:74px;height:7px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;flex:0 0 auto;}
+.research-row .rbar > i{display:block;height:100%;background:var(--warn);}
+.research-row .rcount{width:30px;text-align:right;color:var(--fg-dim);font-size:10.5px;flex:0 0 auto;}
+
+/* observation report inside an event row */
+.obs{margin-top:5px;padding-top:5px;border-top:1px dashed var(--line);font-size:11px;color:var(--fg-dim);}
+.obs b{color:var(--fg);font-weight:600;}
+
 /* inspect */
 #inspect-body{flex:1;overflow-y:auto;padding:12px;}
 .kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
@@ -233,6 +272,7 @@ body{
   </div>
 
   <div id="panel-analyze" class="panel">
+    <div id="research-list"></div>
     <div id="event-feed"></div>
   </div>
 
@@ -247,8 +287,13 @@ body{
       <div id="designer-cost"></div>
     </div>
     <div id="designer-slots"></div>
+    <div id="designer-combo"></div>
     <div id="designer-stats"></div>
-    <button id="btn-create-organism" class="bigbtn" disabled>CREATE ORGANISM</button>
+    <div id="designer-designs"></div>
+    <div id="designer-actions">
+      <button id="btn-save-design" class="bigbtn secondary">SAVE STRAIN</button>
+      <button id="btn-create-organism" class="bigbtn" disabled>CREATE ORGANISM</button>
+    </div>
   </div>
 
   <div id="inspect-overlay" class="overlay hidden">
@@ -432,12 +477,12 @@ body{
       visual_modifier: 'legs', behavior_modifier: null },
     { id: 'fast_movement', name: 'Fast Movement', category: 'BODY',
       description: 'A streamlined build built for speed, at a metabolic cost.',
-      stat_modifiers: { speed: 24, metabolism: 8 }, energy_cost: 8, biomass_cost: 10,
+      stat_modifiers: { speed: 24, metabolism: 8, water_requirement: 0.15 }, energy_cost: 8, biomass_cost: 10,
       compatibility: ['vibration_sense'], incompatibility: ['armor'],
       visual_modifier: 'streamlined', behavior_modifier: null },
     { id: 'burrowing', name: 'Burrowing', category: 'BODY',
       description: 'Digging limbs that let this organism vanish underground to escape danger.',
-      stat_modifiers: { digging: 45, speed: -6, defense: 6 }, energy_cost: 6, biomass_cost: 9,
+      stat_modifiers: { digging: 45, speed: -6, defense: 6, water_requirement: -0.18 }, energy_cost: 6, biomass_cost: 9,
       compatibility: ['camouflage'], incompatibility: ['fast_movement'],
       visual_modifier: 'digger', behavior_modifier: 'can_burrow_flee' },
 
@@ -461,7 +506,11 @@ body{
     // -- DEFENSE --
     { id: 'armor', name: 'Armor', category: 'DEFENSE',
       description: 'A heavy external shell. Excellent protection, but slow and hungry.',
-      stat_modifiers: { defense: 32, armor: 32, speed: -13, metabolism: 7 }, energy_cost: 6, biomass_cost: 14,
+      // -7, not -13: the base speed is 13, so a -13 penalty drove every
+      // armored build straight into the speed floor. That made armor read as
+      // "this organism is now furniture" rather than as a tradeoff, and left
+      // armored wild predators unable to chase anything at all.
+      stat_modifiers: { defense: 32, armor: 32, speed: -7, metabolism: 7, water_requirement: 0.12 }, energy_cost: 6, biomass_cost: 14,
       compatibility: ['regeneration'], incompatibility: ['fast_movement', 'burrowing'],
       visual_modifier: 'shell', behavior_modifier: null },
     { id: 'camouflage', name: 'Camouflage', category: 'DEFENSE',
@@ -470,8 +519,8 @@ body{
       compatibility: ['burrowing'], incompatibility: [],
       visual_modifier: 'mottled', behavior_modifier: 'reduce_detection' },
     { id: 'regeneration', name: 'Regeneration', category: 'DEFENSE',
-      description: 'Slowly heals wounds over time, at a steady energy cost.',
-      stat_modifiers: { metabolism: 10 }, energy_cost: 8, biomass_cost: 12,
+      description: 'Slowly heals wounds over time, at a steady energy and water cost.',
+      stat_modifiers: { metabolism: 10, water_requirement: 0.15 }, energy_cost: 8, biomass_cost: 12,
       compatibility: ['armor'], incompatibility: [],
       visual_modifier: 'veined', behavior_modifier: 'passive_heal' },
 
@@ -483,7 +532,7 @@ body{
       visual_modifier: 'jaws', behavior_modifier: null },
     { id: 'claws', name: 'Claws', category: 'OFFENSE',
       description: 'Sharp claws for tearing. Strong, but a little slower.',
-      stat_modifiers: { attack: 25, speed: -3 }, energy_cost: 5, biomass_cost: 9,
+      stat_modifiers: { attack: 25, speed: -2 }, energy_cost: 5, biomass_cost: 9,
       compatibility: ['armor'], incompatibility: [],
       visual_modifier: 'claws', behavior_modifier: null },
     { id: 'venom', name: 'Venom', category: 'OFFENSE',
@@ -499,13 +548,13 @@ body{
 
     // -- METABOLISM --
     { id: 'efficient_metabolism', name: 'Efficient Metabolism', category: 'METABOLISM',
-      description: 'Burns energy more slowly — needs to eat less often.',
-      stat_modifiers: { metabolism: -19 }, energy_cost: 4, biomass_cost: 8,
-      compatibility: [], incompatibility: ['armor'],
+      description: 'Burns energy and water more slowly — needs to eat and drink less often.',
+      stat_modifiers: { metabolism: -19, water_requirement: -0.2 }, energy_cost: 4, biomass_cost: 8,
+      compatibility: ['prolific_broodsac'], incompatibility: ['armor'],
       visual_modifier: 'lean', behavior_modifier: null },
     { id: 'heat_resistance', name: 'Heat Resistance', category: 'METABOLISM',
-      description: 'Tolerates a much wider range of hot climates.',
-      stat_modifiers: { temperature_tolerance: 19 }, energy_cost: 3, biomass_cost: 7,
+      description: 'Tolerates a much wider range of hot climates, and retains water better.',
+      stat_modifiers: { temperature_tolerance: 19, water_requirement: -0.15 }, energy_cost: 3, biomass_cost: 7,
       compatibility: [], incompatibility: ['cold_resistance'],
       visual_modifier: 'warm_hued', behavior_modifier: null },
     { id: 'cold_resistance', name: 'Cold Resistance', category: 'METABOLISM',
@@ -529,14 +578,85 @@ body{
 
   const BASE_CREATE_COST = { biomass: 18, energy: 12 };
 
+  /* Stats where a *lower* number is the better outcome. Everything that
+   * reasons about whether a modifier is a benefit or a cost — the synergy
+   * bonus below, and the designer's +/- colouring — has to consult this, or
+   * it will cheerfully report a metabolism increase as an improvement. */
+  const LOWER_IS_BETTER = new Set(['metabolism', 'water_requirement']);
+  function isBenefit(statKey, delta) {
+    return LOWER_IS_BETTER.has(statKey) ? delta < 0 : delta > 0;
+  }
+
+  /* Each satisfied `compatibility` pairing amplifies both traits' upsides by
+   * this much. Deliberately one-directional: synergy never deepens a trait's
+   * own costs, so pairing traits is always a reward for noticing the
+   * relationship, never a hidden penalty. */
+  const SYNERGY_BONUS = 0.15;
+
+  /* Which declared pairings are actually live in this set of traits. Pure and
+   * cheap (<=6 traits), so the designer can call it on every change. */
+  function checkCombination(traitIds) {
+    const ids = traitIds.filter(Boolean);
+    const set = new Set(ids);
+    const conflicts = [], synergies = [], seen = new Set();
+    for (const id of ids) {
+      const t = TRAITS_BY_ID[id];
+      if (!t) continue;
+      for (const other of t.incompatibility) {
+        if (!set.has(other)) continue;
+        const key = [id, other].sort().join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        conflicts.push({ a: id, b: other });
+      }
+      for (const other of t.compatibility) {
+        if (!set.has(other)) continue;
+        const key = 's:' + [id, other].sort().join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        synergies.push({ a: id, b: other });
+      }
+    }
+    return { conflicts, synergies };
+  }
+
+  /* True when `candidate` could be added to `traitIds` without creating a
+   * declared incompatibility. The designer uses this to disable the option
+   * rather than letting the player build something the rules forbid. */
+  function conflictsWith(traitIds, candidate) {
+    const t = TRAITS_BY_ID[candidate];
+    if (!t) return null;
+    for (const id of traitIds) {
+      if (!id || id === candidate) continue;
+      const other = TRAITS_BY_ID[id];
+      if (!other) continue;
+      if (t.incompatibility.includes(id) || other.incompatibility.includes(candidate)) return id;
+    }
+    return null;
+  }
+
   /* Compute the full stat block for a set of trait ids (one per category,
    * nulls allowed). Pure function — the designer calls this on every tap. */
   function resolveStats(traitIds) {
+    const ids = traitIds.filter(Boolean);
     const stats = Object.assign({}, BASE_STATS);
-    for (const id of traitIds) {
+
+    // Count each trait's live synergy partners first, so the boost applies to
+    // every contributor of a pairing rather than depending on iteration order.
+    const partners = {};
+    for (const { a, b } of checkCombination(ids).synergies) {
+      partners[a] = (partners[a] || 0) + 1;
+      partners[b] = (partners[b] || 0) + 1;
+    }
+
+    for (const id of ids) {
       const t = TRAITS_BY_ID[id];
       if (!t) continue;
-      for (const k in t.stat_modifiers) stats[k] = (stats[k] || 0) + t.stat_modifiers[k];
+      const boost = 1 + SYNERGY_BONUS * (partners[id] || 0);
+      for (const k in t.stat_modifiers) {
+        const v = t.stat_modifiers[k];
+        stats[k] = (stats[k] || 0) + (isBenefit(k, v) ? v * boost : v);
+      }
     }
     for (const k of STAT_KEYS) stats[k] = Math.max(STAT_MIN[k] || 0, stats[k]);
     return stats;
@@ -569,8 +689,10 @@ body{
       traits: ['armor', 'basic_legs'], color: '#c9b25a' },
     { id: 'stalker', name: 'Stalker', tier: 'predator', diet: 'carnivore',
       traits: ['fast_movement', 'bite'], color: '#d16b5a' },
+    // Carries legs deliberately: an armored predator without them cannot
+    // close on anything, and a predator that never hunts is not a predator.
     { id: 'shellfang', name: 'Shellfang', tier: 'predator', diet: 'carnivore',
-      traits: ['armor', 'claws'], color: '#a15ad1' },
+      traits: ['armor', 'claws', 'basic_legs'], color: '#a15ad1' },
     { id: 'needler', name: 'Needler', tier: 'predator', diet: 'carnivore',
       traits: ['venom', 'vibration_sense'], color: '#5ad1c4' }
   ];
@@ -580,6 +702,7 @@ body{
   CM.traits = {
     CATEGORIES, TRAITS, TRAITS_BY_ID, TRAITS_BY_CATEGORY,
     BASE_STATS, STAT_KEYS, STAT_MIN, BASE_CREATE_COST,
+    LOWER_IS_BETTER, isBenefit, SYNERGY_BONUS, checkCombination, conflictsWith,
     resolveStats, resolveCost, behaviorModifiers,
     WILD_SPECIES, WILD_BY_ID
   };
@@ -701,6 +824,11 @@ body{
     const xi = K.clamp(Math.floor(x), 0, SIZE - 1), yi = K.clamp(Math.floor(y), 0, SIZE - 1);
     return world.temp[idx(xi, yi)];
   }
+  function moistureAt(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return 0;
+    return world.moisture[idx(xi, yi)];
+  }
   function foodAt(world, x, y) {
     const xi = Math.floor(x), yi = Math.floor(y);
     if (!inBounds(xi, yi)) return 0;
@@ -749,6 +877,40 @@ body{
       }
     }
     return best;
+  }
+
+  /* Nearest drinkable cell. Organisms drink from the shore rather than
+   * swimming, so this returns the water cell itself and the caller treats
+   * "adjacent" as close enough (see DRINK_DIST in simulation.js). */
+  function findNearestWater(world, x, y, radius) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    let best = null, bestD = Infinity;
+    const r = Math.ceil(radius);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = xi + dx, ny = yi + dy;
+        if (!inBounds(nx, ny)) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > radius * radius || d2 >= bestD) continue;
+        if (world.biome[idx(nx, ny)] === BIOME.WATER) {
+          bestD = d2; best = { x: nx + 0.5, y: ny + 0.5 };
+        }
+      }
+    }
+    return best;
+  }
+
+  /* Is this position at or beside open water — i.e. can something standing
+   * here drink without entering the lake? */
+  function atWaterEdge(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = xi + dx, ny = yi + dy;
+        if (inBounds(nx, ny) && world.biome[idx(nx, ny)] === BIOME.WATER) return true;
+      }
+    }
+    return false;
   }
 
   // --- uniform spatial grid for organisms / samples -------------------------
@@ -814,8 +976,8 @@ body{
 
   CM.world = {
     SIZE, BIOME, BIOME_NAMES, idx, inBounds,
-    generate, biomeAt, tempAt, foodAt, consumeFood, tickFood, findNearestFood,
-    makeSpatialGrid
+    generate, biomeAt, tempAt, moistureAt, foodAt, consumeFood, tickFood, findNearestFood,
+    findNearestWater, atWaterEdge, makeSpatialGrid
   };
 })(window.CM = window.CM || {});
 
@@ -830,10 +992,14 @@ body{
   const K = CM.core;
   const T = CM.traits;
 
+  /* SEEK_WATER is the one state beyond the brief's list. The brief calls that
+   * list "possible states", and water_requirement is a required stat — without
+   * somewhere for a thirsty organism to go, that stat could only ever be a
+   * hidden death sentence rather than a design decision the player can answer. */
   const AI_STATE = {
-    IDLE: 'IDLE', EXPLORE: 'EXPLORE', SEEK_FOOD: 'SEEK_FOOD', FLEE: 'FLEE',
-    HUNT: 'HUNT', ATTACK: 'ATTACK', REST: 'REST', RETURN_TO_CORE: 'RETURN_TO_CORE',
-    REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE'
+    IDLE: 'IDLE', EXPLORE: 'EXPLORE', SEEK_FOOD: 'SEEK_FOOD', SEEK_WATER: 'SEEK_WATER',
+    FLEE: 'FLEE', HUNT: 'HUNT', ATTACK: 'ATTACK', REST: 'REST',
+    RETURN_TO_CORE: 'RETURN_TO_CORE', REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE'
   };
 
   const DIRECTIVES = ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND', 'REPRODUCE', 'INVESTIGATE', 'RETURN'];
@@ -845,7 +1011,7 @@ body{
       id: null, ownerId: null, speciesId: null, designId: null, name: '',
       generation: 1, age: 0, x: 0, y: 0, heading: 0,
       stats: null, traits: null, behaviors: null, diet: 'herbivore',
-      health: 1, energy: 1, hunger: 0,
+      health: 1, energy: 1, hunger: 0, thirst: 0, burrowed: false, burrowTimer: 0,
       state: AI_STATE.IDLE, stateTimer: 0, directive: null,
       target: null, carrying: 0, alive: true, lod: 'near', selected: false,
       visualSeed: 0, lastEventAt: 0, __gx: 0, __gy: 0
@@ -881,6 +1047,10 @@ body{
     org.health = stats.health;
     org.energy = stats.energyMax;
     org.hunger = 0;
+    org.thirst = 0;
+    org.burrowed = false;
+    org.burrowTimer = 0;
+    org.burrowCooldown = 0;
     org.state = AI_STATE.IDLE;
     org.stateTimer = 0;
     org.directive = opts.directive || null;
@@ -957,6 +1127,7 @@ body{
    *   canEatPlants, canHunt: bool
    *   nearestThreat:  {dist, entity}
    *   nearestFood:    {dist, x, y}
+   *   nearestWater:   {x, y}
    *   nearestPrey:    {dist, entity}
    *   nearestCuriosity: {dist, x, y, kind, ref}   // unknown species sighting or sample
    *   mateAvailable:  bool
@@ -967,11 +1138,12 @@ body{
     if (org.health <= 0) return { state: S.IDLE, target: null };
 
     const hungerFrac = CM.core.clamp01(org.hunger / 100);
+    const thirstFrac = CM.core.clamp01(org.thirst / 100);
     const energyFrac = CM.core.clamp01(org.energy / org.stats.energyMax);
     const healthFrac = CM.core.clamp01(org.health / org.stats.health);
-    const critical = hungerFrac > 0.92 || healthFrac < 0.22;
+    const critical = hungerFrac > 0.92 || thirstFrac > 0.92 || healthFrac < 0.22;
 
-    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0 };
+    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, SEEK_WATER: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0 };
 
     if (ctx.nearestThreat) {
       const closeness = 1 - CM.core.clamp01(ctx.nearestThreat.dist / Math.max(1, org.stats.sense_radius));
@@ -981,6 +1153,10 @@ body{
     if (ctx.canEatPlants) {
       u.SEEK_FOOD = hungerFrac * hungerFrac * (ctx.nearestFood ? 1 : 0.45);
     }
+    // Thirst curves the same way hunger does, so an organism engineered with a
+    // high water_requirement genuinely spends more of its life walking to water
+    // instead of doing what the player asked of it.
+    u.SEEK_WATER = thirstFrac * thirstFrac * (ctx.nearestWater ? 1.05 : 0.4);
     if (ctx.canHunt && ctx.nearestPrey) {
       u.HUNT = (0.35 + hungerFrac * 0.75);
     }
@@ -1018,6 +1194,7 @@ body{
     if (critical) {
       if (healthFrac < 0.22 && ctx.nearestThreat) u.FLEE *= 2.2;
       if (hungerFrac > 0.92) u.SEEK_FOOD = Math.max(u.SEEK_FOOD, 1.5);
+      if (thirstFrac > 0.92) u.SEEK_WATER = Math.max(u.SEEK_WATER, 1.55);
     }
 
     // Hysteresis: mildly prefer whatever we're already doing so utilities
@@ -1042,6 +1219,9 @@ body{
         return { state: S.FLEE, target: { type: 'flee_from', x: ctx.nearestThreat.entity.x, y: ctx.nearestThreat.entity.y } };
       case S.SEEK_FOOD:
         if (ctx.nearestFood) return { state: S.SEEK_FOOD, target: { type: 'food_cell', x: ctx.nearestFood.x, y: ctx.nearestFood.y } };
+        return { state: S.EXPLORE, target: null };
+      case S.SEEK_WATER:
+        if (ctx.nearestWater) return { state: S.SEEK_WATER, target: { type: 'water_cell', x: ctx.nearestWater.x, y: ctx.nearestWater.y } };
         return { state: S.EXPLORE, target: null };
       case S.HUNT:
         if (org.directive === 'DEFEND' && ctx.nearestThreat) {
@@ -1145,6 +1325,22 @@ body{
     }
   }
 
+  /* What the Coremind can say about an organism from watching it fight —
+   * the raw material of the OBSERVATION report below. Both read the
+   * organism's real traits, so the report can never describe a creature
+   * that isn't the one that was actually there. */
+  const DAMAGE_TYPES = { venom: 'Neurotoxic', acid: 'Corrosive', claws: 'Physical (lacerating)', bite: 'Physical (crushing)' };
+  const DEFENSE_NOTES = { armor: 'Heavy external shell', camouflage: 'Adaptive colouration', regeneration: 'Rapid tissue repair', burrowing: 'Subterranean evasion' };
+
+  function observedDamageType(org) {
+    for (const id of org.traits) if (DAMAGE_TYPES[id]) return DAMAGE_TYPES[id];
+    return 'Physical (blunt)';
+  }
+  function observedDefense(org) {
+    for (const id of org.traits) if (DEFENSE_NOTES[id]) return DEFENSE_NOTES[id];
+    return 'None apparent';
+  }
+
   /* outcome: 'player_killed' | 'wild_killed' | 'player_fled' | 'wild_fled' */
   function recordEncounter(game, bus, playerOrg, wildOrg, outcome, x, y) {
     recordSighting(game, bus, wildOrg.speciesId, x, y);
@@ -1157,10 +1353,19 @@ body{
       if (relevant) creditTrait(game, bus, traitId, ENCOUNTER_CREDIT);
     }
     if (outcome === 'player_killed') {
+      const identified = !!game.discovery.knownSpecies[wildOrg.speciesId];
       pushEvent(game, bus, {
         kind: 'death', icon: '☠',
-        message: `${wildOrg.name} killed ${playerOrg.name}.`,
-        x, y, orgId: playerOrg.id
+        message: `${identified ? wildOrg.name : 'An unknown predator'} killed ${playerOrg.name}.`,
+        // The report the player opens to work out what to build next. It is
+        // the same data the trait ledger is accumulating, shown in plain
+        // language at the moment it was earned.
+        observation: {
+          damageType: observedDamageType(wildOrg),
+          defense: observedDefense(wildOrg),
+          species: identified ? wildOrg.name : 'Unidentified'
+        },
+        x, y, orgId: playerOrg.id, speciesId: wildOrg.speciesId
       });
     }
   }
@@ -1203,9 +1408,30 @@ body{
     return Math.min(1, (game.discovery.observations[traitId] || 0) / OBSERVATION_THRESHOLD);
   }
 
+  /* Every trait the Coremind has partial evidence for but hasn't identified
+   * yet — the research backlog the ANALYZE tab renders, so progress toward a
+   * discovery is visible while it accumulates instead of only at the moment
+   * it completes. */
+  function researchInProgress(game) {
+    const out = [];
+    for (const traitId in game.discovery.observations) {
+      if (game.discovery.discoveredTraits[traitId]) continue;
+      const trait = CM.traits.TRAITS_BY_ID[traitId];
+      if (!trait) continue;
+      out.push({
+        traitId, trait,
+        observations: game.discovery.observations[traitId],
+        needed: OBSERVATION_THRESHOLD,
+        progress: observationProgress(game, traitId)
+      });
+    }
+    return out.sort((a, b) => b.progress - a.progress);
+  }
+
   CM.discovery = {
     OBSERVATION_THRESHOLD, newDiscoveryState, pushEvent, recordSighting,
-    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress
+    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress,
+    researchInProgress, observedDamageType, observedDefense
   };
 })(window.CM = window.CM || {});
 
@@ -1295,12 +1521,21 @@ body{
   }
 
   // --- genome designer draft ---------------------------------------------
+  /* Returns true if the slot was set. Refuses undiscovered traits and traits
+   * that declare an incompatibility with something already in the draft —
+   * the designer disables those options too, but the rule is enforced here so
+   * an invalid genome cannot be built by any path. */
   function setDesignSlot(game, category, traitId) {
-    if (!T.CATEGORIES.includes(category)) return;
-    if (traitId && !game.discovery.discoveredTraits[traitId]) return; // must be discovered first
-    game.designerDraft[category] = traitId || null;
+    if (!T.CATEGORIES.includes(category)) return false;
+    if (!traitId) { game.designerDraft[category] = null; return true; }
+    if (!game.discovery.discoveredTraits[traitId]) return false; // must be discovered first
+    const others = T.CATEGORIES.filter(c => c !== category).map(c => game.designerDraft[c]);
+    if (T.conflictsWith(others, traitId)) return false;
+    game.designerDraft[category] = traitId;
+    return true;
   }
   function draftTraitIds(game) { return T.CATEGORIES.map(c => game.designerDraft[c]).filter(Boolean); }
+  function draftCombination(game) { return T.checkCombination(draftTraitIds(game)); }
   function draftStats(game) { return T.resolveStats(draftTraitIds(game)); }
   function draftCost(game) { return T.resolveCost(draftTraitIds(game)); }
 
@@ -1325,16 +1560,46 @@ body{
     return org;
   }
 
+  const MAX_SAVED_DESIGNS = 8;
+
+  /* Saved designs are how the player re-runs an experiment. Once a genome
+   * has proven itself the loop should be "deploy that one again", not
+   * "rebuild it from memory slot by slot". */
   function saveDesign(game, name) {
-    const design = { id: 'design_' + (game.nextDesignId++), name: name || ('Design ' + game.designs.length), traits: Object.assign({}, game.designerDraft) };
-    game.designs.push(design);
+    const traitIds = draftTraitIds(game);
+    if (!traitIds.length) return null;
+    const design = {
+      id: 'design_' + (game.nextDesignId++),
+      name: name || ('Strain ' + (game.designs.length + 1)),
+      traits: Object.assign({}, game.designerDraft)
+    };
+    game.designs.unshift(design);
+    if (game.designs.length > MAX_SAVED_DESIGNS) game.designs.length = MAX_SAVED_DESIGNS;
     return design;
+  }
+
+  /* Load a saved design back into the draft, dropping any trait that is no
+   * longer valid. A save file predating a rules change should degrade to a
+   * partial design the player can repair, never refuse to load. */
+  function loadDesign(game, designId) {
+    const design = game.designs.find(d => d.id === designId);
+    if (!design) return false;
+    for (const cat of T.CATEGORIES) game.designerDraft[cat] = null;
+    for (const cat of T.CATEGORIES) setDesignSlot(game, cat, design.traits[cat] || null);
+    return true;
+  }
+
+  function deleteDesign(game, designId) {
+    const i = game.designs.findIndex(d => d.id === designId);
+    if (i < 0) return false;
+    game.designs.splice(i, 1);
+    return true;
   }
 
   CM.coremind = {
     newGame, addOrganism, removeOrganism, canAfford, spend, deposit,
     selectOrganism, issueDirective, setDesignSlot, draftTraitIds, draftStats, draftCost,
-    createOrganismFromDraft, saveDesign
+    draftCombination, createOrganismFromDraft, saveDesign, loadDesign, deleteDesign
   };
 })(window.CM = window.CM || {});
 
@@ -1365,6 +1630,9 @@ body{
   const PREY_TARGET = 70, PRED_TARGET = 22, MIN_PREY_FOR_PRED = 14;
   const WILD_CAP = 380;
   const PLAYER_REPRO_SOFT_CAP = 60;
+  const WATER_SPEED_MUL = 0.4;
+  const DRINK_DIST = 1.6;
+  const BURROW_DURATION = 4.5, BURROW_COOLDOWN = 14;
 
   // -- population seeding ---------------------------------------------------
   function randomLandSpot(world, minDistFromCore, maxTries) {
@@ -1437,13 +1705,22 @@ body{
   /* Camouflage/burrowing probabilistically keep an organism off a sensing
    * organism's radar — a mechanical payoff for those traits, not just flavour. */
   function isDetected(watcher, target) {
-    const cam = target.stats.camouflage || 0;
+    if (target.burrowed) return false; // underground and out of play
+    // Chemical sensing tracks a scent trail, which visual concealment does
+    // nothing about — the counter that makes camouflage a choice, not a
+    // strictly-correct default.
+    if (watcher.behaviors.has('sense_through_walls')) return true;
+    const cam = target.behaviors.has('reduce_detection') ? (target.stats.camouflage || 0) : 0;
     if (cam <= 0) return true;
     return Math.random() > cam / 140;
   }
 
   function gatherContext(game, org) {
-    const near = game.world.grid.queryRadius(org.x, org.y, org.stats.sense_radius, []);
+    // Vibration sensing reaches further for *threats* specifically: it feels
+    // footfalls through the ground rather than perceiving the whole scene.
+    const senseR = org.stats.sense_radius;
+    const threatR = org.behaviors.has('early_warning') ? senseR * 1.5 : senseR;
+    const near = game.world.grid.queryRadius(org.x, org.y, Math.max(senseR, threatR), []);
     let nearestThreat = null, nearestPrey = null, nearestCuriosity = null;
     let bestThreatD = Infinity, bestPreyD = Infinity, bestCurD = Infinity;
     const newSightings = [];
@@ -1453,49 +1730,73 @@ body{
       const d = K.dist(org.x, org.y, other.x, other.y);
       if (!isDetected(org, other)) continue;
 
-      if (isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
-      if (validHuntTarget(org, other) && d < bestPreyD) {
+      if (d <= threatR && isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
+      if (d <= senseR && validHuntTarget(org, other) && d < bestPreyD) {
         const canHuntNow = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
         if (canHuntNow) { bestPreyD = d; nearestPrey = { dist: d, entity: other }; }
       }
-      if (other.ownerId === 'wild' && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
+      if (d <= senseR && other.ownerId === 'wild' && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
     }
 
     for (const sample of game.discovery.samples) {
       const d = K.dist(org.x, org.y, sample.x, sample.y);
-      if (d <= org.stats.sense_radius && d < bestCurD) { bestCurD = d; nearestCuriosity = { dist: d, x: sample.x, y: sample.y, ref: sample }; }
+      if (d <= senseR && d < bestCurD) { bestCurD = d; nearestCuriosity = { dist: d, x: sample.x, y: sample.y, ref: sample }; }
     }
 
     const canEatPlants = org.diet !== 'carnivore';
     const canHunt = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
-    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, org.stats.sense_radius, 4) : null;
+    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, senseR, 4) : null;
+    // Water is only looked up when the organism actually cares — this is a
+    // grid scan, and running it for every organism every decision would cost
+    // far more than the thirst system is worth.
+    // Search range widens with thirst: a desperate animal ranges much further
+    // for water than a comfortable one bothers to.
+    const nearestWater = org.thirst > 25
+      ? W.findNearestWater(game.world, org.x, org.y, senseR * (1.6 + K.clamp01(org.thirst / 100) * 2.6))
+      : null;
 
-    return { nearestThreat, nearestPrey, nearestFood, nearestCuriosity, canEatPlants, canHunt, newSightings, defendRadius: org.stats.sense_radius };
+    return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt, newSightings, defendRadius: senseR };
   }
 
   // -- movement ---------------------------------------------------------------
-  function moveToward(org, tx, ty, dt, mul) {
+  /* Open water is crossable but expensive, rather than a hard wall. A wall
+   * needs pathfinding to look anything but stupid (organisms grinding along a
+   * shoreline); a movement cost gets the same read — creatures go around
+   * lakes, and the map's water genuinely shapes where life goes — with none
+   * of the stuck-against-geometry failure modes. */
+  function moveToward(world, org, tx, ty, dt, mul) {
     const dx = tx - org.x, dy = ty - org.y;
     const d = Math.hypot(dx, dy);
     if (d < 1e-4) return 0;
     const desired = Math.atan2(dy, dx);
     org.heading = K.turnToward(org.heading, desired, 5 * dt);
-    const spd = (org.stats.speed / SPEED_DIV) * (mul || 1);
+    const terrain = W.biomeAt(world, org.x, org.y) === W.BIOME.WATER ? WATER_SPEED_MUL : 1;
+    const spd = (org.stats.speed / SPEED_DIV) * (mul || 1) * terrain;
     const step = Math.min(d, spd * dt);
     org.x += Math.cos(org.heading) * step;
     org.y += Math.sin(org.heading) * step;
     return d - step;
   }
 
+  /* Wandering is random, except when the organism is thirsty — then it walks
+   * up the humidity gradient. Large inland stretches of this map hold no
+   * open water at all, so without a gradient to follow a thirsty organism
+   * out there has no strategy but luck, and quietly dies. Following moisture
+   * is both a real thing animals do and the reason droughts here produce
+   * migration toward the wet regions rather than a silent die-off. */
   function pickWanderTarget(org, world, radius) {
+    const thirsty = org.thirst > 55;
+    let best = null, bestMoisture = -1;
     for (let i = 0; i < 6; i++) {
       const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * radius;
       const x = K.clamp(org.x + Math.cos(a) * r, 1, world.size - 1);
       const y = K.clamp(org.y + Math.sin(a) * r, 1, world.size - 1);
-      const b = W.biomeAt(world, x, y);
-      if (b !== W.BIOME.WATER) return { x, y };
+      if (W.biomeAt(world, x, y) === W.BIOME.WATER) continue;
+      if (!thirsty) return { x, y };
+      const m = W.moistureAt(world, x, y);
+      if (m > bestMoisture) { bestMoisture = m; best = { x, y }; }
     }
-    return { x: org.x, y: org.y };
+    return best || { x: org.x, y: org.y };
   }
 
   // -- combat / death -----------------------------------------------------
@@ -1527,14 +1828,22 @@ body{
 
     const retaliates = (target.ownerId === 'wild' && T.WILD_BY_ID[target.speciesId].diet === 'carnivore')
       || (target.ownerId === 'player' && (target.directive === 'DEFEND' || target.directive === 'HUNT'));
+    let retaliationDealt = 0;
     if (retaliates && target.health > 0) {
       const rEffDef = org.stats.defense;
       const rDmg = Math.max(1, target.stats.attack - rEffDef * 0.5) * dt;
       org.health -= rDmg;
+      retaliationDealt = rDmg;
     }
 
     if (target.health <= 0) { resolveDeath(game, bus, target, org); org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; }
-    if (org.health <= 0) resolveDeath(game, bus, org, target);
+    // Credit the kill to the target only if it actually fought back. An
+    // attacker that was already starving or dehydrated can cross zero during
+    // its own attack, and blaming whatever it happened to be biting produced
+    // reports like "Grazer killed Scout" — a herbivore that never deals
+    // damage. Those reports are the evidence the player designs from, so a
+    // false one is worse than none.
+    if (org.health <= 0) resolveDeath(game, bus, org, retaliationDealt > 0 ? target : null);
   }
 
   // -- per-organism step ------------------------------------------------------
@@ -1546,13 +1855,13 @@ body{
           const radius = (org.ownerId === 'player' && org.directive === 'EXPLORE') ? 26 : 10;
           org.actionTarget = pickWanderTarget(org, world, radius);
         }
-        moveToward(org, org.actionTarget.x, org.actionTarget.y, dt, 0.55);
+        moveToward(world, org, org.actionTarget.x, org.actionTarget.y, dt, 0.55);
         break;
       }
       case S.SEEK_FOOD: {
         const tgt = org.actionTarget;
         if (!tgt) { org.state = S.EXPLORE; break; }
-        const d = moveToward(org, tgt.x, tgt.y, dt, 0.8);
+        const d = moveToward(world, org, tgt.x, tgt.y, dt, 0.8);
         if (d < ARRIVE_DIST) {
           const taken = W.consumeFood(world, tgt.x, tgt.y, 16);
           org.hunger = Math.max(0, org.hunger - taken * 3.2);
@@ -1564,6 +1873,18 @@ body{
         }
         break;
       }
+      case S.SEEK_WATER: {
+        const tgt = org.actionTarget;
+        if (!tgt) { org.state = S.EXPLORE; break; }
+        // Drinking happens from the shore, so arriving *next to* the water
+        // cell is enough — walking into the lake would only cost speed.
+        moveToward(world, org, tgt.x, tgt.y, dt, 0.85);
+        if (W.atWaterEdge(world, org.x, org.y) || K.dist(org.x, org.y, tgt.x, tgt.y) < DRINK_DIST) {
+          org.thirst = Math.max(0, org.thirst - 55 * dt);
+          if (org.thirst <= 0) { org.actionTarget = null; org.aiCounter = 0; }
+        }
+        break;
+      }
       case S.HUNT: {
         const tgt = org.actionTarget && org.actionTarget.ref;
         if (!tgt || !O.isAlive(tgt)) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; break; }
@@ -1571,7 +1892,7 @@ body{
         org.huntTimer = (org.huntTimer || 0) + dt;
         if (d <= ATTACK_RANGE) { org.state = S.ATTACK; org.huntTimer = 0; break; }
         if (org.huntTimer > HUNT_GIVEUP) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; org.huntTimer = 0; break; }
-        moveToward(org, tgt.x, tgt.y, dt, 1.05);
+        moveToward(world, org, tgt.x, tgt.y, dt, 1.05);
         break;
       }
       case S.ATTACK:
@@ -1579,9 +1900,19 @@ body{
         break;
       case S.FLEE: {
         const away = org.actionTarget;
+        // A digger that can't outrun the threat goes under instead. This is
+        // what `digging` buys: burrowing beats being slow, which is the whole
+        // reason the trait's speed penalty is affordable.
+        if (org.behaviors.has('can_burrow_flee') && !org.burrowed && org.burrowCooldown <= 0
+            && away && K.dist(org.x, org.y, away.x, away.y) < 7
+            && W.biomeAt(world, org.x, org.y) !== W.BIOME.WATER) {
+          org.burrowed = true;
+          org.burrowTimer = BURROW_DURATION * (0.6 + org.stats.digging / 90);
+          break;
+        }
         if (away) {
           const a = Math.atan2(org.y - away.y, org.x - away.x);
-          moveToward(org, org.x + Math.cos(a) * 6, org.y + Math.sin(a) * 6, dt, 1.15);
+          moveToward(world, org, org.x + Math.cos(a) * 6, org.y + Math.sin(a) * 6, dt, 1.15);
         }
         break;
       }
@@ -1590,7 +1921,7 @@ body{
         org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.02 * dt);
         break;
       case S.RETURN_TO_CORE: {
-        const d = moveToward(org, game.core.x, game.core.y, dt, 1);
+        const d = moveToward(world, org, game.core.x, game.core.y, dt, 1);
         if (d < game.core.radius) {
           if (org.carrying > 0) {
             CM.coremind.deposit(game, org.carrying, org.carrying * 0.25);
@@ -1612,7 +1943,7 @@ body{
       case S.INVESTIGATE: {
         const tgt = org.actionTarget;
         if (!tgt) { org.state = S.EXPLORE; break; }
-        const d = moveToward(org, tgt.x, tgt.y, dt, 0.7);
+        const d = moveToward(world, org, tgt.x, tgt.y, dt, 0.7);
         if (d < ARRIVE_DIST) { org.directiveTarget = null; org.actionTarget = null; org.aiCounter = 0; }
         break;
       }
@@ -1700,16 +2031,44 @@ body{
       const distCam = K.dist(org.x, org.y, camX, camY);
       org.lod = distCam < NEAR_R ? 'near' : distCam < MID_R ? 'mid' : 'far';
 
+      // A burrowed organism is out of play: safe, still, and recovering. It
+      // skips sensing, deciding and acting entirely, which also makes
+      // burrowing the cheapest thing in the sim rather than the priciest.
+      if (org.burrowed) {
+        org.burrowTimer -= dt;
+        org.energy = Math.min(org.stats.energyMax, org.energy + org.stats.energyMax * 0.03 * dt);
+        org.hunger = K.clamp(org.hunger + (org.stats.metabolism / 11) * 0.4 * dt, 0, 100);
+        if (org.burrowTimer <= 0) {
+          org.burrowed = false;
+          org.burrowCooldown = BURROW_COOLDOWN;
+          org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0;
+        }
+        playerPop += org.ownerId === 'player' ? 1 : 0;
+        if (org.ownerId === 'wild') {
+          const sp = T.WILD_BY_ID[org.speciesId];
+          if (sp && sp.tier === 'predator') predatorPop++; else herbivorePop++;
+        }
+        continue;
+      }
+      if (org.burrowCooldown > 0) org.burrowCooldown -= dt;
+
       // needs
       const metaRate = org.stats.metabolism / 11;
       org.hunger = K.clamp(org.hunger + metaRate * 1.05 * dt, 0, 100);
-      const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.RETURN_TO_CORE;
+      org.thirst = K.clamp(org.thirst + metaRate * org.stats.water_requirement * 1.6 * dt, 0, 100);
+      const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.SEEK_WATER || org.state === S.RETURN_TO_CORE;
       org.energy = K.clamp(org.energy - metaRate * (moving ? 0.9 : 0.35) * dt, 0, org.stats.energyMax);
       if (org.hunger >= 100) org.health -= org.stats.health * 0.03 * dt;
+      if (org.thirst >= 100) org.health -= org.stats.health * 0.035 * dt;
       if (org.energy <= 0) org.health -= org.stats.health * 0.015 * dt;
 
       const stress = O.tempStress(org, W.tempAt(game.world, org.x, org.y));
-      if (stress > 1) org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
+      if (stress > 1) {
+        org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
+        // Heat drives thirst: a badly-adapted organism in the wrong climate
+        // dies of the heat *and* of the water it costs to cope with it.
+        org.thirst = K.clamp(org.thirst + (stress - 1) * 1.2 * dt, 0, 100);
+      }
 
       if (org.behaviors.has('passive_heal') && org.hunger < 85 && !org.__attackedThisTick) {
         org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.045 * dt);
@@ -1717,6 +2076,11 @@ body{
       org.__attackedThisTick = false;
 
       if (org.reproCooldown > 0) org.reproCooldown -= dt;
+
+      // Resolve a needs death here, before the organism gets to sense, decide
+      // or act. Letting a corpse take another swing is both wrong and the
+      // source of misattributed kills further down.
+      if (org.health <= 0) { resolveDeath(game, bus, org, null); continue; }
 
       // AI re-decision, throttled by LOD
       org.aiCounter = (org.aiCounter || 0) - 1;
@@ -1921,6 +2285,21 @@ body{
     const size = Math.max(1.5, org.stats.size * 0.075) * zoom;
     const mods = new Set(org.traits.map(id => (T.TRAITS_BY_ID[id] || {}).visual_modifier).filter(Boolean));
     const stretch = mods.has('streamlined') ? 1.5 : mods.has('lean') ? 1.25 : 1;
+
+    // A burrowed organism is drawn as the mound it left behind — it has to be
+    // visibly *gone* rather than merely faded, because "the predator can no
+    // longer see it" is the entire mechanic.
+    if (org.burrowed) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(74,56,38,.85)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, size * 1.15, size * 0.6, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20,14,8,.5)'; ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
 
     ctx.save();
     ctx.translate(sx, sy);
@@ -2265,9 +2644,10 @@ body{
     ['health', 'Health'], ['energyMax', 'Energy'], ['speed', 'Speed'], ['size', 'Size'],
     ['vision', 'Vision'], ['sense_radius', 'Sense'], ['attack', 'Attack'], ['defense', 'Defense'],
     ['armor', 'Armor'], ['venom', 'Venom'], ['camouflage', 'Camo'], ['digging', 'Dig'],
-    ['temperature_tolerance', 'Temp.Tol'], ['reproduction_rate', 'Repro'], ['metabolism', 'Metab.']
+    ['temperature_tolerance', 'Temp.Tol'], ['water_requirement', 'Water'],
+    ['reproduction_rate', 'Repro'], ['metabolism', 'Metab.']
   ];
-  const STAT_MAXES = { health: 140, energyMax: 100, speed: 60, size: 40, vision: 70, sense_radius: 45, attack: 70, defense: 70, armor: 45, venom: 45, camouflage: 45, digging: 55, temperature_tolerance: 55, reproduction_rate: 1.2, metabolism: 40 };
+  const STAT_MAXES = { health: 140, energyMax: 100, speed: 60, size: 40, vision: 70, sense_radius: 45, attack: 70, defense: 70, armor: 45, venom: 45, camouflage: 45, digging: 55, temperature_tolerance: 55, water_requirement: 1.2, reproduction_rate: 1.2, metabolism: 40 };
 
   function el(id) { return document.getElementById(id); }
   function fmt1(n) { return (Math.round(n * 10) / 10).toString(); }
@@ -2355,9 +2735,18 @@ body{
     panel.classList.remove('hidden');
     const hf = Math.round(100 * org.health / org.stats.health);
     const ef = Math.round(100 * org.energy / org.stats.energyMax);
+    // Distress flags name the thing that is actually killing this organism,
+    // so a failed design reads as a diagnosis instead of a mystery.
+    const flags = [];
+    if (org.burrowed) flags.push('<span style="color:var(--warn)">BURROWED</span>');
+    if (org.hunger > 80) flags.push('<span style="color:var(--danger)">STARVING</span>');
+    if (org.thirst > 80) flags.push('<span style="color:var(--danger)">DEHYDRATED</span>');
+    const stress = CM.organism.tempStress(org, CM.world.tempAt(game.world, org.x, org.y));
+    if (stress > 1) flags.push('<span style="color:var(--danger)">TEMP STRESS</span>');
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
       <b>${org.name}</b><span style="color:var(--fg-dim);font-size:11px">${org.ownerId === 'player' ? 'Gen ' + org.generation : org.name}</span></div>
-      <div style="font-size:11.5px;color:var(--fg-dim);margin-top:2px">${org.state} &middot; HP ${hf}% &middot; Energy ${ef}%</div>`;
+      <div style="font-size:11.5px;color:var(--fg-dim);margin-top:2px">${org.state} &middot; HP ${hf}% &middot; Energy ${ef}% &middot; Thirst ${Math.round(org.thirst)}%</div>
+      ${flags.length ? `<div style="font-size:10.5px;margin-top:3px;letter-spacing:.05em">${flags.join(' ')}</div>` : ''}`;
     summary.textContent = `${org.name} selected — directives below apply to it only.`;
     renderDirectiveBar(game);
   }
@@ -2380,7 +2769,26 @@ body{
     while (layer.children.length > 3) layer.removeChild(layer.firstChild);
   }
 
+  /* The research backlog: traits the Coremind has partial evidence for.
+   * Without this the player only ever sees the moment a discovery lands and
+   * has no idea that watching a predator fight is *doing* anything. */
+  function renderResearch(game) {
+    const wrap = el('research-list');
+    const rows = D.researchInProgress(game);
+    if (!rows.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = '<div class="research-head">ANALYSIS IN PROGRESS</div>';
+    for (const r of rows.slice(0, 6)) {
+      const row = document.createElement('div');
+      row.className = 'research-row';
+      row.innerHTML = `<div class="rname">${r.trait.name}</div>
+        <div class="rbar"><i style="width:${Math.round(r.progress * 100)}%"></i></div>
+        <div class="rcount">${r.observations}/${r.needed}</div>`;
+      wrap.appendChild(row);
+    }
+  }
+
   function renderFeed(game) {
+    renderResearch(game);
     const feed = el('event-feed');
     const events = game.discovery.events;
     if (!events.length) { feed.innerHTML = '<div class="event-empty">Nothing observed yet. Send an organism to EXPLORE.</div>'; return; }
@@ -2389,7 +2797,10 @@ body{
       const row = document.createElement('button');
       row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death' : evt.kind === 'warn' ? ' warn' : '');
       const mins = Math.floor(evt.time / 60), secs = Math.floor(evt.time % 60);
-      row.innerHTML = `<div class="ico">${evt.icon || '•'}</div><div class="body"><div class="msg">${evt.message}</div><div class="time">t+${mins}:${String(secs).padStart(2, '0')}</div></div>`;
+      const obs = evt.observation
+        ? `<div class="obs">Species: <b>${evt.observation.species}</b><br>Damage type: <b>${evt.observation.damageType}</b><br>Observed defense: <b>${evt.observation.defense}</b></div>`
+        : '';
+      row.innerHTML = `<div class="ico">${evt.icon || '•'}</div><div class="body"><div class="msg">${evt.message}</div>${obs}<div class="time">t+${mins}:${String(secs).padStart(2, '0')}</div></div>`;
       row.addEventListener('click', () => onEventClick(game, evt));
       feed.appendChild(row);
     }
@@ -2423,7 +2834,11 @@ body{
     el('btn-designer-close').addEventListener('click', () => closeDesigner(game));
     el('btn-create-organism').addEventListener('click', () => {
       const org = CORE.createOrganismFromDraft(game, bus);
-      if (org) { renderDesignerCost(game); renderDesignerStats(game); toast({ kind: 'system', icon: '\u{1F9EA}', message: `${org.name} deployed near the Core.` }); }
+      if (org) { renderDesigner(game); toast({ kind: 'system', icon: '\u{1F9EA}', message: `${org.name} deployed near the Core.` }); }
+    });
+    el('btn-save-design').addEventListener('click', () => {
+      const design = CORE.saveDesign(game);
+      if (design) { renderDesignerDesigns(game); toast({ kind: 'system', icon: '\u{1F4BE}', message: `Saved ${design.name}.` }); }
     });
   }
 
@@ -2431,9 +2846,7 @@ body{
     el('designer-overlay').classList.remove('hidden');
     game.ui.dnaBadgeSeen = Object.keys(game.discovery.discoveredTraits).length;
     updateBadges(game);
-    renderDesignerSlots(game);
-    renderDesignerStats(game);
-    renderDesignerCost(game);
+    renderDesigner(game);
     startPreviewLoop(game);
   }
   function closeDesigner(game) {
@@ -2451,18 +2864,23 @@ body{
       const currentTrait = current && T.TRAITS_BY_ID[current];
       const select = document.createElement('select');
       const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'None'; select.appendChild(noneOpt);
+      const otherSlots = T.CATEGORIES.filter(c => c !== cat).map(c => game.designerDraft[c]);
       for (const t of T.TRAITS_BY_CATEGORY[cat]) {
         const opt = document.createElement('option');
         opt.value = t.id;
         const known = !!game.discovery.discoveredTraits[t.id];
-        opt.textContent = known ? t.name : '\u{1F512} ' + t.name;
-        opt.disabled = !known;
+        const blockedBy = known ? T.conflictsWith(otherSlots, t.id) : null;
+        if (!known) opt.textContent = '\u{1F512} ' + t.name;               // not discovered yet
+        else if (blockedBy) opt.textContent = '\u{2298} ' + t.name;        // biologically incompatible
+        else opt.textContent = t.name;
+        opt.disabled = !known || !!blockedBy;
+        if (blockedBy) opt.title = `Incompatible with ${T.TRAITS_BY_ID[blockedBy].name}`;
         if (t.id === current) opt.selected = true;
         select.appendChild(opt);
       }
       select.addEventListener('change', () => {
         CORE.setDesignSlot(game, cat, select.value || null);
-        renderDesignerStats(game); renderDesignerCost(game); renderDesignerSlots(game);
+        renderDesigner(game);
       });
       slot.innerHTML = `<div class="cat">${cat}</div>`;
       const nameDiv = document.createElement('div');
@@ -2486,7 +2904,11 @@ body{
       const row = document.createElement('div'); row.className = 'statrow';
       const pct = K.clamp01(val / max) * 100;
       const deltaTxt = Math.abs(delta) < 0.01 ? '' : (delta > 0 ? '+' + fmt1(delta) : fmt1(delta));
-      const deltaCls = delta > 0.01 ? 'pos' : delta < -0.01 ? 'neg' : '';
+      // Colour by whether the change is *good*, not by its sign: a higher
+      // metabolism or water requirement is a cost, and showing it in the
+      // same green as a higher attack would invert the tradeoff the
+      // designer exists to communicate.
+      const deltaCls = Math.abs(delta) < 0.01 ? '' : (T.isBenefit(key, delta) ? 'pos' : 'neg');
       row.innerHTML = `<div class="label">${label}</div><div class="bar"><i style="width:${pct}%"></i></div><div class="val">${fmt1(val)}</div><div class="delta ${deltaCls}">${deltaTxt}</div>`;
       wrap.appendChild(row);
     }
@@ -2497,6 +2919,58 @@ body{
     const afford = CORE.canAfford(game, cost);
     el('designer-cost').innerHTML = `Cost: <span class="${game.core.biomass >= cost.biomass ? 'ok' : 'bad'}">${cost.biomass} biomass</span> &middot; <span class="${game.core.energy >= cost.energy ? 'ok' : 'bad'}">${cost.energy} energy</span>`;
     el('btn-create-organism').disabled = !afford;
+    el('btn-save-design').disabled = CORE.draftTraitIds(game).length === 0;
+  }
+
+  /* Why these traits are worth putting together — or why they can't be. The
+   * designer's whole job is making a tradeoff legible before it is paid for. */
+  function renderDesignerCombo(game) {
+    const wrap = el('designer-combo');
+    const { conflicts, synergies } = CORE.draftCombination(game);
+    wrap.innerHTML = '';
+    for (const s of synergies) {
+      const div = document.createElement('div');
+      div.className = 'combo-note synergy';
+      div.innerHTML = `<span>\u{1F517}</span><span><b>${T.TRAITS_BY_ID[s.a].name} + ${T.TRAITS_BY_ID[s.b].name}</b> reinforce each other — both traits' benefits are boosted ${Math.round(T.SYNERGY_BONUS * 100)}%.</span>`;
+      wrap.appendChild(div);
+    }
+    for (const c of conflicts) {
+      const div = document.createElement('div');
+      div.className = 'combo-note conflict';
+      div.innerHTML = `<span>\u{2298}</span><span><b>${T.TRAITS_BY_ID[c.a].name}</b> cannot coexist with <b>${T.TRAITS_BY_ID[c.b].name}</b>.</span>`;
+      wrap.appendChild(div);
+    }
+  }
+
+  /* Saved strains: tap to load one back into the draft, tap the x to drop it. */
+  function renderDesignerDesigns(game) {
+    const wrap = el('designer-designs');
+    wrap.innerHTML = '';
+    for (const design of game.designs) {
+      const chip = document.createElement('button');
+      chip.className = 'strain-chip';
+      chip.innerHTML = `${design.name}<span class="del">×</span>`;
+      chip.addEventListener('click', evt => {
+        if (evt.target.classList.contains('del')) {
+          CORE.deleteDesign(game, design.id);
+        } else {
+          CORE.loadDesign(game, design.id);
+        }
+        renderDesigner(game);
+      });
+      wrap.appendChild(chip);
+    }
+  }
+
+  /* One entry point so every designer control redraws consistently — the
+   * slots gate on each other (conflicts), so a partial refresh would leave
+   * stale options enabled. */
+  function renderDesigner(game) {
+    renderDesignerSlots(game);
+    renderDesignerCombo(game);
+    renderDesignerStats(game);
+    renderDesignerCost(game);
+    renderDesignerDesigns(game);
   }
 
   function startPreviewLoop(game) {
@@ -2604,8 +3078,11 @@ body{
         ownerId: o.ownerId, speciesId: o.speciesId, designId: o.designId, name: o.name,
         generation: o.generation, age: o.age, x: o.x, y: o.y, heading: o.heading,
         traits: o.traits, diet: o.diet, color: o.color,
-        health: o.health, energy: o.energy, hunger: o.hunger,
-        state: o.state, directive: o.directive, carrying: o.carrying, reproCooldown: o.reproCooldown
+        health: o.health, energy: o.energy, hunger: o.hunger, thirst: o.thirst,
+        state: o.state, directive: o.directive, carrying: o.carrying, reproCooldown: o.reproCooldown,
+        // Burrow state is deliberately not saved: reloading into "underground
+        // and untargetable" would be an invisible, unexplainable condition.
+        // Everything reloads above ground.
       }))
     };
   }
@@ -2667,7 +3144,10 @@ body{
         traits: od.traits, diet: od.diet, color: od.color, directive: od.directive
       });
       org.age = od.age; org.health = od.health; org.energy = od.energy; org.hunger = od.hunger;
+      org.thirst = od.thirst || 0;
       org.state = od.state; org.carrying = od.carrying || 0; org.reproCooldown = od.reproCooldown || 0;
+      // A state saved mid-burrow (or from an older save) resumes above ground.
+      if (org.state === 'SEEK_WATER' && !od.thirst) org.state = 'EXPLORE';
       CM.coremind.addOrganism(game, org);
     }
     return game;

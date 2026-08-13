@@ -23,9 +23,10 @@
     ['health', 'Health'], ['energyMax', 'Energy'], ['speed', 'Speed'], ['size', 'Size'],
     ['vision', 'Vision'], ['sense_radius', 'Sense'], ['attack', 'Attack'], ['defense', 'Defense'],
     ['armor', 'Armor'], ['venom', 'Venom'], ['camouflage', 'Camo'], ['digging', 'Dig'],
-    ['temperature_tolerance', 'Temp.Tol'], ['reproduction_rate', 'Repro'], ['metabolism', 'Metab.']
+    ['temperature_tolerance', 'Temp.Tol'], ['water_requirement', 'Water'],
+    ['reproduction_rate', 'Repro'], ['metabolism', 'Metab.']
   ];
-  const STAT_MAXES = { health: 140, energyMax: 100, speed: 60, size: 40, vision: 70, sense_radius: 45, attack: 70, defense: 70, armor: 45, venom: 45, camouflage: 45, digging: 55, temperature_tolerance: 55, reproduction_rate: 1.2, metabolism: 40 };
+  const STAT_MAXES = { health: 140, energyMax: 100, speed: 60, size: 40, vision: 70, sense_radius: 45, attack: 70, defense: 70, armor: 45, venom: 45, camouflage: 45, digging: 55, temperature_tolerance: 55, water_requirement: 1.2, reproduction_rate: 1.2, metabolism: 40 };
 
   function el(id) { return document.getElementById(id); }
   function fmt1(n) { return (Math.round(n * 10) / 10).toString(); }
@@ -113,9 +114,18 @@
     panel.classList.remove('hidden');
     const hf = Math.round(100 * org.health / org.stats.health);
     const ef = Math.round(100 * org.energy / org.stats.energyMax);
+    // Distress flags name the thing that is actually killing this organism,
+    // so a failed design reads as a diagnosis instead of a mystery.
+    const flags = [];
+    if (org.burrowed) flags.push('<span style="color:var(--warn)">BURROWED</span>');
+    if (org.hunger > 80) flags.push('<span style="color:var(--danger)">STARVING</span>');
+    if (org.thirst > 80) flags.push('<span style="color:var(--danger)">DEHYDRATED</span>');
+    const stress = CM.organism.tempStress(org, CM.world.tempAt(game.world, org.x, org.y));
+    if (stress > 1) flags.push('<span style="color:var(--danger)">TEMP STRESS</span>');
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
       <b>${org.name}</b><span style="color:var(--fg-dim);font-size:11px">${org.ownerId === 'player' ? 'Gen ' + org.generation : org.name}</span></div>
-      <div style="font-size:11.5px;color:var(--fg-dim);margin-top:2px">${org.state} &middot; HP ${hf}% &middot; Energy ${ef}%</div>`;
+      <div style="font-size:11.5px;color:var(--fg-dim);margin-top:2px">${org.state} &middot; HP ${hf}% &middot; Energy ${ef}% &middot; Thirst ${Math.round(org.thirst)}%</div>
+      ${flags.length ? `<div style="font-size:10.5px;margin-top:3px;letter-spacing:.05em">${flags.join(' ')}</div>` : ''}`;
     summary.textContent = `${org.name} selected — directives below apply to it only.`;
     renderDirectiveBar(game);
   }
@@ -138,7 +148,26 @@
     while (layer.children.length > 3) layer.removeChild(layer.firstChild);
   }
 
+  /* The research backlog: traits the Coremind has partial evidence for.
+   * Without this the player only ever sees the moment a discovery lands and
+   * has no idea that watching a predator fight is *doing* anything. */
+  function renderResearch(game) {
+    const wrap = el('research-list');
+    const rows = D.researchInProgress(game);
+    if (!rows.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = '<div class="research-head">ANALYSIS IN PROGRESS</div>';
+    for (const r of rows.slice(0, 6)) {
+      const row = document.createElement('div');
+      row.className = 'research-row';
+      row.innerHTML = `<div class="rname">${r.trait.name}</div>
+        <div class="rbar"><i style="width:${Math.round(r.progress * 100)}%"></i></div>
+        <div class="rcount">${r.observations}/${r.needed}</div>`;
+      wrap.appendChild(row);
+    }
+  }
+
   function renderFeed(game) {
+    renderResearch(game);
     const feed = el('event-feed');
     const events = game.discovery.events;
     if (!events.length) { feed.innerHTML = '<div class="event-empty">Nothing observed yet. Send an organism to EXPLORE.</div>'; return; }
@@ -147,7 +176,10 @@
       const row = document.createElement('button');
       row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death' : evt.kind === 'warn' ? ' warn' : '');
       const mins = Math.floor(evt.time / 60), secs = Math.floor(evt.time % 60);
-      row.innerHTML = `<div class="ico">${evt.icon || '•'}</div><div class="body"><div class="msg">${evt.message}</div><div class="time">t+${mins}:${String(secs).padStart(2, '0')}</div></div>`;
+      const obs = evt.observation
+        ? `<div class="obs">Species: <b>${evt.observation.species}</b><br>Damage type: <b>${evt.observation.damageType}</b><br>Observed defense: <b>${evt.observation.defense}</b></div>`
+        : '';
+      row.innerHTML = `<div class="ico">${evt.icon || '•'}</div><div class="body"><div class="msg">${evt.message}</div>${obs}<div class="time">t+${mins}:${String(secs).padStart(2, '0')}</div></div>`;
       row.addEventListener('click', () => onEventClick(game, evt));
       feed.appendChild(row);
     }
@@ -181,7 +213,11 @@
     el('btn-designer-close').addEventListener('click', () => closeDesigner(game));
     el('btn-create-organism').addEventListener('click', () => {
       const org = CORE.createOrganismFromDraft(game, bus);
-      if (org) { renderDesignerCost(game); renderDesignerStats(game); toast({ kind: 'system', icon: '\u{1F9EA}', message: `${org.name} deployed near the Core.` }); }
+      if (org) { renderDesigner(game); toast({ kind: 'system', icon: '\u{1F9EA}', message: `${org.name} deployed near the Core.` }); }
+    });
+    el('btn-save-design').addEventListener('click', () => {
+      const design = CORE.saveDesign(game);
+      if (design) { renderDesignerDesigns(game); toast({ kind: 'system', icon: '\u{1F4BE}', message: `Saved ${design.name}.` }); }
     });
   }
 
@@ -189,9 +225,7 @@
     el('designer-overlay').classList.remove('hidden');
     game.ui.dnaBadgeSeen = Object.keys(game.discovery.discoveredTraits).length;
     updateBadges(game);
-    renderDesignerSlots(game);
-    renderDesignerStats(game);
-    renderDesignerCost(game);
+    renderDesigner(game);
     startPreviewLoop(game);
   }
   function closeDesigner(game) {
@@ -209,18 +243,23 @@
       const currentTrait = current && T.TRAITS_BY_ID[current];
       const select = document.createElement('select');
       const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'None'; select.appendChild(noneOpt);
+      const otherSlots = T.CATEGORIES.filter(c => c !== cat).map(c => game.designerDraft[c]);
       for (const t of T.TRAITS_BY_CATEGORY[cat]) {
         const opt = document.createElement('option');
         opt.value = t.id;
         const known = !!game.discovery.discoveredTraits[t.id];
-        opt.textContent = known ? t.name : '\u{1F512} ' + t.name;
-        opt.disabled = !known;
+        const blockedBy = known ? T.conflictsWith(otherSlots, t.id) : null;
+        if (!known) opt.textContent = '\u{1F512} ' + t.name;               // not discovered yet
+        else if (blockedBy) opt.textContent = '\u{2298} ' + t.name;        // biologically incompatible
+        else opt.textContent = t.name;
+        opt.disabled = !known || !!blockedBy;
+        if (blockedBy) opt.title = `Incompatible with ${T.TRAITS_BY_ID[blockedBy].name}`;
         if (t.id === current) opt.selected = true;
         select.appendChild(opt);
       }
       select.addEventListener('change', () => {
         CORE.setDesignSlot(game, cat, select.value || null);
-        renderDesignerStats(game); renderDesignerCost(game); renderDesignerSlots(game);
+        renderDesigner(game);
       });
       slot.innerHTML = `<div class="cat">${cat}</div>`;
       const nameDiv = document.createElement('div');
@@ -244,7 +283,11 @@
       const row = document.createElement('div'); row.className = 'statrow';
       const pct = K.clamp01(val / max) * 100;
       const deltaTxt = Math.abs(delta) < 0.01 ? '' : (delta > 0 ? '+' + fmt1(delta) : fmt1(delta));
-      const deltaCls = delta > 0.01 ? 'pos' : delta < -0.01 ? 'neg' : '';
+      // Colour by whether the change is *good*, not by its sign: a higher
+      // metabolism or water requirement is a cost, and showing it in the
+      // same green as a higher attack would invert the tradeoff the
+      // designer exists to communicate.
+      const deltaCls = Math.abs(delta) < 0.01 ? '' : (T.isBenefit(key, delta) ? 'pos' : 'neg');
       row.innerHTML = `<div class="label">${label}</div><div class="bar"><i style="width:${pct}%"></i></div><div class="val">${fmt1(val)}</div><div class="delta ${deltaCls}">${deltaTxt}</div>`;
       wrap.appendChild(row);
     }
@@ -255,6 +298,58 @@
     const afford = CORE.canAfford(game, cost);
     el('designer-cost').innerHTML = `Cost: <span class="${game.core.biomass >= cost.biomass ? 'ok' : 'bad'}">${cost.biomass} biomass</span> &middot; <span class="${game.core.energy >= cost.energy ? 'ok' : 'bad'}">${cost.energy} energy</span>`;
     el('btn-create-organism').disabled = !afford;
+    el('btn-save-design').disabled = CORE.draftTraitIds(game).length === 0;
+  }
+
+  /* Why these traits are worth putting together — or why they can't be. The
+   * designer's whole job is making a tradeoff legible before it is paid for. */
+  function renderDesignerCombo(game) {
+    const wrap = el('designer-combo');
+    const { conflicts, synergies } = CORE.draftCombination(game);
+    wrap.innerHTML = '';
+    for (const s of synergies) {
+      const div = document.createElement('div');
+      div.className = 'combo-note synergy';
+      div.innerHTML = `<span>\u{1F517}</span><span><b>${T.TRAITS_BY_ID[s.a].name} + ${T.TRAITS_BY_ID[s.b].name}</b> reinforce each other — both traits' benefits are boosted ${Math.round(T.SYNERGY_BONUS * 100)}%.</span>`;
+      wrap.appendChild(div);
+    }
+    for (const c of conflicts) {
+      const div = document.createElement('div');
+      div.className = 'combo-note conflict';
+      div.innerHTML = `<span>\u{2298}</span><span><b>${T.TRAITS_BY_ID[c.a].name}</b> cannot coexist with <b>${T.TRAITS_BY_ID[c.b].name}</b>.</span>`;
+      wrap.appendChild(div);
+    }
+  }
+
+  /* Saved strains: tap to load one back into the draft, tap the x to drop it. */
+  function renderDesignerDesigns(game) {
+    const wrap = el('designer-designs');
+    wrap.innerHTML = '';
+    for (const design of game.designs) {
+      const chip = document.createElement('button');
+      chip.className = 'strain-chip';
+      chip.innerHTML = `${design.name}<span class="del">×</span>`;
+      chip.addEventListener('click', evt => {
+        if (evt.target.classList.contains('del')) {
+          CORE.deleteDesign(game, design.id);
+        } else {
+          CORE.loadDesign(game, design.id);
+        }
+        renderDesigner(game);
+      });
+      wrap.appendChild(chip);
+    }
+  }
+
+  /* One entry point so every designer control redraws consistently — the
+   * slots gate on each other (conflicts), so a partial refresh would leave
+   * stale options enabled. */
+  function renderDesigner(game) {
+    renderDesignerSlots(game);
+    renderDesignerCombo(game);
+    renderDesignerStats(game);
+    renderDesignerCost(game);
+    renderDesignerDesigns(game);
   }
 
   function startPreviewLoop(game) {

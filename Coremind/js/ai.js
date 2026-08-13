@@ -31,6 +31,7 @@
    *   canEatPlants, canHunt: bool
    *   nearestThreat:  {dist, entity}
    *   nearestFood:    {dist, x, y}
+   *   nearestWater:   {x, y}
    *   nearestPrey:    {dist, entity}
    *   nearestCuriosity: {dist, x, y, kind, ref}   // unknown species sighting or sample
    *   mateAvailable:  bool
@@ -41,11 +42,12 @@
     if (org.health <= 0) return { state: S.IDLE, target: null };
 
     const hungerFrac = CM.core.clamp01(org.hunger / 100);
+    const thirstFrac = CM.core.clamp01(org.thirst / 100);
     const energyFrac = CM.core.clamp01(org.energy / org.stats.energyMax);
     const healthFrac = CM.core.clamp01(org.health / org.stats.health);
-    const critical = hungerFrac > 0.92 || healthFrac < 0.22;
+    const critical = hungerFrac > 0.92 || thirstFrac > 0.92 || healthFrac < 0.22;
 
-    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0 };
+    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, SEEK_WATER: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0 };
 
     if (ctx.nearestThreat) {
       const closeness = 1 - CM.core.clamp01(ctx.nearestThreat.dist / Math.max(1, org.stats.sense_radius));
@@ -55,6 +57,10 @@
     if (ctx.canEatPlants) {
       u.SEEK_FOOD = hungerFrac * hungerFrac * (ctx.nearestFood ? 1 : 0.45);
     }
+    // Thirst curves the same way hunger does, so an organism engineered with a
+    // high water_requirement genuinely spends more of its life walking to water
+    // instead of doing what the player asked of it.
+    u.SEEK_WATER = thirstFrac * thirstFrac * (ctx.nearestWater ? 1.05 : 0.4);
     if (ctx.canHunt && ctx.nearestPrey) {
       u.HUNT = (0.35 + hungerFrac * 0.75);
     }
@@ -92,6 +98,7 @@
     if (critical) {
       if (healthFrac < 0.22 && ctx.nearestThreat) u.FLEE *= 2.2;
       if (hungerFrac > 0.92) u.SEEK_FOOD = Math.max(u.SEEK_FOOD, 1.5);
+      if (thirstFrac > 0.92) u.SEEK_WATER = Math.max(u.SEEK_WATER, 1.55);
     }
 
     // Hysteresis: mildly prefer whatever we're already doing so utilities
@@ -116,6 +123,9 @@
         return { state: S.FLEE, target: { type: 'flee_from', x: ctx.nearestThreat.entity.x, y: ctx.nearestThreat.entity.y } };
       case S.SEEK_FOOD:
         if (ctx.nearestFood) return { state: S.SEEK_FOOD, target: { type: 'food_cell', x: ctx.nearestFood.x, y: ctx.nearestFood.y } };
+        return { state: S.EXPLORE, target: null };
+      case S.SEEK_WATER:
+        if (ctx.nearestWater) return { state: S.SEEK_WATER, target: { type: 'water_cell', x: ctx.nearestWater.x, y: ctx.nearestWater.y } };
         return { state: S.EXPLORE, target: null };
       case S.HUNT:
         if (org.directive === 'DEFEND' && ctx.nearestThreat) {

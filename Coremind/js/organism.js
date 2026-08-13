@@ -7,10 +7,14 @@
   const K = CM.core;
   const T = CM.traits;
 
+  /* SEEK_WATER is the one state beyond the brief's list. The brief calls that
+   * list "possible states", and water_requirement is a required stat — without
+   * somewhere for a thirsty organism to go, that stat could only ever be a
+   * hidden death sentence rather than a design decision the player can answer. */
   const AI_STATE = {
-    IDLE: 'IDLE', EXPLORE: 'EXPLORE', SEEK_FOOD: 'SEEK_FOOD', FLEE: 'FLEE',
-    HUNT: 'HUNT', ATTACK: 'ATTACK', REST: 'REST', RETURN_TO_CORE: 'RETURN_TO_CORE',
-    REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE'
+    IDLE: 'IDLE', EXPLORE: 'EXPLORE', SEEK_FOOD: 'SEEK_FOOD', SEEK_WATER: 'SEEK_WATER',
+    FLEE: 'FLEE', HUNT: 'HUNT', ATTACK: 'ATTACK', REST: 'REST',
+    RETURN_TO_CORE: 'RETURN_TO_CORE', REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE'
   };
 
   const DIRECTIVES = ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND', 'REPRODUCE', 'INVESTIGATE', 'RETURN'];
@@ -22,7 +26,7 @@
       id: null, ownerId: null, speciesId: null, designId: null, name: '',
       generation: 1, age: 0, x: 0, y: 0, heading: 0,
       stats: null, traits: null, behaviors: null, diet: 'herbivore',
-      health: 1, energy: 1, hunger: 0,
+      health: 1, energy: 1, hunger: 0, thirst: 0, burrowed: false, burrowTimer: 0,
       state: AI_STATE.IDLE, stateTimer: 0, directive: null,
       target: null, carrying: 0, alive: true, lod: 'near', selected: false,
       visualSeed: 0, lastEventAt: 0, __gx: 0, __gy: 0
@@ -58,6 +62,10 @@
     org.health = stats.health;
     org.energy = stats.energyMax;
     org.hunger = 0;
+    org.thirst = 0;
+    org.burrowed = false;
+    org.burrowTimer = 0;
+    org.burrowCooldown = 0;
     org.state = AI_STATE.IDLE;
     org.stateTimer = 0;
     org.directive = opts.directive || null;

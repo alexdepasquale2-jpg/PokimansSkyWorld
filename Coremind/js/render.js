@@ -114,6 +114,21 @@
     const mods = new Set(org.traits.map(id => (T.TRAITS_BY_ID[id] || {}).visual_modifier).filter(Boolean));
     const stretch = mods.has('streamlined') ? 1.5 : mods.has('lean') ? 1.25 : 1;
 
+    // A burrowed organism is drawn as the mound it left behind — it has to be
+    // visibly *gone* rather than merely faded, because "the predator can no
+    // longer see it" is the entire mechanic.
+    if (org.burrowed) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(74,56,38,.85)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, size * 1.15, size * 0.6, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20,14,8,.5)'; ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(org.heading);

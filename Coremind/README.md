@@ -56,17 +56,40 @@ The full core loop from the brief, playable end to end:
   speed, size, vision, sense_radius, attack, defense, temperature_tolerance,
   water_requirement, reproduction_rate, metabolism, camouflage, venom,
   armor, digging) is base stats + summed trait deltas, nothing hard-coded
-  per species — `js/organism.js`, `js/traits.js`.
+  per species — `js/organism.js`, `js/traits.js`. **Every one of those stats
+  drives something**: `water_requirement` sets how fast thirst climbs (and
+  thirst kills), `digging` sets how long a burrowing organism can stay
+  underground.
 - **17 traits** across the 6 designer categories (Body/Sense/Metabolism/
   Defense/Offense/Reproduction), each with real stat tradeoffs, an energy/
   biomass cost, and a visual modifier the procedural renderer actually
   draws (shell, venom glands, streamlined body, digging limbs, eyes,
   antennae, camouflage mottling, brood sac, …).
+- **Traits interact**, which is where the design game lives:
+  - **Declared incompatibilities are enforced.** Armor and Fast Movement
+    can't coexist; the designer disables the option, marks it `⊘`, and says
+    what it conflicts with.
+  - **Declared compatibilities pay off.** A satisfied pairing (Armor +
+    Claws, Burrowing + Camouflage, Chemical Sensing + Venom, …) boosts both
+    traits' *benefits* by 15% and never deepens their costs. The designer
+    names the pairing when it goes live. Wild species get this too — that's
+    why Shellfang (armor + claws) is genuinely tough rather than just the
+    sum of two parts.
+  - **Counters exist.** Camouflage hides an organism probabilistically, and
+    Chemical Sensing defeats it outright — so camouflage is a choice rather
+    than a strictly-correct default. Vibration Sensing extends threat
+    detection 50% further than ordinary senses. Acid halves the target's
+    effective armor.
+  - **Burrowing is an escape, not a stat line.** A cornered digger drops
+    underground: untargetable, immobile, recovering, and drawn as the mound
+    it left behind. That's what makes its speed penalty affordable.
 - **Utility AI**: all 10 states from the brief (IDLE, EXPLORE, SEEK_FOOD,
-  FLEE, HUNT, ATTACK, REST, RETURN_TO_CORE, REPRODUCE, INVESTIGATE), scored
-  from needs + senses + the player's directive, with a hard floor so
-  critical hunger/health can't be argued away by a stale directive —
-  `js/ai.js`.
+  FLEE, HUNT, ATTACK, REST, RETURN_TO_CORE, REPRODUCE, INVESTIGATE) plus
+  SEEK_WATER, scored from needs + senses + the player's directive, with a
+  hard floor so critical hunger/thirst/health can't be argued away by a
+  stale directive — `js/ai.js`. Thirsty organisms with no water in range
+  walk up the terrain's humidity gradient, so a drought produces migration
+  rather than a silent die-off.
 - **Food web**: plants → herbivores → predators, all through the same
   organism/AI system. Overhunting measurably drops herbivore population,
   which drops predator food, which drops predator population — watch it
@@ -76,9 +99,23 @@ The full core loop from the brief, playable end to end:
   killing one leaves a biological sample you walk up to (or tap) and
   extract for a much bigger dose of evidence. Traits become available in
   the designer only once you've actually earned them — `js/discovery.js`.
+  Two things make this read as investigation rather than a hidden counter:
+  - **Observation reports.** A death produces the brief's report verbatim —
+    species (or "Unidentified"), damage type, observed defense — derived
+    from the *individual* that did the killing, so a mutated wild organism
+    is described as what it actually is, not as its species archetype.
+  - **A visible research backlog.** The ANALYZE tab lists every partially
+    observed trait with its progress (`Basic Legs ▓▓▓░ 3/4`), so watching a
+    predator fight is visibly *doing* something long before the discovery
+    lands.
 - **Genome designer**: 6 trait slots, live procedural preview, a stat panel
-  with explicit +/- deltas against the baseline, cost gating, one button —
-  CREATE ORGANISM — `js/ui.js` (designer section) + `js/coremind.js`.
+  with explicit +/- deltas against the baseline (coloured by whether the
+  change is *good*, so a metabolism increase reads as the cost it is), a
+  conflict/synergy readout, cost gating, and one button — CREATE ORGANISM —
+  `js/ui.js` (designer section) + `js/coremind.js`.
+- **Saved strains**: a proven genome can be saved and reloaded with one tap,
+  so iterating is "deploy that one again, with one change" rather than
+  rebuilding it slot by slot from memory.
 - **Event feed**: clickable, focuses the camera on the relevant location
   and opens the relevant detail (organism / species / trait).
 - **Touch controls**: one-finger drag pan, two-finger pinch zoom, tap to
@@ -138,5 +175,27 @@ birth in near-perfect sync a few seconds in; and — the sharpest one — a
 death check that used "alive AND health > 0" to mean "already handled",
 which also matched "just died of starvation and hasn't been handled yet",
 producing organisms that were dead in every practical sense but never
-removed, silently corrupting the population counts. All are fixed and
-covered by the test run above.
+removed, silently corrupting the population counts.
+
+The second pass (traits interacting, thirst, burrowing) caught three more:
+
+- **Armor was −13 speed against a base of 13**, so every armored build hit
+  the speed floor. Shellfang, an armored predator, could not chase anything
+  — the ecosystem looked balanced only because one of its predators was
+  effectively furniture.
+- **Kills were misattributed.** An organism that starved mid-swing was
+  recorded as killed by whatever it was biting, producing reports like
+  "Grazer killed Scout" — a herbivore that deals no damage. Those reports
+  are the evidence the player designs from, so a false one is worse than
+  none. Now a death is credited to the target only if the target actually
+  fought back, and a needs death resolves before the organism can act at
+  all. Verified across 5 seeds: 107 death events, 0 misattributed.
+- **Thirst had no strategy behind it.** Large inland regions of these maps
+  hold no open water, so thirsty organisms there simply died. They now
+  follow the humidity gradient and range further as they get more desperate.
+
+Two of those were found only because a test asserted the *causal* claim
+rather than the symptom — the burrow test checks that the same organism is
+detected when exposed and not when burrowed, which is what caught that an
+earlier version of the check was passing for the wrong reason (the two test
+organisms were simply out of each other's range).

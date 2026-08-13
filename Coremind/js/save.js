@@ -34,8 +34,11 @@
         ownerId: o.ownerId, speciesId: o.speciesId, designId: o.designId, name: o.name,
         generation: o.generation, age: o.age, x: o.x, y: o.y, heading: o.heading,
         traits: o.traits, diet: o.diet, color: o.color,
-        health: o.health, energy: o.energy, hunger: o.hunger,
-        state: o.state, directive: o.directive, carrying: o.carrying, reproCooldown: o.reproCooldown
+        health: o.health, energy: o.energy, hunger: o.hunger, thirst: o.thirst,
+        state: o.state, directive: o.directive, carrying: o.carrying, reproCooldown: o.reproCooldown,
+        // Burrow state is deliberately not saved: reloading into "underground
+        // and untargetable" would be an invisible, unexplainable condition.
+        // Everything reloads above ground.
       }))
     };
   }
@@ -97,7 +100,10 @@
         traits: od.traits, diet: od.diet, color: od.color, directive: od.directive
       });
       org.age = od.age; org.health = od.health; org.energy = od.energy; org.hunger = od.hunger;
+      org.thirst = od.thirst || 0;
       org.state = od.state; org.carrying = od.carrying || 0; org.reproCooldown = od.reproCooldown || 0;
+      // A state saved mid-burrow (or from an older save) resumes above ground.
+      if (org.state === 'SEEK_WATER' && !od.thirst) org.state = 'EXPLORE';
       CM.coremind.addOrganism(game, org);
     }
     return game;

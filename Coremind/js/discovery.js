@@ -65,6 +65,22 @@
     }
   }
 
+  /* What the Coremind can say about an organism from watching it fight —
+   * the raw material of the OBSERVATION report below. Both read the
+   * organism's real traits, so the report can never describe a creature
+   * that isn't the one that was actually there. */
+  const DAMAGE_TYPES = { venom: 'Neurotoxic', acid: 'Corrosive', claws: 'Physical (lacerating)', bite: 'Physical (crushing)' };
+  const DEFENSE_NOTES = { armor: 'Heavy external shell', camouflage: 'Adaptive colouration', regeneration: 'Rapid tissue repair', burrowing: 'Subterranean evasion' };
+
+  function observedDamageType(org) {
+    for (const id of org.traits) if (DAMAGE_TYPES[id]) return DAMAGE_TYPES[id];
+    return 'Physical (blunt)';
+  }
+  function observedDefense(org) {
+    for (const id of org.traits) if (DEFENSE_NOTES[id]) return DEFENSE_NOTES[id];
+    return 'None apparent';
+  }
+
   /* outcome: 'player_killed' | 'wild_killed' | 'player_fled' | 'wild_fled' */
   function recordEncounter(game, bus, playerOrg, wildOrg, outcome, x, y) {
     recordSighting(game, bus, wildOrg.speciesId, x, y);
@@ -77,10 +93,19 @@
       if (relevant) creditTrait(game, bus, traitId, ENCOUNTER_CREDIT);
     }
     if (outcome === 'player_killed') {
+      const identified = !!game.discovery.knownSpecies[wildOrg.speciesId];
       pushEvent(game, bus, {
         kind: 'death', icon: '☠',
-        message: `${wildOrg.name} killed ${playerOrg.name}.`,
-        x, y, orgId: playerOrg.id
+        message: `${identified ? wildOrg.name : 'An unknown predator'} killed ${playerOrg.name}.`,
+        // The report the player opens to work out what to build next. It is
+        // the same data the trait ledger is accumulating, shown in plain
+        // language at the moment it was earned.
+        observation: {
+          damageType: observedDamageType(wildOrg),
+          defense: observedDefense(wildOrg),
+          species: identified ? wildOrg.name : 'Unidentified'
+        },
+        x, y, orgId: playerOrg.id, speciesId: wildOrg.speciesId
       });
     }
   }
@@ -123,8 +148,29 @@
     return Math.min(1, (game.discovery.observations[traitId] || 0) / OBSERVATION_THRESHOLD);
   }
 
+  /* Every trait the Coremind has partial evidence for but hasn't identified
+   * yet — the research backlog the ANALYZE tab renders, so progress toward a
+   * discovery is visible while it accumulates instead of only at the moment
+   * it completes. */
+  function researchInProgress(game) {
+    const out = [];
+    for (const traitId in game.discovery.observations) {
+      if (game.discovery.discoveredTraits[traitId]) continue;
+      const trait = CM.traits.TRAITS_BY_ID[traitId];
+      if (!trait) continue;
+      out.push({
+        traitId, trait,
+        observations: game.discovery.observations[traitId],
+        needed: OBSERVATION_THRESHOLD,
+        progress: observationProgress(game, traitId)
+      });
+    }
+    return out.sort((a, b) => b.progress - a.progress);
+  }
+
   CM.discovery = {
     OBSERVATION_THRESHOLD, newDiscoveryState, pushEvent, recordSighting,
-    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress
+    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress,
+    researchInProgress, observedDamageType, observedDefense
   };
 })(window.CM = window.CM || {});

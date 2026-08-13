@@ -112,6 +112,11 @@
     const xi = K.clamp(Math.floor(x), 0, SIZE - 1), yi = K.clamp(Math.floor(y), 0, SIZE - 1);
     return world.temp[idx(xi, yi)];
   }
+  function moistureAt(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return 0;
+    return world.moisture[idx(xi, yi)];
+  }
   function foodAt(world, x, y) {
     const xi = Math.floor(x), yi = Math.floor(y);
     if (!inBounds(xi, yi)) return 0;
@@ -160,6 +165,40 @@
       }
     }
     return best;
+  }
+
+  /* Nearest drinkable cell. Organisms drink from the shore rather than
+   * swimming, so this returns the water cell itself and the caller treats
+   * "adjacent" as close enough (see DRINK_DIST in simulation.js). */
+  function findNearestWater(world, x, y, radius) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    let best = null, bestD = Infinity;
+    const r = Math.ceil(radius);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = xi + dx, ny = yi + dy;
+        if (!inBounds(nx, ny)) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > radius * radius || d2 >= bestD) continue;
+        if (world.biome[idx(nx, ny)] === BIOME.WATER) {
+          bestD = d2; best = { x: nx + 0.5, y: ny + 0.5 };
+        }
+      }
+    }
+    return best;
+  }
+
+  /* Is this position at or beside open water — i.e. can something standing
+   * here drink without entering the lake? */
+  function atWaterEdge(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = xi + dx, ny = yi + dy;
+        if (inBounds(nx, ny) && world.biome[idx(nx, ny)] === BIOME.WATER) return true;
+      }
+    }
+    return false;
   }
 
   // --- uniform spatial grid for organisms / samples -------------------------
@@ -225,7 +264,7 @@
 
   CM.world = {
     SIZE, BIOME, BIOME_NAMES, idx, inBounds,
-    generate, biomeAt, tempAt, foodAt, consumeFood, tickFood, findNearestFood,
-    makeSpatialGrid
+    generate, biomeAt, tempAt, moistureAt, foodAt, consumeFood, tickFood, findNearestFood,
+    findNearestWater, atWaterEdge, makeSpatialGrid
   };
 })(window.CM = window.CM || {});
