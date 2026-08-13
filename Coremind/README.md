@@ -1,0 +1,142 @@
+# Coremind
+
+A mobile-first, single-player biological evolution sandbox. You are
+**Coremind**, a distributed biological intelligence: you don't control
+individual creatures directly, you **discover → analyze → extract → design →
+deploy → adapt**, engineering organisms to survive an ecosystem that reacts
+on its own.
+
+**Stack:** vanilla JS + Canvas2D, no build step, no dependencies, no backend.
+Runs offline from `index.html`.
+
+---
+
+## Why not Godot
+
+The brief's default is Godot 4.x. This container has no Godot binary and no
+network path to install one (the outbound proxy blocks
+`godotengine.org`/GitHub release downloads), so a Godot project here could be
+written but never *run* — and this project's own build order explicitly
+requires running and testing after every phase, not assuming the code works.
+
+This repo already has a working precedent for exactly this constraint:
+`PrimalIsle` and `SkyWorld` are mobile-first Canvas2D games with zero build
+dependencies, developed and tested the same way this one was — loaded in the
+sandbox's pre-installed Chromium via Playwright, driven with real touch
+gestures, screenshotted, and iterated on. Coremind follows the same pattern
+so every system in the build order below was actually exercised end-to-end,
+not just written and hoped for. `index.html` is also a legitimate mobile
+target on its own (installable as a PWA / wrapped in a WebView via
+Capacitor/Cordova for a real Android package) — `tools/build.mjs` produces
+the single self-contained HTML file that kind of wrapping needs.
+
+## Running it
+
+```
+python3 -m http.server 8000    # from this directory
+# open http://localhost:8000/index.html on a phone or in a browser
+```
+
+Or open `index.html` directly — it has no external dependencies.
+
+```
+node tools/simtest.js          # headless test of world/AI/sim/discovery, no DOM
+node tools/build.mjs           # -> dist/coremind.html, one self-contained file
+```
+
+## What's implemented
+
+The full core loop from the brief, playable end to end:
+
+- **World**: a seeded, deterministic 256×256 cell ecosystem (grass / water /
+  soil / rock, temperature and moisture fields, plant biomass that regrows
+  and gets grazed down) — `js/world.js`.
+- **Organisms**: one reusable data-driven system for every creature, player-
+  designed or wild — every stat the brief lists (health, energy, hunger,
+  speed, size, vision, sense_radius, attack, defense, temperature_tolerance,
+  water_requirement, reproduction_rate, metabolism, camouflage, venom,
+  armor, digging) is base stats + summed trait deltas, nothing hard-coded
+  per species — `js/organism.js`, `js/traits.js`.
+- **17 traits** across the 6 designer categories (Body/Sense/Metabolism/
+  Defense/Offense/Reproduction), each with real stat tradeoffs, an energy/
+  biomass cost, and a visual modifier the procedural renderer actually
+  draws (shell, venom glands, streamlined body, digging limbs, eyes,
+  antennae, camouflage mottling, brood sac, …).
+- **Utility AI**: all 10 states from the brief (IDLE, EXPLORE, SEEK_FOOD,
+  FLEE, HUNT, ATTACK, REST, RETURN_TO_CORE, REPRODUCE, INVESTIGATE), scored
+  from needs + senses + the player's directive, with a hard floor so
+  critical hunger/health can't be argued away by a stale directive —
+  `js/ai.js`.
+- **Food web**: plants → herbivores → predators, all through the same
+  organism/AI system. Overhunting measurably drops herbivore population,
+  which drops predator food, which drops predator population — watch it
+  happen in `js/simulation.js`, narrated by `narrateEcosystem()`.
+- **Discover → Analyze → Extract**: every encounter between your organisms
+  and a wild one is partial evidence toward that wild organism's traits;
+  killing one leaves a biological sample you walk up to (or tap) and
+  extract for a much bigger dose of evidence. Traits become available in
+  the designer only once you've actually earned them — `js/discovery.js`.
+- **Genome designer**: 6 trait slots, live procedural preview, a stat panel
+  with explicit +/- deltas against the baseline, cost gating, one button —
+  CREATE ORGANISM — `js/ui.js` (designer section) + `js/coremind.js`.
+- **Event feed**: clickable, focuses the camera on the relevant location
+  and opens the relevant detail (organism / species / trait).
+- **Touch controls**: one-finger drag pan, two-finger pinch zoom, tap to
+  select/inspect, mouse wheel for desktop dev — `js/input.js`.
+- **Performance**: object pooling for organisms, a uniform spatial grid for
+  neighbor queries, simulation LOD (near organisms re-decide every tick,
+  mid every 4th, far every 12th — spatial queries only happen at decision
+  time, not every frame), the whole 256×256 terrain baked into one offscreen
+  canvas and blitted with a single `drawImage` regardless of zoom, and a
+  soft population ceiling per ecosystem tier so the world plateaus instead
+  of one species filling the entire active-organism cap.
+- **Save/load**: autosaves on discoveries/deaths/creation (throttled) plus
+  every 20s and on tab-hide/page-hide; `Continue` on the boot screen
+  restores seed, discovered species/traits (with partial observation
+  progress), samples, designs, every living organism, and Core resources.
+
+### What's deliberately out of scope for this pass
+
+- **Android packaging** (APK/AAB via Gradle): no Android SDK in this
+  container to build or verify one. `tools/build.mjs` produces the single
+  bundled HTML file a Capacitor/Cordova/TWA wrapper would need next.
+- **Render-tick interpolation**: the simulation runs a fixed 10 Hz tick
+  decoupled from the render loop (which runs every frame); organism motion
+  is not interpolated between ticks, so it reads as slightly stepped rather
+  than perfectly smooth at high zoom. Rendering itself runs every
+  `requestAnimationFrame`.
+- Sound/particle effects (brief's Phase 7 polish) — not started.
+
+## Debugging
+
+`window.__CM_GAME__` is the live game state object once a world is running
+— never read by game logic itself, it's there so you (or a test script) can
+inspect `.organisms`, `.discovery`, `.core`, etc. from the console.
+
+## Testing notes
+
+Every system above was driven through actual gameplay during development,
+not just unit-tested in isolation:
+
+- `tools/simtest.js` boots a real game, runs 4000 fixed-step ticks (400
+  sim-seconds) with a full starter colony + wildlife, and asserts no NaNs,
+  a bounded population, real resource/event/discovery activity, and that
+  combat (`ATTACK` state) actually occurs.
+- The full boot → new world → pan/zoom → issue directive → fast-forward →
+  discover → open designer → pick a real discovered trait through the
+  actual `<select>` → CREATE ORGANISM → save → reload → continue path was
+  driven in the sandbox's Chromium via Playwright, screenshotted at each
+  step, with zero uncaught page errors.
+
+That process caught several bugs that a design read-through wouldn't have:
+organisms stuck flapping between HUNT and ATTACK and never actually landing
+a hit; a stale action-target shape producing NaN positions on a state
+transition; mutating the organism array while iterating it, silently
+skipping whoever shifted into the current slot; every organism starting at
+zero reproduction cooldown, so almost the entire starting population gave
+birth in near-perfect sync a few seconds in; and — the sharpest one — a
+death check that used "alive AND health > 0" to mean "already handled",
+which also matched "just died of starvation and hasn't been handled yet",
+producing organisms that were dead in every practical sense but never
+removed, silently corrupting the population counts. All are fixed and
+covered by the test run above.

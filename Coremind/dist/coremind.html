@@ -1,0 +1,2794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#060b12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Coremind</title>
+<meta name="description" content="COREMIND — a single-player biological evolution sandbox. Discover, analyze, extract, design, deploy, adapt.">
+<style>
+/* Coremind — mobile-first dark UI. Large touch targets, portrait layout. */
+:root{
+  --bg:#060b12;
+  --panel:#0b141d;
+  --panel2:#0f1c27;
+  --line:#1c2e3a;
+  --fg:#dfeef0;
+  --fg-dim:#8aa3ab;
+  --accent:#33e6b0;
+  --accent-dim:#1c8a6b;
+  --warn:#f2a33c;
+  --danger:#ef5b5b;
+  --biomass:#7ee081;
+  --energy:#ffd166;
+  --pop:#8ec8ff;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+html,body{height:100%;margin:0;overscroll-behavior:none;touch-action:none;}
+body{
+  background:var(--bg);color:var(--fg);
+  font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  overflow:hidden;position:fixed;inset:0;
+}
+#app{position:absolute;inset:0;display:flex;flex-direction:column;padding-top:var(--safe-top);}
+
+/* ---- top bar ---- */
+#topbar{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;
+  background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto;
+  z-index:5;
+}
+#topbar .stat{display:flex;align-items:center;gap:5px;font-weight:600;font-variant-numeric:tabular-nums;padding:4px 8px;border-radius:8px;background:var(--panel2);}
+#topbar .stat i{font-style:normal;font-size:15px;}
+#stat-biomass{color:var(--biomass);}
+#stat-energy{color:var(--energy);}
+#stat-pop{color:var(--pop);}
+#btn-speed{margin-left:auto;}
+
+.iconbtn{
+  background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;
+  min-width:40px;min-height:36px;font-size:16px;line-height:1;cursor:pointer;
+}
+.iconbtn:active{background:var(--line);}
+
+/* ---- stage / world canvas ---- */
+#stage{position:relative;flex:1 1 auto;min-height:0;background:#04080d;overflow:hidden;}
+#world-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+
+#cam-controls{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:8px;z-index:4;}
+.roundbtn{
+  width:46px;height:46px;border-radius:50%;background:rgba(11,20,29,.85);
+  color:var(--fg);border:1px solid var(--line);font-size:20px;backdrop-filter:blur(2px);
+}
+.roundbtn:active{background:var(--accent-dim);}
+
+#toast-layer{position:absolute;top:10px;left:10px;right:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:6;align-items:center;}
+.toast{
+  background:rgba(11,20,29,.92);border:1px solid var(--line);border-left:3px solid var(--accent);
+  padding:8px 12px;border-radius:8px;max-width:340px;font-size:13px;animation:toastin .18s ease-out;
+}
+.toast.warn{border-left-color:var(--warn);}
+.toast.danger{border-left-color:var(--danger);}
+@keyframes toastin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+#selection-panel.card{
+  position:absolute;left:10px;top:10px;right:10px;max-width:360px;z-index:5;
+}
+.card{
+  background:rgba(11,20,29,.94);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+}
+.hidden{display:none !important;}
+
+/* ---- bottom tabs ---- */
+#tabs{display:flex;flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);}
+.tab{
+  flex:1;padding:11px 4px;background:none;border:none;color:var(--fg-dim);font-weight:700;
+  font-size:12.5px;letter-spacing:.04em;position:relative;min-height:44px;
+}
+.tab.active{color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent);}
+.badge{
+  position:absolute;top:4px;right:calc(50% - 26px);background:var(--accent);color:#04140e;
+  border-radius:9px;padding:0 5px;font-size:10px;font-weight:800;
+}
+.badge.warn{background:var(--warn);}
+
+/* ---- bottom panels ---- */
+.panel{display:none;flex:0 0 auto;background:var(--panel);max-height:40vh;overflow-y:auto;padding:8px 10px calc(10px + var(--safe-bottom));}
+.panel.active{display:block;}
+#selection-summary{color:var(--fg-dim);font-size:12.5px;margin-bottom:8px;}
+
+#directive-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.dirbtn{
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--fg);
+  padding:10px 2px;font-size:11.5px;font-weight:700;min-height:52px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;
+}
+.dirbtn i{font-style:normal;font-size:18px;}
+.dirbtn.active{border-color:var(--accent);color:var(--accent);background:rgba(51,230,176,.08);}
+.dirbtn:disabled{opacity:.35;}
+
+/* ---- event feed ---- */
+#event-feed{display:flex;flex-direction:column;gap:6px;}
+.event-row{
+  display:flex;gap:8px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;text-align:left;color:var(--fg);
+}
+.event-row .ico{font-size:16px;flex:0 0 auto;}
+.event-row .body{flex:1;min-width:0;}
+.event-row .msg{font-size:12.5px;}
+.event-row .time{font-size:10.5px;color:var(--fg-dim);}
+.event-row.discovery{border-left:3px solid var(--accent);}
+.event-row.death{border-left:3px solid var(--danger);}
+.event-row.warn{border-left:3px solid var(--warn);}
+.event-empty{color:var(--fg-dim);text-align:center;padding:20px 0;font-size:12.5px;}
+
+/* ---- overlays (designer / inspect / boot) ---- */
+.overlay{
+  position:absolute;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;
+  padding-top:var(--safe-top);
+}
+.overlay-head{display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;}
+.overlay-title{flex:1;text-align:center;font-weight:800;letter-spacing:.06em;font-size:13px;}
+
+/* designer */
+#designer-preview{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;padding:10px;background:var(--panel);border-bottom:1px solid var(--line);}
+#preview-canvas{background:radial-gradient(circle at 50% 40%,#0f2018,#050a08);border-radius:12px;border:1px solid var(--line);}
+#designer-cost{margin-top:6px;font-size:12px;color:var(--fg-dim);}
+#designer-cost .ok{color:var(--biomass);}
+#designer-cost .bad{color:var(--danger);}
+
+#designer-slots{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px;background:var(--panel);border-bottom:1px solid var(--line);}
+.slot{
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;
+}
+.slot .cat{font-size:10px;color:var(--fg-dim);letter-spacing:.06em;}
+.slot .trait{font-size:12.5px;font-weight:700;margin:4px 0;min-height:16px;}
+.slot .trait.empty{color:var(--fg-dim);font-weight:400;}
+.slot select{
+  width:100%;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px;
+  padding:6px 2px;font-size:11.5px;min-height:34px;
+}
+
+#designer-stats{flex:1;overflow-y:auto;padding:10px;}
+.statrow{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;}
+.statrow .label{width:76px;flex:0 0 auto;color:var(--fg-dim);}
+.statrow .bar{flex:1;height:9px;background:var(--panel2);border-radius:5px;overflow:hidden;border:1px solid var(--line);}
+.statrow .bar > i{display:block;height:100%;background:var(--accent);}
+.statrow .val{width:34px;text-align:right;flex:0 0 auto;font-variant-numeric:tabular-nums;}
+.statrow .delta{width:36px;flex:0 0 auto;font-size:10.5px;text-align:left;}
+.statrow .delta.pos{color:var(--biomass);}
+.statrow .delta.neg{color:var(--danger);}
+
+.bigbtn{
+  flex:0 0 auto;margin:10px;padding:14px;border-radius:12px;border:none;background:var(--accent);
+  color:#04140e;font-weight:800;font-size:14px;letter-spacing:.03em;min-height:50px;
+}
+.bigbtn:disabled{opacity:.35;}
+.bigbtn.secondary{background:var(--panel2);color:var(--fg);border:1px solid var(--line);}
+
+/* inspect */
+#inspect-body{flex:1;overflow-y:auto;padding:12px;}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+.kv .k{color:var(--fg-dim);}
+.trait-chip{
+  display:inline-flex;align-items:center;gap:4px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:14px;padding:4px 10px;margin:3px 4px 0 0;font-size:11.5px;
+}
+.extract-btn{width:100%;margin-top:12px;}
+
+/* boot */
+#boot-overlay{align-items:center;justify-content:center;z-index:50;background:radial-gradient(circle at 50% 30%,#0d1f18,#04080d 70%);}
+.boot-card{text-align:center;padding:20px;max-width:360px;}
+.boot-card h1{font-size:34px;letter-spacing:.12em;margin:0 0 4px;color:var(--accent);text-shadow:0 0 24px rgba(51,230,176,.5);}
+.boot-card .tag{color:var(--fg-dim);margin:0 0 26px;}
+.boot-card .hint{color:var(--fg-dim);font-size:11.5px;margin-top:20px;}
+.boot-card .bigbtn{width:100%;margin:8px 0;}
+
+@media (min-width:600px){
+  #selection-panel.card{max-width:320px;}
+  #designer-slots{grid-template-columns:repeat(6,1fr);}
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="stat" id="stat-biomass" title="Biomass"><i>&#127793;</i><span>0</span></div>
+    <div class="stat" id="stat-energy" title="Energy"><i>&#9889;</i><span>0</span></div>
+    <div class="stat" id="stat-pop" title="Population"><i>&#129440;</i><span>0</span></div>
+    <button id="btn-speed" class="iconbtn" title="Simulation speed">1x</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="world-canvas"></canvas>
+
+    <div id="toast-layer"></div>
+
+    <div id="selection-panel" class="card hidden"></div>
+
+    <div id="cam-controls">
+      <button id="btn-focus-core" class="roundbtn" title="Focus Core">&#8962;</button>
+      <button id="btn-zoom-in" class="roundbtn" title="Zoom in">+</button>
+      <button id="btn-zoom-out" class="roundbtn" title="Zoom out">&minus;</button>
+    </div>
+
+    <div id="directive-toast" class="hidden"></div>
+  </div>
+
+  <div id="tabs">
+    <button data-tab="explore" class="tab active">EXPLORE</button>
+    <button data-tab="analyze" class="tab">ANALYZE<span id="badge-analyze" class="badge hidden">0</span></button>
+    <button data-tab="dna" class="tab">DNA<span id="badge-dna" class="badge hidden">!</span></button>
+  </div>
+
+  <div id="panel-explore" class="panel active">
+    <div id="selection-summary">Tap an organism to select it, or issue a directive to your whole colony.</div>
+    <div id="directive-bar"></div>
+  </div>
+
+  <div id="panel-analyze" class="panel">
+    <div id="event-feed"></div>
+  </div>
+
+  <div id="designer-overlay" class="overlay hidden">
+    <div class="overlay-head">
+      <button id="btn-designer-close" class="iconbtn">&#10005;</button>
+      <div class="overlay-title">GENOME DESIGNER</div>
+      <div style="width:40px"></div>
+    </div>
+    <div id="designer-preview">
+      <canvas id="preview-canvas" width="240" height="240"></canvas>
+      <div id="designer-cost"></div>
+    </div>
+    <div id="designer-slots"></div>
+    <div id="designer-stats"></div>
+    <button id="btn-create-organism" class="bigbtn" disabled>CREATE ORGANISM</button>
+  </div>
+
+  <div id="inspect-overlay" class="overlay hidden">
+    <div class="overlay-head">
+      <button id="btn-inspect-close" class="iconbtn">&#10005;</button>
+      <div class="overlay-title" id="inspect-title">DETAILS</div>
+      <div style="width:40px"></div>
+    </div>
+    <div id="inspect-body"></div>
+  </div>
+
+  <div id="boot-overlay" class="overlay">
+    <div class="boot-card">
+      <h1>COREMIND</h1>
+      <p class="tag">a distributed biological intelligence</p>
+      <button id="btn-continue" class="bigbtn hidden">CONTINUE</button>
+      <button id="btn-new-world" class="bigbtn secondary">NEW WORLD</button>
+      <p class="hint">Discover &rarr; Analyze &rarr; Extract &rarr; Design &rarr; Deploy &rarr; Adapt</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* Coremind — shared helpers: RNG, noise, math, formatting, event bus.
+ *
+ * The world is regenerated from a seed (see world.js), so anything here that
+ * touches world generation must be deterministic given the same seed.
+ */
+(function (CM) {
+  'use strict';
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const clamp01 = v => clamp(v, 0, 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const invLerp = (a, b, v) => (b === a ? 0 : clamp01((v - a) / (b - a)));
+  const rndInt = (rng, a, b) => Math.floor(a + rng() * (b - a + 1));
+  const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
+  const chance = (rng, p) => rng() < p;
+  const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; };
+  const dist = (ax, ay, bx, by) => Math.sqrt(dist2(ax, ay, bx, by));
+
+  /* Angle helpers for steering. */
+  function angDelta(a, b) {
+    let d = (b - a) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+  function turnToward(a, b, maxStep) {
+    return a + clamp(angDelta(a, b), -maxStep, maxStep);
+  }
+
+  /* Seeded RNG (mulberry32). Every stream that must be reproducible from the
+   * world seed uses one of these — never Math.random(). */
+  function rngFrom(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function hash2(seed, x, y) {
+    let h = (seed * 374761393 + x * 668265263 + y * 2147483647) >>> 0;
+    h = (h ^ (h >>> 13)) >>> 0;
+    h = Math.imul(h, 1274126177) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  /* Smooth value noise — good enough for biome blotches and temperature
+   * fields, cheap enough to sample 65k times at world-gen. */
+  function noise2(seed, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(seed, xi, yi), b = hash2(seed, xi + 1, yi);
+    const c = hash2(seed, xi, yi + 1), d = hash2(seed, xi + 1, yi + 1);
+    return lerp(lerp(a, b, u), lerp(c, d, u), v);
+  }
+
+  function fbm(seed, x, y, octaves) {
+    let sum = 0, amp = 1, norm = 0, f = 1;
+    for (let i = 0; i < (octaves || 4); i++) {
+      sum += amp * noise2(seed + i * 7919, x * f, y * f);
+      norm += amp;
+      amp *= 0.52; f *= 2.1;
+    }
+    return sum / norm;
+  }
+
+  // --- formatting ----------------------------------------------------------
+  function fmt(n) {
+    n = Math.floor(n);
+    if (Math.abs(n) < 1000) return String(n);
+    if (Math.abs(n) < 1e6) return (n / 1000).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '') + 'k';
+    return (n / 1e6).toFixed(2).replace(/\.0+$/, '') + 'M';
+  }
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    if (h) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  // --- tiny pub/sub used to decouple simulation, discovery and UI ----------
+  function makeBus() {
+    const listeners = {};
+    return {
+      on(kind, fn) {
+        (listeners[kind] || (listeners[kind] = [])).push(fn);
+        return () => { const a = listeners[kind]; const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); };
+      },
+      emit(kind, payload) {
+        const a = listeners[kind];
+        if (!a) return;
+        for (let i = 0; i < a.length; i++) {
+          try { a[i](payload); } catch (e) { console.error('[coremind] listener error for', kind, e); }
+        }
+      }
+    };
+  }
+
+  /* Monotonically increasing ids, namespaced by prefix so debug output stays
+   * readable ("org_42", "sample_7"). */
+  function makeIdGen() {
+    const counters = {};
+    return prefix => {
+      counters[prefix] = (counters[prefix] || 0) + 1;
+      return prefix + '_' + counters[prefix];
+    };
+  }
+
+  CM.core = {
+    clamp, clamp01, lerp, invLerp, rndInt, pick, chance, dist, dist2,
+    angDelta, turnToward, rngFrom, hash2, noise2, fbm,
+    fmt, fmtClock, makeBus, makeIdGen
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — the trait catalog and the base organism schema.
+ *
+ * Every organism, player-designed or wild, is built the same way: a base
+ * stat block plus the summed deltas of up to six traits (one per category
+ * slot). Nothing here hard-codes a species' behaviour — wild species (below)
+ * are just trait combinations with a default AI disposition, exactly like a
+ * player design.
+ */
+(function (CM) {
+  'use strict';
+
+  const CATEGORIES = ['BODY', 'SENSE', 'METABOLISM', 'DEFENSE', 'OFFENSE', 'REPRODUCTION'];
+
+  /* The intentionally weak, generic starting point. Every stat an organism
+   * can have is listed here — traits only ever add a delta on top. */
+  const BASE_STATS = {
+    health: 40, energyMax: 40, speed: 13, size: 10, vision: 16, sense_radius: 9,
+    attack: 5, defense: 3, temperature_tolerance: 9, water_requirement: 0.55,
+    reproduction_rate: 0.16, metabolism: 11, camouflage: 4, venom: 0, armor: 0, digging: 0
+  };
+
+  const STAT_KEYS = Object.keys(BASE_STATS);
+  const STAT_MIN = { health: 5, energyMax: 5, speed: 2, size: 3, vision: 2, sense_radius: 2, attack: 0, defense: 0, temperature_tolerance: 2, water_requirement: 0.1, reproduction_rate: 0.02, metabolism: 3, camouflage: 0, venom: 0, armor: 0, digging: 0 };
+
+  /* stat_modifiers are additive deltas over BASE_STATS. energy_cost / biomass_cost
+   * are paid once, at CREATE ORGANISM time (see genome.js). compatibility /
+   * incompatibility are informational pairings shown in the designer — they
+   * tell the player which traits play well together, they don't hide extra
+   * math the UI can't explain. */
+  const TRAITS = [
+    // -- BODY (movement) --
+    { id: 'basic_legs', name: 'Basic Legs', category: 'BODY',
+      description: 'Sturdier limbs for covering ground.',
+      stat_modifiers: { speed: 10, metabolism: 2 }, energy_cost: 4, biomass_cost: 6,
+      compatibility: ['fast_movement'], incompatibility: [],
+      visual_modifier: 'legs', behavior_modifier: null },
+    { id: 'fast_movement', name: 'Fast Movement', category: 'BODY',
+      description: 'A streamlined build built for speed, at a metabolic cost.',
+      stat_modifiers: { speed: 24, metabolism: 8 }, energy_cost: 8, biomass_cost: 10,
+      compatibility: ['vibration_sense'], incompatibility: ['armor'],
+      visual_modifier: 'streamlined', behavior_modifier: null },
+    { id: 'burrowing', name: 'Burrowing', category: 'BODY',
+      description: 'Digging limbs that let this organism vanish underground to escape danger.',
+      stat_modifiers: { digging: 45, speed: -6, defense: 6 }, energy_cost: 6, biomass_cost: 9,
+      compatibility: ['camouflage'], incompatibility: ['fast_movement'],
+      visual_modifier: 'digger', behavior_modifier: 'can_burrow_flee' },
+
+    // -- SENSE --
+    { id: 'vision', name: 'Vision', category: 'SENSE',
+      description: 'Larger eyes — spots food and threats from further away.',
+      stat_modifiers: { vision: 26, sense_radius: 6 }, energy_cost: 3, biomass_cost: 5,
+      compatibility: ['fast_movement'], incompatibility: [],
+      visual_modifier: 'eyes', behavior_modifier: null },
+    { id: 'chem_sense', name: 'Chemical Sensing', category: 'SENSE',
+      description: 'Detects food and creatures by scent, even without line of sight.',
+      stat_modifiers: { sense_radius: 11, vision: 4 }, energy_cost: 4, biomass_cost: 6,
+      compatibility: ['venom'], incompatibility: [],
+      visual_modifier: 'antennae', behavior_modifier: 'sense_through_walls' },
+    { id: 'vibration_sense', name: 'Vibration Sensing', category: 'SENSE',
+      description: 'Feels footsteps through the ground — an early warning against predators.',
+      stat_modifiers: { sense_radius: 9 }, energy_cost: 4, biomass_cost: 6,
+      compatibility: ['burrowing'], incompatibility: [],
+      visual_modifier: 'whiskers', behavior_modifier: 'early_warning' },
+
+    // -- DEFENSE --
+    { id: 'armor', name: 'Armor', category: 'DEFENSE',
+      description: 'A heavy external shell. Excellent protection, but slow and hungry.',
+      stat_modifiers: { defense: 32, armor: 32, speed: -13, metabolism: 7 }, energy_cost: 6, biomass_cost: 14,
+      compatibility: ['regeneration'], incompatibility: ['fast_movement', 'burrowing'],
+      visual_modifier: 'shell', behavior_modifier: null },
+    { id: 'camouflage', name: 'Camouflage', category: 'DEFENSE',
+      description: 'Colouration that blends with the environment, reducing detection.',
+      stat_modifiers: { camouflage: 38, speed: -3 }, energy_cost: 5, biomass_cost: 10,
+      compatibility: ['burrowing'], incompatibility: [],
+      visual_modifier: 'mottled', behavior_modifier: 'reduce_detection' },
+    { id: 'regeneration', name: 'Regeneration', category: 'DEFENSE',
+      description: 'Slowly heals wounds over time, at a steady energy cost.',
+      stat_modifiers: { metabolism: 10 }, energy_cost: 8, biomass_cost: 12,
+      compatibility: ['armor'], incompatibility: [],
+      visual_modifier: 'veined', behavior_modifier: 'passive_heal' },
+
+    // -- OFFENSE --
+    { id: 'bite', name: 'Bite', category: 'OFFENSE',
+      description: 'Basic jaws. Reliable, low-cost damage.',
+      stat_modifiers: { attack: 16 }, energy_cost: 3, biomass_cost: 6,
+      compatibility: [], incompatibility: [],
+      visual_modifier: 'jaws', behavior_modifier: null },
+    { id: 'claws', name: 'Claws', category: 'OFFENSE',
+      description: 'Sharp claws for tearing. Strong, but a little slower.',
+      stat_modifiers: { attack: 25, speed: -3 }, energy_cost: 5, biomass_cost: 9,
+      compatibility: ['armor'], incompatibility: [],
+      visual_modifier: 'claws', behavior_modifier: null },
+    { id: 'venom', name: 'Venom', category: 'OFFENSE',
+      description: 'A toxic bite that keeps damaging the target after contact.',
+      stat_modifiers: { venom: 36, attack: 9 }, energy_cost: 7, biomass_cost: 13,
+      compatibility: ['chem_sense'], incompatibility: [],
+      visual_modifier: 'venom_glands', behavior_modifier: 'damage_over_time' },
+    { id: 'acid', name: 'Acid', category: 'OFFENSE',
+      description: 'A corrosive attack that eats through armor.',
+      stat_modifiers: { attack: 19 }, energy_cost: 7, biomass_cost: 12,
+      compatibility: [], incompatibility: ['armor'],
+      visual_modifier: 'acid_sacs', behavior_modifier: 'armor_pierce' },
+
+    // -- METABOLISM --
+    { id: 'efficient_metabolism', name: 'Efficient Metabolism', category: 'METABOLISM',
+      description: 'Burns energy more slowly — needs to eat less often.',
+      stat_modifiers: { metabolism: -19 }, energy_cost: 4, biomass_cost: 8,
+      compatibility: [], incompatibility: ['armor'],
+      visual_modifier: 'lean', behavior_modifier: null },
+    { id: 'heat_resistance', name: 'Heat Resistance', category: 'METABOLISM',
+      description: 'Tolerates a much wider range of hot climates.',
+      stat_modifiers: { temperature_tolerance: 19 }, energy_cost: 3, biomass_cost: 7,
+      compatibility: [], incompatibility: ['cold_resistance'],
+      visual_modifier: 'warm_hued', behavior_modifier: null },
+    { id: 'cold_resistance', name: 'Cold Resistance', category: 'METABOLISM',
+      description: 'Tolerates a much wider range of cold climates.',
+      stat_modifiers: { temperature_tolerance: 19 }, energy_cost: 3, biomass_cost: 7,
+      compatibility: [], incompatibility: ['heat_resistance'],
+      visual_modifier: 'cool_hued', behavior_modifier: null },
+
+    // -- REPRODUCTION --
+    { id: 'prolific_broodsac', name: 'Prolific Broodsac', category: 'REPRODUCTION',
+      description: 'Produces offspring far more readily, at the cost of a smaller body.',
+      stat_modifiers: { reproduction_rate: 0.4, size: -4 }, energy_cost: 6, biomass_cost: 10,
+      compatibility: ['efficient_metabolism'], incompatibility: [],
+      visual_modifier: 'brood_sac', behavior_modifier: null }
+  ];
+
+  const TRAITS_BY_ID = {};
+  const TRAITS_BY_CATEGORY = {};
+  for (const cat of CATEGORIES) TRAITS_BY_CATEGORY[cat] = [];
+  for (const t of TRAITS) { TRAITS_BY_ID[t.id] = t; TRAITS_BY_CATEGORY[t.category].push(t); }
+
+  const BASE_CREATE_COST = { biomass: 18, energy: 12 };
+
+  /* Compute the full stat block for a set of trait ids (one per category,
+   * nulls allowed). Pure function — the designer calls this on every tap. */
+  function resolveStats(traitIds) {
+    const stats = Object.assign({}, BASE_STATS);
+    for (const id of traitIds) {
+      const t = TRAITS_BY_ID[id];
+      if (!t) continue;
+      for (const k in t.stat_modifiers) stats[k] = (stats[k] || 0) + t.stat_modifiers[k];
+    }
+    for (const k of STAT_KEYS) stats[k] = Math.max(STAT_MIN[k] || 0, stats[k]);
+    return stats;
+  }
+
+  function resolveCost(traitIds) {
+    let biomass = BASE_CREATE_COST.biomass, energy = BASE_CREATE_COST.energy;
+    for (const id of traitIds) {
+      const t = TRAITS_BY_ID[id];
+      if (!t) continue;
+      biomass += t.biomass_cost; energy += t.energy_cost;
+    }
+    return { biomass, energy };
+  }
+
+  function behaviorModifiers(traitIds) {
+    const set = new Set();
+    for (const id of traitIds) {
+      const t = TRAITS_BY_ID[id];
+      if (t && t.behavior_modifier) set.add(t.behavior_modifier);
+    }
+    return set;
+  }
+
+  // --- wild species: the same trait system, an authored preset each --------
+  const WILD_SPECIES = [
+    { id: 'grazer', name: 'Grazer', tier: 'prey', diet: 'herbivore',
+      traits: ['basic_legs', 'vision'], color: '#8fd15a' },
+    { id: 'thistleback', name: 'Thistleback', tier: 'prey', diet: 'herbivore',
+      traits: ['armor', 'basic_legs'], color: '#c9b25a' },
+    { id: 'stalker', name: 'Stalker', tier: 'predator', diet: 'carnivore',
+      traits: ['fast_movement', 'bite'], color: '#d16b5a' },
+    { id: 'shellfang', name: 'Shellfang', tier: 'predator', diet: 'carnivore',
+      traits: ['armor', 'claws'], color: '#a15ad1' },
+    { id: 'needler', name: 'Needler', tier: 'predator', diet: 'carnivore',
+      traits: ['venom', 'vibration_sense'], color: '#5ad1c4' }
+  ];
+  const WILD_BY_ID = {};
+  for (const s of WILD_SPECIES) WILD_BY_ID[s.id] = s;
+
+  CM.traits = {
+    CATEGORIES, TRAITS, TRAITS_BY_ID, TRAITS_BY_CATEGORY,
+    BASE_STATS, STAT_KEYS, STAT_MIN, BASE_CREATE_COST,
+    resolveStats, resolveCost, behaviorModifiers,
+    WILD_SPECIES, WILD_BY_ID
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — procedural world: a 256x256 cell ecosystem grid, plus a uniform
+ * spatial grid used to query organisms by position cheaply.
+ *
+ * The terrain is regenerated from the seed on every load (world.js never
+ * touches localStorage); only the *deltas* worth keeping — food levels drift
+ * back to their natural carrying capacity fast enough that they are not
+ * saved at all; see save.js for what actually persists.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+
+  const SIZE = 256; // cells per side
+  const BIOME = { WATER: 0, GRASS: 1, SOIL: 2, ROCK: 3 };
+  const BIOME_NAMES = ['Water', 'Grass', 'Soil', 'Rock'];
+
+  function idx(x, y) { return y * SIZE + x; }
+  function inBounds(x, y) { return x >= 0 && y >= 0 && x < SIZE && y < SIZE; }
+
+  /* --- generation ---------------------------------------------------------
+   * Elevation carves water / land / rock. Moisture (itself elevation-biased,
+   * so basins are wetter) decides grass vs bare soil. Temperature follows a
+   * latitude band across the y axis plus noise, so the world has a cold edge,
+   * a warm middle, and local variation neither alone would produce. */
+  function generate(seed) {
+    seed = (seed >>> 0) || 1;
+    const n = SIZE * SIZE;
+    const biome = new Uint8Array(n);
+    const temp = new Float32Array(n);      // degrees C
+    const moisture = new Float32Array(n);
+    const food = new Float32Array(n);      // current plant biomass per cell
+    const foodCap = new Float32Array(n);   // carrying capacity per cell
+
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const i = idx(x, y);
+        const e = K.fbm(seed, x * 0.02, y * 0.02, 5) * 0.75 + K.fbm(seed + 1, x * 0.06, y * 0.06, 3) * 0.25;
+        let m = K.fbm(seed + 2000, x * 0.035, y * 0.035, 4) * 0.7 + (1 - e) * 0.3;
+        m = K.clamp01(m);
+
+        // latitude-ish temperature band centred on the vertical middle,
+        // warmest at the equator (mid-row), coldest at the poles (edges).
+        const lat = Math.abs(y / SIZE - 0.5) * 2; // 0 at equator, 1 at pole
+        let t = K.lerp(34, -12, lat) + (K.fbm(seed + 4000, x * 0.05, y * 0.05, 3) - 0.5) * 14;
+        t -= K.clamp01(e - 0.6) * 18; // higher ground runs cooler
+
+        let b;
+        if (e < 0.30) b = BIOME.WATER;
+        else if (e > 0.80 || (e > 0.62 && m < 0.22)) b = BIOME.ROCK;
+        else if (m > 0.38 && t > -4) b = BIOME.GRASS;
+        else b = BIOME.SOIL;
+
+        biome[i] = b;
+        temp[i] = t;
+        moisture[i] = m;
+        if (b === BIOME.GRASS) {
+          const cap = K.clamp01(m * 0.7 + K.invLerp(-4, 30, t) * 0.3) * 90 + 10;
+          foodCap[i] = cap;
+          // Coherent noise, not a raw per-cell hash — a hash decorrelates
+          // completely between neighbours, which reads as TV static once
+          // painted into the terrain cache. Real grass patchiness (and the
+          // grazing pressure that later shows through it) should look like
+          // patches, not salt-and-pepper noise.
+          food[i] = cap * (0.45 + 0.55 * K.noise2(seed + 5000, x * 0.12, y * 0.12));
+        } else {
+          foodCap[i] = 0;
+          food[i] = 0;
+        }
+      }
+    }
+
+    const world = {
+      seed, size: SIZE, biome, temp, moisture, food, foodCap,
+      foodCursor: 0,
+      grid: makeSpatialGrid(SIZE, 6)
+    };
+    world.coreSpawn = findCoreSpawn(world, K.rngFrom(seed ^ 0x9e3779b9));
+    return world;
+  }
+
+  /* A grassy, temperate, non-coastal patch near the middle of the map — a
+   * reasonable home base regardless of seed. */
+  function findCoreSpawn(world, rng) {
+    let best = null, bestScore = -Infinity;
+    for (let tries = 0; tries < 400; tries++) {
+      const x = K.rndInt(rng, SIZE * 0.25, SIZE * 0.75);
+      const y = K.rndInt(rng, SIZE * 0.25, SIZE * 0.75);
+      const i = idx(x, y);
+      if (world.biome[i] !== BIOME.GRASS) continue;
+      const t = world.temp[i];
+      let score = -Math.abs(t - 18) - K.dist(x, y, SIZE / 2, SIZE / 2) * 0.02;
+      // reward being near water (drinkable, but not flooded)
+      let nearWater = false;
+      for (let dy = -3; dy <= 3 && !nearWater; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (inBounds(nx, ny) && world.biome[idx(nx, ny)] === BIOME.WATER) { nearWater = true; break; }
+        }
+      }
+      if (nearWater) score += 5;
+      if (score > bestScore) { bestScore = score; best = { x: x + 0.5, y: y + 0.5 }; }
+    }
+    return best || { x: SIZE / 2, y: SIZE / 2 };
+  }
+
+  function biomeAt(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return BIOME.ROCK;
+    return world.biome[idx(xi, yi)];
+  }
+  function tempAt(world, x, y) {
+    const xi = K.clamp(Math.floor(x), 0, SIZE - 1), yi = K.clamp(Math.floor(y), 0, SIZE - 1);
+    return world.temp[idx(xi, yi)];
+  }
+  function foodAt(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return 0;
+    return world.food[idx(xi, yi)];
+  }
+  function consumeFood(world, x, y, amount) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return 0;
+    const i = idx(xi, yi);
+    const taken = Math.min(world.food[i], amount);
+    world.food[i] -= taken;
+    return taken;
+  }
+
+  /* Regrowth runs on a rolling cursor instead of a full 65k-cell sweep every
+   * call, so cost per call is bounded regardless of world size. */
+  function tickFood(world, batchSize) {
+    const n = world.food.length;
+    let c = world.foodCursor;
+    for (let k = 0; k < batchSize; k++) {
+      const i = c;
+      if (world.foodCap[i] > 0) {
+        const cap = world.foodCap[i];
+        world.food[i] += (cap - world.food[i]) * 0.02;
+        if (world.food[i] < 0.01) world.food[i] = 0;
+      }
+      c = (c + 1) % n;
+    }
+    world.foodCursor = c;
+  }
+
+  function findNearestFood(world, x, y, radius, minAmount) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    let best = null, bestD = Infinity;
+    const r = Math.ceil(radius);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = xi + dx, ny = yi + dy;
+        if (!inBounds(nx, ny)) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > radius * radius) continue;
+        const i = idx(nx, ny);
+        if (world.food[i] >= minAmount) {
+          if (d2 < bestD) { bestD = d2; best = { x: nx + 0.5, y: ny + 0.5, amount: world.food[i] }; }
+        }
+      }
+    }
+    return best;
+  }
+
+  // --- uniform spatial grid for organisms / samples -------------------------
+  function makeSpatialGrid(worldSize, cellSize) {
+    const cols = Math.ceil(worldSize / cellSize);
+    const buckets = new Map();
+    const key = (cx, cy) => cx * 100000 + cy;
+
+    function bucketOf(x, y) {
+      return [Math.floor(x / cellSize), Math.floor(y / cellSize)];
+    }
+    function insert(entity) {
+      const [cx, cy] = bucketOf(entity.x, entity.y);
+      entity.__gx = cx; entity.__gy = cy;
+      const k = key(cx, cy);
+      let b = buckets.get(k);
+      if (!b) { b = new Set(); buckets.set(k, b); }
+      b.add(entity);
+    }
+    function remove(entity) {
+      const k = key(entity.__gx, entity.__gy);
+      const b = buckets.get(k);
+      if (b) { b.delete(entity); if (b.size === 0) buckets.delete(k); }
+    }
+    function update(entity) {
+      const [cx, cy] = bucketOf(entity.x, entity.y);
+      if (cx === entity.__gx && cy === entity.__gy) return;
+      remove(entity);
+      insert(entity);
+    }
+    function queryRadius(x, y, radius, out) {
+      out = out || [];
+      const r = Math.ceil(radius / cellSize);
+      const [cx, cy] = bucketOf(x, y);
+      const r2 = radius * radius;
+      for (let gy = cy - r; gy <= cy + r; gy++) {
+        for (let gx = cx - r; gx <= cx + r; gx++) {
+          const b = buckets.get(key(gx, gy));
+          if (!b) continue;
+          for (const e of b) {
+            if (K.dist2(e.x, e.y, x, y) <= r2) out.push(e);
+          }
+        }
+      }
+      return out;
+    }
+    function queryBox(minX, minY, maxX, maxY, out) {
+      out = out || [];
+      const [cx0, cy0] = bucketOf(minX, minY);
+      const [cx1, cy1] = bucketOf(maxX, maxY);
+      for (let gy = cy0; gy <= cy1; gy++) {
+        for (let gx = cx0; gx <= cx1; gx++) {
+          const b = buckets.get(key(gx, gy));
+          if (!b) continue;
+          for (const e of b) out.push(e);
+        }
+      }
+      return out;
+    }
+    function clear() { buckets.clear(); }
+    return { cellSize, insert, remove, update, queryRadius, queryBox, clear };
+  }
+
+  CM.world = {
+    SIZE, BIOME, BIOME_NAMES, idx, inBounds,
+    generate, biomeAt, tempAt, foodAt, consumeFood, tickFood, findNearestFood,
+    makeSpatialGrid
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — organism instances: factory, object pool, and the pure stat/
+ * comfort math shared by simulation and AI. No per-species behaviour lives
+ * here — see ai.js for the reusable state machine every organism runs.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const T = CM.traits;
+
+  const AI_STATE = {
+    IDLE: 'IDLE', EXPLORE: 'EXPLORE', SEEK_FOOD: 'SEEK_FOOD', FLEE: 'FLEE',
+    HUNT: 'HUNT', ATTACK: 'ATTACK', REST: 'REST', RETURN_TO_CORE: 'RETURN_TO_CORE',
+    REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE'
+  };
+
+  const DIRECTIVES = ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND', 'REPRODUCE', 'INVESTIGATE', 'RETURN'];
+
+  const pool = [];
+
+  function acquire() {
+    return pool.pop() || {
+      id: null, ownerId: null, speciesId: null, designId: null, name: '',
+      generation: 1, age: 0, x: 0, y: 0, heading: 0,
+      stats: null, traits: null, behaviors: null, diet: 'herbivore',
+      health: 1, energy: 1, hunger: 0,
+      state: AI_STATE.IDLE, stateTimer: 0, directive: null,
+      target: null, carrying: 0, alive: true, lod: 'near', selected: false,
+      visualSeed: 0, lastEventAt: 0, __gx: 0, __gy: 0
+    };
+  }
+
+  function release(org) {
+    org.alive = false;
+    org.target = null;
+    pool.push(org);
+  }
+
+  let nextId = 1;
+
+  /* traitIds: array (nulls for empty slots are fine, filtered here). */
+  function create(opts) {
+    const org = acquire();
+    const traitIds = (opts.traits || []).filter(Boolean);
+    const stats = T.resolveStats(traitIds);
+    org.id = 'org_' + (nextId++);
+    org.ownerId = opts.ownerId || 'wild';
+    org.speciesId = opts.speciesId || null;
+    org.designId = opts.designId || null;
+    org.name = opts.name || (opts.speciesId ? T.WILD_BY_ID[opts.speciesId].name : 'Organism');
+    org.generation = opts.generation || 1;
+    org.age = 0;
+    org.x = opts.x; org.y = opts.y;
+    org.heading = opts.heading != null ? opts.heading : Math.random() * Math.PI * 2;
+    org.stats = stats;
+    org.traits = traitIds;
+    org.behaviors = T.behaviorModifiers(traitIds);
+    org.diet = opts.diet || (opts.ownerId === 'player' ? 'omnivore' : 'herbivore');
+    org.health = stats.health;
+    org.energy = stats.energyMax;
+    org.hunger = 0;
+    org.state = AI_STATE.IDLE;
+    org.stateTimer = 0;
+    org.directive = opts.directive || null;
+    org.directiveTarget = null;
+    org.target = null;
+    org.actionTarget = null;
+    org.carrying = 0;
+    // A random maturation delay before an organism is first eligible to
+    // reproduce. Without this every organism in the starting population
+    // begins at full health/energy with nothing else to do, so they all
+    // enter REPRODUCE on their very first AI decision — a synchronized
+    // birth spike a few seconds later, rather than a population that grows
+    // gradually and staggers itself the way reproCooldown does afterward.
+    org.reproCooldown = 5 + Math.random() * 28;
+    org.reproTimer = null;
+    org.huntTimer = 0;
+    org.aiCounter = 0;
+    org.__attackedThisTick = false;
+    org.alive = true;
+    org.lod = 'near';
+    org.selected = false;
+    org.visualSeed = (opts.visualSeed != null ? opts.visualSeed : Math.floor(Math.random() * 1e9));
+    org.color = opts.color || (opts.ownerId === 'player' ? '#33e6b0' : (T.WILD_BY_ID[opts.speciesId] || {}).color || '#cccccc');
+    return org;
+  }
+
+  /* 0 (dead center of comfort) .. 1 (right at the edge of tolerance) .. >1
+   * (out of range, taking damage). temperature_tolerance is a +/- half-width
+   * band around a fixed species-neutral comfort point. */
+  const COMFORT_TEMP = 19;
+  function tempStress(org, worldTemp) {
+    const band = org.stats.temperature_tolerance;
+    const d = Math.abs(worldTemp - COMFORT_TEMP);
+    return d / band; // <=1 fine, >1 stressed
+  }
+
+  function isAlive(org) { return org.alive && org.health > 0; }
+
+  CM.organism = { AI_STATE, DIRECTIVES, create, release, isAlive, tempStress, COMFORT_TEMP };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — reusable utility AI. One function decides what any organism
+ * wants to do next from its needs, senses and the player's directive; it
+ * never knows about a specific species. Pure logic, no canvas/DOM — the
+ * simulation gathers `ctx` (what's nearby) and executes the chosen state.
+ */
+(function (CM) {
+  'use strict';
+  const S = CM.organism.AI_STATE;
+
+  /* How much a spotted threat scares this organism. Armor and defense make
+   * standing ground more viable; a defense-heavy build flees later. */
+  function fearMultiplier(org) {
+    const stoutness = (org.stats.defense + org.stats.armor) / 120;
+    return Math.max(0.35, 1.1 - stoutness);
+  }
+
+  function applyDirectiveBias(directive, u) {
+    switch (directive) {
+      case 'EXPLORE': u.EXPLORE *= 2.2; u.INVESTIGATE *= 1.4; break;
+      case 'GATHER': u.SEEK_FOOD *= 2.4; u.RETURN_TO_CORE *= 1.3; break;
+      case 'HUNT': u.HUNT *= 2.6; u.ATTACK *= 1.5; break;
+      case 'DEFEND': u.FLEE *= 0.15; u.EXPLORE *= 0.3; break; // guard() below drives the actual behaviour
+      case 'REPRODUCE': u.REPRODUCE *= 3; break;
+      case 'INVESTIGATE': u.INVESTIGATE *= 3; break;
+      case 'RETURN': u.RETURN_TO_CORE = 999; break;
+      default: break;
+    }
+  }
+
+  /* ctx fields (all optional — absence just means "nothing sensed"):
+   *   canEatPlants, canHunt: bool
+   *   nearestThreat:  {dist, entity}
+   *   nearestFood:    {dist, x, y}
+   *   nearestPrey:    {dist, entity}
+   *   nearestCuriosity: {dist, x, y, kind, ref}   // unknown species sighting or sample
+   *   mateAvailable:  bool
+   *   coreDist: number
+   *   defendRadius: number  (only meaningful with directive DEFEND)
+   */
+  function decide(org, ctx) {
+    if (org.health <= 0) return { state: S.IDLE, target: null };
+
+    const hungerFrac = CM.core.clamp01(org.hunger / 100);
+    const energyFrac = CM.core.clamp01(org.energy / org.stats.energyMax);
+    const healthFrac = CM.core.clamp01(org.health / org.stats.health);
+    const critical = hungerFrac > 0.92 || healthFrac < 0.22;
+
+    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0 };
+
+    if (ctx.nearestThreat) {
+      const closeness = 1 - CM.core.clamp01(ctx.nearestThreat.dist / Math.max(1, org.stats.sense_radius));
+      u.FLEE = closeness * 1.35 * fearMultiplier(org);
+    }
+
+    if (ctx.canEatPlants) {
+      u.SEEK_FOOD = hungerFrac * hungerFrac * (ctx.nearestFood ? 1 : 0.45);
+    }
+    if (ctx.canHunt && ctx.nearestPrey) {
+      u.HUNT = (0.35 + hungerFrac * 0.75);
+    }
+
+    u.REST = Math.max(0, (1 - energyFrac) * 0.75 + (1 - healthFrac) * 0.25 - (ctx.nearestThreat ? 0.6 : 0));
+    u.RETURN_TO_CORE = org.carrying > 0 ? 0.85 + Math.min(0.4, org.carrying / 40) : 0;
+    u.REPRODUCE = (energyFrac > 0.72 && healthFrac > 0.7 && (org.reproCooldown || 0) <= 0)
+      ? org.stats.reproduction_rate * 1.8 : 0;
+    u.INVESTIGATE = ctx.nearestCuriosity ? 0.4 : 0;
+
+    // A fight in progress is not re-litigated every re-decision — without
+    // this an ATTACK organism would be yanked back into HUNT (which
+    // immediately re-enters ATTACK, but only *after* skipping this tick's
+    // damage) every single time it re-decides, i.e. every tick for anything
+    // near the camera.
+    if (org.state === S.ATTACK && org.actionTarget && org.actionTarget.ref && org.actionTarget.ref.health > 0) {
+      u.ATTACK = 2.2;
+    }
+
+    applyDirectiveBias(org.directive, u);
+
+    // A guarding organism holds position near the Core and only leaves the
+    // utility loop to fight something that gets close, or to flee if truly
+    // overwhelmed (critical health always wins — see below).
+    if (org.directive === 'DEFEND') {
+      if (ctx.nearestThreat && ctx.defendRadius != null && ctx.nearestThreat.dist <= ctx.defendRadius) {
+        u.HUNT = Math.max(u.HUNT, 1.6); // "hunt" the intruder, i.e. engage it
+      } else {
+        u.EXPLORE = 0.12; // stay close; movement code keeps DEFEND orbiting the Core
+      }
+    }
+
+    // Critical needs are an imperative, not a suggestion — an organism must
+    // never be argued out of eating or fleeing by a stale directive.
+    if (critical) {
+      if (healthFrac < 0.22 && ctx.nearestThreat) u.FLEE *= 2.2;
+      if (hungerFrac > 0.92) u.SEEK_FOOD = Math.max(u.SEEK_FOOD, 1.5);
+    }
+
+    // Hysteresis: mildly prefer whatever we're already doing so utilities
+    // that are nearly tied don't flap the organism between states every tick.
+    if (u[org.state] != null) u[org.state] *= 1.12;
+
+    let bestState = S.IDLE, bestScore = -Infinity;
+    for (const st in u) {
+      if (u[st] > bestScore) { bestScore = u[st]; bestState = st; }
+    }
+
+    return resolveTarget(org, bestState, ctx);
+  }
+
+  /* Turn the chosen state into something the simulation can act on. If the
+   * ideal target isn't actually available (e.g. HUNT with no prey in range),
+   * fall back to a search behaviour instead of an empty action. */
+  function resolveTarget(org, state, ctx) {
+    switch (state) {
+      case S.FLEE:
+        if (!ctx.nearestThreat) return { state: S.EXPLORE, target: null };
+        return { state: S.FLEE, target: { type: 'flee_from', x: ctx.nearestThreat.entity.x, y: ctx.nearestThreat.entity.y } };
+      case S.SEEK_FOOD:
+        if (ctx.nearestFood) return { state: S.SEEK_FOOD, target: { type: 'food_cell', x: ctx.nearestFood.x, y: ctx.nearestFood.y } };
+        return { state: S.EXPLORE, target: null };
+      case S.HUNT:
+        if (org.directive === 'DEFEND' && ctx.nearestThreat) {
+          return { state: S.HUNT, target: { type: 'organism', ref: ctx.nearestThreat.entity } };
+        }
+        if (ctx.nearestPrey) return { state: S.HUNT, target: { type: 'organism', ref: ctx.nearestPrey.entity } };
+        return { state: S.EXPLORE, target: null };
+      case S.ATTACK:
+        // Only ever chosen by the hysteresis guard in decide() when already
+        // mid-fight; keep the exact same target rather than re-resolving it.
+        if (org.actionTarget && org.actionTarget.ref && org.actionTarget.ref.health > 0) {
+          return { state: S.ATTACK, target: org.actionTarget };
+        }
+        return { state: S.EXPLORE, target: null };
+      case S.RETURN_TO_CORE:
+        return { state: S.RETURN_TO_CORE, target: { type: 'core' } };
+      case S.REPRODUCE:
+        return { state: S.REPRODUCE, target: null };
+      case S.INVESTIGATE:
+        if (org.directive === 'INVESTIGATE' && org.directiveTarget) {
+          return { state: S.INVESTIGATE, target: { type: 'point', x: org.directiveTarget.x, y: org.directiveTarget.y, ref: org.directiveTarget.ref || null } };
+        }
+        if (ctx.nearestCuriosity) return { state: S.INVESTIGATE, target: { type: 'point', x: ctx.nearestCuriosity.x, y: ctx.nearestCuriosity.y, ref: ctx.nearestCuriosity.ref || null } };
+        return { state: S.EXPLORE, target: null };
+      case S.REST:
+        return { state: S.REST, target: null };
+      default:
+        return { state: S.EXPLORE, target: null };
+    }
+  }
+
+  CM.ai = { decide, fearMultiplier };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — DISCOVER -> ANALYZE -> EXTRACT.
+ *
+ * Traits are never unlocked by a level-up; they're earned by watching wild
+ * organisms use them. Every encounter between a player organism and a wild
+ * one leaves partial evidence; killing a wild organism leaves a biological
+ * sample the player can walk up to and extract for a much bigger dose of
+ * evidence. Once a trait has enough evidence behind it, it becomes available
+ * in the genome designer.
+ */
+(function (CM) {
+  'use strict';
+
+  const OBSERVATION_THRESHOLD = 4;
+  const EXTRACT_CREDIT = 3;
+  const ENCOUNTER_CREDIT = 1;
+  const SAMPLE_TTL = 180; // seconds of sim time before an unclaimed sample decays
+
+  function newDiscoveryState() {
+    return {
+      events: [],
+      nextEventId: 1,
+      observations: {},     // traitId -> count
+      discoveredTraits: {},  // traitId -> true
+      knownSpecies: {},      // speciesId -> true
+      samples: []            // {id, x, y, speciesId, traits, name, ttl}
+    };
+  }
+
+  function pushEvent(game, bus, evt) {
+    const e = Object.assign({
+      id: 'evt_' + (game.discovery.nextEventId++),
+      time: game.simTime,
+      read: false
+    }, evt);
+    game.discovery.events.unshift(e);
+    if (game.discovery.events.length > 200) game.discovery.events.length = 200;
+    bus.emit('event', e);
+    return e;
+  }
+
+  function recordSighting(game, bus, speciesId, x, y) {
+    const D = game.discovery;
+    if (D.knownSpecies[speciesId]) return;
+    D.knownSpecies[speciesId] = true;
+    const sp = CM.traits.WILD_BY_ID[speciesId];
+    pushEvent(game, bus, {
+      kind: 'discovery', icon: sp && sp.tier === 'predator' ? '\u{1F439}' : '\u{1F43F}',
+      message: `Your organism discovered a new ${sp ? sp.tier : 'species'}: ${sp ? sp.name : speciesId}.`,
+      x, y, speciesId
+    });
+  }
+
+  function creditTrait(game, bus, traitId, amount) {
+    const D = game.discovery;
+    if (D.discoveredTraits[traitId]) return;
+    D.observations[traitId] = (D.observations[traitId] || 0) + amount;
+    if (D.observations[traitId] >= OBSERVATION_THRESHOLD) {
+      D.discoveredTraits[traitId] = true;
+      const t = CM.traits.TRAITS_BY_ID[traitId];
+      pushEvent(game, bus, {
+        kind: 'discovery', icon: '\u{1F9EC}',
+        message: `Biological discovery: ${t.name.toUpperCase()} can now be designed into your organisms.`,
+        traitId
+      });
+    }
+  }
+
+  /* outcome: 'player_killed' | 'wild_killed' | 'player_fled' | 'wild_fled' */
+  function recordEncounter(game, bus, playerOrg, wildOrg, outcome, x, y) {
+    recordSighting(game, bus, wildOrg.speciesId, x, y);
+    for (const traitId of wildOrg.traits) {
+      const t = CM.traits.TRAITS_BY_ID[traitId];
+      if (!t) continue;
+      const relevant = (outcome === 'player_killed' && (t.category === 'OFFENSE'))
+        || (outcome === 'wild_killed' && (t.category === 'DEFENSE'))
+        || t.category === 'SENSE' || t.category === 'BODY' || t.category === 'METABOLISM' || t.category === 'REPRODUCTION';
+      if (relevant) creditTrait(game, bus, traitId, ENCOUNTER_CREDIT);
+    }
+    if (outcome === 'player_killed') {
+      pushEvent(game, bus, {
+        kind: 'death', icon: '☠',
+        message: `${wildOrg.name} killed ${playerOrg.name}.`,
+        x, y, orgId: playerOrg.id
+      });
+    }
+  }
+
+  function spawnSample(game, world, x, y, wildOrg) {
+    const D = game.discovery;
+    const sample = {
+      id: 'sample_' + (game.discovery.nextEventId++),
+      x, y, speciesId: wildOrg.speciesId, traits: wildOrg.traits.slice(),
+      name: wildOrg.name, ttl: SAMPLE_TTL
+    };
+    D.samples.push(sample);
+    return sample;
+  }
+
+  function tickSamples(game, dt) {
+    const D = game.discovery;
+    for (let i = D.samples.length - 1; i >= 0; i--) {
+      D.samples[i].ttl -= dt;
+      if (D.samples[i].ttl <= 0) D.samples.splice(i, 1);
+    }
+  }
+
+  function extractSample(game, bus, sampleId) {
+    const D = game.discovery;
+    const i = D.samples.findIndex(s => s.id === sampleId);
+    if (i < 0) return false;
+    const sample = D.samples[i];
+    D.samples.splice(i, 1);
+    for (const traitId of sample.traits) creditTrait(game, bus, traitId, EXTRACT_CREDIT);
+    pushEvent(game, bus, {
+      kind: 'analysis', icon: '\u{1F52C}',
+      message: `Extracted a biological sample from ${sample.name}.`,
+      x: sample.x, y: sample.y
+    });
+    return true;
+  }
+
+  function observationProgress(game, traitId) {
+    return Math.min(1, (game.discovery.observations[traitId] || 0) / OBSERVATION_THRESHOLD);
+  }
+
+  CM.discovery = {
+    OBSERVATION_THRESHOLD, newDiscoveryState, pushEvent, recordSighting,
+    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — the player's own entity: the Core (biomass/energy pool),
+ * directive issuance, selection, and the organism designer's draft buffer.
+ * Also owns the shape of the overall game object every other system reads.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const T = CM.traits;
+  const O = CM.organism;
+
+  function newGame(seed) {
+    seed = seed >>> 0;
+    const world = CM.world.generate(seed);
+    const game = {
+      seed, simTime: 0, speed: 1, paused: false,
+      world,
+      organisms: [],
+      byId: {},
+      core: { x: world.coreSpawn.x, y: world.coreSpawn.y, biomass: 60, energy: 55, radius: 7 },
+      discovery: CM.discovery.newDiscoveryState(),
+      designs: [],
+      selection: null,
+      camera: { x: world.coreSpawn.x, y: world.coreSpawn.y, zoom: 18, targetX: world.coreSpawn.x, targetY: world.coreSpawn.y, targetZoom: 18, dragging: false },
+      stats: { playerPop: 0, herbivorePop: 0, predatorPop: 0, plantTotal: 0 },
+      designerDraft: { BODY: null, SENSE: null, METABOLISM: null, DEFENSE: null, OFFENSE: null, REPRODUCTION: null },
+      globalDirective: 'EXPLORE',
+      nextDesignId: 1
+    };
+    return game;
+  }
+
+  function addOrganism(game, org) {
+    game.organisms.push(org);
+    game.byId[org.id] = org;
+    game.world.grid.insert(org);
+    return org;
+  }
+  function removeOrganism(game, org) {
+    game.world.grid.remove(org);
+    delete game.byId[org.id];
+    const i = game.organisms.indexOf(org);
+    if (i >= 0) game.organisms.splice(i, 1);
+    if (game.selection === org.id) game.selection = null;
+    O.release(org);
+  }
+
+  // --- resources -------------------------------------------------------
+  function canAfford(game, cost) { return game.core.biomass >= cost.biomass && game.core.energy >= cost.energy; }
+  function spend(game, cost) {
+    if (!canAfford(game, cost)) return false;
+    game.core.biomass -= cost.biomass;
+    game.core.energy -= cost.energy;
+    return true;
+  }
+  function deposit(game, biomass, energy) {
+    game.core.biomass += biomass || 0;
+    game.core.energy += energy || 0;
+  }
+
+  // --- selection & directives -------------------------------------------
+  function selectOrganism(game, orgId) {
+    if (game.selection && game.byId[game.selection]) game.byId[game.selection].selected = false;
+    game.selection = orgId || null;
+    if (orgId && game.byId[orgId]) game.byId[orgId].selected = true;
+  }
+
+  /* target: optional {x,y,ref} — required for a meaningful INVESTIGATE.
+   * When nothing is selected, the directive applies colony-wide and becomes
+   * the default new organisms are deployed with. */
+  function issueDirective(game, directive, target) {
+    if (game.selection && game.byId[game.selection]) {
+      const org = game.byId[game.selection];
+      org.directive = directive;
+      org.directiveTarget = target || null;
+      return 'selected';
+    }
+    game.globalDirective = directive;
+    for (const org of game.organisms) {
+      if (org.ownerId === 'player') { org.directive = directive; org.directiveTarget = target || null; }
+    }
+    return 'all';
+  }
+
+  // --- genome designer draft ---------------------------------------------
+  function setDesignSlot(game, category, traitId) {
+    if (!T.CATEGORIES.includes(category)) return;
+    if (traitId && !game.discovery.discoveredTraits[traitId]) return; // must be discovered first
+    game.designerDraft[category] = traitId || null;
+  }
+  function draftTraitIds(game) { return T.CATEGORIES.map(c => game.designerDraft[c]).filter(Boolean); }
+  function draftStats(game) { return T.resolveStats(draftTraitIds(game)); }
+  function draftCost(game) { return T.resolveCost(draftTraitIds(game)); }
+
+  function createOrganismFromDraft(game, bus) {
+    const cost = draftCost(game);
+    if (!spend(game, cost)) return null;
+    const jitter = () => (Math.random() - 0.5) * 3;
+    const org = O.create({
+      ownerId: 'player', traits: draftTraitIds(game),
+      x: K.clamp(game.core.x + jitter(), 1, game.world.size - 1),
+      y: K.clamp(game.core.y + jitter(), 1, game.world.size - 1),
+      generation: 1, directive: game.globalDirective,
+      name: 'Coremind-' + game.nextDesignId
+    });
+    game.nextDesignId++;
+    addOrganism(game, org);
+    CM.discovery.pushEvent(game, bus, {
+      kind: 'system', icon: '\u{1F9EA}',
+      message: `New organism successfully created: ${org.name}.`,
+      x: org.x, y: org.y, orgId: org.id
+    });
+    return org;
+  }
+
+  function saveDesign(game, name) {
+    const design = { id: 'design_' + (game.nextDesignId++), name: name || ('Design ' + game.designs.length), traits: Object.assign({}, game.designerDraft) };
+    game.designs.push(design);
+    return design;
+  }
+
+  CM.coremind = {
+    newGame, addOrganism, removeOrganism, canAfford, spend, deposit,
+    selectOrganism, issueDirective, setDesignSlot, draftTraitIds, draftStats, draftCost,
+    createOrganismFromDraft, saveDesign
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — the simulation: ties world + organisms + ai together into one
+ * fixed-step tick. Runs at a modest fixed rate (see main.js) independent of
+ * render framerate, with LOD bands so cost stays bounded regardless of how
+ * many organisms are alive.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const W = CM.world;
+  const O = CM.organism;
+  const T = CM.traits;
+  const D = CM.discovery;
+  const S = O.AI_STATE;
+
+  const MAX_ACTIVE = 500;
+  const NEAR_R = 45, MID_R = 115;
+  const SPEED_DIV = 9;             // stat speed -> cells/sec
+  const ARRIVE_DIST = 0.65;
+  const ATTACK_RANGE = 1.35;
+  const ATTACK_LEASH = 2.4;
+  const HUNT_GIVEUP = 12;
+  const MAX_CARRY = 22;
+  const PREY_TARGET = 70, PRED_TARGET = 22, MIN_PREY_FOR_PRED = 14;
+  const WILD_CAP = 380;
+  const PLAYER_REPRO_SOFT_CAP = 60;
+
+  // -- population seeding ---------------------------------------------------
+  function randomLandSpot(world, minDistFromCore, maxTries) {
+    for (let i = 0; i < maxTries; i++) {
+      const x = Math.random() * world.size, y = Math.random() * world.size;
+      const b = W.biomeAt(world, x, y);
+      if (b === W.BIOME.WATER || b === W.BIOME.ROCK) continue;
+      if (minDistFromCore && K.dist(x, y, world.coreSpawn.x, world.coreSpawn.y) < minDistFromCore) continue;
+      return { x, y };
+    }
+    return { x: world.coreSpawn.x + (Math.random() - 0.5) * 20, y: world.coreSpawn.y + (Math.random() - 0.5) * 20 };
+  }
+
+  function spawnWildOne(game, speciesId, spot) {
+    const sp = T.WILD_BY_ID[speciesId];
+    const org = O.create({
+      ownerId: 'wild', speciesId, name: sp.name, x: spot.x, y: spot.y,
+      traits: sp.traits, diet: sp.diet, color: sp.color, directive: null
+    });
+    CM.coremind.addOrganism(game, org);
+    return org;
+  }
+
+  function spawnStarterWildlife(game) {
+    const preySpecies = T.WILD_SPECIES.filter(s => s.tier === 'prey').map(s => s.id);
+    const predSpecies = T.WILD_SPECIES.filter(s => s.tier === 'predator').map(s => s.id);
+    for (let i = 0; i < 40; i++) {
+      spawnWildOne(game, K.pick(Math.random, preySpecies), randomLandSpot(game.world, 12, 60));
+    }
+    for (let i = 0; i < 10; i++) {
+      spawnWildOne(game, K.pick(Math.random, predSpecies), randomLandSpot(game.world, 25, 60));
+    }
+  }
+
+  function spawnStarterColony(game, bus) {
+    for (let i = 0; i < 3; i++) {
+      const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * 2;
+      const org = O.create({
+        ownerId: 'player', traits: [], name: 'Scout-' + (i + 1),
+        x: game.core.x + Math.cos(a) * r, y: game.core.y + Math.sin(a) * r,
+        directive: game.globalDirective
+      });
+      CM.coremind.addOrganism(game, org);
+    }
+    D.pushEvent(game, bus, { kind: 'system', icon: '\u{1F4E1}', message: 'Coremind established. Three starter organisms are ready for a directive.', x: game.core.x, y: game.core.y });
+  }
+
+  // -- sensing ----------------------------------------------------------------
+  function isPredatorLike(org) {
+    if (org.ownerId === 'wild') return T.WILD_BY_ID[org.speciesId].diet === 'carnivore';
+    return org.ownerId === 'player' && (org.directive === 'HUNT' || org.directive === 'DEFEND');
+  }
+  function validHuntTarget(hunter, other) {
+    if (other.ownerId === hunter.ownerId && hunter.ownerId === 'player') return false;
+    if (hunter.ownerId === 'wild') {
+      if (other.ownerId === 'player') return true;
+      return other.ownerId === 'wild' && T.WILD_BY_ID[other.speciesId].tier === 'prey';
+    }
+    // player, directed to HUNT or defending
+    return other.ownerId === 'wild';
+  }
+  function isThreatTo(org, other) {
+    if (org.ownerId === 'player') return other.ownerId === 'wild' && T.WILD_BY_ID[other.speciesId].diet === 'carnivore';
+    if (org.ownerId === 'wild' && T.WILD_BY_ID[org.speciesId].tier === 'prey') {
+      return (other.ownerId === 'wild' && T.WILD_BY_ID[other.speciesId].diet === 'carnivore')
+        || (other.ownerId === 'player' && (other.directive === 'HUNT'));
+    }
+    return false;
+  }
+  /* Camouflage/burrowing probabilistically keep an organism off a sensing
+   * organism's radar — a mechanical payoff for those traits, not just flavour. */
+  function isDetected(watcher, target) {
+    const cam = target.stats.camouflage || 0;
+    if (cam <= 0) return true;
+    return Math.random() > cam / 140;
+  }
+
+  function gatherContext(game, org) {
+    const near = game.world.grid.queryRadius(org.x, org.y, org.stats.sense_radius, []);
+    let nearestThreat = null, nearestPrey = null, nearestCuriosity = null;
+    let bestThreatD = Infinity, bestPreyD = Infinity, bestCurD = Infinity;
+    const newSightings = [];
+
+    for (const other of near) {
+      if (other === org || !O.isAlive(other)) continue;
+      const d = K.dist(org.x, org.y, other.x, other.y);
+      if (!isDetected(org, other)) continue;
+
+      if (isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
+      if (validHuntTarget(org, other) && d < bestPreyD) {
+        const canHuntNow = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
+        if (canHuntNow) { bestPreyD = d; nearestPrey = { dist: d, entity: other }; }
+      }
+      if (other.ownerId === 'wild' && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
+    }
+
+    for (const sample of game.discovery.samples) {
+      const d = K.dist(org.x, org.y, sample.x, sample.y);
+      if (d <= org.stats.sense_radius && d < bestCurD) { bestCurD = d; nearestCuriosity = { dist: d, x: sample.x, y: sample.y, ref: sample }; }
+    }
+
+    const canEatPlants = org.diet !== 'carnivore';
+    const canHunt = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
+    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, org.stats.sense_radius, 4) : null;
+
+    return { nearestThreat, nearestPrey, nearestFood, nearestCuriosity, canEatPlants, canHunt, newSightings, defendRadius: org.stats.sense_radius };
+  }
+
+  // -- movement ---------------------------------------------------------------
+  function moveToward(org, tx, ty, dt, mul) {
+    const dx = tx - org.x, dy = ty - org.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-4) return 0;
+    const desired = Math.atan2(dy, dx);
+    org.heading = K.turnToward(org.heading, desired, 5 * dt);
+    const spd = (org.stats.speed / SPEED_DIV) * (mul || 1);
+    const step = Math.min(d, spd * dt);
+    org.x += Math.cos(org.heading) * step;
+    org.y += Math.sin(org.heading) * step;
+    return d - step;
+  }
+
+  function pickWanderTarget(org, world, radius) {
+    for (let i = 0; i < 6; i++) {
+      const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * radius;
+      const x = K.clamp(org.x + Math.cos(a) * r, 1, world.size - 1);
+      const y = K.clamp(org.y + Math.sin(a) * r, 1, world.size - 1);
+      const b = W.biomeAt(world, x, y);
+      if (b !== W.BIOME.WATER) return { x, y };
+    }
+    return { x: org.x, y: org.y };
+  }
+
+  // -- combat / death -----------------------------------------------------
+  function resolveDeath(game, bus, victim, killer) {
+    if (victim.ownerId === 'wild') {
+      if (killer && killer.ownerId === 'player') {
+        D.spawnSample(game, game.world, victim.x, victim.y, victim);
+        D.recordEncounter(game, bus, killer, victim, 'wild_killed', victim.x, victim.y);
+        killer.carrying = Math.min(MAX_CARRY, killer.carrying + 9 + victim.stats.size * 0.25);
+      }
+    } else {
+      if (killer) D.recordEncounter(game, bus, victim, killer, 'player_killed', victim.x, victim.y);
+    }
+    CM.coremind.removeOrganism(game, victim);
+  }
+
+  function meleeTick(game, bus, org, dt) {
+    const target = org.actionTarget && org.actionTarget.ref;
+    if (!target || !O.isAlive(target)) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; return; }
+    const d = K.dist(org.x, org.y, target.x, target.y);
+    if (d > ATTACK_LEASH) { org.state = S.HUNT; return; }
+
+    const pierce = org.behaviors.has('armor_pierce') ? 0.5 : 1;
+    const venomMul = org.behaviors.has('damage_over_time') ? 1.28 : 1;
+    const effDef = target.stats.defense * pierce;
+    const dmg = Math.max(1, org.stats.attack - effDef * 0.5) * venomMul * dt;
+    target.health -= dmg;
+    if (org.behaviors.has('passive_heal')) target.__attackedThisTick = true;
+
+    const retaliates = (target.ownerId === 'wild' && T.WILD_BY_ID[target.speciesId].diet === 'carnivore')
+      || (target.ownerId === 'player' && (target.directive === 'DEFEND' || target.directive === 'HUNT'));
+    if (retaliates && target.health > 0) {
+      const rEffDef = org.stats.defense;
+      const rDmg = Math.max(1, target.stats.attack - rEffDef * 0.5) * dt;
+      org.health -= rDmg;
+    }
+
+    if (target.health <= 0) { resolveDeath(game, bus, target, org); org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; }
+    if (org.health <= 0) resolveDeath(game, bus, org, target);
+  }
+
+  // -- per-organism step ------------------------------------------------------
+  function executeState(game, bus, org, dt) {
+    const world = game.world;
+    switch (org.state) {
+      case S.EXPLORE: {
+        if (!org.actionTarget || K.dist(org.x, org.y, org.actionTarget.x, org.actionTarget.y) < ARRIVE_DIST) {
+          const radius = (org.ownerId === 'player' && org.directive === 'EXPLORE') ? 26 : 10;
+          org.actionTarget = pickWanderTarget(org, world, radius);
+        }
+        moveToward(org, org.actionTarget.x, org.actionTarget.y, dt, 0.55);
+        break;
+      }
+      case S.SEEK_FOOD: {
+        const tgt = org.actionTarget;
+        if (!tgt) { org.state = S.EXPLORE; break; }
+        const d = moveToward(org, tgt.x, tgt.y, dt, 0.8);
+        if (d < ARRIVE_DIST) {
+          const taken = W.consumeFood(world, tgt.x, tgt.y, 16);
+          org.hunger = Math.max(0, org.hunger - taken * 3.2);
+          org.energy = Math.min(org.stats.energyMax, org.energy + taken * 0.6);
+          if (org.ownerId === 'player' && org.directive === 'GATHER') {
+            org.carrying = Math.min(MAX_CARRY, org.carrying + taken * 0.5);
+          }
+          org.actionTarget = null; org.aiCounter = 0;
+        }
+        break;
+      }
+      case S.HUNT: {
+        const tgt = org.actionTarget && org.actionTarget.ref;
+        if (!tgt || !O.isAlive(tgt)) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; break; }
+        const d = K.dist(org.x, org.y, tgt.x, tgt.y);
+        org.huntTimer = (org.huntTimer || 0) + dt;
+        if (d <= ATTACK_RANGE) { org.state = S.ATTACK; org.huntTimer = 0; break; }
+        if (org.huntTimer > HUNT_GIVEUP) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; org.huntTimer = 0; break; }
+        moveToward(org, tgt.x, tgt.y, dt, 1.05);
+        break;
+      }
+      case S.ATTACK:
+        meleeTick(game, bus, org, dt);
+        break;
+      case S.FLEE: {
+        const away = org.actionTarget;
+        if (away) {
+          const a = Math.atan2(org.y - away.y, org.x - away.x);
+          moveToward(org, org.x + Math.cos(a) * 6, org.y + Math.sin(a) * 6, dt, 1.15);
+        }
+        break;
+      }
+      case S.REST:
+        org.energy = Math.min(org.stats.energyMax, org.energy + org.stats.energyMax * 0.08 * dt);
+        org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.02 * dt);
+        break;
+      case S.RETURN_TO_CORE: {
+        const d = moveToward(org, game.core.x, game.core.y, dt, 1);
+        if (d < game.core.radius) {
+          if (org.carrying > 0) {
+            CM.coremind.deposit(game, org.carrying, org.carrying * 0.25);
+            org.carrying = 0;
+          }
+          org.aiCounter = 0;
+        }
+        break;
+      }
+      case S.REPRODUCE: {
+        if (org.reproTimer == null) org.reproTimer = 3.5 + org.stats.size * 0.06;
+        org.reproTimer -= dt;
+        if (org.reproTimer <= 0) {
+          attemptReproduce(game, bus, org);
+          org.reproTimer = null; org.reproCooldown = 22 + Math.random() * 10; org.aiCounter = 0;
+        }
+        break;
+      }
+      case S.INVESTIGATE: {
+        const tgt = org.actionTarget;
+        if (!tgt) { org.state = S.EXPLORE; break; }
+        const d = moveToward(org, tgt.x, tgt.y, dt, 0.7);
+        if (d < ARRIVE_DIST) { org.directiveTarget = null; org.actionTarget = null; org.aiCounter = 0; }
+        break;
+      }
+      default: break;
+    }
+  }
+
+  function attemptReproduce(game, bus, org) {
+    if (game.organisms.length >= MAX_ACTIVE) return;
+    // Wild reproduction has its own soft ceiling (double the target density)
+    // so the ecosystem plateaus instead of one tier filling the entire
+    // active-organism cap and crowding out everything else, including the
+    // player's own designs.
+    if (org.ownerId === 'wild') {
+      const tier = T.WILD_BY_ID[org.speciesId].tier;
+      if (tier === 'prey' && game.stats.herbivorePop >= PREY_TARGET * 2) return;
+      if (tier === 'predator' && game.stats.predatorPop >= PRED_TARGET * 2) return;
+    } else if (game.stats.playerPop >= PLAYER_REPRO_SOFT_CAP) {
+      // Auto-reproduction pauses once the colony is sizeable so it never
+      // crowds out the wildlife or the player's own room to deploy fresh
+      // designs — deliberate CREATE ORGANISM spend is never blocked by this.
+      return;
+    }
+    org.energy -= org.stats.energyMax * 0.42;
+    org.health -= org.stats.health * 0.08;
+    const jitter = () => (Math.random() - 0.5) * 2.4;
+    let traits = org.traits.slice();
+    if (org.ownerId === 'wild' && Math.random() < 0.08) {
+      const cat = K.pick(Math.random, T.CATEGORIES);
+      const options = T.TRAITS_BY_CATEGORY[cat];
+      if (options.length) traits = traits.filter(id => T.TRAITS_BY_ID[id].category !== cat).concat([K.pick(Math.random, options).id]);
+    }
+    const child = O.create({
+      ownerId: org.ownerId, speciesId: org.speciesId, designId: org.designId,
+      name: org.ownerId === 'player' ? org.name : org.name,
+      traits, diet: org.diet, color: org.color,
+      x: K.clamp(org.x + jitter(), 1, game.world.size - 1),
+      y: K.clamp(org.y + jitter(), 1, game.world.size - 1),
+      generation: org.generation + 1,
+      directive: org.ownerId === 'player' ? org.directive : null
+    });
+    CM.coremind.addOrganism(game, child);
+    return child;
+  }
+
+  // -- wild population maintenance --------------------------------------------
+  function maybeSpawnWild(game, dt) {
+    game.wildSpawnAcc = (game.wildSpawnAcc || 0) + dt;
+    if (game.wildSpawnAcc < 1.4) return;
+    game.wildSpawnAcc = 0;
+    if (game.organisms.length >= MAX_ACTIVE) return;
+    const wildCount = game.stats.herbivorePop + game.stats.predatorPop;
+    if (wildCount >= WILD_CAP) return;
+
+    if (game.stats.herbivorePop < PREY_TARGET && Math.random() < 0.55) {
+      const species = T.WILD_SPECIES.filter(s => s.tier === 'prey').map(s => s.id);
+      spawnWildOne(game, K.pick(Math.random, species), randomLandSpot(game.world, 8, 30));
+    } else if (game.stats.predatorPop < PRED_TARGET && game.stats.herbivorePop > MIN_PREY_FOR_PRED && Math.random() < 0.28) {
+      const species = T.WILD_SPECIES.filter(s => s.tier === 'predator').map(s => s.id);
+      spawnWildOne(game, K.pick(Math.random, species), randomLandSpot(game.world, 20, 30));
+    }
+  }
+
+  // -- main tick ----------------------------------------------------------
+  function tick(game, bus, dt) {
+    game.simTime += dt;
+
+    W.tickFood(game.world, 3200);
+    D.tickSamples(game, dt);
+    maybeSpawnWild(game, dt);
+
+    const camX = game.camera.x, camY = game.camera.y;
+    let playerPop = 0, herbivorePop = 0, predatorPop = 0, plantTotal = 0;
+
+    // Snapshot the roster before iterating: resolveDeath() splices
+    // game.organisms as organisms die (natural causes below, or combat
+    // inside executeState/meleeTick), and mutating an array mid-`for...of`
+    // silently skips whatever shifts into the current index.
+    const roster = game.organisms.slice();
+
+    for (const org of roster) {
+      if (!org.alive) continue; // already resolveDeath'd earlier this tick (e.g. to a faster predator)
+      org.age += dt;
+
+      const distCam = K.dist(org.x, org.y, camX, camY);
+      org.lod = distCam < NEAR_R ? 'near' : distCam < MID_R ? 'mid' : 'far';
+
+      // needs
+      const metaRate = org.stats.metabolism / 11;
+      org.hunger = K.clamp(org.hunger + metaRate * 1.05 * dt, 0, 100);
+      const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.RETURN_TO_CORE;
+      org.energy = K.clamp(org.energy - metaRate * (moving ? 0.9 : 0.35) * dt, 0, org.stats.energyMax);
+      if (org.hunger >= 100) org.health -= org.stats.health * 0.03 * dt;
+      if (org.energy <= 0) org.health -= org.stats.health * 0.015 * dt;
+
+      const stress = O.tempStress(org, W.tempAt(game.world, org.x, org.y));
+      if (stress > 1) org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
+
+      if (org.behaviors.has('passive_heal') && org.hunger < 85 && !org.__attackedThisTick) {
+        org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.045 * dt);
+      }
+      org.__attackedThisTick = false;
+
+      if (org.reproCooldown > 0) org.reproCooldown -= dt;
+
+      // AI re-decision, throttled by LOD
+      org.aiCounter = (org.aiCounter || 0) - 1;
+      if (org.aiCounter <= 0) {
+        const interval = org.lod === 'near' ? 1 : org.lod === 'mid' ? 4 : 12;
+        org.aiCounter = interval;
+        const ctx = gatherContext(game, org);
+        for (const s of ctx.newSightings) D.recordSighting(game, bus, s.speciesId, s.x, s.y);
+        const decision = CM.ai.decide(org, ctx);
+        const transitioning = decision.state !== org.state;
+        if (transitioning) { org.state = decision.state; org.huntTimer = 0; }
+        // A null target on an unchanged state (e.g. still EXPLORE) means
+        // "nothing new to report" — keep whatever in-progress target
+        // executeState is working toward instead of wiping it every
+        // re-decision, which for a near-camera organism is every tick.
+        if (decision.target !== null || transitioning) org.actionTarget = decision.target;
+      }
+
+      executeState(game, bus, org, dt);
+      // Deliberately org.alive, not O.isAlive(): isAlive also factors in
+      // health, which is true both for "combat already resolveDeath'd this
+      // organism inside meleeTick" (alive=false — skip) and for "hunger/temp
+      // damage above just dropped health to 0 and hasn't been resolved yet"
+      // (alive still true — must fall through to the health<=0 check below,
+      // or the organism becomes a permanent zombie: dead in every practical
+      // sense but never removed from the roster).
+      if (!org.alive) continue;
+
+      org.x = K.clamp(org.x, 0.1, game.world.size - 0.1);
+      org.y = K.clamp(org.y, 0.1, game.world.size - 0.1);
+      game.world.grid.update(org);
+
+      if (org.health <= 0) { resolveDeath(game, bus, org, null); continue; }
+
+      if (org.ownerId === 'player') playerPop++;
+      else {
+        const sp = T.WILD_BY_ID[org.speciesId];
+        if (sp && sp.tier === 'predator') predatorPop++; else herbivorePop++;
+      }
+    }
+
+    for (let i = 0; i < game.world.food.length; i += 733) plantTotal += game.world.food[i]; // sampled estimate, cheap
+    game.stats = { playerPop, herbivorePop, predatorPop, plantTotal: Math.round(plantTotal) };
+
+    // slow passive core regeneration — the Coremind's own baseline metabolism
+    game.core.energy = Math.min(999, game.core.energy + 0.9 * dt);
+
+    narrateEcosystem(game, bus, dt);
+  }
+
+  /* The food web has to visibly react on its own, not just in the player's
+   * organisms. Rather than scripting it, watch the population numbers the
+   * simulation already produces and say something when they cross a
+   * threshold — each flag latches so one crossing narrates once, not every
+   * tick it stays crossed. */
+  function narrateEcosystem(game, bus, dt) {
+    const eco = game.eco || (game.eco = { acc: 0, prevHerb: 0, prevPred: 0, shortage: false, predSurge: false, herbCrash: false });
+    eco.acc += dt;
+    if (eco.acc < 16) return;
+    eco.acc = 0;
+
+    const s = game.stats;
+    const plantFrac = K.clamp01(s.plantTotal / 3200);
+
+    if (plantFrac < 0.18 && !eco.shortage) {
+      eco.shortage = true;
+      D.pushEvent(game, bus, { kind: 'warn', icon: '\u{1F342}', message: 'Food shortage detected — plant coverage is critically low.' });
+    } else if (plantFrac > 0.35) eco.shortage = false;
+
+    if (eco.prevPred > 4 && s.predatorPop > eco.prevPred * 1.4 && !eco.predSurge) {
+      eco.predSurge = true;
+      D.pushEvent(game, bus, { kind: 'warn', icon: '\u{1F43A}', message: 'Predator population increasing.' });
+    } else if (s.predatorPop < eco.prevPred * 1.15) eco.predSurge = false;
+
+    if (eco.prevHerb > 10 && s.herbivorePop < eco.prevHerb * 0.55 && !eco.herbCrash) {
+      eco.herbCrash = true;
+      D.pushEvent(game, bus, { kind: 'warn', icon: '\u{26A0}', message: 'Herbivore population crashing — predators will follow.' });
+    } else if (s.herbivorePop > eco.prevHerb * 0.85) eco.herbCrash = false;
+
+    eco.prevHerb = s.herbivorePop; eco.prevPred = s.predatorPop;
+  }
+
+  CM.simulation = {
+    MAX_ACTIVE, tick, spawnStarterColony, spawnStarterWildlife, spawnWildOne, randomLandSpot, gatherContext
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — camera + rendering. Terrain is baked once into an offscreen
+ * canvas (1 pixel per world cell) and blitted with a single drawImage per
+ * frame regardless of zoom level; only organisms/samples/Core are drawn as
+ * individual shapes, and only the ones inside the viewport (+ a margin).
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const W = CM.world;
+  const T = CM.traits;
+
+  const ZOOM_MIN = 5, ZOOM_MAX = 46;
+  const CAM_EASE = 6.5; // per-second convergence rate toward the camera target
+
+  const BIOME_COLOR = {
+    [W.BIOME.WATER]: [26, 61, 92],
+    [W.BIOME.SOIL]: [90, 68, 48],
+    [W.BIOME.ROCK]: [78, 80, 84]
+  };
+
+  function buildTerrainCache(world) {
+    const size = world.size;
+    const canvas = (typeof OffscreenCanvas !== 'undefined')
+      ? new OffscreenCanvas(size, size)
+      : Object.assign(document.createElement('canvas'), { width: size, height: size });
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = y * size + x;
+        const p = i * 4;
+        const b = world.biome[i];
+        let rgb;
+        if (b === W.BIOME.GRASS) {
+          const lush = K.clamp01(world.food[i] / Math.max(1, world.foodCap[i]));
+          const t = K.clamp01(K.invLerp(-4, 30, world.temp[i]));
+          const g1 = [107, 66, 38], g2 = [63, 138, 58], g3 = [150, 168, 60];
+          const cold = [K.lerp(g1[0], g2[0], lush), K.lerp(g1[1], g2[1], lush), K.lerp(g1[2], g2[2], lush)];
+          const warm = [K.lerp(g1[0], g3[0], lush), K.lerp(g1[1], g3[1], lush), K.lerp(g1[2], g3[2], lush)];
+          rgb = [K.lerp(cold[0], warm[0], t), K.lerp(cold[1], warm[1], t), K.lerp(cold[2], warm[2], t)];
+        } else {
+          rgb = BIOME_COLOR[b] || [50, 50, 50];
+        }
+        img.data[p] = rgb[0] | 0; img.data[p + 1] = rgb[1] | 0; img.data[p + 2] = rgb[2] | 0; img.data[p + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+  }
+
+  function ensureCache(game) {
+    if (!game.render) game.render = {};
+    if (!game.render.terrainCanvas || game.render.terrainSeed !== game.seed) {
+      game.render.terrainCanvas = buildTerrainCache(game.world);
+      game.render.terrainSeed = game.seed;
+    }
+    return game.render.terrainCanvas;
+  }
+
+  function resizeCanvas(canvas) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    return dpr;
+  }
+
+  function clampCamera(game) {
+    const c = game.camera, size = game.world.size;
+    c.x = K.clamp(c.x, 0, size);
+    c.y = K.clamp(c.y, 0, size);
+    c.zoom = K.clamp(c.zoom, ZOOM_MIN, ZOOM_MAX);
+    if (c.targetZoom != null) c.targetZoom = K.clamp(c.targetZoom, ZOOM_MIN, ZOOM_MAX);
+  }
+
+  function focusOn(game, x, y, zoom) {
+    const c = game.camera;
+    c.targetX = x; c.targetY = y;
+    if (zoom != null) c.targetZoom = zoom;
+  }
+
+  function updateCamera(game, dt) {
+    const c = game.camera;
+    if (c.targetX == null) { c.targetX = c.x; c.targetY = c.y; c.targetZoom = c.zoom; }
+    if (!c.dragging) {
+      const t = 1 - Math.exp(-CAM_EASE * dt);
+      c.x = K.lerp(c.x, c.targetX, t);
+      c.y = K.lerp(c.y, c.targetY, t);
+      c.zoom = K.lerp(c.zoom, c.targetZoom, t);
+    }
+    clampCamera(game);
+  }
+
+  function worldToScreen(game, canvas, wx, wy) {
+    const c = game.camera;
+    return {
+      x: (wx - c.x) * c.zoom + canvas.width / 2,
+      y: (wy - c.y) * c.zoom + canvas.height / 2
+    };
+  }
+  function screenToWorld(game, canvas, sx, sy) {
+    const c = game.camera;
+    return {
+      x: (sx - canvas.width / 2) / c.zoom + c.x,
+      y: (sy - canvas.height / 2) / c.zoom + c.y
+    };
+  }
+
+  // -- organism drawing -------------------------------------------------------
+  function drawOrganism(ctx, org, sx, sy, zoom, alpha) {
+    const size = Math.max(1.5, org.stats.size * 0.075) * zoom;
+    const mods = new Set(org.traits.map(id => (T.TRAITS_BY_ID[id] || {}).visual_modifier).filter(Boolean));
+    const stretch = mods.has('streamlined') ? 1.5 : mods.has('lean') ? 1.25 : 1;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(org.heading);
+
+    // camouflage: render translucent to hint that predators struggle to spot it
+    if (mods.has('mottled')) ctx.globalAlpha = 0.62;
+
+    // legs / digger limbs, drawn under the body
+    if (mods.has('legs') || mods.has('digger')) {
+      ctx.strokeStyle = 'rgba(0,0,0,.35)';
+      ctx.lineWidth = Math.max(1, size * 0.12);
+      const n = mods.has('digger') ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const t = (i / (n - 1 || 1) - 0.5) * size * 1.6;
+        ctx.beginPath(); ctx.moveTo(t, size * 0.55); ctx.lineTo(t * 0.7, size * 1.05); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(t, -size * 0.55); ctx.lineTo(t * 0.7, -size * 1.05); ctx.stroke();
+      }
+    }
+
+    // body
+    let bodyColor = org.color;
+    if (mods.has('warm_hued')) bodyColor = tint(bodyColor, [40, 10, -10]);
+    if (mods.has('cool_hued')) bodyColor = tint(bodyColor, [-15, 5, 35]);
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * stretch, size * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (mods.has('shell')) {
+      ctx.strokeStyle = 'rgba(20,20,20,.55)';
+      ctx.lineWidth = Math.max(1.2, size * 0.22);
+      ctx.beginPath(); ctx.ellipse(0, 0, size * stretch * 0.86, size * 0.56, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (mods.has('veined')) {
+      ctx.strokeStyle = 'rgba(255,90,90,.5)';
+      ctx.lineWidth = Math.max(0.6, size * 0.08);
+      ctx.beginPath(); ctx.moveTo(-size * 0.4, 0); ctx.lineTo(size * 0.4, 0); ctx.stroke();
+    }
+
+    // head features (front = +x local, since heading rotates toward travel dir)
+    if (mods.has('jaws') || mods.has('claws')) {
+      ctx.fillStyle = 'rgba(30,20,20,.85)';
+      ctx.beginPath();
+      ctx.moveTo(size * stretch * 0.85, -size * 0.22);
+      ctx.lineTo(size * stretch * 1.35, 0);
+      ctx.lineTo(size * stretch * 0.85, size * 0.22);
+      ctx.closePath(); ctx.fill();
+    }
+    if (mods.has('eyes')) {
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(size * stretch * 0.55, -size * 0.28, size * 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(size * stretch * 0.55, size * 0.28, size * 0.15, 0, Math.PI * 2); ctx.fill();
+    }
+    if (mods.has('antennae')) {
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = Math.max(0.6, size * 0.08);
+      ctx.beginPath(); ctx.moveTo(size * stretch * 0.6, -size * 0.1); ctx.lineTo(size * stretch * 1.3, -size * 0.55); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(size * stretch * 0.6, size * 0.1); ctx.lineTo(size * stretch * 1.3, size * 0.55); ctx.stroke();
+    }
+    if (mods.has('whiskers')) {
+      ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = Math.max(0.5, size * 0.06);
+      for (const s of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(0, s * size * 0.6); ctx.lineTo(-size * 0.6, s * size * 1.0); ctx.stroke();
+      }
+    }
+    if (mods.has('venom_glands')) {
+      ctx.fillStyle = '#8a3fd1';
+      for (const s of [-0.35, 0.35]) { ctx.beginPath(); ctx.arc(-size * 0.15, s * size * 0.55, size * 0.22, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (mods.has('acid_sacs')) {
+      ctx.fillStyle = '#8fd15a';
+      for (const s of [-0.3, 0.3]) { ctx.beginPath(); ctx.arc(-size * 0.25, s * size * 0.5, size * 0.2, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (mods.has('brood_sac')) {
+      ctx.fillStyle = 'rgba(255,200,220,.85)';
+      ctx.beginPath(); ctx.ellipse(-size * 0.95, 0, size * 0.4, size * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.restore();
+
+    if (org.selected) {
+      ctx.save();
+      ctx.strokeStyle = '#33e6b0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx, sy, size * 1.9, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // health bar for anything below 60% — a quiet, constant readout of danger
+    const hf = K.clamp01(org.health / org.stats.health);
+    if (hf < 0.6) {
+      const w = Math.max(10, size * 2.2), h = 3;
+      const bx = sx - w / 2, by = sy - size * 1.9 - 6;
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, by, w, h);
+      ctx.fillStyle = hf < 0.3 ? '#ef5b5b' : '#f2a33c'; ctx.fillRect(bx, by, w * hf, h);
+    }
+  }
+
+  function tint(hex, delta) {
+    const c = hexToRgb(hex);
+    return `rgb(${K.clamp(c[0] + delta[0], 0, 255)},${K.clamp(c[1] + delta[1], 0, 255)},${K.clamp(c[2] + delta[2], 0, 255)})`;
+  }
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+
+  // -- main draw ---------------------------------------------------------
+  function draw(game, canvas, ctx) {
+    const dpr = resizeCanvas(canvas);
+    const w = canvas.width, h = canvas.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#04080d';
+    ctx.fillRect(0, 0, w, h);
+
+    const zoom = game.camera.zoom * dpr;
+    const size = game.world.size;
+    const halfW = w / 2 / zoom, halfH = h / 2 / zoom;
+    let sx0 = game.camera.x - halfW, sy0 = game.camera.y - halfH;
+    let sx1 = game.camera.x + halfW, sy1 = game.camera.y + halfH;
+    const csx0 = K.clamp(sx0, 0, size), csy0 = K.clamp(sy0, 0, size);
+    const csx1 = K.clamp(sx1, 0, size), csy1 = K.clamp(sy1, 0, size);
+
+    if (csx1 > csx0 && csy1 > csy0) {
+      const cache = ensureCache(game);
+      const dx0 = (csx0 - game.camera.x) * zoom + w / 2, dy0 = (csy0 - game.camera.y) * zoom + h / 2;
+      const dx1 = (csx1 - game.camera.x) * zoom + w / 2, dy1 = (csy1 - game.camera.y) * zoom + h / 2;
+      ctx.imageSmoothingEnabled = zoom < 3;
+      ctx.drawImage(cache, csx0, csy0, csx1 - csx0, csy1 - csy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
+    }
+
+    // Core
+    {
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, game.core.x, game.core.y);
+      const r = game.core.radius * zoom;
+      const pulse = 0.85 + Math.sin(game.simTime * 2) * 0.08;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * pulse);
+      grad.addColorStop(0, 'rgba(51,230,176,.55)');
+      grad.addColorStop(1, 'rgba(51,230,176,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0f2e26';
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(4, r * 0.32), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#33e6b0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(4, r * 0.32), 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // samples
+    for (const s of game.discovery.samples) {
+      if (s.x < sx0 - 2 || s.x > sx1 + 2 || s.y < sy0 - 2 || s.y > sy1 + 2) continue;
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, s.x, s.y);
+      const r = Math.max(4, 3.6 * zoom / 12);
+      ctx.fillStyle = 'rgba(51,230,176,.85)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // organisms (viewport-culled)
+    const margin = 3;
+    for (const org of game.organisms) {
+      if (org.x < sx0 - margin || org.x > sx1 + margin || org.y < sy0 - margin || org.y > sy1 + margin) continue;
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, org.x, org.y);
+      drawOrganism(ctx, org, p.x, p.y, zoom);
+    }
+
+    canvas.__dpr = dpr;
+  }
+
+  function worldToScreenDpr(game, w, h, zoom, dpr, wx, wy) {
+    return { x: (wx - game.camera.x) * zoom + w / 2, y: (wy - game.camera.y) * zoom + h / 2 };
+  }
+
+  CM.render = {
+    ZOOM_MIN, ZOOM_MAX, ensureCache, resizeCanvas, clampCamera, focusOn, updateCamera,
+    worldToScreen, screenToWorld, draw, drawOrganism
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — touch input: one-finger drag to pan, two-finger pinch to zoom,
+ * tap to select/inspect. Pointer Events unify mouse and touch so the same
+ * code path is what gets exercised on desktop during development.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const R = CM.render;
+
+  const TAP_MOVE_THRESHOLD = 9;   // px
+  const TAP_MAX_DURATION = 400;   // ms
+  const HIT_RADIUS_PX = 22;
+
+  function zoomBy(game, factor) {
+    const c = game.camera;
+    c.targetZoom = K.clamp((c.targetZoom || c.zoom) * factor, R.ZOOM_MIN, R.ZOOM_MAX);
+  }
+  function focusCore(game) { R.focusOn(game, game.core.x, game.core.y, 16); }
+
+  function hitTestOrganism(game, canvas, screenX, screenY) {
+    let best = null, bestD = HIT_RADIUS_PX;
+    for (const org of game.organisms) {
+      const p = R.worldToScreen(game, canvas, org.x, org.y);
+      const d = Math.hypot(p.x - screenX, p.y - screenY);
+      const r = Math.max(10, org.stats.size * 0.11 * game.camera.zoom * (canvas.__dpr || 1) * 1.9);
+      if (d < r + 6 && d < bestD) { bestD = d; best = org; }
+    }
+    return best;
+  }
+  function hitTestSample(game, canvas, screenX, screenY) {
+    let best = null, bestD = HIT_RADIUS_PX;
+    for (const s of game.discovery.samples) {
+      const p = R.worldToScreen(game, canvas, s.x, s.y);
+      const d = Math.hypot(p.x - screenX, p.y - screenY);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return best;
+  }
+  function hitTestCore(game, canvas, screenX, screenY) {
+    const p = R.worldToScreen(game, canvas, game.core.x, game.core.y);
+    const r = Math.max(18, game.core.radius * game.camera.zoom * (canvas.__dpr || 1));
+    return Math.hypot(p.x - screenX, p.y - screenY) < r ? game.core : null;
+  }
+
+  function attach(canvas, game, handlers) {
+    handlers = handlers || {};
+    const pointers = new Map();
+    let mode = null; // 'pan' | 'pinch'
+    let panLast = null;
+    let pinchStartDist = 0, pinchStartZoom = 0;
+    let tapStart = null; // {x,y,t,id}
+
+    function dpr() { return canvas.__dpr || (window.devicePixelRatio || 1); }
+    function toCanvasPx(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: (evt.clientX - rect.left) * (canvas.width / rect.width), y: (evt.clientY - rect.top) * (canvas.height / rect.height) };
+    }
+
+    function onDown(evt) {
+      canvas.setPointerCapture(evt.pointerId);
+      const p = toCanvasPx(evt);
+      pointers.set(evt.pointerId, p);
+      if (pointers.size === 1) {
+        mode = 'pan';
+        panLast = p;
+        tapStart = { x: p.x, y: p.y, t: performance.now(), id: evt.pointerId };
+        game.camera.dragging = true;
+      } else if (pointers.size === 2) {
+        mode = 'pinch';
+        tapStart = null;
+        const pts = [...pointers.values()];
+        pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        pinchStartZoom = game.camera.zoom;
+      }
+    }
+
+    function onMove(evt) {
+      if (!pointers.has(evt.pointerId)) return;
+      const p = toCanvasPx(evt);
+      pointers.set(evt.pointerId, p);
+
+      if (mode === 'pan' && pointers.size === 1) {
+        const dx = p.x - panLast.x, dy = p.y - panLast.y;
+        panLast = p;
+        const zoom = game.camera.zoom * dpr();
+        game.camera.x -= dx / zoom;
+        game.camera.y -= dy / zoom;
+        game.camera.targetX = game.camera.x; game.camera.targetY = game.camera.y;
+        R.clampCamera(game);
+        if (tapStart && Math.hypot(p.x - tapStart.x, p.y - tapStart.y) > TAP_MOVE_THRESHOLD) tapStart = null;
+      } else if (mode === 'pinch' && pointers.size === 2) {
+        const pts = [...pointers.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        const z = K.clamp(pinchStartZoom * (dist / pinchStartDist), R.ZOOM_MIN, R.ZOOM_MAX);
+        game.camera.zoom = z; game.camera.targetZoom = z;
+      }
+    }
+
+    function onUp(evt) {
+      const wasTap = tapStart && tapStart.id === evt.pointerId
+        && (performance.now() - tapStart.t) < TAP_MAX_DURATION;
+      pointers.delete(evt.pointerId);
+
+      if (wasTap) handleTap(tapStart.x, tapStart.y);
+
+      if (pointers.size === 0) {
+        mode = null; game.camera.dragging = false; tapStart = null;
+      } else if (pointers.size === 1) {
+        mode = 'pan';
+        panLast = [...pointers.values()][0];
+        tapStart = null;
+      }
+    }
+
+    function handleTap(x, y) {
+      const org = hitTestOrganism(game, canvas, x, y);
+      if (org) { handlers.onSelectOrganism && handlers.onSelectOrganism(org); return; }
+      const sample = hitTestSample(game, canvas, x, y);
+      if (sample) { handlers.onTapSample && handlers.onTapSample(sample); return; }
+      const core = hitTestCore(game, canvas, x, y);
+      if (core) { handlers.onTapCore && handlers.onTapCore(); return; }
+      handlers.onTapEmpty && handlers.onTapEmpty(R.screenToWorld(game, canvas, x, y));
+    }
+
+    canvas.addEventListener('pointerdown', onDown, { passive: true });
+    canvas.addEventListener('pointermove', onMove, { passive: true });
+    canvas.addEventListener('pointerup', onUp, { passive: true });
+    canvas.addEventListener('pointercancel', onUp, { passive: true });
+    canvas.addEventListener('wheel', evt => {
+      evt.preventDefault();
+      zoomBy(game, evt.deltaY < 0 ? 1.12 : 0.89);
+    }, { passive: false });
+  }
+
+  CM.input = { attach, zoomBy, focusCore, hitTestOrganism, hitTestSample, hitTestCore };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — DOM UI: HUD, tabs, directive bar, event feed, genome designer,
+ * inspect overlay. Rendering (canvas) stays in render.js; this file only
+ * touches the DOM layer on top of it.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const T = CM.traits;
+  const D = CM.discovery;
+  const CORE = CM.coremind;
+
+  const DIRECTIVE_META = {
+    EXPLORE: { icon: '\u{1F9ED}', label: 'Explore' },
+    GATHER: { icon: '\u{1F33F}', label: 'Gather' },
+    HUNT: { icon: '\u{1F3F9}', label: 'Hunt' },
+    DEFEND: { icon: '\u{1F6E1}', label: 'Defend' },
+    REPRODUCE: { icon: '\u{1F95A}', label: 'Reproduce' },
+    INVESTIGATE: { icon: '\u{1F50D}', label: 'Investigate' },
+    RETURN: { icon: '\u{1F3E0}', label: 'Return' }
+  };
+
+  const STAT_ROWS = [
+    ['health', 'Health'], ['energyMax', 'Energy'], ['speed', 'Speed'], ['size', 'Size'],
+    ['vision', 'Vision'], ['sense_radius', 'Sense'], ['attack', 'Attack'], ['defense', 'Defense'],
+    ['armor', 'Armor'], ['venom', 'Venom'], ['camouflage', 'Camo'], ['digging', 'Dig'],
+    ['temperature_tolerance', 'Temp.Tol'], ['reproduction_rate', 'Repro'], ['metabolism', 'Metab.']
+  ];
+  const STAT_MAXES = { health: 140, energyMax: 100, speed: 60, size: 40, vision: 70, sense_radius: 45, attack: 70, defense: 70, armor: 45, venom: 45, camouflage: 45, digging: 55, temperature_tolerance: 55, reproduction_rate: 1.2, metabolism: 40 };
+
+  function el(id) { return document.getElementById(id); }
+  function fmt1(n) { return (Math.round(n * 10) / 10).toString(); }
+
+  function init(game, bus) {
+    const ui = {
+      dnaBadgeSeen: 0, unreadAnalyze: 0, previewRaf: null, previewAngle: 0,
+      inspectTarget: null, canvas: el('world-canvas')
+    };
+    game.ui = ui;
+
+    initTabs(game);
+    initDirectiveBar(game, bus);
+    initCamControls(game);
+    initDesigner(game, bus);
+    initInspect(game);
+
+    el('btn-speed').addEventListener('click', () => {
+      game.speed = game.speed >= 3 ? 1 : (game.speed === 1 ? 2 : 3);
+      el('btn-speed').textContent = game.speed + 'x';
+    });
+
+    bus.on('event', evt => onEvent(game, evt));
+
+    render(game);
+    return ui;
+  }
+
+  // -- tabs -----------------------------------------------------------------
+  function initTabs(game) {
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        if (tab === 'dna') { openDesigner(game); return; }
+        document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+        if (tab === 'analyze') { game.ui.unreadAnalyze = 0; renderFeed(game); updateBadges(game); }
+      });
+    });
+  }
+
+  // -- directive bar ----------------------------------------------------------
+  function initDirectiveBar(game, bus) {
+    const bar = el('directive-bar');
+    bar.innerHTML = '';
+    for (const d of CM.organism.DIRECTIVES) {
+      const meta = DIRECTIVE_META[d];
+      const btn = document.createElement('button');
+      btn.className = 'dirbtn'; btn.dataset.directive = d;
+      btn.innerHTML = `<i>${meta.icon}</i>${meta.label}`;
+      btn.addEventListener('click', () => {
+        const scope = CORE.issueDirective(game, d);
+        const who = scope === 'selected' ? (game.byId[game.selection] || {}).name : 'Your colony';
+        toast({ kind: 'system', icon: meta.icon, message: `${who} directed to ${meta.label}.` });
+        renderDirectiveBar(game);
+        renderSelection(game);
+      });
+      bar.appendChild(btn);
+    }
+    renderDirectiveBar(game);
+  }
+  function renderDirectiveBar(game) {
+    const active = game.selection && game.byId[game.selection] ? game.byId[game.selection].directive : game.globalDirective;
+    document.querySelectorAll('#directive-bar .dirbtn').forEach(b => b.classList.toggle('active', b.dataset.directive === active));
+  }
+
+  // -- camera controls ---------------------------------------------------
+  function initCamControls(game) {
+    el('btn-focus-core').addEventListener('click', () => CM.input.focusCore(game));
+    el('btn-zoom-in').addEventListener('click', () => CM.input.zoomBy(game, 1.35));
+    el('btn-zoom-out').addEventListener('click', () => CM.input.zoomBy(game, 1 / 1.35));
+  }
+
+  // -- selection panel ------------------------------------------------------
+  function renderSelection(game) {
+    const panel = el('selection-panel');
+    const summary = el('selection-summary');
+    const org = game.selection && game.byId[game.selection];
+    if (!org) {
+      panel.classList.add('hidden');
+      summary.textContent = 'Tap an organism to select it, or issue a directive to your whole colony.';
+      renderDirectiveBar(game);
+      return;
+    }
+    panel.classList.remove('hidden');
+    const hf = Math.round(100 * org.health / org.stats.health);
+    const ef = Math.round(100 * org.energy / org.stats.energyMax);
+    panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+      <b>${org.name}</b><span style="color:var(--fg-dim);font-size:11px">${org.ownerId === 'player' ? 'Gen ' + org.generation : org.name}</span></div>
+      <div style="font-size:11.5px;color:var(--fg-dim);margin-top:2px">${org.state} &middot; HP ${hf}% &middot; Energy ${ef}%</div>`;
+    summary.textContent = `${org.name} selected — directives below apply to it only.`;
+    renderDirectiveBar(game);
+  }
+
+  // -- events / feed / toasts ---------------------------------------------
+  function onEvent(game, evt) {
+    game.ui.unreadAnalyze++;
+    updateBadges(game);
+    if (evt.kind === 'discovery' || evt.kind === 'death' || evt.kind === 'warn') toast(evt);
+    if (el('panel-analyze').classList.contains('active')) renderFeed(game);
+  }
+
+  function toast(evt) {
+    const layer = el('toast-layer');
+    const div = document.createElement('div');
+    div.className = 'toast' + (evt.kind === 'death' ? ' danger' : evt.kind === 'warn' ? ' warn' : '');
+    div.textContent = (evt.icon ? evt.icon + ' ' : '') + evt.message;
+    layer.appendChild(div);
+    setTimeout(() => { div.style.transition = 'opacity .4s'; div.style.opacity = '0'; setTimeout(() => div.remove(), 400); }, 3600);
+    while (layer.children.length > 3) layer.removeChild(layer.firstChild);
+  }
+
+  function renderFeed(game) {
+    const feed = el('event-feed');
+    const events = game.discovery.events;
+    if (!events.length) { feed.innerHTML = '<div class="event-empty">Nothing observed yet. Send an organism to EXPLORE.</div>'; return; }
+    feed.innerHTML = '';
+    for (const evt of events.slice(0, 80)) {
+      const row = document.createElement('button');
+      row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death' : evt.kind === 'warn' ? ' warn' : '');
+      const mins = Math.floor(evt.time / 60), secs = Math.floor(evt.time % 60);
+      row.innerHTML = `<div class="ico">${evt.icon || '•'}</div><div class="body"><div class="msg">${evt.message}</div><div class="time">t+${mins}:${String(secs).padStart(2, '0')}</div></div>`;
+      row.addEventListener('click', () => onEventClick(game, evt));
+      feed.appendChild(row);
+    }
+  }
+
+  function onEventClick(game, evt) {
+    if (evt.x != null && evt.y != null) CM.render.focusOn(game, evt.x, evt.y, 22);
+    if (evt.traitId) { openDesigner(game); return; }
+    if (evt.orgId && game.byId[evt.orgId]) { CORE.selectOrganism(game, evt.orgId); renderSelection(game); switchTab('explore'); return; }
+    if (evt.speciesId) showInspect(game, 'species', { speciesId: evt.speciesId });
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  }
+
+  function updateBadges(game) {
+    const ab = el('badge-analyze');
+    if (game.ui.unreadAnalyze > 0) { ab.textContent = Math.min(99, game.ui.unreadAnalyze); ab.classList.remove('hidden'); }
+    else ab.classList.add('hidden');
+
+    const discovered = Object.keys(game.discovery.discoveredTraits).length;
+    const db = el('badge-dna');
+    if (discovered > game.ui.dnaBadgeSeen) { db.classList.remove('hidden'); db.classList.add('warn'); }
+    else db.classList.add('hidden');
+  }
+
+  // -- genome designer -----------------------------------------------------
+  function initDesigner(game, bus) {
+    el('btn-designer-close').addEventListener('click', () => closeDesigner(game));
+    el('btn-create-organism').addEventListener('click', () => {
+      const org = CORE.createOrganismFromDraft(game, bus);
+      if (org) { renderDesignerCost(game); renderDesignerStats(game); toast({ kind: 'system', icon: '\u{1F9EA}', message: `${org.name} deployed near the Core.` }); }
+    });
+  }
+
+  function openDesigner(game) {
+    el('designer-overlay').classList.remove('hidden');
+    game.ui.dnaBadgeSeen = Object.keys(game.discovery.discoveredTraits).length;
+    updateBadges(game);
+    renderDesignerSlots(game);
+    renderDesignerStats(game);
+    renderDesignerCost(game);
+    startPreviewLoop(game);
+  }
+  function closeDesigner(game) {
+    el('designer-overlay').classList.add('hidden');
+    stopPreviewLoop(game);
+  }
+
+  function renderDesignerSlots(game) {
+    const wrap = el('designer-slots');
+    wrap.innerHTML = '';
+    for (const cat of T.CATEGORIES) {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      const current = game.designerDraft[cat];
+      const currentTrait = current && T.TRAITS_BY_ID[current];
+      const select = document.createElement('select');
+      const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'None'; select.appendChild(noneOpt);
+      for (const t of T.TRAITS_BY_CATEGORY[cat]) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        const known = !!game.discovery.discoveredTraits[t.id];
+        opt.textContent = known ? t.name : '\u{1F512} ' + t.name;
+        opt.disabled = !known;
+        if (t.id === current) opt.selected = true;
+        select.appendChild(opt);
+      }
+      select.addEventListener('change', () => {
+        CORE.setDesignSlot(game, cat, select.value || null);
+        renderDesignerStats(game); renderDesignerCost(game); renderDesignerSlots(game);
+      });
+      slot.innerHTML = `<div class="cat">${cat}</div>`;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'trait' + (currentTrait ? '' : ' empty');
+      nameDiv.textContent = currentTrait ? currentTrait.name : 'Empty';
+      slot.appendChild(nameDiv);
+      slot.appendChild(select);
+      wrap.appendChild(slot);
+    }
+  }
+
+  function renderDesignerStats(game) {
+    const wrap = el('designer-stats');
+    const stats = CORE.draftStats(game);
+    wrap.innerHTML = '';
+    for (const [key, label] of STAT_ROWS) {
+      const base = T.BASE_STATS[key];
+      const val = stats[key];
+      const delta = val - base;
+      const max = STAT_MAXES[key] || 100;
+      const row = document.createElement('div'); row.className = 'statrow';
+      const pct = K.clamp01(val / max) * 100;
+      const deltaTxt = Math.abs(delta) < 0.01 ? '' : (delta > 0 ? '+' + fmt1(delta) : fmt1(delta));
+      const deltaCls = delta > 0.01 ? 'pos' : delta < -0.01 ? 'neg' : '';
+      row.innerHTML = `<div class="label">${label}</div><div class="bar"><i style="width:${pct}%"></i></div><div class="val">${fmt1(val)}</div><div class="delta ${deltaCls}">${deltaTxt}</div>`;
+      wrap.appendChild(row);
+    }
+  }
+
+  function renderDesignerCost(game) {
+    const cost = CORE.draftCost(game);
+    const afford = CORE.canAfford(game, cost);
+    el('designer-cost').innerHTML = `Cost: <span class="${game.core.biomass >= cost.biomass ? 'ok' : 'bad'}">${cost.biomass} biomass</span> &middot; <span class="${game.core.energy >= cost.energy ? 'ok' : 'bad'}">${cost.energy} energy</span>`;
+    el('btn-create-organism').disabled = !afford;
+  }
+
+  function startPreviewLoop(game) {
+    stopPreviewLoop(game);
+    const canvas = el('preview-canvas');
+    const ctx = canvas.getContext('2d');
+    function frame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      game.ui.previewAngle += 0.012;
+      const traits = CORE.draftTraitIds(game);
+      const stats = T.resolveStats(traits);
+      const previewOrg = { traits, stats, health: stats.health, heading: game.ui.previewAngle, color: '#33e6b0', selected: false };
+      // A fixed, generous zoom independent of the world camera — the
+      // designer's job is to show off trait silhouettes up close, not to
+      // represent true in-world scale.
+      CM.render.drawOrganism(ctx, previewOrg, canvas.width / 2, canvas.height / 2, 55);
+      game.ui.previewRaf = requestAnimationFrame(frame);
+    }
+    frame();
+  }
+  function stopPreviewLoop(game) {
+    if (game.ui.previewRaf) cancelAnimationFrame(game.ui.previewRaf);
+    game.ui.previewRaf = null;
+  }
+
+  // -- inspect overlay (samples / species / core) --------------------------
+  function initInspect(game) {
+    el('btn-inspect-close').addEventListener('click', () => el('inspect-overlay').classList.add('hidden'));
+  }
+
+  function showInspect(game, kind, data) {
+    const title = el('inspect-title'), body = el('inspect-body');
+    if (kind === 'sample') {
+      const s = data.sample;
+      title.textContent = 'BIOLOGICAL SAMPLE';
+      const traitChips = s.traits.map(id => `<span class="trait-chip">${T.TRAITS_BY_ID[id].name}</span>`).join('');
+      body.innerHTML = `<div class="kv"><span class="k">Source</span><span>${s.name}</span></div>
+        <div class="kv"><span class="k">Traits detected</span><span></span></div>
+        <div style="margin-top:6px">${traitChips || '<span style="color:var(--fg-dim)">Unclear — needs more observation</span>'}</div>
+        <button class="bigbtn extract-btn" id="btn-do-extract">EXTRACT SAMPLE</button>`;
+      el('btn-do-extract').addEventListener('click', () => {
+        D.extractSample(game, game.__bus, s.id);
+        el('inspect-overlay').classList.add('hidden');
+      });
+    } else if (kind === 'core') {
+      title.textContent = 'COREMIND';
+      body.innerHTML = `<div class="kv"><span class="k">Biomass</span><span>${Math.floor(game.core.biomass)}</span></div>
+        <div class="kv"><span class="k">Energy</span><span>${Math.floor(game.core.energy)}</span></div>
+        <div class="kv"><span class="k">Population</span><span>${game.stats.playerPop}</span></div>
+        <p style="color:var(--fg-dim);font-size:12.5px;margin-top:10px">Every organism you deploy is grown from biomass and energy gathered by the colony. Send organisms to GATHER to keep the Core supplied.</p>`;
+    } else if (kind === 'species') {
+      const sp = T.WILD_BY_ID[data.speciesId];
+      title.textContent = sp.name.toUpperCase();
+      const traitChips = sp.traits.map(id => `<span class="trait-chip">${game.discovery.discoveredTraits[id] ? '' : '\u{1F512} '}${T.TRAITS_BY_ID[id].name}</span>`).join('');
+      body.innerHTML = `<div class="kv"><span class="k">Role</span><span>${sp.tier}</span></div><div style="margin-top:6px">${traitChips}</div>`;
+    }
+    el('inspect-overlay').classList.remove('hidden');
+  }
+
+  // -- per-frame refresh (cheap: text only) --------------------------------
+  function render(game) {
+    el('stat-biomass').querySelector('span').textContent = K.fmt(game.core.biomass);
+    el('stat-energy').querySelector('span').textContent = K.fmt(game.core.energy);
+    el('stat-pop').querySelector('span').textContent = game.stats.playerPop + game.stats.herbivorePop + game.stats.predatorPop;
+  }
+
+  CM.ui = { init, render, renderSelection, renderFeed, updateBadges, showInspect, toast, switchTab };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — local persistence. Terrain is never saved (it's fully
+ * regenerable from the seed); everything the player actually changed is:
+ * discovered species/traits, designs, every living organism, and the
+ * Core's resources. Autosaves are throttled but triggered eagerly on
+ * anything narratively "major" so closing the app never loses progress.
+ */
+(function (CM) {
+  'use strict';
+  const KEY = 'coremind/save/v1';
+  const VERSION = 1;
+  const MIN_SAVE_INTERVAL_MS = 5000;
+  const PERIODIC_MS = 20000;
+
+  function hasSave() {
+    try { return !!localStorage.getItem(KEY); } catch (e) { return false; }
+  }
+
+  function serialize(game) {
+    return {
+      v: VERSION, savedAt: Date.now(),
+      seed: game.seed, simTime: game.simTime, speed: game.speed,
+      core: { biomass: game.core.biomass, energy: game.core.energy },
+      camera: { x: game.camera.x, y: game.camera.y, zoom: game.camera.zoom },
+      discovery: {
+        observations: game.discovery.observations,
+        discoveredTraits: game.discovery.discoveredTraits,
+        knownSpecies: game.discovery.knownSpecies,
+        events: game.discovery.events.slice(0, 150),
+        samples: game.discovery.samples
+      },
+      designs: game.designs,
+      nextDesignId: game.nextDesignId,
+      organisms: game.organisms.map(o => ({
+        ownerId: o.ownerId, speciesId: o.speciesId, designId: o.designId, name: o.name,
+        generation: o.generation, age: o.age, x: o.x, y: o.y, heading: o.heading,
+        traits: o.traits, diet: o.diet, color: o.color,
+        health: o.health, energy: o.energy, hunger: o.hunger,
+        state: o.state, directive: o.directive, carrying: o.carrying, reproCooldown: o.reproCooldown
+      }))
+    };
+  }
+
+  function writeNow(game) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(serialize(game)));
+      game.__lastSaveAt = performance.now();
+      return true;
+    } catch (e) {
+      console.warn('[coremind] save failed', e);
+      return false;
+    }
+  }
+
+  function readRaw() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || data.v !== VERSION) return null;
+      return data;
+    } catch (e) {
+      console.warn('[coremind] read failed', e);
+      return null;
+    }
+  }
+
+  /* Rebuild a full game object: regenerate the world from the seed, then
+   * overlay everything that isn't derivable from it. */
+  function hydrate(data) {
+    const game = CM.coremind.newGame(data.seed);
+    game.simTime = data.simTime || 0;
+    game.speed = data.speed || 1;
+    game.core.biomass = data.core.biomass;
+    game.core.energy = data.core.energy;
+    if (data.camera) {
+      game.camera.x = data.camera.x; game.camera.y = data.camera.y; game.camera.zoom = data.camera.zoom;
+      game.camera.targetX = game.camera.x; game.camera.targetY = game.camera.y; game.camera.targetZoom = game.camera.zoom;
+    }
+    const disc = data.discovery || {};
+    game.discovery.observations = disc.observations || {};
+    game.discovery.discoveredTraits = disc.discoveredTraits || {};
+    game.discovery.knownSpecies = disc.knownSpecies || {};
+    game.discovery.events = disc.events || [];
+    game.discovery.samples = disc.samples || [];
+    let maxEvtId = 0, maxSampleId = 0;
+    for (const e of game.discovery.events) { const n = parseInt(String(e.id).split('_')[1], 10); if (n > maxEvtId) maxEvtId = n; }
+    for (const s of game.discovery.samples) { const n = parseInt(String(s.id).split('_')[1], 10); if (n > maxSampleId) maxSampleId = n; }
+    game.discovery.nextEventId = Math.max(maxEvtId, maxSampleId) + 1;
+
+    game.designs = data.designs || [];
+    game.nextDesignId = data.nextDesignId || 1;
+
+    for (const od of data.organisms || []) {
+      const org = CM.organism.create({
+        ownerId: od.ownerId, speciesId: od.speciesId, designId: od.designId, name: od.name,
+        generation: od.generation, x: od.x, y: od.y, heading: od.heading,
+        traits: od.traits, diet: od.diet, color: od.color, directive: od.directive
+      });
+      org.age = od.age; org.health = od.health; org.energy = od.energy; org.hunger = od.hunger;
+      org.state = od.state; org.carrying = od.carrying || 0; org.reproCooldown = od.reproCooldown || 0;
+      CM.coremind.addOrganism(game, org);
+    }
+    return game;
+  }
+
+  /* Called on every notable event; only actually writes if the throttle
+   * window has elapsed, so a burst of deaths/discoveries can't hammer
+   * localStorage. */
+  function maybeAutosave(game) {
+    const now = performance.now();
+    if (!game.__lastSaveAt || now - game.__lastSaveAt >= MIN_SAVE_INTERVAL_MS) writeNow(game);
+  }
+
+  function init(game, bus) {
+    bus.on('event', evt => {
+      if (evt.kind === 'discovery' || evt.kind === 'death' || evt.kind === 'system') maybeAutosave(game);
+    });
+  }
+
+  CM.save = { hasSave, writeNow, readRaw, hydrate, maybeAutosave, init, PERIODIC_MS };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — bootstrap. Wires world/sim/render/input/ui/save together and
+ * runs the game loop: a fixed-step simulation accumulator decoupled from
+ * rendering, so physics stays stable regardless of frame rate or the
+ * player's chosen simulation speed.
+ */
+(function (CM) {
+  'use strict';
+  const SIM_DT = 0.1;
+  const MAX_STEPS_PER_FRAME = 8;
+
+  let game = null, canvas = null, ctx = null, acc = 0, lastT = 0, rafId = null, periodicAcc = 0;
+
+  function wireInput() {
+    CM.input.attach(canvas, game, {
+      onSelectOrganism(org) {
+        CM.coremind.selectOrganism(game, org.id);
+        CM.ui.renderSelection(game);
+        CM.render.focusOn(game, org.x, org.y);
+      },
+      onTapSample(sample) { CM.ui.showInspect(game, 'sample', { sample }); },
+      onTapCore() { CM.ui.showInspect(game, 'core', {}); },
+      onTapEmpty() { CM.coremind.selectOrganism(game, null); CM.ui.renderSelection(game); }
+    });
+  }
+
+  function startCommon() {
+    canvas = document.getElementById('world-canvas');
+    ctx = canvas.getContext('2d');
+    window.__CM_GAME__ = game; // debug/inspection hook only — never read by game logic
+    CM.save.init(game, game.__bus);
+    CM.ui.init(game, game.__bus);
+    CM.ui.renderFeed(game);
+    CM.ui.updateBadges(game);
+    wireInput();
+    window.addEventListener('resize', () => CM.render.resizeCanvas(canvas));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) CM.save.writeNow(game); });
+    window.addEventListener('pagehide', () => CM.save.writeNow(game));
+    acc = 0; periodicAcc = 0; lastT = 0;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function newWorld() {
+    const seed = (Math.random() * 0xffffffff) >>> 0;
+    game = CM.coremind.newGame(seed);
+    game.__bus = CM.core.makeBus();
+    CM.simulation.spawnStarterColony(game, game.__bus);
+    CM.simulation.spawnStarterWildlife(game);
+    startCommon();
+    CM.save.writeNow(game);
+  }
+
+  function continueGame() {
+    const data = CM.save.readRaw();
+    if (!data) { newWorld(); return; }
+    game = CM.save.hydrate(data);
+    game.__bus = CM.core.makeBus();
+    startCommon();
+  }
+
+  function loop(tMs) {
+    rafId = requestAnimationFrame(loop);
+    if (!lastT) lastT = tMs;
+    let frameDt = (tMs - lastT) / 1000;
+    lastT = tMs;
+    frameDt = Math.min(frameDt, 0.25); // guard against tab-backgrounding spikes
+
+    acc += frameDt * game.speed;
+    let steps = 0;
+    while (acc >= SIM_DT && steps < MAX_STEPS_PER_FRAME) {
+      CM.simulation.tick(game, game.__bus, SIM_DT);
+      acc -= SIM_DT;
+      steps++;
+    }
+    if (steps === MAX_STEPS_PER_FRAME) acc = 0; // device can't keep up — drop the backlog rather than spiral
+
+    CM.render.updateCamera(game, frameDt);
+    CM.render.draw(game, canvas, ctx);
+    CM.ui.render(game);
+    CM.ui.renderSelection(game);
+
+    periodicAcc += frameDt;
+    if (periodicAcc * 1000 >= CM.save.PERIODIC_MS) { periodicAcc = 0; CM.save.writeNow(game); }
+  }
+
+  function boot() {
+    const bootOverlay = document.getElementById('boot-overlay');
+    const continueBtn = document.getElementById('btn-continue');
+    if (CM.save.hasSave()) continueBtn.classList.remove('hidden');
+    continueBtn.addEventListener('click', () => { bootOverlay.classList.add('hidden'); continueGame(); });
+    document.getElementById('btn-new-world').addEventListener('click', () => { bootOverlay.classList.add('hidden'); newWorld(); });
+  }
+
+  CM.main = { newWorld, continueGame, boot };
+  document.addEventListener('DOMContentLoaded', CM.main.boot);
+})(window.CM = window.CM || {});
+
+</script>
+</body>
+</html>
