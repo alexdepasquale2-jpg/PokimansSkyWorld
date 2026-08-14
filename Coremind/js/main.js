@@ -19,6 +19,7 @@
       },
       onTapSample(sample) { CM.ui.showInspect(game, 'sample', { sample }); },
       onTapCore() { CM.ui.showInspect(game, 'core', {}); },
+      onTapStructure(site) { CM.ui.showInspect(game, 'structure', { site }); },
       onTapEmpty(world) {
         /* Placing a chamber takes priority over clearing the selection: while
          * build mode is armed a tap on the ground is a construction order. */

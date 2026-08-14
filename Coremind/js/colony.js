@@ -595,7 +595,30 @@
   function damageCore(game, bus, colony, amount) {
     if (!colony.alive) return;
     colony.integrity -= amount;
-    if (colony.integrity <= 0) collapse(game, bus, colony);
+    if (colony.integrity > 0) return;
+    /* A Deep Sanctum is a second seat for the Coremind, buried past anything
+     * that can reach it from the surface. Losing the surface Core no longer
+     * ends the colony — it falls back to the sanctum and rebuilds from there.
+     * That is what the abyssal tier is *for*: the endgame is not a bigger
+     * number, it is becoming impossible to kill from above. */
+    if (CM.structures.hasSanctum(game, colony.id)) {
+      const seat = CM.structures.all(game)
+        .find(s => s.done && s.colonyId === colony.id && CM.structures.TYPES[s.type].endgame);
+      colony.integrity = 55;
+      if (seat && !colony.__fellBack) {
+        colony.__fellBack = true;
+        colony.x = seat.x; colony.y = seat.y;
+        CM.discovery.pushEvent(game, bus, {
+          kind: colony.isPlayer ? 'warn' : 'rival', icon: '\u{1F52E}',
+          message: colony.isPlayer
+            ? 'Your surface Core is gone. The Coremind falls back to the Deep Sanctum — you are still here.'
+            : `${colony.name}'s Core fell, but it survives in a Deep Sanctum.`,
+          x: seat.x, y: seat.y, colonyId: colony.id
+        });
+      }
+      return;
+    }
+    collapse(game, bus, colony);
   }
 
   function collapse(game, bus, colony) {

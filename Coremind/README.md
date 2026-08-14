@@ -113,25 +113,62 @@ The full core loop from the brief, playable end to end:
     excavates, so the trait is what makes the underground reachable at all —
     a colony with no burrowers can site chambers but will crawl through them,
     and the deeper chamber types refuse to be cut without it.
-- **The underground** — a colony's second body, `js/structures.js`. Seven
-  modular chamber types, each answering a pressure the surface game already
-  applies rather than being a generic upgrade:
-  - **Access Shaft** — the only chamber that can be sunk on open ground.
-    Everything else must connect to a *finished* chamber within reach, which
-    is what makes the network a shape the player designs rather than a list
-    of purchases. Tunnels are drawn between linked chambers.
-  - **Warren** — shelter: organisms inside cannot be sensed by predators and
-    the chamber holds a workable temperature whatever the surface is doing.
-  - **Cistern** — taps groundwater, so dry inland ground becomes survivable.
-  - **Granary** — raises the Core's biomass ceiling past its own limit.
-  - **Nursery** — organisms nearby come off reproduction cooldown far faster.
-  - **Analysis Vault** — speeds observations into discoveries.
-  - **Redoubt** — fortified ground; its defenders count for more in a siege.
-  - Three new orders drive it: **DIG** (work the sites you placed), **EXPAND**
+- **The underground** — a colony's second body, `js/structures.js`. Twelve
+  modular chamber types across **three strata**, each answering a pressure the
+  surface game already applies rather than being a generic upgrade.
+
+  A chamber may only link to one within a *single depth level* of itself.
+  That one rule is what makes depth a campaign instead of a menu: you cannot
+  reach the abyssal reach without holding deep galleries, and you cannot hold
+  those without shallow works above them.
+
+  - **Shallow Works (level 1)** — **Access Shaft** (the only chamber that can
+    be sunk on open ground; everything else must connect to a *finished*
+    chamber within reach, which is what makes the network a shape the player
+    designs rather than a list of purchases), **Warren** (organisms inside
+    cannot be sensed by predators and the chamber holds a workable temperature
+    whatever the surface is doing), **Cistern** (taps groundwater, so dry
+    inland ground becomes survivable), **Granary** (raises the Core's biomass
+    ceiling past its own limit).
+  - **Deep Galleries (level 2)** — **Descent** (cuts down; everything at this
+    depth hangs off one), **Nursery** (organisms nearby come off reproduction
+    cooldown far faster), **Analysis Vault** (speeds observations into
+    discoveries), **Redoubt** (fortified ground — its defenders count for more
+    in a siege *and* the chambers around it resist being chewed open),
+    **Fungarium** (feeds whoever stands in it, which is what severs a colony
+    from the surface: below this depth there is no forage).
+  - **Abyssal Reach (level 3)** — **Geothermal Tap** (a large permanent energy
+    income), **Veinworks** (mines a buried biomass seam; must be cut directly
+    onto one, and the seam is finite), **Deep Sanctum** (a second seat for the
+    Coremind — losing the surface Core no longer ends the colony, it falls
+    back and rebuilds from below).
+  - **Prospecting.** Abyssal seams are placed at world generation and are
+    invisible until a colony finishes a level-2-or-deeper chamber near one.
+    Finding them is a consequence of digging rather than a separate action,
+    and because they are fixed points on the map the deep tier is contested
+    ground rather than a shop.
+  - **The deep is inhabited.** Three subterranean species — Rock Gnawer,
+    Shalefang, Hollow Serpent — one per stratum, drawn to excavation and
+    rallied to the chamber that woke them. Unguarded chambers are chewed open
+    and collapse; the pressure scales with how deep the colony has cut, so the
+    abyssal tier is the most dangerous ground on the map.
+  - Three orders drive it: **DIG** (work the sites you placed), **EXPAND**
     (the Coremind chooses its own sites from what the colony is short of), and
     **SHELTER** (retreat underground). Rivals dig too, using the same
-    shortfall reasoning — an inland rival ends up with cisterns, a besieged
-    one with redoubts — and a collapsed colony's network dies with it.
+    shortfall reasoning and walking the same depth ladder — an inland rival
+    ends up with cisterns, a besieged one with redoubts — and a collapsed
+    colony's network dies with it.
+- **The underground view** — `SURF / I / II / III` down the left of the stage
+  switches between the surface map and each stratum, rendered as an actual
+  excavated space rather than markers on a map: banded rock baked once per
+  depth (one blit per frame, same as the terrain), chambers as irregular lit
+  caverns cut out of it, corridors between them, and shafts marked where the
+  network changes level. Only ground the colony has opened is lit — the rest
+  of the stratum is dark, because an underground map that showed the whole
+  world would make prospecting pointless. Chambers one level away are ghosted
+  so the strata read as stacked rather than as unrelated maps, and tapping a
+  room opens its details. A stratum you have not reached yet is visible but
+  disabled, so the deep tier is something the player can see waiting.
 - **Utility AI**: all 10 states from the brief (IDLE, EXPLORE, SEEK_FOOD,
   FLEE, HUNT, ATTACK, REST, RETURN_TO_CORE, REPRODUCE, INVESTIGATE) plus
   SEEK_WATER, scored from needs + senses + the player's directive, with a
@@ -216,8 +253,15 @@ The full core loop from the brief, playable end to end:
   every 20s and on tab-hide/page-hide; `Continue` on the boot screen
   restores seed, discovered species/traits (with partial observation
   progress), samples, designs, every living organism, Core resources, every
-  colony's identity/knowledge/genome, and the climate state. The format is
-  versioned and loads v1 saves forward rather than discarding a campaign.
+  colony's identity/knowledge/genome, the climate state, the whole underground
+  network with its depths and integrity, and what play changed about the world
+  itself — how far each biomass deposit has been stripped, who claimed it, and
+  which abyssal seams have been prospected and how much is left in them. The
+  terrain is never saved because it regenerates exactly from the seed; that
+  used to mean the *mutable* parts of it regenerated too, so a stripped
+  deposit came back full and an hour of prospecting came back unknown. The
+  format is versioned and loads v1 and v2 saves forward rather than discarding
+  a campaign.
 
 ### What's deliberately out of scope for this pass
 

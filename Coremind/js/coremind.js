@@ -26,6 +26,7 @@
       climate: CM.climate.newState(seed),
       structures: CM.structures.newState(),
       buildMode: null,          // structure type key the player is placing
+      viewDepth: 0,             // 0 = surface, 1..MAX_DEPTH = an underground stratum
       discovery: CM.discovery.newDiscoveryState(),
       designs: [],
       selection: null,

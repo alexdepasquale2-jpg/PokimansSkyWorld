@@ -13,10 +13,20 @@ const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/traits.js', 'js/flora.js', 'js/world.js', 'js/organism.js',
   'js/ai.js', 'js/discovery.js', 'js/climate.js', 'js/colony.js', 'js/structures.js',
-  'js/coremind.js', 'js/simulation.js'
+  'js/coremind.js', 'js/simulation.js', 'js/save.js'
 ];
 
+/* save.js reaches for localStorage and performance; neither exists in the vm
+ * sandbox. Stubbing them lets the persistence layer be tested here rather than
+ * only in a browser, which is where the vein/deposit round-trip bug hid. */
 const sandbox = { console, Math, Set, Map, Object, JSON, Infinity, NaN, Date };
+sandbox.performance = { now: () => Date.now() };
+sandbox.localStorage = {
+  __s: {},
+  getItem(k) { return Object.prototype.hasOwnProperty.call(this.__s, k) ? this.__s[k] : null; },
+  setItem(k, v) { this.__s[k] = String(v); },
+  removeItem(k) { delete this.__s[k]; }
+};
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const f of FILES) {
@@ -914,6 +924,361 @@ function noNaN(org) {
     assert(CM.structures.ofColony(game, victim.id).length === 0,
       'a collapsed colony leaves no chambers behind');
   }
+}
+
+/* --- depth tiers ----------------------------------------------------------
+ * The whole point of the strata is that they are a ladder. These tests are
+ * about the ladder rungs, not about the chambers themselves: what can be cut
+ * where, and what a level pays out once it is held. */
+
+// A small helper: drop a finished chamber straight into the world. The dig
+// loop is already covered above, and going through it for every depth test
+// would make these run for thousands of ticks each.
+/* Offsets cannot be hardcoded in these tests: a fixed "+6 east of the shaft"
+ * lands in a lake on plenty of seeds, and the refusal that comes back is about
+ * water rather than about depth — which is exactly the sort of test that
+ * passes or fails for a reason unrelated to what it claims to check. */
+function findSpot(game, colony, typeKey, from, minR, maxR) {
+  for (let r = minR; r <= maxR; r += 0.75) {
+    for (let a = 0; a < 24; a++) {
+      const x = from.x + Math.cos(a * 0.262) * r, y = from.y + Math.sin(a * 0.262) * r;
+      if (CM.structures.canPlace(game, colony, typeKey, x, y).ok) return { x, y };
+    }
+  }
+  return null;
+}
+
+function plant(game, colony, typeKey, x, y, linkTo) {
+  const type = CM.structures.TYPES[typeKey];
+  const site = {
+    id: 'st_' + (game.structures.nextId++), colonyId: colony.id, type: typeKey,
+    x, y, depth: type.depth, work: type.work, workNeeded: type.work,
+    done: true, integrity: 100, linkId: linkTo ? linkTo.id : null
+  };
+  game.structures.list.push(site);
+  return site;
+}
+
+// --- you cannot skip a stratum ---------------------------------------------
+{
+  const game = CM.coremind.newGame(5150);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+  colony.biomass = 4000; colony.energy = 4000;
+
+  // Find dry, buildable ground near the Core to work on.
+  let base = null;
+  for (let r = 5; r < 18 && !base; r += 1.5) {
+    for (let a = 0; a < 20; a++) {
+      const x = colony.x + Math.cos(a * 0.31) * r, y = colony.y + Math.sin(a * 0.31) * r;
+      if (CM.structures.canPlace(game, colony, 'SHAFT', x, y).ok) { base = { x, y }; break; }
+    }
+  }
+  assert(base, 'found buildable ground for the depth test');
+
+  const shaft = plant(game, colony, 'SHAFT', base.x, base.y);
+  assert(shaft.depth === 1, 'a shaft is a shallow-works chamber');
+  assert(CM.structures.deepestOf(game, colony.id) === 1, 'the network is one level deep');
+
+  // Depth 2 hangs off depth 1 — allowed.
+  const near = findSpot(game, colony, 'DESCENT', shaft, 5, 13);
+  assert(near, 'a descent can be cut from the shallow works');
+  // Depth 3 at that same spot is not: two levels of separation is refused.
+  const deepCheck = CM.structures.canPlace(game, colony, 'GEOTHERMAL', near.x, near.y);
+  assert(!deepCheck.ok, 'an abyssal chamber cannot be cut straight off the shallow works');
+  assert(/deep galleries/i.test(deepCheck.reason),
+    'and the refusal names the level that is missing: ' + deepCheck.reason);
+
+  /* Two chambers on different strata may share ground; two on the same may
+   * not. Checked here, while the shaft is still the only thing built — with a
+   * descent already sited nearby this would fail on that chamber's spacing
+   * rather than on the rule under test. */
+  assert(CM.structures.canPlace(game, colony, 'NURSERY', shaft.x + 1, shaft.y).ok,
+    'a deep chamber may sit under a shallow one');
+  assert(!CM.structures.canPlace(game, colony, 'WARREN', shaft.x + 1, shaft.y).ok,
+    'but two chambers cannot share the same spot on the same stratum');
+
+  // Cut the descent, and the abyssal reach opens.
+  const descent = plant(game, colony, 'DESCENT', near.x, near.y, shaft);
+  assert(CM.structures.deepestOf(game, colony.id) === 2, 'the network is now two levels deep');
+  assert(findSpot(game, colony, 'GEOTHERMAL', descent, 5, 13),
+    'with deep galleries held, an abyssal chamber can be cut');
+
+  // The build palette gates on the same rule the placement check uses, so what
+  // the player is offered and what the world accepts cannot drift apart.
+  assert(CM.structures.TYPES.SANCTUM.depth === 3 && CM.structures.TYPES.SANCTUM.endgame,
+    'the Sanctum is an abyssal, endgame chamber');
+  assert(descent.depth === 2, 'the descent occupies the deep galleries');
+}
+
+// --- prospecting: veins are found by digging, not given --------------------
+{
+  const game = CM.coremind.newGame(6161);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+  colony.biomass = 4000; colony.energy = 4000;
+
+  assert(game.world.veins.length > 0, 'the world generates abyssal veins');
+  assert(game.world.veins.every(v => !v.known), 'no vein is known at world generation');
+
+  const vein = game.world.veins[0];
+  // A depth-2 chamber finished next to it should strike the seam.
+  const site = {
+    id: 'st_probe', colonyId: colony.id, type: 'DESCENT', x: vein.x + 3, y: vein.y,
+    depth: 2, work: 0, workNeeded: 1, done: false, integrity: 100, linkId: null
+  };
+  game.structures.list.push(site);
+  const digger = CM.organism.create({ ownerId: 'player', traits: ['burrowing'], name: 'Probe', x: site.x, y: site.y });
+  CM.structures.addWork(game, bus, site, digger, 10);
+  assert(site.done, 'the probe chamber finished');
+  assert(vein.known, 'finishing a deep chamber next to a seam reveals it');
+
+  // A shallow chamber does not prospect — that is what makes depth worth it.
+  const game2 = CM.coremind.newGame(6161);
+  const bus2 = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game2, bus2);
+  const v2 = game2.world.veins[0];
+  const shallow = {
+    id: 'st_probe2', colonyId: 'player', type: 'WARREN', x: v2.x + 3, y: v2.y,
+    depth: 1, work: 0, workNeeded: 1, done: false, integrity: 100, linkId: null
+  };
+  game2.structures.list.push(shallow);
+  CM.structures.addWork(game2, bus2, shallow, digger, 10);
+  assert(shallow.done && !v2.known, 'a shallow chamber over the same seam finds nothing');
+}
+
+// --- the abyssal economy ---------------------------------------------------
+{
+  const game = CM.coremind.newGame(7272);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+
+  const vein = game.world.veins[0];
+  vein.known = true;
+  const geo = plant(game, colony, 'GEOTHERMAL', colony.x + 4, colony.y);
+  const works = plant(game, colony, 'VEINWORKS', vein.x, vein.y);
+  works.veinId = vein.id;
+  vein.claimedBy = colony.id;
+
+  const inc = CM.structures.colonyIncome(game, colony.id);
+  assert(inc.energy > 0, 'a geothermal tap pays energy, got ' + inc.energy);
+  assert(inc.biomass > 0, 'a veinworks pays biomass, got ' + inc.biomass);
+
+  // The seam is finite: an abyssal windfall runs out.
+  const before = vein.remaining;
+  for (let i = 0; i < 200; i++) CM.structures.colonyIncome(game, colony.id);
+  assert(vein.remaining < before, 'working a seam depletes it');
+  let guard = 0;
+  while (vein.remaining > 0 && guard++ < 5000) CM.structures.colonyIncome(game, colony.id);
+  assert(vein.remaining === 0, 'a seam can be worked out entirely');
+  assert(CM.structures.colonyIncome(game, colony.id).biomass === 0,
+    'and an exhausted seam pays nothing');
+
+  // Losing the veinworks releases the claim so someone else can take it.
+  CM.structures.destroy(game, works);
+  assert(vein.claimedBy === null, 'destroying a veinworks frees its seam');
+  assert(!CM.structures.all(game).includes(works), 'and removes the chamber');
+  assert(CM.structures.all(game).includes(geo), 'while leaving the rest of the network');
+}
+
+// --- fungus feeds the deep -------------------------------------------------
+{
+  const game = CM.coremind.newGame(8383);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+  // Somewhere with no forage, so the only food is the chamber's.
+  const spot = { x: colony.x + 5, y: colony.y + 5 };
+  const fung = plant(game, colony, 'FUNGARIUM', spot.x, spot.y);
+
+  const inside = CM.organism.create({ ownerId: 'player', traits: [], name: 'Inside', x: spot.x, y: spot.y });
+  const outside = CM.organism.create({ ownerId: 'player', traits: [], name: 'Outside', x: spot.x + 30, y: spot.y });
+  assert(CM.structures.fungariumFeed(game, inside) > 0, 'an organism in the fungarium is fed by it');
+  assert(CM.structures.fungariumFeed(game, outside) === 0, 'one outside is not');
+  assert(fung.done, 'the fungarium is complete');
+}
+
+// --- the deep bites back ---------------------------------------------------
+{
+  const game = CM.coremind.newGame(9494);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+
+  const subterranean = CM.traits.WILD_SPECIES.filter(sp => sp.subterranean);
+  assert(subterranean.length >= 3, 'there is a subterranean species for each stratum');
+  for (let d = 1; d <= CM.structures.MAX_DEPTH; d++) {
+    assert(subterranean.some(sp => sp.subterranean === d), 'stratum ' + d + ' has its own fauna');
+  }
+
+  // A chamber with gnawers on it and nobody defending gets chewed open. The
+  // rally point is what deep fauna are spawned with — without it they drift
+  // off and the chamber heals faster than they chew, which is exactly the bug
+  // this assertion caught the first time it was written.
+  const site = plant(game, colony, 'WARREN', colony.x + 8, colony.y + 8);
+  for (let i = 0; i < 4; i++) {
+    const g = CM.organism.create({
+      ownerId: 'wild', speciesId: 'gnawer', traits: ['burrowing', 'bite'],
+      name: 'Gnawer', x: site.x, y: site.y
+    });
+    g.rallyPoint = { x: site.x, y: site.y, radius: 3 };
+    CM.coremind.addOrganism(game, g);
+  }
+  let ticks = 0;
+  while (CM.structures.all(game).includes(site) && ticks++ < 3000) CM.simulation.tick(game, bus, 0.1);
+  assert(!CM.structures.all(game).includes(site),
+    'unguarded chambers are chewed open and collapse (ticks ' + ticks + ')');
+
+  // ...and the spawner really does hand out that rally, so the mechanic above
+  // is the one the game actually runs rather than one only the test sets up.
+  const game2 = CM.coremind.newGame(9495);
+  const bus2 = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game2, bus2);
+  plant(game2, game2.core, 'DESCENT', game2.core.x + 9, game2.core.y);
+  let rallied = 0, spawned = 0;
+  for (let i = 0; i < 4000 && rallied === 0; i++) {
+    CM.simulation.tick(game2, bus2, 0.1);
+    for (const o of game2.organisms) {
+      if (!o.depth) continue;
+      spawned++;
+      if (o.rallyPoint) rallied++;
+    }
+  }
+  assert(spawned > 0, 'deep fauna spawn near a finished chamber');
+  assert(rallied > 0, 'and are rallied to the excavation that woke them');
+}
+
+// --- a redoubt hardens the ground around it --------------------------------
+{
+  const game = CM.coremind.newGame(1357);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+  const where = { x: colony.x + 6, y: colony.y };
+  assert(CM.structures.defenseAt(game, colony.id, where.x, where.y) === 0,
+    'bare ground has no defensive bonus');
+  plant(game, colony, 'REDOUBT', where.x, where.y);
+  assert(CM.structures.defenseAt(game, colony.id, where.x, where.y) > 0,
+    'a redoubt hardens the ground it sits in');
+  assert(CM.structures.defenseAt(game, colony.id, where.x + 40, where.y) === 0,
+    'and only the ground near it');
+}
+
+// --- the Sanctum: the endgame the descent is for ---------------------------
+{
+  const game = CM.coremind.newGame(2468);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+
+  assert(!CM.structures.hasSanctum(game, colony.id), 'no sanctum to begin with');
+  assert(CM.structures.sanctumProgress(game, colony.id) === 0, 'and no progress toward one');
+
+  // Half-cut: progress reads, but the colony is not yet safe.
+  const partial = {
+    id: 'st_sanc', colonyId: colony.id, type: 'SANCTUM', x: colony.x + 9, y: colony.y,
+    depth: 3, work: 95, workNeeded: 190, done: false, integrity: 100, linkId: null
+  };
+  game.structures.list.push(partial);
+  const prog = CM.structures.sanctumProgress(game, colony.id);
+  assert(prog > 0.4 && prog < 0.6, 'a half-cut sanctum reads as half done, got ' + prog);
+  assert(!CM.structures.hasSanctum(game, colony.id), 'and does not protect anything yet');
+
+  // Without it, a Core that loses its siege collapses.
+  const doomed = CM.coremind.newGame(2468);
+  const dbus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(doomed, dbus);
+  CM.colony.damageCore(doomed, dbus, doomed.core, 999);
+  assert(!doomed.core.alive, 'without a sanctum, a Core that takes enough damage collapses');
+
+  // With it, the Coremind falls back instead of dying.
+  partial.done = true; partial.work = partial.workNeeded;
+  assert(CM.structures.hasSanctum(game, colony.id), 'the finished sanctum registers');
+  assert(CM.structures.sanctumProgress(game, colony.id) === 1, 'and reads as complete');
+  CM.colony.damageCore(game, bus, colony, 999);
+  assert(colony.alive, 'a colony with a sanctum survives losing its surface Core');
+  assert(Math.abs(colony.x - partial.x) < 0.001 && Math.abs(colony.y - partial.y) < 0.001,
+    'and relocates to the sanctum');
+  assert(colony.integrity > 0, 'with integrity restored at its new seat');
+
+  // It is a fallback, not immortality: the sanctum itself can still be lost.
+  CM.structures.destroy(game, partial);
+  assert(!CM.structures.hasSanctum(game, colony.id), 'destroying the sanctum removes the protection');
+  CM.colony.damageCore(game, bus, colony, 999);
+  assert(!colony.alive, 'and then the colony can be killed like any other');
+}
+
+// --- depth survives a save round-trip --------------------------------------
+{
+  const game = CM.coremind.newGame(8642);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  const colony = game.core;
+  const shaft = plant(game, colony, 'SHAFT', colony.x + 7, colony.y);
+  const descent = plant(game, colony, 'DESCENT', colony.x + 11, colony.y, shaft);
+  const vein = game.world.veins[0];
+  vein.known = true; vein.claimedBy = colony.id;
+  descent.integrity = 61;
+
+  const data = JSON.parse(JSON.stringify(CM.save.serialize(game)));
+  const loaded = CM.save.hydrate(data);
+  const back = CM.structures.all(loaded).find(s => s.id === descent.id);
+  assert(back, 'the deep chamber survives a save');
+  assert(back.depth === 2, 'with its stratum intact');
+  assert(back.integrity === 61, 'and its integrity');
+  assert(CM.structures.deepestOf(loaded, colony.id) === 2, 'and the network is still two levels deep');
+  const vBack = loaded.world.veins.find(v => v.id === vein.id);
+  assert(vBack && vBack.known, 'a found seam stays found');
+  assert(vBack.claimedBy === colony.id, 'and stays claimed');
+}
+
+/* --- the world remembers what was done to it ------------------------------
+ * The terrain regenerates from the seed, which is why none of it is written to
+ * storage. The consequence was that everything play *changed* about the world
+ * regenerated too: a deposit stripped to nothing came back full, and a seam
+ * the colony had spent an hour prospecting came back unknown. */
+{
+  const game = CM.coremind.newGame(1470);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+
+  const dep = game.world.deposits[0];
+  const startRemaining = dep.remaining;
+  dep.remaining = Math.round(startRemaining * 0.25);
+  dep.claimedBy = game.core.id;
+  const vein = game.world.veins[1];
+  vein.known = true;
+  vein.remaining = Math.round(vein.richness * 0.4);
+
+  const loaded = CM.save.hydrate(JSON.parse(JSON.stringify(CM.save.serialize(game))));
+  const depBack = loaded.world.deposits.find(d => d.id === dep.id);
+  assert(depBack, 'the deposit still exists after a reload');
+  assert(depBack.remaining === dep.remaining,
+    `a harvested deposit stays harvested (got ${depBack.remaining}, want ${dep.remaining})`);
+  assert(depBack.remaining < startRemaining, 'and is genuinely below its generated richness');
+  assert(depBack.claimedBy === game.core.id, 'and stays claimed by whoever worked it');
+
+  const veinBack = loaded.world.veins.find(v => v.id === vein.id);
+  assert(veinBack.known, 'a prospected seam is still known');
+  assert(veinBack.remaining === vein.remaining, 'with the amount already mined out of it');
+
+  // Untouched features come back exactly as the seed generates them.
+  const fresh = CM.coremind.newGame(1470);
+  const other = loaded.world.deposits[loaded.world.deposits.length - 1];
+  const otherFresh = fresh.world.deposits.find(d => d.id === other.id);
+  assert(otherFresh && other.remaining === otherFresh.remaining,
+    'an untouched deposit is identical to a fresh generation of the same seed');
+
+  // A v1/v2 save has no world block at all and must still load.
+  const legacy = JSON.parse(JSON.stringify(CM.save.serialize(game)));
+  delete legacy.world;
+  legacy.v = 2;
+  const old = CM.save.hydrate(legacy);
+  assert(old && old.world.deposits.length > 0, 'a save from before world state was recorded still loads');
+  assert(old.organisms.length > 0, 'with its organisms intact');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -95,6 +95,57 @@
     return r.terrainCanvas;
   }
 
+  /* --- the underground view -------------------------------------------------
+   * A separate way of looking at the world: instead of the surface map, the
+   * rock of one stratum, with the colony's excavations cut through it. Baked
+   * exactly like the terrain — one canvas per depth, one blit per frame — so
+   * looking underground costs no more than looking at the surface.
+   *
+   * The rock is banded horizontally rather than blotched, because strata are
+   * what makes a cross-section read as *rock* rather than as a differently
+   * coloured map. */
+  function buildRockCache(world, depth) {
+    const info = CM.structures.DEPTHS[depth];
+    const size = world.size;
+    const canvas = (typeof OffscreenCanvas !== 'undefined')
+      ? new OffscreenCanvas(size, size)
+      : Object.assign(document.createElement('canvas'), { width: size, height: size });
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const data = img.data;
+    const seed = 90210 + depth * 1777;
+
+    for (let y = 0; y < size; y++) {
+      // Sedimentary banding: a low-frequency vertical ramp warped by noise so
+      // the bands buckle instead of running dead straight.
+      for (let x = 0; x < size; x++) {
+        const i = y * size + x;
+        const p = i * 4;
+        const warp = K.fbm(seed, x * 0.035, y * 0.035, 3);
+        const band = Math.sin((y * 0.42) + warp * 5.5);
+        const grain = K.fbm(seed + 31, x * 0.16, y * 0.16, 4);
+        const shade = 0.74 + band * 0.09 + grain * 0.3;
+        // Deeper rock also carries heat: veins of warmth bleed through the
+        // abyssal layer, which is why it is worth cutting a geothermal tap.
+        const heat = depth >= 3 ? Math.max(0, K.fbm(seed + 77, x * 0.05, y * 0.05, 3) - 0.62) * 3.4 : 0;
+        data[p]     = K.clamp(info.rock[0] * shade + heat * 90, 0, 255) | 0;
+        data[p + 1] = K.clamp(info.rock[1] * shade + heat * 26, 0, 255) | 0;
+        data[p + 2] = K.clamp(info.rock[2] * shade + heat * 18, 0, 255) | 0;
+        data[p + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+  }
+
+  function ensureRockCache(game, depth) {
+    if (!game.render) game.render = {};
+    const r = game.render;
+    if (!r.rock || r.rockSeed !== game.seed) { r.rock = {}; r.rockSeed = game.seed; }
+    if (!r.rock[depth]) r.rock[depth] = buildRockCache(game.world, depth);
+    return r.rock[depth];
+  }
+
   function resizeCanvas(canvas) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -131,18 +182,26 @@
     clampCamera(game);
   }
 
+  /* Both of these work in *canvas* pixels, which is what the input layer
+   * produces and what draw() renders in. The dpr factor is not optional: the
+   * frame is drawn at camera.zoom * dpr, so leaving it out here made every
+   * hit test progressively wronger the further the tap was from the centre of
+   * the screen — invisible at dpr 1 on a desktop, and a miss of most of a
+   * phone's width at dpr 3, which is the only device this game is for. */
   function worldToScreen(game, canvas, wx, wy) {
     const c = game.camera;
+    const zoom = c.zoom * (canvas.__dpr || 1);
     return {
-      x: (wx - c.x) * c.zoom + canvas.width / 2,
-      y: (wy - c.y) * c.zoom + canvas.height / 2
+      x: (wx - c.x) * zoom + canvas.width / 2,
+      y: (wy - c.y) * zoom + canvas.height / 2
     };
   }
   function screenToWorld(game, canvas, sx, sy) {
     const c = game.camera;
+    const zoom = c.zoom * (canvas.__dpr || 1);
     return {
-      x: (sx - canvas.width / 2) / c.zoom + c.x,
-      y: (sy - canvas.height / 2) / c.zoom + c.y
+      x: (sx - canvas.width / 2) / zoom + c.x,
+      y: (sy - canvas.height / 2) / zoom + c.y
     };
   }
 
@@ -277,6 +336,9 @@
     const dpr = resizeCanvas(canvas);
     const w = canvas.width, h = canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    if (game.viewDepth) { drawStratum(game, canvas, ctx, w, h, dpr); return; }
+
     ctx.fillStyle = '#04080d';
     ctx.fillRect(0, 0, w, h);
 
@@ -455,6 +517,350 @@
     }
   }
 
+  /* --- the stratum view -----------------------------------------------------
+   * Looking at one underground level instead of the surface. Everything the
+   * colony has cut becomes an actual excavated space: rooms with rock walls,
+   * corridors between them, shafts running up and down. The rest of the
+   * stratum is unlit rock, because a colony only knows the ground it has dug
+   * — an underground map that showed the whole world would make prospecting
+   * meaningless. */
+  function siteSeed(site) {
+    const n = parseInt(String(site.id).replace(/\D/g, ''), 10);
+    return (isNaN(n) ? 1 : n) * 2654435761 % 100003;
+  }
+
+  /* Cavern outlines are wobbled and then smoothed through their midpoints, so
+   * a room reads as something cut out of rock rather than a drawn circle. The
+   * wobble is hashed off the chamber id, so a given room keeps its shape. */
+  function roomPath(ctx, cx, cy, r, seed) {
+    const n = 14;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const wob = 0.76 + K.hash2(seed, i, 0) * 0.42;
+      pts.push([cx + Math.cos(a) * r * wob, cy + Math.sin(a) * r * wob]);
+    }
+    ctx.beginPath();
+    let prev = pts[n - 1];
+    ctx.moveTo((prev[0] + pts[0][0]) / 2, (prev[1] + pts[0][1]) / 2);
+    for (let i = 0; i < n; i++) {
+      const cur = pts[i], next = pts[(i + 1) % n];
+      ctx.quadraticCurveTo(cur[0], cur[1], (cur[0] + next[0]) / 2, (cur[1] + next[1]) / 2);
+    }
+    ctx.closePath();
+  }
+
+  function drawStratum(game, canvas, ctx, w, h, dpr) {
+    const depth = K.clamp(game.viewDepth, 1, CM.structures.MAX_DEPTH);
+    const info = CM.structures.DEPTHS[depth];
+    const zoom = game.camera.zoom * dpr;
+    const size = game.world.size;
+    const halfW = w / 2 / zoom, halfH = h / 2 / zoom;
+    const sx0 = game.camera.x - halfW, sy0 = game.camera.y - halfH;
+    const sx1 = game.camera.x + halfW, sy1 = game.camera.y + halfH;
+
+    // Unlit rock. Everything drawn after this is somewhere a colony has been.
+    ctx.fillStyle = depth === 3 ? '#0b0509' : depth === 2 ? '#08070d' : '#0a0806';
+    ctx.fillRect(0, 0, w, h);
+
+    const list = CM.structures.all(game);
+    const byId = {};
+    for (const s of list) byId[s.id] = s;
+    const here = list.filter(s => s.depth === depth);
+    const p2 = (x, y) => worldToScreenDpr(game, w, h, zoom, dpr, x, y);
+
+    if (here.length) {
+      /* The lit region: rock is only visible where the colony has opened it
+       * up. Built as a clip of rooms plus the corridors between them, then
+       * the baked rock is blitted through it — one drawImage, same as the
+       * surface, however elaborate the network gets. */
+      ctx.save();
+      ctx.beginPath();
+      for (const s of here) {
+        const p = p2(s.x, s.y);
+        const lit = CM.structures.TYPES[s.type].radius * zoom * 0.88;
+        ctx.moveTo(p.x + lit, p.y);
+        ctx.arc(p.x, p.y, lit, 0, Math.PI * 2);
+      }
+      // Corridors are lit too, or a tunnel would run through black nothing.
+      ctx.lineWidth = Math.max(6, zoom * 1.6);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (const s of here) {
+        const other = s.linkId && byId[s.linkId];
+        if (!other || other.depth !== depth) continue;
+        const a = p2(s.x, s.y), b = p2(other.x, other.y);
+        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      }
+      ctx.clip();
+
+      const csx0 = K.clamp(sx0, 0, size), csy0 = K.clamp(sy0, 0, size);
+      const csx1 = K.clamp(sx1, 0, size), csy1 = K.clamp(sy1, 0, size);
+      if (csx1 > csx0 && csy1 > csy0) {
+        const rock = ensureRockCache(game, depth);
+        const dx0 = (csx0 - game.camera.x) * zoom + w / 2, dy0 = (csy0 - game.camera.y) * zoom + h / 2;
+        const dx1 = (csx1 - game.camera.x) * zoom + w / 2, dy1 = (csy1 - game.camera.y) * zoom + h / 2;
+        /* Nearest-neighbour once a world cell is bigger than a few pixels.
+         * Smoothed, the 1px-per-cell grain averages itself into a flat brown
+         * fog and the stratum stops reading as rock at all — the same reason
+         * the surface terrain turns smoothing off past this zoom. */
+        ctx.imageSmoothingEnabled = zoom < 3;
+        ctx.drawImage(rock, csx0, csy0, csx1 - csx0, csy1 - csy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
+      }
+
+      /* Falloff: the lit area has to fade into the dark instead of ending at a
+       * hard circle, or the network looks like discs cut out of a photograph
+       * rather than the reach of the colony's own light.
+       *
+       * Composited with 'darken' rather than drawn normally. Drawn normally,
+       * two chambers whose halos overlap sum their shadows, and a developed
+       * network turns into a pattern of visibly overlapping grey discs — the
+       * seam between two rooms came out darker than the rock beyond either.
+       * 'darken' takes the darker of the two instead of adding them, which is
+       * how overlapping pools of light actually behave. */
+      ctx.globalCompositeOperation = 'darken';
+      for (const s of here) {
+        const p = p2(s.x, s.y);
+        const lit = CM.structures.TYPES[s.type].radius * zoom * 0.88;
+        /* The fade starts inside the room, not at its wall. Starting it at
+         * the wall left a band of raw, evenly-lit rock around every chamber,
+         * and a cluster of chambers read as a pile of grey discs. */
+        const fade = ctx.createRadialGradient(p.x, p.y, lit * 0.45, p.x, p.y, lit);
+        // Fully opaque at the rim, not merely dark: at 0.88 the clip boundary
+        // stayed faintly visible, so the lit region read as a ring of hard
+        // grey discs rather than as light petering out into rock.
+        fade.addColorStop(0, 'rgba(0,0,0,0)');
+        fade.addColorStop(1, 'rgba(0,0,0,1)');
+        ctx.fillStyle = fade;
+        ctx.beginPath(); ctx.arc(p.x, p.y, lit, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
+    }
+
+    // Known veins, drawn before the excavations so a veinworks sits on top of
+    // its seam. Only at the depth they belong to, and only once found.
+    if (depth === CM.structures.MAX_DEPTH) {
+      for (const v of (game.world.veins || [])) {
+        if (!v.known) continue;
+        if (v.x < sx0 - 6 || v.x > sx1 + 6 || v.y < sy0 - 6 || v.y > sy1 + 6) continue;
+        const p = p2(v.x, v.y);
+        const frac = K.clamp01(v.remaining / v.richness);
+        const r = Math.max(4, 2.6 * zoom);
+        const pulse = 0.6 + Math.sin(game.simTime * 1.6 + v.x) * 0.15;
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.2);
+        grad.addColorStop(0, `rgba(126,224,160,${(0.2 + frac * 0.5) * pulse})`);
+        grad.addColorStop(1, 'rgba(126,224,160,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+        // The seam itself: a few bright splinters through the rock.
+        ctx.strokeStyle = `rgba(180,255,200,${0.25 + frac * 0.45})`;
+        ctx.lineWidth = Math.max(1, zoom * 0.09);
+        for (let i = 0; i < 4; i++) {
+          const a = K.hash2(7, v.x | 0, i) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x - Math.cos(a) * r, p.y - Math.sin(a) * r);
+          ctx.lineTo(p.x + Math.cos(a) * r * 1.3, p.y + Math.sin(a) * r * 1.3);
+          ctx.stroke();
+        }
+      }
+    }
+
+    /* Corridors. A link between two chambers on this level is a cut tunnel;
+     * a link that changes level is a shaft, drawn at the deeper end. */
+    for (const s of here) {
+      if (!s.linkId) continue;
+      const other = byId[s.linkId];
+      if (!other) continue;
+      const colony = game.coloniesById && game.coloniesById[s.colonyId];
+      const rgb = hexToRgb(colony ? colony.color : '#8899aa');
+      if (other.depth !== depth) continue; // vertical: drawn as a shaft below
+      const rock = CM.structures.DEPTHS[depth].rock;
+      const a = p2(s.x, s.y), b = p2(other.x, other.y);
+      const wide = Math.max(2.5, zoom * 0.5);
+      ctx.lineCap = 'round';
+      // Cut walls, then the floor of the passage between them. Same logic as a
+      // room: the corridor is dug-out space, so it is lighter than the rock.
+      ctx.strokeStyle = `rgba(${(rock[0] * 0.35) | 0},${(rock[1] * 0.35) | 0},${(rock[2] * 0.35) | 0},.9)`;
+      ctx.lineWidth = wide + Math.max(2, zoom * 0.18);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = s.done
+        ? `rgb(${Math.min(255, rock[0] * 1.2 + rgb[0] * 0.12) | 0},${Math.min(255, rock[1] * 1.2 + rgb[1] * 0.12) | 0},${Math.min(255, rock[2] * 1.2 + rgb[2] * 0.12) | 0})`
+        : 'rgba(120,120,130,.3)';
+      ctx.lineWidth = wide;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+
+    // Rooms.
+    for (const s of here) {
+      if (s.x < sx0 - 12 || s.x > sx1 + 12 || s.y < sy0 - 12 || s.y > sy1 + 12) continue;
+      drawRoom(game, ctx, s, p2(s.x, s.y), zoom, byId, depth);
+    }
+
+    /* Organisms that are down here. Deep fauna carry their own stratum;
+     * a colony's own organisms are underground when they are standing inside
+     * one of its chambers on this level, which is exactly when the chamber's
+     * effects are reaching them. */
+    const seen = new Set();
+    const drawOne = (org) => {
+      if (seen.has(org.id) || !org.alive) return;
+      seen.add(org.id);
+      const p = p2(org.x, org.y);
+      drawOrganism(ctx, org, p.x, p.y, zoom);
+    };
+    for (const s of here) {
+      if (!s.done) continue;
+      // Matched to the *drawn* room, not to the chamber's effect radius: the
+      // effect radius is much wider, so organisms merely passing near a
+      // chamber were drawn floating in solid rock.
+      const r = CM.structures.TYPES[s.type].radius * 0.62;
+      for (const o of game.world.grid.queryRadius(s.x, s.y, r, [])) {
+        if (o.depth && o.depth !== depth) continue;
+        drawOne(o);
+      }
+    }
+    for (const org of game.organisms) {
+      if (org.depth === depth && org.x > sx0 - 3 && org.x < sx1 + 3 && org.y > sy0 - 3 && org.y < sy1 + 3) drawOne(org);
+    }
+
+    /* Chambers one level away, as faint ghosts. Without them the strata feel
+     * like unrelated maps; with them the player can see where the level above
+     * sits over the level they are cutting. */
+    ctx.save();
+    ctx.setLineDash([2, 5]);
+    for (const s of list) {
+      if (Math.abs(s.depth - depth) !== 1) continue;
+      if (s.x < sx0 - 10 || s.x > sx1 + 10 || s.y < sy0 - 10 || s.y > sy1 + 10) continue;
+      const p = p2(s.x, s.y);
+      const r = Math.max(3, CM.structures.TYPES[s.type].radius * zoom * 0.5);
+      ctx.strokeStyle = s.depth < depth ? 'rgba(150,170,190,.22)' : 'rgba(190,140,170,.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+
+    // Shafts: where a chamber on this level connects to another stratum.
+    for (const s of here) {
+      const other = s.linkId && byId[s.linkId];
+      if (!other || other.depth === depth) continue;
+      const p = p2(s.x, s.y);
+      const r = Math.max(5, zoom * 0.9);
+      const up = other.depth < depth;
+      ctx.strokeStyle = up ? 'rgba(190,205,220,.8)' : 'rgba(210,150,180,.8)';
+      ctx.lineWidth = Math.max(1.5, zoom * 0.1);
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+      // rungs, so the direction of travel is readable without a legend
+      for (let i = -1; i <= 1; i++) {
+        const y = p.y + i * r * 0.55;
+        ctx.beginPath(); ctx.moveTo(p.x - r * 0.55, y); ctx.lineTo(p.x + r * 0.55, y); ctx.stroke();
+      }
+    }
+
+    /* Depth banner. Along the bottom rather than the top: the top of the stage
+     * is where toasts stack, and a banner there spent most of its life hidden
+     * behind three of them. */
+    ctx.save();
+    ctx.font = `600 ${Math.round(13 * dpr)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    const label = `${info.name}  ·  level ${depth} of ${CM.structures.MAX_DEPTH}`;
+    const tw = ctx.measureText(label).width;
+    const by = h - 34 * dpr;
+    ctx.fillStyle = 'rgba(6,8,12,.8)';
+    ctx.fillRect(w / 2 - tw / 2 - 12 * dpr, by, tw + 24 * dpr, 24 * dpr);
+    ctx.strokeStyle = info.tint; ctx.lineWidth = dpr;
+    ctx.beginPath(); ctx.moveTo(w / 2 - tw / 2 - 12 * dpr, by); ctx.lineTo(w / 2 + tw / 2 + 12 * dpr, by); ctx.stroke();
+    ctx.fillStyle = info.tint;
+    ctx.fillText(label, w / 2, by + 17 * dpr);
+    if (!here.length) {
+      ctx.font = `${Math.round(12 * dpr)}px system-ui, sans-serif`;
+      ctx.fillStyle = 'rgba(200,210,220,.55)';
+      ctx.fillText('Solid rock. Nothing has been cut this deep yet.', w / 2, h / 2);
+    }
+    ctx.restore();
+    canvas.__dpr = dpr;
+  }
+
+  function drawRoom(game, ctx, s, p, zoom, byId, depth) {
+    const type = CM.structures.TYPES[s.type];
+    const colony = game.coloniesById && game.coloniesById[s.colonyId];
+    const rgb = hexToRgb(colony ? colony.color : '#8899aa');
+    const r = Math.max(5, type.radius * zoom * 0.62);
+    const seed = siteSeed(s);
+
+    if (!s.done) {
+      // A working face: the outline of the room to come, and how far in it is.
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.45)`;
+      ctx.lineWidth = 1.5;
+      roomPath(ctx, p.x, p.y, r, seed);
+      ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.95)`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 0.55, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (s.work / s.workNeeded));
+      ctx.stroke();
+      return;
+    }
+
+    /* Floor. An excavated, occupied room is the *brightest* thing on the
+     * stratum — an earlier version filled it with near-black over lighter
+     * rock, which read exactly backwards: the chambers looked like holes
+     * punched in the ground rather than spaces the colony lives in. The floor
+     * is lit stone, warmed toward the colony's own colour at the centre. */
+    const rock = CM.structures.DEPTHS[s.depth].rock;
+    roomPath(ctx, p.x, p.y, r, seed);
+    const floor = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    floor.addColorStop(0, `rgb(${Math.min(255, rock[0] * 1.5 + rgb[0] * 0.34)},${Math.min(255, rock[1] * 1.5 + rgb[1] * 0.34)},${Math.min(255, rock[2] * 1.5 + rgb[2] * 0.34)})`);
+    floor.addColorStop(0.62, `rgb(${(rock[0] * 1.05) | 0},${(rock[1] * 1.05) | 0},${(rock[2] * 1.05) | 0})`);
+    floor.addColorStop(1, `rgb(${(rock[0] * 0.6) | 0},${(rock[1] * 0.6) | 0},${(rock[2] * 0.6) | 0})`);
+    ctx.fillStyle = floor;
+    ctx.fill();
+    // Cut rock rim: a bright inner edge over a dark one reads as a wall face.
+    ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.lineWidth = Math.max(2, zoom * 0.2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.75)`;
+    ctx.lineWidth = Math.max(1, zoom * 0.06);
+    ctx.stroke();
+
+    /* The Sanctum is the one room the whole descent is for, so it is the one
+     * room that announces itself: a slow pulse the player can find from any
+     * zoom level. */
+    if (type.endgame) {
+      const pulse = 0.5 + Math.sin(game.simTime * 1.4) * 0.5;
+      ctx.strokeStyle = `rgba(200,140,255,${0.25 + pulse * 0.5})`;
+      ctx.lineWidth = Math.max(1.5, zoom * 0.1);
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * (1.15 + pulse * 0.18), 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // Damage: a chamber being chewed open cracks visibly before it collapses.
+    if (s.integrity != null && s.integrity < 100) {
+      const frac = K.clamp01(s.integrity / 100);
+      ctx.strokeStyle = `rgba(239,91,91,${0.4 + (1 - frac) * 0.5})`;
+      ctx.lineWidth = Math.max(1, zoom * 0.08);
+      for (let i = 0; i < 3; i++) {
+        const a = K.hash2(seed, i, 9) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(a) * r * 0.9, p.y + Math.sin(a) * r * 0.9);
+        ctx.lineTo(p.x + Math.cos(a + 0.5) * r * 0.35, p.y + Math.sin(a + 0.5) * r * 0.35);
+        ctx.stroke();
+      }
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.font = `${Math.max(10, Math.min(20, r * 0.7))}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(type.icon, p.x, p.y);
+    if (zoom > 9) {
+      ctx.font = `${Math.max(8, Math.min(12, r * 0.3))}px system-ui, sans-serif`;
+      ctx.fillStyle = 'rgba(220,228,236,.7)';
+      ctx.fillText(type.name, p.x, p.y + r * 0.78);
+    }
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
   function drawTerritory(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1) {
     const terr = game.territory;
     const cell = terr.cell;
@@ -482,7 +888,7 @@
   }
 
   CM.render = {
-    ZOOM_MIN, ZOOM_MAX, ensureCache, resizeCanvas, clampCamera, focusOn, updateCamera,
+    ZOOM_MIN, ZOOM_MAX, ensureCache, ensureRockCache, resizeCanvas, clampCamera, focusOn, updateCamera,
     worldToScreen, screenToWorld, draw, drawOrganism
   };
 })(window.CM = window.CM || {});

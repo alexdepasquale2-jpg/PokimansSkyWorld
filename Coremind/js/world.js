@@ -158,6 +158,7 @@
       regions: [],
       hazards: [],
       deposits: [],
+      veins: [],
       grid: makeSpatialGrid(SIZE, 6)
     };
     CM.flora.populate(world, seed);
@@ -169,6 +170,7 @@
     // stage 7: hazards + deposits ------------------------------------------
     placeHazards(world, K.rngFrom(seed ^ 0x165667b1));
     placeDeposits(world, K.rngFrom(seed ^ 0x9e3779b1));
+    placeVeins(world, K.rngFrom(seed ^ 0x3b9aca07));
 
     world.coreSpawn = findColonySite(world, K.rngFrom(seed ^ 0x9e3779b9), []);
     return world;
@@ -346,6 +348,29 @@
         richness,
         remaining: richness,
         claimedBy: null
+      });
+      placed++;
+    }
+  }
+
+  /* Abyssal biomass veins. Unlike surface deposits these are invisible until
+   * a colony digs deep near them, so the deep tier opens with prospecting
+   * rather than with a shopping list. Placed on any diggable ground — the
+   * best vein on a map may well be somewhere unpleasant to hold. */
+  function placeVeins(world, rng) {
+    world.veins = [];
+    const wanted = 14;
+    for (let placed = 0; placed < wanted; ) {
+      const x = Math.floor(rng() * SIZE), y = Math.floor(rng() * SIZE);
+      const i = idx(x, y);
+      if (isWaterBiome(world.biome[i]) || world.biome[i] === BIOME.MOUNTAIN) continue;
+      let tooClose = false;
+      for (const v of world.veins) if (K.dist(v.x, v.y, x, y) < 26) { tooClose = true; break; }
+      if (tooClose) continue;
+      const richness = 900 + rng() * 1600;
+      world.veins.push({
+        id: 'vein_' + placed, x: x + 0.5, y: y + 0.5,
+        richness, remaining: richness, known: false, claimedBy: null
       });
       placed++;
     }

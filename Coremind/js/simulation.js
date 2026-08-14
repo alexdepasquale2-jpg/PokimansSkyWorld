@@ -640,6 +640,104 @@
     }
   }
 
+  /* --- the deep is not empty ------------------------------------------------
+   * Subterranean fauna are drawn to excavation. The pressure scales with how
+   * deep a colony has cut and how much it has built there, so the underground
+   * is contested ground rather than a safe basement — and the abyssal tier,
+   * where the endgame sits, is the most dangerous place on the map. */
+  const DEEP_SPAWN_INTERVAL = 9;
+  function deepFaunaTick(game, bus, dt) {
+    game.__deepAcc = (game.__deepAcc || 0) + dt;
+    if (game.__deepAcc < DEEP_SPAWN_INTERVAL) return;
+    game.__deepAcc = 0;
+    if (game.organisms.length >= MAX_ACTIVE) return;
+
+    const chambers = CM.structures.all(game).filter(s => s.done && s.depth >= 1);
+    if (!chambers.length) return;
+
+    // Weight by depth: deep works attract worse things, more often.
+    const target = chambers[Math.floor(Math.random() * chambers.length)];
+    const depth = target.depth || 1;
+    if (Math.random() > 0.22 * depth) return;
+
+    const candidates = T.WILD_SPECIES.filter(sp => sp.subterranean && sp.subterranean <= depth);
+    if (!candidates.length) return;
+    // Prefer the deepest thing that belongs at this stratum.
+    candidates.sort((a, b) => b.subterranean - a.subterranean);
+    const species = Math.random() < 0.6 ? candidates[0] : candidates[Math.floor(Math.random() * candidates.length)];
+
+    const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * 4;
+    const org = spawnWildOne(game, species.id, {
+      x: K.clamp(target.x + Math.cos(a) * r, 1, game.world.size - 1),
+      y: K.clamp(target.y + Math.sin(a) * r, 1, game.world.size - 1)
+    });
+    org.depth = depth;
+    /* Deep fauna are drawn to the excavation that woke them, not merely near
+     * it. Without this they wandered off within seconds of spawning and the
+     * chamber's integrity healed faster than they could chew it — the deep
+     * looked dangerous and was not. Rallying them to the chamber reuses the
+     * same bias a colony's own doctrine uses, so a besieged chamber genuinely
+     * has to be defended by standing organisms in it. */
+    org.rallyPoint = { x: target.x, y: target.y, radius: 3 };
+    const colony = game.coloniesById[target.colonyId];
+    if (colony && colony.isPlayer && !game.__deepWarned) {
+      game.__deepWarned = true;
+      D.pushEvent(game, bus, {
+        kind: 'warn', icon: '\u{1F573}',
+        message: `Something came up out of the rock near your workings: ${species.name}. The deep is inhabited.`,
+        x: org.x, y: org.y, speciesId: species.id
+      });
+    }
+  }
+
+  /* Chambers can be chewed open. A subterranean predator standing on a
+   * finished chamber grinds its integrity down; at zero the chamber collapses
+   * and everything it was providing stops. Without this the underground would
+   * be permanent once built, and there would be nothing to defend down there. */
+  function chamberSiegeTick(game, bus, dt) {
+    game.__chamberAcc = (game.__chamberAcc || 0) + dt;
+    if (game.__chamberAcc < 1.5) return;
+    const step = game.__chamberAcc;
+    game.__chamberAcc = 0;
+
+    const list = CM.structures.all(game);
+    for (let i = list.length - 1; i >= 0; i--) {
+      const site = list[i];
+      if (!site.done) continue;
+      const near = game.world.grid.queryRadius(site.x, site.y, 3.5, []);
+      let gnawers = 0, guards = 0;
+      for (const o of near) {
+        if (!o.alive) continue;
+        if (o.ownerId === site.colonyId) { guards++; continue; }
+        if (isWild(o) && (T.WILD_BY_ID[o.speciesId] || {}).subterranean) gnawers++;
+      }
+      if (gnawers > guards) {
+        // Hardened ground bleeds slower. A redoubt in the middle of a network
+        // protects the chambers around it, not just the organisms.
+        const hardness = 1 + CM.structures.defenseAt(game, site.colonyId, site.x, site.y);
+        site.integrity = (site.integrity == null ? 100 : site.integrity) - (gnawers - guards) * 2.2 * step / hardness;
+        if (site.integrity <= 0) {
+          const colony = game.coloniesById[site.colonyId];
+          // Whatever was besieging this chamber loses its reason to stand
+          // here; it goes back to roaming rather than milling over a hole.
+          for (const o of near) {
+            if (o.rallyPoint && o.rallyPoint.x === site.x && o.rallyPoint.y === site.y) o.rallyPoint = null;
+          }
+          CM.structures.destroy(game, site);
+          if (colony && colony.isPlayer) {
+            D.pushEvent(game, bus, {
+              kind: 'death', icon: '\u{1F4A5}',
+              message: `${CM.structures.TYPES[site.type].name} has been chewed open and collapsed.`,
+              x: site.x, y: site.y
+            });
+          }
+        }
+      } else if (site.integrity != null && site.integrity < 100) {
+        site.integrity = Math.min(100, site.integrity + 1.5 * step);
+      }
+    }
+  }
+
   // -- main tick ----------------------------------------------------------
   function tick(game, bus, dt) {
     game.simTime += dt;
@@ -703,6 +801,14 @@
       // needs
       const metaRate = org.stats.metabolism / 11;
       org.hunger = K.clamp(org.hunger + metaRate * 1.05 * dt, 0, 100);
+      /* Cultivated fungus feeds whoever is standing in it. This is what makes
+       * the deep liveable: below the second stratum there is no forage, so a
+       * colony without a fungarium can dig the abyssal reach but cannot hold
+       * it. */
+      if (!isWild(org)) {
+        const fungus = CM.structures.fungariumFeed(game, org);
+        if (fungus) org.hunger = Math.max(0, org.hunger - fungus * dt);
+      }
       org.thirst = K.clamp(org.thirst + metaRate * org.stats.water_requirement * 1.6 * dt, 0, 100);
       const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.SEEK_WATER || org.state === S.RETURN_TO_CORE;
       org.energy = K.clamp(org.energy - metaRate * (moving ? 0.9 : 0.35) * dt, 0, org.stats.energyMax);
@@ -821,8 +927,26 @@
     reseedEmptyColonies(game, bus, dt);
     CM.climate.tick(game, bus, dt);
     CM.colony.tick(game, bus, dt);
+    deepFaunaTick(game, bus, dt);
+    chamberSiegeTick(game, bus, dt);
+    structureIncomeTick(game, bus, dt);
     coreSiegeTick(game, bus, dt);
     narrateEcosystem(game, bus, dt);
+  }
+
+  /* Chambers that pay out do so here, once per colony per second rather than
+   * per structure per tick. */
+  function structureIncomeTick(game, bus, dt) {
+    game.__incomeAcc = (game.__incomeAcc || 0) + dt;
+    if (game.__incomeAcc < 1) return;
+    const step = game.__incomeAcc;
+    game.__incomeAcc = 0;
+    for (const colony of (game.colonies || [])) {
+      if (!colony.alive) continue;
+      const inc = CM.structures.colonyIncome(game, colony.id);
+      if (inc.biomass) colony.biomass = Math.min(colony.biomassCap, colony.biomass + inc.biomass * step);
+      if (inc.energy) colony.energy = Math.min(colony.energyCap, colony.energy + inc.energy * step);
+    }
   }
 
   /* The EXPAND directive hands site selection to the colony itself: the
@@ -910,7 +1034,7 @@
       }
       /* A redoubt covering the Core makes its defenders count for more —
        * fortified ground is the whole reason to dig one. */
-      const fortified = CM.structures.redoubtAt(game, { ownerId: colony.id, x: colony.x, y: colony.y }) ? 1.45 : 1;
+      const fortified = 1 + CM.structures.defenseAt(game, colony.id, colony.x, colony.y);
       const pressure = attackers - defenders * 0.8 * fortified;
       if (pressure > 0) {
         CM.colony.damageCore(game, bus, colony, pressure * 1.4 * step);

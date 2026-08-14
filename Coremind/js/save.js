@@ -12,7 +12,12 @@
    * fresh set — the player keeps their discoveries and organisms, and the
    * world simply acquires neighbours. Losing a campaign to a schema bump is
    * never worth the tidiness. */
-  const VERSION = 2;
+  /* v3 adds the world's mutable features. The terrain is regenerable from the
+   * seed, but what the player has *done* to it is not: a stripped deposit came
+   * back full and a found vein came back unknown, so reloading quietly undid
+   * an hour of prospecting and harvesting. Old saves still load — they simply
+   * arrive with untouched deposits, which is what they already did. */
+  const VERSION = 3;
   const MIN_LOADABLE = 1;
   const MIN_SAVE_INTERVAL_MS = 5000;
   const PERIODIC_MS = 20000;
@@ -28,6 +33,12 @@
       core: { biomass: game.core.biomass, energy: game.core.energy },
       climate: game.climate,
       structures: CM.structures.serialize(game),
+      /* Only the fields play changes. Positions and richness come back off the
+       * seed, so there is no point writing them to storage every 20 seconds. */
+      world: {
+        deposits: game.world.deposits.map(d => ({ id: d.id, remaining: d.remaining, claimedBy: d.claimedBy || null })),
+        veins: (game.world.veins || []).map(v => ({ id: v.id, remaining: v.remaining, known: !!v.known, claimedBy: v.claimedBy || null }))
+      },
       colonies: game.colonies.map(c => ({
         id: c.id, name: c.name, isPlayer: c.isPlayer, x: c.x, y: c.y, color: c.color,
         strategyKey: c.strategyKey, alive: c.alive, integrity: c.integrity,
@@ -94,6 +105,29 @@
     if (data.climate) game.climate = data.climate;
     CM.climate.apply(game);
     CM.structures.hydrate(game, data.structures);
+
+    // Overlay what play changed onto the freshly-generated features. Matched
+    // by id rather than by index, so a change to how many deposits a world
+    // gets cannot silently shuffle a save's harvest state onto the wrong ones.
+    if (data.world) {
+      const byId = {};
+      for (const d of game.world.deposits) byId[d.id] = d;
+      for (const saved of data.world.deposits || []) {
+        const dep = byId[saved.id];
+        if (!dep) continue;
+        dep.remaining = saved.remaining;
+        dep.claimedBy = saved.claimedBy || null;
+      }
+      const veinById = {};
+      for (const v of (game.world.veins || [])) veinById[v.id] = v;
+      for (const saved of data.world.veins || []) {
+        const vein = veinById[saved.id];
+        if (!vein) continue;
+        vein.remaining = saved.remaining;
+        vein.known = !!saved.known;
+        vein.claimedBy = saved.claimedBy || null;
+      }
+    }
 
     /* Colonies are restored onto the objects createAll() just built, rather
      * than replacing the array: the Core positions come from the seed and are
@@ -167,5 +201,5 @@
     });
   }
 
-  CM.save = { hasSave, writeNow, readRaw, hydrate, maybeAutosave, init, PERIODIC_MS };
+  CM.save = { hasSave, writeNow, readRaw, serialize, hydrate, maybeAutosave, init, PERIODIC_MS };
 })(window.CM = window.CM || {});

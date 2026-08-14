@@ -55,6 +55,28 @@ body{
 }
 .roundbtn:active{background:var(--accent-dim);}
 
+/* Depth switcher: a vertical stack down the left edge, laid out top-to-bottom
+   like the strata it selects, so which way is "down" never needs explaining. */
+#depth-controls{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;z-index:4;}
+.depthbtn{
+  width:44px;height:34px;border-radius:7px;background:rgba(11,20,29,.82);
+  color:var(--muted);border:1px solid var(--line);font-size:12px;font-weight:600;
+  letter-spacing:.4px;backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;
+}
+.depthbtn.active{color:#08131b;background:var(--accent);border-color:var(--accent);}
+.depthbtn:disabled{opacity:.32;}
+
+/* Bottom-right, above the camera buttons: bottom-left belongs to the depth
+   strip and bottom-centre to the stratum banner the renderer draws. */
+#sanctum-meter{
+  position:absolute;right:10px;bottom:178px;z-index:4;font-size:11px;color:var(--muted);
+  background:rgba(11,20,29,.85);border:1px solid var(--line);border-radius:7px;padding:5px 8px;
+  max-width:150px;pointer-events:none;
+}
+#sanctum-meter .bar{height:4px;background:rgba(255,255,255,.12);border-radius:2px;margin-top:4px;overflow:hidden;}
+#sanctum-meter .bar > i{display:block;height:100%;background:#c88cff;}
+#sanctum-meter.secured{color:#e6c8ff;border-color:#8a4fd1;}
+
 #toast-layer{position:absolute;top:10px;left:10px;right:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:6;align-items:center;}
 .toast{
   background:rgba(11,20,29,.92);border:1px solid var(--line);border-left:3px solid var(--accent);
@@ -290,6 +312,12 @@ body{
 }
 
 .build-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.depth-head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-size:10.5px;letter-spacing:.09em;color:var(--fg-dim);
+  margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--line);
+}
+.depth-head span:first-child{font-weight:700;}
 .build-card{
   background:var(--panel2);border:1px solid var(--line);border-radius:10px;
   padding:9px 10px;text-align:left;color:var(--fg);min-height:70px;

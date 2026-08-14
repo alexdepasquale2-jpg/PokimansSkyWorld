@@ -253,7 +253,18 @@
     { id: 'shellfang', name: 'Shellfang', tier: 'predator', diet: 'carnivore',
       traits: ['armor', 'claws', 'basic_legs'], color: '#a15ad1' },
     { id: 'needler', name: 'Needler', tier: 'predator', diet: 'carnivore',
-      traits: ['venom', 'vibration_sense'], color: '#5ad1c4' }
+      traits: ['venom', 'vibration_sense'], color: '#5ad1c4' },
+
+    /* Subterranean fauna. These never appear on the surface — they are drawn
+     * out of the rock by excavation itself, which is what stops the deep
+     * tiers from being a safe basement the player retreats into. Depth is the
+     * stratum they haunt; the deeper the colony cuts, the worse it meets. */
+    { id: 'gnawer', name: 'Rock Gnawer', tier: 'predator', diet: 'carnivore',
+      traits: ['burrowing', 'bite', 'vibration_sense'], color: '#b08968', subterranean: 1 },
+    { id: 'shalefang', name: 'Shalefang', tier: 'predator', diet: 'carnivore',
+      traits: ['armor', 'claws', 'vibration_sense'], color: '#7d6b8f', subterranean: 2 },
+    { id: 'hollow_serpent', name: 'Hollow Serpent', tier: 'predator', diet: 'carnivore',
+      traits: ['venom', 'fast_movement', 'chem_sense'], color: '#c1557f', subterranean: 3 }
   ];
   const WILD_BY_ID = {};
   for (const s of WILD_SPECIES) WILD_BY_ID[s.id] = s;

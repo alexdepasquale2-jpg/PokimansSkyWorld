@@ -116,6 +116,7 @@
     initDesigner(game, bus);
     initInspect(game);
     initBuild(game, bus);
+    initDepthControls(game);
     initSheetGestures(game);
 
     el('btn-open-build').addEventListener('click', () => openBuild(game));
@@ -175,6 +176,65 @@
     el('btn-focus-core').addEventListener('click', () => CM.input.focusCore(game));
     el('btn-zoom-in').addEventListener('click', () => CM.input.zoomBy(game, 1.35));
     el('btn-zoom-out').addEventListener('click', () => CM.input.zoomBy(game, 1 / 1.35));
+  }
+
+  /* --- depth switching -----------------------------------------------------
+   * Surface plus one button per stratum. Levels below what the colony has cut
+   * stay disabled rather than hidden, because the whole point of the deep tier
+   * is that the player can see it waiting. */
+  function initDepthControls(game) {
+    const box = el('depth-controls');
+    box.addEventListener('click', evt => {
+      const btn = evt.target.closest('.depthbtn');
+      if (!btn || btn.disabled) return;
+      setViewDepth(game, parseInt(btn.dataset.depth, 10));
+    });
+    renderDepthControls(game);
+  }
+
+  function setViewDepth(game, depth) {
+    if (game.viewDepth === depth) return;
+    game.viewDepth = depth;
+    // Placing a chamber is a surface action — the build banner would otherwise
+    // sit over a view the tap does not apply to.
+    if (depth && game.buildMode) setBuildMode(game, null);
+    // No toast: the view itself changes completely and carries its own banner.
+    // Announcing it as well just buried the map under notifications every time
+    // the player flicked between levels.
+    renderDepthControls(game);
+  }
+
+  const DEPTH_LABEL = ['SURF', 'I', 'II', 'III'];
+  function renderDepthControls(game) {
+    const box = el('depth-controls');
+    const deepest = game.core ? CM.structures.deepestOf(game, game.core.id) : 0;
+    const view = game.viewDepth || 0;
+    let html = '';
+    for (let d = 0; d <= CM.structures.MAX_DEPTH; d++) {
+      // A level is viewable once the colony holds the level above it: you can
+      // look into the rock you are about to cut, but not three strata down.
+      const open = d === 0 || d <= deepest + 1;
+      const info = d ? CM.structures.DEPTHS[d] : null;
+      const title = d === 0 ? 'Surface' : (open ? info.name : `${info.name} — dig deeper to see it`);
+      html += `<button class="depthbtn${view === d ? ' active' : ''}" data-depth="${d}"
+        ${open ? '' : 'disabled'} title="${title}">${DEPTH_LABEL[d]}</button>`;
+    }
+    box.innerHTML = html;
+  }
+
+  /* The Sanctum readout. Only appears once the colony is actually cutting one
+   * — before that it would be a promise the game has not made yet. */
+  function renderSanctumMeter(game) {
+    const box = el('sanctum-meter');
+    if (!game.core) return;
+    const done = CM.structures.hasSanctum(game, game.core.id);
+    const prog = CM.structures.sanctumProgress(game, game.core.id);
+    if (prog <= 0) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.classList.toggle('secured', done);
+    box.innerHTML = done
+      ? '\u{1F52E} <b>Sanctum secured.</b><br>The Coremind cannot be killed from the surface.'
+      : `\u{1F52E} Deep Sanctum ${Math.round(prog * 100)}%<div class="bar"><i style="width:${Math.round(prog * 100)}%"></i></div>`;
   }
 
   // -- selection panel ------------------------------------------------------
@@ -500,6 +560,27 @@
       title.textContent = sp.name.toUpperCase();
       const traitChips = sp.traits.map(id => `<span class="trait-chip">${game.discovery.discoveredTraits[id] ? '' : '\u{1F512} '}${T.TRAITS_BY_ID[id].name}</span>`).join('');
       body.innerHTML = `<div class="kv"><span class="k">Role</span><span>${sp.tier}</span></div><div style="margin-top:6px">${traitChips}</div>`;
+    } else if (kind === 'structure') {
+      const site = data.site;
+      const type = CM.structures.TYPES[site.type];
+      const depth = CM.structures.DEPTHS[site.depth];
+      const owner = game.coloniesById[site.colonyId];
+      title.textContent = type.name.toUpperCase();
+      const integrity = site.integrity == null ? 100 : Math.round(site.integrity);
+      let rows = `<div class="kv"><span class="k">Stratum</span><span style="color:${depth.tint}">${depth.name}</span></div>
+        <div class="kv"><span class="k">Colony</span><span style="color:${owner ? owner.color : '#889'}">${owner ? owner.name : 'unknown'}</span></div>
+        <div class="kv"><span class="k">State</span><span>${site.done ? 'Complete' : Math.round(100 * site.work / site.workNeeded) + '% excavated'}</span></div>`;
+      if (site.done) {
+        rows += `<div class="kv"><span class="k">Integrity</span><span style="color:${integrity < 60 ? 'var(--danger)' : 'var(--fg)'}">${integrity}%</span></div>`;
+      }
+      if (site.veinId) {
+        const vein = (game.world.veins || []).find(v => v.id === site.veinId);
+        if (vein) rows += `<div class="kv"><span class="k">Seam remaining</span><span>${Math.round(vein.remaining)}</span></div>`;
+      }
+      body.innerHTML = rows + `<p style="color:var(--fg-dim);font-size:12.5px;margin-top:10px">${type.blurb}</p>`
+        + (site.done && integrity < 100
+          ? '<p style="color:var(--warn);font-size:12px;margin-top:6px">Something is chewing at this chamber. Organisms standing in it will drive them off.</p>'
+          : '');
     }
     openSheet(game, 'inspect-overlay');
   }
@@ -522,6 +603,9 @@
 
   function setBuildMode(game, typeKey) {
     game.buildMode = typeKey;
+    // Siting a chamber is done against the surface — that is where the tap
+    // has to land, so entering build mode surfaces the view.
+    if (typeKey && game.viewDepth) { game.viewDepth = 0; renderDepthControls(game); }
     renderBuildBanner(game);
     if (typeKey) closeSheet(game, 'build-overlay');
     else renderBuild(game);
@@ -551,24 +635,44 @@
     let html = `<div style="font-size:11.5px;color:var(--fg-dim);margin-bottom:8px">
       Network: <b style="color:var(--fg)">${built.length}</b> chambers &middot;
       ${pending.length} under excavation &middot; best digging <b style="color:var(--fg)">${Math.round(bestDig)}</b>
-      </div><div class="build-grid">`;
+      </div>`;
 
-    for (const key of CM.structures.TYPE_KEYS) {
-      const type = CM.structures.TYPES[key];
-      const cost = CM.structures.cost(key);
-      const afford = colony.biomass >= cost.biomass && colony.energy >= cost.energy;
-      const canDig = bestDig >= type.minDigging;
-      const disabled = !afford || !canDig;
-      let note = `${cost.biomass} biomass · ${cost.energy} energy`;
-      if (!canDig) note = `Needs digging ${type.minDigging} — none of your organisms can cut this.`;
-      else if (!afford) note = `Not enough — needs ${cost.biomass} biomass, ${cost.energy} energy.`;
-      html += `<button class="build-card${game.buildMode === key ? ' active' : ''}" data-type="${key}" ${disabled ? 'disabled' : ''}>
-        <div class="bc-top"><span>${type.icon}</span><span>${type.name}</span></div>
-        <div class="bc-cost">${note}</div>
-        <div class="bc-blurb">${type.blurb}</div>
-      </button>`;
+    /* Grouped by stratum, deepest last. The palette is the clearest place to
+     * show that the underground is a ladder rather than a shop: a level you
+     * have not reached is listed, greyed, with the one thing that would open
+     * it — otherwise the abyssal chambers would simply be invisible and the
+     * player would never learn there is anywhere further to go. */
+    const deepest = CM.structures.deepestOf(game, colony.id);
+    for (let d = 1; d <= CM.structures.MAX_DEPTH; d++) {
+      const info = CM.structures.DEPTHS[d];
+      const reached = deepest >= d - 1;   // you can always cut one level below
+      html += `<div class="depth-head"${reached ? '' : ' style="opacity:.5"'}>
+        <span style="color:${info.tint}">${info.name.toUpperCase()}</span>
+        <span>${reached ? `level ${d}` : 'sealed — dig the level above first'}</span></div>`;
+      html += '<div class="build-grid">';
+      for (const key of CM.structures.TYPE_KEYS) {
+        const type = CM.structures.TYPES[key];
+        if (type.depth !== d) continue;
+        const cost = CM.structures.cost(key);
+        const afford = colony.biomass >= cost.biomass && colony.energy >= cost.energy;
+        const canDig = bestDig >= type.minDigging;
+        const disabled = !afford || !canDig || !reached;
+        let note = `${cost.biomass} biomass · ${cost.energy} energy`;
+        if (!reached) note = `Sealed — cut ${CM.structures.DEPTHS[d - 1].name.toLowerCase()} first.`;
+        else if (!canDig) note = `Needs digging ${type.minDigging} — none of your organisms can cut this.`;
+        else if (!afford) note = `Not enough — needs ${cost.biomass} biomass, ${cost.energy} energy.`;
+        else if (type.requiresVein) {
+          const known = (game.world.veins || []).filter(v => v.known && !v.claimedBy).length;
+          note += known ? ` · ${known} vein${known > 1 ? 's' : ''} found` : ' · no vein found yet';
+        }
+        html += `<button class="build-card${game.buildMode === key ? ' active' : ''}" data-type="${key}" ${disabled ? 'disabled' : ''}>
+          <div class="bc-top"><span>${type.icon}</span><span>${type.name}</span></div>
+          <div class="bc-cost">${note}</div>
+          <div class="bc-blurb">${type.blurb}</div>
+        </button>`;
+      }
+      html += '</div>';
     }
-    html += '</div>';
 
     if (pending.length) {
       html += '<div class="research-head" style="margin-top:12px">UNDER EXCAVATION</div><div class="build-list">';
@@ -658,8 +762,17 @@
       ui.worldPanelAcc = 0;
       renderWorldPanel(game);
     }
+    // The depth strip and sanctum meter change on the timescale of a chamber
+    // being finished, so twice a second is plenty.
+    ui.depthAcc = (ui.depthAcc || 0) + 1;
+    if (ui.depthAcc >= 30) {
+      ui.depthAcc = 0;
+      renderDepthControls(game);
+      renderSanctumMeter(game);
+    }
   }
 
   CM.ui = { init, render, renderSelection, renderFeed, renderWorldPanel, updateBadges, showInspect, toast, switchTab,
-    openSheet, closeSheet, anySheetOpen, openBuild, renderBuild, renderBuildBanner };
+    openSheet, closeSheet, anySheetOpen, openBuild, renderBuild, renderBuildBanner,
+    setViewDepth, renderDepthControls, renderSanctumMeter };
 })(window.CM = window.CM || {});
