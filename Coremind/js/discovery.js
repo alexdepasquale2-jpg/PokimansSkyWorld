@@ -50,6 +50,33 @@
     });
   }
 
+  /* Watching counts as research.
+   *
+   * Discovery used to fire only from `resolveDeath`, which meant credit
+   * existed on exactly two paths: your organism killed something, or
+   * something killed your organism. A colony on GATHER does neither — and
+   * GATHER is the opening directive — so a measured 1400 sim-seconds of
+   * ordinary play produced an entirely empty observation ledger and not one
+   * discovery. The brief's own loop starts with organisms *encountering*
+   * species, so proximity has to be worth something.
+   *
+   * Only traits with an outward visual signature can be learned this way: a
+   * shell or a set of claws is visible from across a meadow, but nothing
+   * about standing near an animal reveals its biochemistry. Those still need
+   * a fight or a sample, which is what keeps EXTRACT worth doing. */
+  const SIGHTING_RATE = 0.05;     // credit per second of sustained proximity
+
+  function observeNearby(game, bus, observer, targets, dt) {
+    if (observer.ownerId !== 'player') return;   // only the player runs a lab
+    for (const target of targets) {
+      for (const traitId of target.traits) {
+        const trait = CM.traits.TRAITS_BY_ID[traitId];
+        if (!trait || !trait.visual_modifier) continue;
+        creditTrait(game, bus, traitId, SIGHTING_RATE * dt);
+      }
+    }
+  }
+
   function creditTrait(game, bus, traitId, amount) {
     const D = game.discovery;
     if (D.discoveredTraits[traitId]) return;
@@ -170,7 +197,8 @@
 
   CM.discovery = {
     OBSERVATION_THRESHOLD, newDiscoveryState, pushEvent, recordSighting,
-    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress,
+    recordEncounter, spawnSample, tickSamples, extractSample, observationProgress, observeNearby,
+    SIGHTING_RATE,
     researchInProgress, observedDamageType, observedDefense
   };
 })(window.CM = window.CM || {});

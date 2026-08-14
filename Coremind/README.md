@@ -48,9 +48,35 @@ node tools/build.mjs           # -> dist/coremind.html, one self-contained file
 
 The full core loop from the brief, playable end to end:
 
-- **World**: a seeded, deterministic 256×256 cell ecosystem (grass / water /
-  soil / rock, temperature and moisture fields, plant biomass that regrows
-  and gets grazed down) — `js/world.js`.
+- **World**: a seeded, deterministic 256×256 cell ecosystem generated as a
+  named pipeline of stages, each drawing from its own seed offset so changing
+  one cannot silently shift the others — `js/world.js`.
+  - **14 biomes** classified jointly from elevation, temperature and
+    moisture: deep water, shallows, marsh, sands, desert, savanna, grassland,
+    forest, jungle, taiga, tundra, ice sheet, rocky waste, mountains. Each
+    carries its own food ceiling, movement cost, and shelter from temperature
+    extremes.
+  - **Rivers** traced from high ground to the sea by steepest descent, adding
+    moisture along their length. They are what makes the interior habitable —
+    without them every inland region is a death sentence for anything that
+    needs to drink.
+  - **Named regions** (~40–55 per map) flood-filled from contiguous biome
+    areas, so the map has places worth talking about rather than coordinates.
+  - **Hazards** (thermal vents, toxic bogs, frost hollows) that shift local
+    temperature and injure whatever stands in them, and **biomass deposits**
+    placed only on productive ground so contested land is also land worth
+    holding.
+- **Flora**: nine plant species distributed by biome and low-frequency noise,
+  differing in nutrition, regrowth rate, and how hard they fight back —
+  `js/flora.js`. Bitterleaf and bloodcap are toxic; thornscrub and succulents
+  are physically defended. Venom-producing organisms resist ingested toxins
+  and armor blunts thorns, so a defended meadow is a design problem rather
+  than a wall. Organisms avoid defended forage unless genuinely hungry.
+- **Climate**: a four-season cycle plus weather events (drought, rains, cold
+  snap, heatwave) that shift the whole map's temperature and plant growth —
+  `js/climate.js`. This is the main engine of "a new ecological problem
+  emerges": a colony bred entirely for heat is in real trouble when Deep Cold
+  arrives.
 - **Organisms**: one reusable data-driven system for every creature, player-
   designed or wild — every stat the brief lists (health, energy, hunger,
   speed, size, vision, sense_radius, attack, defense, temperature_tolerance,
@@ -83,6 +109,66 @@ The full core loop from the brief, playable end to end:
   - **Burrowing is an escape, not a stat line.** A cornered digger drops
     underground: untargetable, immobile, recovering, and drawn as the mound
     it left behind. That's what makes its speed penalty affordable.
+  - **Digging also builds.** The `digging` stat sets how fast an organism
+    excavates, so the trait is what makes the underground reachable at all —
+    a colony with no burrowers can site chambers but will crawl through them,
+    and the deeper chamber types refuse to be cut without it.
+- **The underground** — a colony's second body, `js/structures.js`. Twelve
+  modular chamber types across **three strata**, each answering a pressure the
+  surface game already applies rather than being a generic upgrade.
+
+  A chamber may only link to one within a *single depth level* of itself.
+  That one rule is what makes depth a campaign instead of a menu: you cannot
+  reach the abyssal reach without holding deep galleries, and you cannot hold
+  those without shallow works above them.
+
+  - **Shallow Works (level 1)** — **Access Shaft** (the only chamber that can
+    be sunk on open ground; everything else must connect to a *finished*
+    chamber within reach, which is what makes the network a shape the player
+    designs rather than a list of purchases), **Warren** (organisms inside
+    cannot be sensed by predators and the chamber holds a workable temperature
+    whatever the surface is doing), **Cistern** (taps groundwater, so dry
+    inland ground becomes survivable), **Granary** (raises the Core's biomass
+    ceiling past its own limit).
+  - **Deep Galleries (level 2)** — **Descent** (cuts down; everything at this
+    depth hangs off one), **Nursery** (organisms nearby come off reproduction
+    cooldown far faster), **Analysis Vault** (speeds observations into
+    discoveries), **Redoubt** (fortified ground — its defenders count for more
+    in a siege *and* the chambers around it resist being chewed open),
+    **Fungarium** (feeds whoever stands in it, which is what severs a colony
+    from the surface: below this depth there is no forage).
+  - **Abyssal Reach (level 3)** — **Geothermal Tap** (a large permanent energy
+    income), **Veinworks** (mines a buried biomass seam; must be cut directly
+    onto one, and the seam is finite), **Deep Sanctum** (a second seat for the
+    Coremind — losing the surface Core no longer ends the colony, it falls
+    back and rebuilds from below).
+  - **Prospecting.** Abyssal seams are placed at world generation and are
+    invisible until a colony finishes a level-2-or-deeper chamber near one.
+    Finding them is a consequence of digging rather than a separate action,
+    and because they are fixed points on the map the deep tier is contested
+    ground rather than a shop.
+  - **The deep is inhabited.** Three subterranean species — Rock Gnawer,
+    Shalefang, Hollow Serpent — one per stratum, drawn to excavation and
+    rallied to the chamber that woke them. Unguarded chambers are chewed open
+    and collapse; the pressure scales with how deep the colony has cut, so the
+    abyssal tier is the most dangerous ground on the map.
+  - Three orders drive it: **DIG** (work the sites you placed), **EXPAND**
+    (the Coremind chooses its own sites from what the colony is short of), and
+    **SHELTER** (retreat underground). Rivals dig too, using the same
+    shortfall reasoning and walking the same depth ladder — an inland rival
+    ends up with cisterns, a besieged one with redoubts — and a collapsed
+    colony's network dies with it.
+- **The underground view** — `SURF / I / II / III` down the left of the stage
+  switches between the surface map and each stratum, rendered as an actual
+  excavated space rather than markers on a map: banded rock baked once per
+  depth (one blit per frame, same as the terrain), chambers as irregular lit
+  caverns cut out of it, corridors between them, and shafts marked where the
+  network changes level. Only ground the colony has opened is lit — the rest
+  of the stratum is dark, because an underground map that showed the whole
+  world would make prospecting pointless. Chambers one level away are ghosted
+  so the strata read as stacked rather than as unrelated maps, and tapping a
+  room opens its details. A stratum you have not reached yet is visible but
+  disabled, so the deep tier is something the player can see waiting.
 - **Utility AI**: all 10 states from the brief (IDLE, EXPLORE, SEEK_FOOD,
   FLEE, HUNT, ATTACK, REST, RETURN_TO_CORE, REPRODUCE, INVESTIGATE) plus
   SEEK_WATER, scored from needs + senses + the player's directive, with a
@@ -119,7 +205,15 @@ The full core loop from the brief, playable end to end:
 - **Event feed**: clickable, focuses the camera on the relevant location
   and opens the relevant detail (organism / species / trait).
 - **Touch controls**: one-finger drag pan, two-finger pinch zoom, tap to
-  select/inspect, mouse wheel for desktop dev — `js/input.js`.
+  select/inspect, mouse wheel for desktop dev — `js/input.js`. In build mode
+  a tap is a construction order and short-circuits selection, so aiming at
+  crowded ground still places the chamber.
+- **Transient sheets, not full-screen menus.** The designer, inspector and
+  excavation palette are bottom sheets: the world stays visible and running
+  above them, and any of tap-outside, swipe-the-grip-down, or the close
+  button dismisses them. Choosing a chamber closes the palette and leaves a
+  slim banner, so the player is picking a spot while watching real ground
+  rather than a menu.
 - **Performance**: object pooling for organisms, a uniform spatial grid for
   neighbor queries, simulation LOD (near organisms re-decide every tick,
   mid every 4th, far every 12th — spatial queries only happen at decision
@@ -127,10 +221,47 @@ The full core loop from the brief, playable end to end:
   canvas and blitted with a single `drawImage` regardless of zoom, and a
   soft population ceiling per ecosystem tier so the world plateaus instead
   of one species filling the entire active-organism cap.
+- **Rival Coreminds**: three other colonies run the same loop the player
+  does — `js/colony.js`. Each gathers biomass into its own Core, keeps its
+  own ledger of what it has fought, unlocks traits from those observations,
+  and designs an organism by scoring its known traits against its doctrine
+  *and* the conditions it can actually perceive around its own Core. A rival
+  on cold ground reaches for cold resistance; one that keeps losing organisms
+  to combat reaches for armor. They redesign when their losses tell them to,
+  and the feed reports it.
+  - Four doctrines — Expansionist, Entrenched, Predatory, Adaptive — which are
+    weights rather than scripts, so two colonies sharing a doctrine on
+    different ground still diverge.
+  - Rivals **wake on a stagger** (~4/5.5/7 minutes) and grow into their
+    ceiling, so the brief's quiet opening survives and rivals are the
+    escalation that follows it.
+  - **Territory** is a coarse influence field fed by Cores and living
+    organisms; where two colonies overlap comparably the cell is *contested*,
+    which is the border friction that produces raids without a scripted war.
+  - **Hostility is earned, not assigned.** Every colony starts wary; kills
+    drive standing down and quiet years let it drift back up. Past a
+    threshold two colonies treat each other as targets on sight, which turns
+    a border incident into a running feud with no scripted war declaration.
+  - **Biomass deposits** are finite, slow to recover, and claimed by whoever
+    works them — the concrete thing colonies fight over.
+  - **Cores can fall.** Hostile organisms standing on a Core with no
+    defenders grind its integrity down; at zero the colony collapses and its
+    organisms go feral rather than vanishing. This applies to the player's
+    Core on exactly the same terms. A Core with biomass left can always
+    regrow one organism, so losing your last body is never a dead end.
 - **Save/load**: autosaves on discoveries/deaths/creation (throttled) plus
   every 20s and on tab-hide/page-hide; `Continue` on the boot screen
   restores seed, discovered species/traits (with partial observation
-  progress), samples, designs, every living organism, and Core resources.
+  progress), samples, designs, every living organism, Core resources, every
+  colony's identity/knowledge/genome, the climate state, the whole underground
+  network with its depths and integrity, and what play changed about the world
+  itself — how far each biomass deposit has been stripped, who claimed it, and
+  which abyssal seams have been prospected and how much is left in them. The
+  terrain is never saved because it regenerates exactly from the seed; that
+  used to mean the *mutable* parts of it regenerated too, so a stripped
+  deposit came back full and an hour of prospecting came back unknown. The
+  format is versioned and loads v1 and v2 saves forward rather than discarding
+  a campaign.
 
 ### What's deliberately out of scope for this pass
 

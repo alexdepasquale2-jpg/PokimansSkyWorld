@@ -55,6 +55,28 @@ body{
 }
 .roundbtn:active{background:var(--accent-dim);}
 
+/* Depth switcher: a vertical stack down the left edge, laid out top-to-bottom
+   like the strata it selects, so which way is "down" never needs explaining. */
+#depth-controls{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;z-index:4;}
+.depthbtn{
+  width:44px;height:34px;border-radius:7px;background:rgba(11,20,29,.82);
+  color:var(--muted);border:1px solid var(--line);font-size:12px;font-weight:600;
+  letter-spacing:.4px;backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;
+}
+.depthbtn.active{color:#08131b;background:var(--accent);border-color:var(--accent);}
+.depthbtn:disabled{opacity:.32;}
+
+/* Bottom-right, above the camera buttons: bottom-left belongs to the depth
+   strip and bottom-centre to the stratum banner the renderer draws. */
+#sanctum-meter{
+  position:absolute;right:10px;bottom:178px;z-index:4;font-size:11px;color:var(--muted);
+  background:rgba(11,20,29,.85);border:1px solid var(--line);border-radius:7px;padding:5px 8px;
+  max-width:150px;pointer-events:none;
+}
+#sanctum-meter .bar{height:4px;background:rgba(255,255,255,.12);border-radius:2px;margin-top:4px;overflow:hidden;}
+#sanctum-meter .bar > i{display:block;height:100%;background:#c88cff;}
+#sanctum-meter.secured{color:#e6c8ff;border-color:#8a4fd1;}
+
 #toast-layer{position:absolute;top:10px;left:10px;right:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:6;align-items:center;}
 .toast{
   background:rgba(11,20,29,.92);border:1px solid var(--line);border-left:3px solid var(--accent);
@@ -217,3 +239,103 @@ body{
   #selection-panel.card{max-width:320px;}
   #designer-slots{grid-template-columns:repeat(6,1fr);}
 }
+
+/* world / colony roster */
+#world-readout{margin-bottom:10px;}
+#colony-roster{display:flex;flex-direction:column;gap:6px;}
+.colony-row{
+  display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;text-align:left;color:var(--fg);width:100%;min-height:44px;
+}
+.colony-row.dead{opacity:.45;}
+.colony-row .swatch{width:12px;height:12px;border-radius:3px;flex:0 0 auto;}
+.colony-row .cbody{flex:1;min-width:0;display:flex;flex-direction:column;}
+.colony-row .cname{font-size:12.5px;font-weight:600;}
+.colony-row .cname em{color:var(--fg-dim);font-style:normal;font-weight:400;}
+.colony-row .cmeta{font-size:10.5px;color:var(--fg-dim);}
+.colony-row .cint{font-size:11px;color:var(--danger);flex:0 0 auto;}
+.event-row.rival{border-left:3px solid #a26bd6;}
+.event-row.climate{border-left:3px solid #4fa9e0;}
+#stat-climate{color:#9fd0e6;font-size:11.5px;}
+#stat-climate span{white-space:nowrap;}
+
+/* ---- transient sheets -------------------------------------------------
+   Sheets slide up from the bottom and deliberately do NOT cover the world:
+   the game stays visible and running above them, which is the whole reason
+   they replaced full-screen overlays. Dismiss by tapping outside, swiping
+   the grip down, or the close button. */
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;z-index:30;
+  display:flex;flex-direction:column;
+  max-height:52vh;
+  background:rgba(11,20,29,.97);
+  border-top:1px solid var(--line);
+  border-radius:16px 16px 0 0;
+  box-shadow:0 -10px 30px rgba(0,0,0,.45);
+  padding-bottom:var(--safe-bottom);
+  transform:translateY(0);
+  transition:transform .2s cubic-bezier(.2,.8,.3,1);
+  touch-action:none;
+}
+.sheet.tall{max-height:82vh;}
+.sheet.closing{transform:translateY(105%);}
+.sheet-grip{
+  flex:0 0 auto;width:40px;height:4px;border-radius:2px;background:var(--line);
+  margin:8px auto 2px;
+}
+.sheet-head{
+  flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:4px 12px 8px;
+  border-bottom:1px solid var(--line);
+}
+.sheet-title{flex:1;font-weight:800;letter-spacing:.06em;font-size:12.5px;color:var(--fg-dim);}
+#inspect-body,#build-body{flex:1 1 auto;overflow-y:auto;padding:10px 12px;}
+
+/* The catcher sits under the sheet but over the world, so a tap anywhere
+   else closes it without dimming what the player is watching. */
+#sheet-catcher{position:absolute;inset:0;z-index:29;background:transparent;}
+
+@keyframes sheetin{from{transform:translateY(105%)}to{transform:translateY(0)}}
+.sheet:not(.closing){animation:sheetin .2s cubic-bezier(.2,.8,.3,1);}
+
+/* ---- build mode ---- */
+#build-banner{
+  position:absolute;left:10px;right:10px;top:10px;z-index:8;
+  background:rgba(11,20,29,.95);border:1px solid var(--accent-dim);
+  border-left:3px solid var(--accent);border-radius:10px;padding:9px 12px;
+  font-size:12.5px;display:flex;align-items:center;gap:10px;
+}
+#build-banner .bb-text{flex:1;}
+#build-banner .bb-text b{color:var(--accent);}
+#build-banner button{
+  background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+  border-radius:8px;min-height:32px;padding:0 10px;font-size:11.5px;
+}
+
+.build-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.depth-head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-size:10.5px;letter-spacing:.09em;color:var(--fg-dim);
+  margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--line);
+}
+.depth-head span:first-child{font-weight:700;}
+.build-card{
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:9px 10px;text-align:left;color:var(--fg);min-height:70px;
+}
+.build-card:disabled{opacity:.4;}
+.build-card.active{border-color:var(--accent);background:rgba(51,230,176,.09);}
+.build-card .bc-top{display:flex;align-items:center;gap:6px;font-weight:700;font-size:12.5px;}
+.build-card .bc-cost{font-size:10.5px;color:var(--fg-dim);margin-top:3px;}
+.build-card .bc-blurb{font-size:10.5px;color:var(--fg-dim);margin-top:4px;line-height:1.35;}
+.build-list{display:flex;flex-direction:column;gap:5px;margin-top:10px;}
+.build-row{display:flex;align-items:center;gap:8px;font-size:11.5px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--fg);text-align:left;}
+.build-row .br-bar{flex:1;height:6px;background:var(--panel);border-radius:3px;overflow:hidden;border:1px solid var(--line);}
+.build-row .br-bar > i{display:block;height:100%;background:var(--accent);}
+
+/* The designer sheet: one scrolling body, a pinned action row. */
+#designer-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;}
+#designer-scroll #designer-preview{border-bottom:1px solid var(--line);}
+#designer-scroll #preview-canvas{width:180px;height:180px;}
+#designer-scroll #designer-stats{flex:none;overflow:visible;}
+#designer-actions{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);}

@@ -20,6 +20,7 @@
     <div class="stat" id="stat-biomass" title="Biomass"><i>&#127793;</i><span>0</span></div>
     <div class="stat" id="stat-energy" title="Energy"><i>&#9889;</i><span>0</span></div>
     <div class="stat" id="stat-pop" title="Population"><i>&#129440;</i><span>0</span></div>
+    <div class="stat" id="stat-climate" title="Season and weather"><i>&#127777;</i><span>—</span></div>
     <button id="btn-speed" class="iconbtn" title="Simulation speed">1x</button>
   </div>
 
@@ -36,6 +37,9 @@
       <button id="btn-zoom-out" class="roundbtn" title="Zoom out">&minus;</button>
     </div>
 
+    <div id="depth-controls"></div>
+    <div id="sanctum-meter" class="hidden"></div>
+
     <div id="directive-toast" class="hidden"></div>
   </div>
 
@@ -43,11 +47,18 @@
     <button data-tab="explore" class="tab active">EXPLORE</button>
     <button data-tab="analyze" class="tab">ANALYZE<span id="badge-analyze" class="badge hidden">0</span></button>
     <button data-tab="dna" class="tab">DNA<span id="badge-dna" class="badge hidden">!</span></button>
+    <button data-tab="world" class="tab">WORLD</button>
   </div>
 
   <div id="panel-explore" class="panel active">
     <div id="selection-summary">Tap an organism to select it, or issue a directive to your whole colony.</div>
     <div id="directive-bar"></div>
+    <button id="btn-open-build" class="bigbtn secondary" style="width:100%;margin:8px 0 0">&#9935; EXCAVATION</button>
+  </div>
+
+  <div id="panel-world" class="panel">
+    <div id="world-readout"></div>
+    <div id="colony-roster"></div>
   </div>
 
   <div id="panel-analyze" class="panel">
@@ -55,34 +66,56 @@
     <div id="event-feed"></div>
   </div>
 
-  <div id="designer-overlay" class="overlay hidden">
-    <div class="overlay-head">
+  <div id="designer-overlay" class="sheet tall hidden">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="sheet-title">GENOME DESIGNER</div>
       <button id="btn-designer-close" class="iconbtn">&#10005;</button>
-      <div class="overlay-title">GENOME DESIGNER</div>
-      <div style="width:40px"></div>
     </div>
-    <div id="designer-preview">
-      <canvas id="preview-canvas" width="240" height="240"></canvas>
-      <div id="designer-cost"></div>
+    <!-- Everything except the action row scrolls together. The fixed-height
+         preview and slot grid together can exceed the sheet, and with them
+         all flex:0 0 auto the CREATE ORGANISM button was pushed off the
+         bottom of the screen and became unclickable. -->
+    <div id="designer-scroll">
+      <div id="designer-preview">
+        <canvas id="preview-canvas" width="240" height="240"></canvas>
+        <div id="designer-cost"></div>
+      </div>
+      <div id="designer-slots"></div>
+      <div id="designer-combo"></div>
+      <div id="designer-stats"></div>
+      <div id="designer-designs"></div>
     </div>
-    <div id="designer-slots"></div>
-    <div id="designer-combo"></div>
-    <div id="designer-stats"></div>
-    <div id="designer-designs"></div>
     <div id="designer-actions">
       <button id="btn-save-design" class="bigbtn secondary">SAVE STRAIN</button>
       <button id="btn-create-organism" class="bigbtn" disabled>CREATE ORGANISM</button>
     </div>
   </div>
 
-  <div id="inspect-overlay" class="overlay hidden">
-    <div class="overlay-head">
+  <div id="inspect-overlay" class="sheet hidden">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="sheet-title" id="inspect-title">DETAILS</div>
       <button id="btn-inspect-close" class="iconbtn">&#10005;</button>
-      <div class="overlay-title" id="inspect-title">DETAILS</div>
-      <div style="width:40px"></div>
     </div>
     <div id="inspect-body"></div>
   </div>
+
+  <div id="build-overlay" class="sheet hidden">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="sheet-title">EXCAVATION</div>
+      <button id="btn-build-close" class="iconbtn">&#10005;</button>
+    </div>
+    <div id="build-body"></div>
+  </div>
+
+  <!-- Catches taps outside an open sheet so anywhere-but-the-sheet dismisses
+       it. Deliberately not a dimming scrim: the point of a sheet here is that
+       the world stays visible and legible behind it. -->
+  <div id="sheet-catcher" class="hidden"></div>
+
+  <div id="build-banner" class="hidden"></div>
 
   <div id="boot-overlay" class="overlay">
     <div class="boot-card">
@@ -98,10 +131,14 @@
 
 <script src="js/core.js"></script>
 <script src="js/traits.js"></script>
+<script src="js/flora.js"></script>
 <script src="js/world.js"></script>
 <script src="js/organism.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/discovery.js"></script>
+<script src="js/climate.js"></script>
+<script src="js/colony.js"></script>
+<script src="js/structures.js"></script>
 <script src="js/coremind.js"></script>
 <script src="js/simulation.js"></script>
 <script src="js/render.js"></script>

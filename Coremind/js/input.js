@@ -15,24 +15,47 @@
     const c = game.camera;
     c.targetZoom = K.clamp((c.targetZoom || c.zoom) * factor, R.ZOOM_MIN, R.ZOOM_MAX);
   }
-  function focusCore(game) { R.focusOn(game, game.core.x, game.core.y, 16); }
+  function focusCore(game) { R.focusOn(game, game.core.x, game.core.y, 12); }
+
+  /* Hit radii are in canvas pixels, so the finger-sized slop has to be scaled
+   * by dpr as well — 22 device pixels is 7 CSS pixels on a modern phone, which
+   * is far smaller than a fingertip. */
+  function slop(canvas) { return HIT_RADIUS_PX * (canvas.__dpr || 1); }
 
   function hitTestOrganism(game, canvas, screenX, screenY) {
-    let best = null, bestD = HIT_RADIUS_PX;
+    const dpr = canvas.__dpr || 1;
+    let best = null, bestD = slop(canvas);
     for (const org of game.organisms) {
       const p = R.worldToScreen(game, canvas, org.x, org.y);
       const d = Math.hypot(p.x - screenX, p.y - screenY);
-      const r = Math.max(10, org.stats.size * 0.11 * game.camera.zoom * (canvas.__dpr || 1) * 1.9);
-      if (d < r + 6 && d < bestD) { bestD = d; best = org; }
+      const r = Math.max(10 * dpr, org.stats.size * 0.11 * game.camera.zoom * dpr * 1.9);
+      if (d < r + 6 * dpr && d < bestD) { bestD = d; best = org; }
     }
     return best;
   }
   function hitTestSample(game, canvas, screenX, screenY) {
-    let best = null, bestD = HIT_RADIUS_PX;
+    let best = null, bestD = slop(canvas);
     for (const s of game.discovery.samples) {
       const p = R.worldToScreen(game, canvas, s.x, s.y);
       const d = Math.hypot(p.x - screenX, p.y - screenY);
       if (d < bestD) { bestD = d; best = s; }
+    }
+    return best;
+  }
+
+  /* Chambers are only tappable in the underground view. On the surface they
+   * are markers over ground the player needs to be able to tap through — a
+   * developed network would otherwise swallow every tap in its own territory. */
+  function hitTestStructure(game, canvas, screenX, screenY) {
+    if (!game.viewDepth) return null;
+    const dpr = canvas.__dpr || 1;
+    let best = null, bestD = Infinity;
+    for (const s of CM.structures.all(game)) {
+      if (s.depth !== game.viewDepth) continue;
+      const p = R.worldToScreen(game, canvas, s.x, s.y);
+      const d = Math.hypot(p.x - screenX, p.y - screenY);
+      const r = Math.max(slop(canvas), CM.structures.TYPES[s.type].radius * game.camera.zoom * dpr * 0.62);
+      if (d < r && d < bestD) { bestD = d; best = s; }
     }
     return best;
   }
@@ -113,8 +136,19 @@
     }
 
     function handleTap(x, y) {
+      /* Build mode short-circuits every other hit test. Otherwise a tap
+       * aimed at open ground that happens to land near an organism selects
+       * it instead of siting the chamber, and the player is left tapping a
+       * crowded area wondering why nothing is being built. While the banner
+       * says "tap the ground", a tap has to mean exactly that. */
+      if (game.buildMode) {
+        handlers.onTapEmpty && handlers.onTapEmpty(R.screenToWorld(game, canvas, x, y));
+        return;
+      }
       const org = hitTestOrganism(game, canvas, x, y);
       if (org) { handlers.onSelectOrganism && handlers.onSelectOrganism(org); return; }
+      const site = hitTestStructure(game, canvas, x, y);
+      if (site) { handlers.onTapStructure && handlers.onTapStructure(site); return; }
       const sample = hitTestSample(game, canvas, x, y);
       if (sample) { handlers.onTapSample && handlers.onTapSample(sample); return; }
       const core = hitTestCore(game, canvas, x, y);
@@ -132,5 +166,5 @@
     }, { passive: false });
   }
 
-  CM.input = { attach, zoomBy, focusCore, hitTestOrganism, hitTestSample, hitTestCore };
+  CM.input = { attach, zoomBy, focusCore, hitTestOrganism, hitTestSample, hitTestCore, hitTestStructure };
 })(window.CM = window.CM || {});
