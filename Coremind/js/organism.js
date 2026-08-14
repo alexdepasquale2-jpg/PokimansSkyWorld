@@ -70,6 +70,7 @@
     org.stateTimer = 0;
     org.directive = opts.directive || null;
     org.directiveTarget = null;
+    org.rallyPoint = null;
     org.target = null;
     org.actionTarget = null;
     org.carrying = 0;

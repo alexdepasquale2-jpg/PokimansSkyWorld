@@ -170,10 +170,17 @@ The full core loop from the brief, playable end to end:
   - **Territory** is a coarse influence field fed by Cores and living
     organisms; where two colonies overlap comparably the cell is *contested*,
     which is the border friction that produces raids without a scripted war.
+  - **Hostility is earned, not assigned.** Every colony starts wary; kills
+    drive standing down and quiet years let it drift back up. Past a
+    threshold two colonies treat each other as targets on sight, which turns
+    a border incident into a running feud with no scripted war declaration.
+  - **Biomass deposits** are finite, slow to recover, and claimed by whoever
+    works them — the concrete thing colonies fight over.
   - **Cores can fall.** Hostile organisms standing on a Core with no
     defenders grind its integrity down; at zero the colony collapses and its
     organisms go feral rather than vanishing. This applies to the player's
-    Core on exactly the same terms.
+    Core on exactly the same terms. A Core with biomass left can always
+    regrow one organism, so losing your last body is never a dead end.
 - **Save/load**: autosaves on discoveries/deaths/creation (throttled) plus
   every 20s and on tab-hide/page-hide; `Continue` on the boot screen
   restores seed, discovered species/traits (with partial observation

@@ -331,6 +331,22 @@
       }
     }
 
+    // Biomass deposits: the thing colonies compete over, so they have to be
+    // visible. A claimed one is ringed in its owner's colour; a depleted one
+    // fades, so "this patch is stripped" reads at a glance.
+    for (const dep of game.world.deposits) {
+      if (dep.x < sx0 - 4 || dep.x > sx1 + 4 || dep.y < sy0 - 4 || dep.y > sy1 + 4) continue;
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, dep.x, dep.y);
+      const frac = K.clamp01(dep.remaining / dep.richness);
+      const r = Math.max(3, 2.4 * zoom * (0.45 + frac * 0.55));
+      ctx.fillStyle = `rgba(126,224,129,${0.25 + frac * 0.5})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      const owner = dep.claimedBy && game.coloniesById && game.coloniesById[dep.claimedBy];
+      ctx.strokeStyle = owner ? owner.color : 'rgba(200,230,200,.5)';
+      ctx.lineWidth = owner ? 2 : 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r + 2, 0, Math.PI * 2); ctx.stroke();
+    }
+
     // samples
     for (const s of game.discovery.samples) {
       if (s.x < sx0 - 2 || s.x > sx1 + 2 || s.y < sy0 - 2 || s.y > sy1 + 2) continue;

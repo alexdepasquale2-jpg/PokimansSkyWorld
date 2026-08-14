@@ -27,7 +27,10 @@
       discovery: CM.discovery.newDiscoveryState(),
       designs: [],
       selection: null,
-      camera: { x: world.coreSpawn.x, y: world.coreSpawn.y, zoom: 18, targetX: world.coreSpawn.x, targetY: world.coreSpawn.y, targetZoom: 18, dragging: false },
+      // Opens wide enough to read the Core's surroundings rather than a single
+      // biome: at 18 only ~22 cells fit across a phone screen, which on a
+      // 256-cell map shows almost nothing of where the colony actually is.
+      camera: { x: world.coreSpawn.x, y: world.coreSpawn.y, zoom: 9, targetX: world.coreSpawn.x, targetY: world.coreSpawn.y, targetZoom: 9, dragging: false },
       stats: { playerPop: 0, herbivorePop: 0, predatorPop: 0, plantTotal: 0, colonyPop: {} },
       designerDraft: { BODY: null, SENSE: null, METABOLISM: null, DEFENSE: null, OFFENSE: null, REPRODUCTION: null },
       // GATHER, not EXPLORE: a colony's first job is to feed itself, and the

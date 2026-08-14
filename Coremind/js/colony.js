@@ -270,6 +270,7 @@
       colony.biomass = Math.min(colony.biomassCap, colony.biomass + 0.55 * dt);
       colony.energy = Math.min(colony.energyCap, colony.energy + 0.7 * dt);
 
+      decayStanding(colony, dt);
       colony.redesignTimer -= dt;
       if (colony.redesignTimer <= 0) {
         colony.redesignTimer = REDESIGN_INTERVAL * (0.7 + Math.random() * 0.6);
@@ -348,6 +349,7 @@
     colony.energy -= cost.energy;
 
     const a = Math.random() * Math.PI * 2, r = 1.5 + Math.random() * 2.5;
+    const directive = rollDirective(colony);
     const org = CM.organism.create({
       ownerId: colony.id,
       traits,
@@ -356,9 +358,43 @@
       y: K.clamp(colony.y + Math.sin(a) * r, 1, game.world.size - 1),
       color: colony.color,
       diet: 'omnivore',
-      directive: rollDirective(colony)
+      directive
     });
+    org.rallyPoint = pickRally(game, colony, directive);
     CM.coremind.addOrganism(game, org);
+  }
+
+  /* Where a newly deployed organism is sent. This is what actually makes the
+   * doctrines legible on screen: a Predatory colony's organisms converge on
+   * whoever it hates, an Expansionist's fan outward toward unheld ground, and
+   * an Entrenched one's never leave the porch. Without it every colony
+   * behaved identically and `aggression`/`expansion`/`defense` were decorative. */
+  function pickRally(game, colony, directive) {
+    const strategy = strategyOf(colony);
+    if (directive === 'DEFEND' || strategy.defense > 1.4) {
+      return { x: colony.x, y: colony.y, radius: 10 };
+    }
+    if (directive === 'HUNT' && strategy.aggression > 0.6) {
+      // Head for the colony it likes least that is actually reachable.
+      let target = null, worst = 1;
+      for (const other of game.colonies) {
+        if (other.id === colony.id || !other.alive) continue;
+        const s = standingBetween(game, colony, other);
+        if (s < worst) { worst = s; target = other; }
+      }
+      if (target) {
+        const t = 0.55 + Math.random() * 0.35;    // stop short of the Core itself
+        return { x: colony.x + (target.x - colony.x) * t, y: colony.y + (target.y - colony.y) * t, radius: 18 };
+      }
+    }
+    // Expansion: push outward from the Core, further the more expansionist.
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 14 + strategy.expansion * 26 * Math.random();
+    return {
+      x: K.clamp(colony.x + Math.cos(ang) * dist, 2, game.world.size - 2),
+      y: K.clamp(colony.y + Math.sin(ang) * dist, 2, game.world.size - 2),
+      radius: 14
+    };
   }
 
   function rollDirective(colony) {
@@ -385,11 +421,69 @@
   }
 
   function recordLoss(game, colony, cause) {
-    if (!colony || colony.isPlayer) return;
+    if (!colony) return;
     colony.losses++;
+    if (colony.isPlayer) return;
     colony.lastLossCause = cause;
     // A colony bleeding organisms rethinks sooner than its normal cadence.
     if (colony.losses % 3 === 0) colony.redesignTimer = Math.min(colony.redesignTimer, 8);
+  }
+
+  /* --- standing -------------------------------------------------------------
+   * Hostility is earned rather than assigned. Every colony starts mildly wary
+   * of every other; killing their organisms drives it down, and time with no
+   * incidents lets it drift back up. Below HOSTILE_AT the two treat each other
+   * as targets on sight rather than only when posturing, which is what turns a
+   * border incident into a running feud without any scripted war declaration. */
+  const HOSTILE_AT = -0.55;
+  const STANDING_PER_KILL = 0.12;
+
+  function standingBetween(game, a, b) {
+    if (!a || !b || a === b) return 0;
+    const colA = typeof a === 'string' ? game.coloniesById[a] : a;
+    if (!colA || !colA.standing) return 0;
+    const bId = typeof b === 'string' ? b : b.id;
+    return colA.standing[bId] != null ? colA.standing[bId] : 0;
+  }
+
+  function areHostile(game, aId, bId) {
+    if (!aId || !bId || aId === bId) return false;
+    if (aId === WILD_ID || bId === WILD_ID) return false;
+    return standingBetween(game, aId, bId) <= HOSTILE_AT
+        || standingBetween(game, bId, aId) <= HOSTILE_AT;
+  }
+
+  /* Both sides move: the victim resents the killer, and the killer's own
+   * regard for a colony it keeps preying on also drops, so predation is
+   * self-reinforcing rather than one-sided. */
+  function registerKill(game, bus, killerColonyId, victimColonyId) {
+    if (!killerColonyId || !victimColonyId || killerColonyId === victimColonyId) return;
+    if (killerColonyId === WILD_ID || victimColonyId === WILD_ID) return;
+    const victim = game.coloniesById[victimColonyId];
+    const killer = game.coloniesById[killerColonyId];
+    if (!victim || !killer) return;
+    const before = areHostile(game, killerColonyId, victimColonyId);
+    victim.standing[killerColonyId] = K.clamp((victim.standing[killerColonyId] || 0) - STANDING_PER_KILL, -1, 1);
+    killer.standing[victimColonyId] = K.clamp((killer.standing[victimColonyId] || 0) - STANDING_PER_KILL * 0.4, -1, 1);
+    if (!before && areHostile(game, killerColonyId, victimColonyId)) {
+      const involvesPlayer = victim.isPlayer || killer.isPlayer;
+      CM.discovery.pushEvent(game, bus, {
+        kind: involvesPlayer ? 'warn' : 'rival', icon: '\u{2694}',
+        message: involvesPlayer
+          ? `${(victim.isPlayer ? killer : victim).name} is now openly hostile to you.`
+          : `${victim.name} and ${killer.name} have turned on each other.`,
+        x: victim.x, y: victim.y, colonyId: victim.isPlayer ? killer.id : victim.id
+      });
+    }
+  }
+
+  /* Standing recovers slowly when nothing is happening, so an old grudge can
+   * cool if both sides leave each other alone. */
+  function decayStanding(colony, dt) {
+    for (const id in colony.standing) {
+      const v = colony.standing[id];
+      if (v < -0.25) colony.standing[id] = Math.min(-0.25, v + 0.004 * dt);
+    }
   }
 
   // --- territory -------------------------------------------------------------
@@ -518,6 +612,7 @@
     BIOMASS_CAP, ENERGY_CAP,
     newColony, createAll, strategyOf, chooseDesign, designTraitIds,
     tick, tryDeploy, creditObservation, recordLoss, perceivedThreat, isAwake,
+    HOSTILE_AT, standingBetween, areHostile, registerKill, pickRally,
     initTerritory, updateTerritory, territoryOwnerAt, territoryCounts,
     damageCore, collapse, livingRivals, populationCap
   };

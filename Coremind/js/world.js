@@ -339,11 +339,12 @@
       const b = world.biome[i];
       if (b !== BIOME.FOREST && b !== BIOME.JUNGLE && b !== BIOME.GRASSLAND && b !== BIOME.MARSH && b !== BIOME.SAVANNA) continue;
       if (world.hazard[i] !== HAZARD.NONE) continue;
+      const richness = 60 + rng() * 140;
       world.deposits.push({
         id: 'dep_' + placed,
         x: x + 0.5, y: y + 0.5,
-        richness: 60 + rng() * 140,
-        remaining: 60 + rng() * 140,
+        richness,
+        remaining: richness,
         claimedBy: null
       });
       placed++;
@@ -581,6 +582,32 @@
     return K.dist(x, y, wx, wy) <= radius ? { x: wx, y: wy } : null;
   }
 
+  /* Deposits are concentrated biomass — worth far more than grazing, finite,
+   * and slow to recover, which is what makes them worth fighting over rather
+   * than merely worth visiting. */
+  const DEPOSIT_REACH = 2.2;
+  function findNearestDeposit(world, x, y, radius) {
+    let best = null, bestD = radius * radius;
+    for (const d of world.deposits) {
+      if (d.remaining <= 1) continue;
+      const dd = K.dist2(d.x, d.y, x, y);
+      if (dd < bestD) { bestD = dd; best = d; }
+    }
+    return best;
+  }
+  function harvestDeposit(deposit, amount) {
+    const taken = Math.min(deposit.remaining, amount);
+    deposit.remaining -= taken;
+    return taken;
+  }
+  /* Regrowth is slow enough that a stripped deposit stays stripped for a
+   * meaningful stretch, so exhausting one has consequences. */
+  function tickDeposits(world, dt) {
+    for (const d of world.deposits) {
+      if (d.remaining < d.richness) d.remaining = Math.min(d.richness, d.remaining + d.richness * 0.004 * dt);
+    }
+  }
+
   function atWaterEdge(world, x, y) {
     const xi = Math.floor(x), yi = Math.floor(y);
     for (let dy = -1; dy <= 1; dy++) {
@@ -654,6 +681,7 @@
     generate, classify, findColonySite,
     biomeAt, biomeInfoAt, isWaterBiome, isWaterAt, moveCostAt, hazardAt,
     tempAt, moistureAt, foodAt, regionAt, consumeFood, tickFood,
-    findNearestFood, findNearestWater, atWaterEdge, makeSpatialGrid
+    findNearestFood, findNearestWater, findNearestDeposit, harvestDeposit, tickDeposits,
+    DEPOSIT_REACH, atWaterEdge, makeSpatialGrid
   };
 })(window.CM = window.CM || {});

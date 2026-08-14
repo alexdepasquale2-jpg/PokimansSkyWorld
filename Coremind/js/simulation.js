@@ -86,21 +86,27 @@
     if (isWild(org)) return T.WILD_BY_ID[org.speciesId].diet === 'carnivore';
     return org.directive === 'HUNT' || org.directive === 'DEFEND';
   }
-  function validHuntTarget(hunter, other) {
+  function validHuntTarget(hunter, other, game) {
     if (sameColony(hunter, other)) return false;          // never eat your own
     if (isWild(hunter)) {
       if (!isWild(other)) return true;                    // any colonial organism is meat
       return T.WILD_BY_ID[other.speciesId].tier === 'prey';
     }
-    // A colonial hunter will take wild game or a rival colony's organisms.
-    return true;
+    if (isWild(other)) return true;                       // wild game is always fair
+    /* Another colony's organisms are only prey once relations have actually
+     * soured. Without this every colony attacks every other on sight from the
+     * first contact, and standing — the whole point of tracking who has
+     * wronged whom — never gets to mean anything. */
+    return !game || CM.colony.areHostile(game, hunter.ownerId, other.ownerId);
   }
-  function isThreatTo(org, other) {
+  function isThreatTo(org, other, game) {
     if (sameColony(org, other)) return false;
     if (!isWild(org)) {
       // Wild carnivores are always a threat; a rival's organisms are a threat
-      // when they are postured to fight.
+      // when they are postured to fight, or whenever the two colonies have
+      // fallen into open hostility.
       if (isWild(other)) return T.WILD_BY_ID[other.speciesId].diet === 'carnivore';
+      if (game && CM.colony.areHostile(game, org.ownerId, other.ownerId)) return true;
       return other.directive === 'HUNT' || other.directive === 'DEFEND';
     }
     if (T.WILD_BY_ID[org.speciesId].tier === 'prey') {
@@ -131,18 +137,24 @@
     let nearestThreat = null, nearestPrey = null, nearestCuriosity = null;
     let bestThreatD = Infinity, bestPreyD = Infinity, bestCurD = Infinity;
     const newSightings = [];
+    // Only the player's organisms feed the research ledger, so only they pay
+    // for collecting the list.
+    const observable = org.ownerId === CM.colony.PLAYER_ID ? [] : null;
 
     for (const other of near) {
       if (other === org || !O.isAlive(other)) continue;
       const d = K.dist(org.x, org.y, other.x, other.y);
       if (!isDetected(org, other)) continue;
 
-      if (d <= threatR && isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
-      if (d <= senseR && validHuntTarget(org, other) && d < bestPreyD) {
+      if (d <= threatR && isThreatTo(org, other, game) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
+      if (d <= senseR && validHuntTarget(org, other, game) && d < bestPreyD) {
         const canHuntNow = isPredatorLike(org);
         if (canHuntNow) { bestPreyD = d; nearestPrey = { dist: d, entity: other }; }
       }
-      if (d <= senseR && isWild(other) && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
+      if (d <= senseR && isWild(other)) {
+        if (!game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
+        if (observable) observable.push(other);
+      }
     }
 
     for (const sample of game.discovery.samples) {
@@ -154,7 +166,16 @@
     const canHunt = isPredatorLike(org);
     // Only a genuinely hungry organism will touch defended forage.
     const desperate = org.hunger > 78;
-    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, senseR, 4, !desperate) : null;
+    let nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, senseR, 4, !desperate) : null;
+    /* A gatherer prefers a deposit to grazing when one is in reach: it is
+     * worth several times as much biomass to the Core, which is exactly why
+     * deposits are worth contesting. Hunger is still served by ordinary
+     * forage — a starving organism eats what is nearest. */
+    let depositTarget = null;
+    if (!isWild(org) && org.directive === 'GATHER' && org.hunger < 70) {
+      depositTarget = W.findNearestDeposit(game.world, org.x, org.y, senseR * 2.2);
+      if (depositTarget) nearestFood = { x: depositTarget.x, y: depositTarget.y, amount: depositTarget.remaining, deposit: depositTarget };
+    }
     // Water is only looked up when the organism actually cares — this is a
     // grid scan, and running it for every organism every decision would cost
     // far more than the thirst system is worth.
@@ -179,7 +200,8 @@
       colonyRoom = K.clamp01(1 - cur / cap);
     }
 
-    return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt, newSightings, colonyRoom, defendRadius: senseR };
+    return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt,
+      newSightings, observable, colonyRoom, carryRoom: K.clamp01(1 - org.carrying / MAX_CARRY), defendRadius: senseR };
   }
 
   // -- movement ---------------------------------------------------------------
@@ -209,6 +231,18 @@
    * is both a real thing animals do and the reason droughts here produce
    * migration toward the wet regions rather than a silent die-off. */
   function pickWanderTarget(org, world, radius) {
+    /* A rally point biases where an organism wanders. It is how a colony's
+     * doctrine becomes visible on screen — predatory colonies drift toward
+     * whoever they hate, entrenched ones never leave home. */
+    const rally = org.rallyPoint;
+    if (rally && Math.random() < 0.7) {
+      for (let i = 0; i < 5; i++) {
+        const a = Math.random() * Math.PI * 2, r = Math.random() * (rally.radius || 14);
+        const x = K.clamp(rally.x + Math.cos(a) * r, 1, world.size - 1);
+        const y = K.clamp(rally.y + Math.sin(a) * r, 1, world.size - 1);
+        if (!W.isWaterAt(world, x, y)) return { x, y };
+      }
+    }
     const thirsty = org.thirst > 55;
     let best = null, bestMoisture = -1;
     for (let i = 0; i < 6; i++) {
@@ -235,10 +269,11 @@
       // The killer's colony always feeds; only the player's colony builds a
       // sample and a discovery entry, because only the player has a lab.
       killer.carrying = Math.min(MAX_CARRY, killer.carrying + 9 + victim.stats.size * 0.25);
-      if (killerColony && !killerColony.isPlayer) {
+      if (killerColony) {
         killerColony.kills++;
-        CM.colony.creditObservation(game, bus, killerColony, victim.traits, 1);
+        if (!killerColony.isPlayer) CM.colony.creditObservation(game, bus, killerColony, victim.traits, 1);
       }
+      if (killerColony && victimColony) CM.colony.registerKill(game, bus, killerColony.id, victimColony.id);
     }
 
     if (isWild(victim)) {
@@ -249,6 +284,7 @@
     } else if (victimColony) {
       if (victimColony.isPlayer) {
         if (killer) D.recordEncounter(game, bus, victim, killer, 'player_killed', victim.x, victim.y);
+        else reportEnvironmentalDeath(game, bus, victim, cause);
       } else {
         CM.colony.recordLoss(game, victimColony, cause || (killer ? 'combat' : null));
         if (killer) CM.colony.creditObservation(game, bus, victimColony, killer.traits, 1);
@@ -266,6 +302,38 @@
   function colonyOf(game, org) {
     if (!game.coloniesById || isWild(org)) return null;
     return game.coloniesById[org.ownerId] || null;
+  }
+
+  /* An organism that starves, dehydrates, freezes or poisons itself dies
+   * silently otherwise — the colony just shrinks and the player is given no
+   * reason. That is the single most useful thing the feed can tell them,
+   * because it names the stat their design got wrong. Throttled per cause so
+   * a mass die-off reports once rather than forty times. */
+  const DEATH_CAUSE_TEXT = {
+    starved: { icon: '\u{1F35D}', label: 'starved — it could not find enough to eat' },
+    thirst: { icon: '\u{1F4A7}', label: 'died of thirst — too far from water for its needs' },
+    heat: { icon: '\u{1F321}', label: 'died of heat stress — its temperature tolerance was too narrow' },
+    cold: { icon: '\u{2744}', label: 'froze — its temperature tolerance was too narrow' },
+    toxin: { icon: '\u{2620}', label: 'died of poisoning' }
+  };
+  const DEATH_REPORT_COOLDOWN = 25;
+
+  function reportEnvironmentalDeath(game, bus, victim, cause) {
+    const info = DEATH_CAUSE_TEXT[cause];
+    if (!info) return;
+    const seen = game.__deathReports || (game.__deathReports = {});
+    if (game.simTime - (seen[cause] || -999) < DEATH_REPORT_COOLDOWN) return;
+    seen[cause] = game.simTime;
+    D.pushEvent(game, bus, {
+      kind: 'death', icon: info.icon,
+      message: `${victim.name} ${info.label}.`,
+      observation: {
+        species: victim.name,
+        damageType: 'Environmental (' + cause + ')',
+        defense: 'n/a — not a combat loss'
+      },
+      x: victim.x, y: victim.y
+    });
   }
 
   /* "Plant produces chemical defense" is one of the brief's own example
@@ -338,6 +406,18 @@
         const tgt = org.actionTarget;
         if (!tgt) { org.state = S.EXPLORE; break; }
         const d = moveToward(world, org, tgt.x, tgt.y, dt, 0.8);
+        // A deposit under the organism is harvested instead of grazed.
+        const deposit = (!isWild(org) && org.directive === 'GATHER')
+          ? W.findNearestDeposit(world, org.x, org.y, W.DEPOSIT_REACH) : null;
+        if (deposit) {
+          const taken = W.harvestDeposit(deposit, 14 * dt);
+          org.carrying = Math.min(MAX_CARRY, org.carrying + taken);
+          org.hunger = Math.max(0, org.hunger - taken * 0.6);
+          const home = colonyOf(game, org);
+          if (home) deposit.claimedBy = home.id;
+          if (org.carrying >= MAX_CARRY * 0.95) { org.actionTarget = null; org.aiCounter = 0; }
+          break;
+        }
         if (d < ARRIVE_DIST) {
           const plantId = world.flora[W.idx(K.clamp(Math.floor(tgt.x), 0, world.size - 1), K.clamp(Math.floor(tgt.y), 0, world.size - 1))];
           const taken = W.consumeFood(world, tgt.x, tgt.y, 16);
@@ -420,6 +500,16 @@
             home.biomass = Math.min(home.biomassCap, home.biomass + org.carrying);
             home.energy = Math.min(home.energyCap, home.energy + org.carrying * 0.25);
             org.carrying = 0;
+          }
+          /* The Core sustains the organisms that feed it. Without this a
+           * gatherer never recovers: hauling keeps it moving, moving keeps
+           * its energy low, and reproduction needs 72% energy — so a GATHER
+           * colony filled its Core to the brim while dwindling to extinction,
+           * having hauled instead of bred. Refuelling at home closes the loop
+           * gather -> deliver -> recover -> reproduce. */
+          if (home.biomass > 5) {
+            org.energy = Math.min(org.stats.energyMax, org.energy + org.stats.energyMax * 0.5 * dt);
+            org.hunger = Math.max(0, org.hunger - 12 * dt);
           }
           org.aiCounter = 0;
         }
@@ -509,6 +599,7 @@
 
     W.tickFood(game.world, 3200);
     D.tickSamples(game, dt);
+    W.tickDeposits(game.world, dt);
     maybeSpawnWild(game, dt);
 
     const camX = game.camera.x, camY = game.camera.y;
@@ -612,6 +703,9 @@
         org.aiCounter = interval;
         const ctx = gatherContext(game, org);
         for (const s of ctx.newSightings) D.recordSighting(game, bus, s.speciesId, s.x, s.y);
+        // Scaled by the decision interval so an organism's research rate does
+        // not depend on how close the camera happens to be to it.
+        if (ctx.observable && ctx.observable.length) D.observeNearby(game, bus, org, ctx.observable, interval * dt);
         const decision = CM.ai.decide(org, ctx);
         const transitioning = decision.state !== org.state;
         if (transitioning) { org.state = decision.state; org.huntTimer = 0; }
@@ -659,10 +753,57 @@
       colony.biomass = Math.max(0, colony.biomass - colony.upkeepRate * dt);
     }
 
+    reseedEmptyColonies(game, bus, dt);
     CM.climate.tick(game, bus, dt);
     CM.colony.tick(game, bus, dt);
     coreSiegeTick(game, bus, dt);
     narrateEcosystem(game, bus, dt);
+  }
+
+  /* A Core with biomass left is never a dead end. If a colony loses every
+   * organism it can still grow one more, slowly, from what it has stored.
+   *
+   * Without this, losing the last organism is unrecoverable no matter how
+   * much biomass the Core is sitting on — and an unattended colony *does*
+   * get ground down eventually by predators and rivals, so a player who
+   * looked away came back to a game that could not be resumed. The Coremind
+   * is a distributed intelligence; the Core regrowing a body is what that
+   * means. Applied to every colony on the same terms, so a mauled rival can
+   * also come back rather than being quietly out of the game forever. */
+  const RESEED_INTERVAL = 18;
+  function reseedEmptyColonies(game, bus, dt) {
+    if (!game.colonies) return;
+    for (const colony of game.colonies) {
+      if (!colony.alive || colony.pop > 0) { colony.reseedTimer = 0; continue; }
+      if (!colony.isPlayer && !CM.colony.isAwake(colony, game.simTime)) continue;
+      const cost = T.resolveCost([]);
+      if (colony.biomass < cost.biomass || colony.energy < cost.energy) continue;
+
+      colony.reseedTimer = (colony.reseedTimer || 0) + dt;
+      if (colony.reseedTimer < RESEED_INTERVAL) continue;
+      colony.reseedTimer = 0;
+      colony.biomass -= cost.biomass;
+      colony.energy -= cost.energy;
+
+      const a = Math.random() * Math.PI * 2;
+      const org = O.create({
+        ownerId: colony.id, traits: [],
+        name: (colony.isPlayer ? 'Scout' : colony.name) + '-' + (++colony.deployed),
+        x: K.clamp(colony.x + Math.cos(a) * 2, 1, game.world.size - 1),
+        y: K.clamp(colony.y + Math.sin(a) * 2, 1, game.world.size - 1),
+        color: colony.color,
+        diet: colony.isPlayer ? 'omnivore' : 'omnivore',
+        directive: colony.isPlayer ? game.globalDirective : 'GATHER'
+      });
+      CM.coremind.addOrganism(game, org);
+      if (colony.isPlayer) {
+        D.pushEvent(game, bus, {
+          kind: 'warn', icon: '\u{1F9EB}',
+          message: 'Your last organism was lost. The Core has grown a replacement from stored biomass.',
+          x: colony.x, y: colony.y, orgId: org.id
+        });
+      }
+    }
   }
 
   /* A Core under siege. Hostile organisms standing on an enemy Core grind its

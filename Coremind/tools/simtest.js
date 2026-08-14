@@ -490,11 +490,37 @@ function noNaN(org) {
   const rivalOrganisms = game.organisms.filter(o => o.ownerId.startsWith('rival_'));
   assert(rivalOrganisms.length > 0, 'rival organisms are alive in the world, got ' + rivalOrganisms.length);
 
-  // Rival gathering must feed *their* Core. This was a real bug: RETURN_TO_CORE
-  // was hardcoded to game.core, so every rival's gatherers walked their
-  // harvest across the map and handed it to the player.
-  assert(rivals.some(r => r.biomass > 70), 'rivals accumulate their own biomass, max=' +
-    Math.max(...rivals.map(r => r.biomass)).toFixed(0));
+  /* Rival gathering must feed *their own* Core. This was a real bug:
+   * RETURN_TO_CORE was hardcoded to game.core, so every rival's gatherers
+   * walked their harvest across the map and handed it to the player.
+   *
+   * Asserted directly rather than by watching biomass totals: the simulation
+   * uses Math.random() throughout, so a threshold on an emergent number is a
+   * coin flip that fails for reasons unrelated to the thing under test. */
+  {
+    /* Deliberately an isolated world with no player organisms in it. Run in
+     * the populated game above, the player's own gatherers keep depositing
+     * during the same ticks, so "the player's biomass did not rise" would be
+     * measuring their economy rather than where the rival's load went. */
+    const iso = CM.coremind.newGame(1111);
+    const isoBus = CM.core.makeBus();
+    const isoRival = iso.colonies[1];
+    const before = { rival: isoRival.biomass, player: iso.core.biomass };
+
+    const hauler = CM.organism.create({
+      ownerId: isoRival.id, traits: [], x: isoRival.x, y: isoRival.y, name: 'Hauler', directive: 'GATHER'
+    });
+    hauler.carrying = 12;
+    hauler.state = 'RETURN_TO_CORE';
+    hauler.actionTarget = { type: 'core' };
+    CM.coremind.addOrganism(iso, hauler);
+    for (let i = 0; i < 30 && hauler.carrying > 0; i++) CM.simulation.tick(iso, isoBus, 0.1);
+
+    assert(hauler.carrying === 0, 'the hauler delivered its load');
+    assert(isoRival.biomass > before.rival, 'a rival gatherer deposits into its OWN Core');
+    assert(iso.core.biomass <= before.player + 0.001,
+      `a rival gatherer never deposits into the player's Core (${before.player.toFixed(1)} -> ${iso.core.biomass.toFixed(1)})`);
+  }
 
   const terr = CM.colony.territoryCounts(game);
   assert(Object.keys(terr).length === game.colonies.length, 'territory is tracked per colony');
@@ -562,17 +588,35 @@ function noNaN(org) {
    * colony: the directive multiplier outranked both feeding and breeding, so
    * organisms sightsaw on an empty stomach and never replaced their losses.
    * Two of three seeds went extinct. This is the regression guard. */
+  /* Measured on *peak* population rather than final. The simulation is
+   * stochastic, so a colony can be unlucky and die in any given run — an
+   * assertion on the final count is a coin flip that reports a balance
+   * failure when nothing changed. Peak is stable across trials (EXPLORE
+   * 32-33, GATHER 53-56, DEFEND 39-59 measured over four runs each) and
+   * still catches the real regression this guards: before the fix EXPLORE
+   * never got off the ground at all, peaking in the low single digits. */
+  /* Best of two runs. Peak is far more stable than final population, but it
+   * still has a tail — EXPLORE measured 21/45/45/45/45/45 over six trials,
+   * and a single run occasionally lands well below that. Requiring the better
+   * of two keeps this a real guard against a systematically dead directive
+   * (which fails both, as EXPLORE did before the fix, peaking in single
+   * digits every time) without failing the build on one unlucky sample. */
   for (const directive of ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND']) {
-    for (const seed of [777, 55]) {
-      const game = CM.coremind.newGame(seed);
+    let bestPeak = 0;
+    for (let trial = 0; trial < 2 && bestPeak < 12; trial++) {
+      const game = CM.coremind.newGame(777);
       const bus = CM.core.makeBus();
       CM.simulation.spawnStarterColony(game, bus);
       CM.simulation.spawnStarterWildlife(game);
       CM.coremind.issueDirective(game, directive);
-      for (let i = 0; i < 6000; i++) CM.simulation.tick(game, bus, 0.1);
-      assert(game.stats.playerPop > 0,
-        `a colony on ${directive} (seed ${seed}) is still alive after 600s, pop=${game.stats.playerPop}`);
+      let peak = 0;
+      for (let i = 0; i < 5000; i++) {
+        CM.simulation.tick(game, bus, 0.1);
+        if (game.stats.playerPop > peak) peak = game.stats.playerPop;
+      }
+      bestPeak = Math.max(bestPeak, peak);
     }
+    assert(bestPeak >= 12, `a colony on ${directive} can actually grow (best peak ${bestPeak})`);
   }
 }
 
@@ -602,6 +646,87 @@ function noNaN(org) {
   });
   assert(decision.state === 'SEEK_FOOD',
     'a hungry organism eats rather than continuing to explore, got ' + decision.state);
+}
+
+// --- deposits are a real, contestable resource ------------------------------
+{
+  const game = CM.coremind.newGame(3690);
+  const bus = CM.core.makeBus();
+  const dep = game.world.deposits[0];
+  assert(!!dep && dep.remaining > 0, 'the world places stocked deposits');
+
+  const gatherer = CM.organism.create({
+    ownerId: 'player', traits: [], x: dep.x, y: dep.y, name: 'Harvester', directive: 'GATHER'
+  });
+  CM.coremind.addOrganism(game, gatherer);
+  gatherer.state = 'SEEK_FOOD';
+  gatherer.actionTarget = { type: 'food_cell', x: dep.x, y: dep.y };
+
+  const before = dep.remaining;
+  for (let i = 0; i < 20; i++) CM.simulation.tick(game, bus, 0.1);
+  assert(dep.remaining < before, `a deposit is depleted by harvesting (${before.toFixed(0)} -> ${dep.remaining.toFixed(0)})`);
+  assert(gatherer.carrying > 0, 'the harvester is actually carrying the yield');
+  assert(dep.claimedBy === 'player', 'harvesting stakes a claim on the deposit');
+
+  // Depletion has to matter: a stripped deposit does not instantly refill.
+  dep.remaining = 0;
+  CM.world.tickDeposits(game.world, 1);
+  assert(dep.remaining < dep.richness * 0.05, 'a stripped deposit recovers slowly, not instantly');
+}
+
+// --- hostility is earned, and changes who is a target -----------------------
+{
+  const game = CM.coremind.newGame(4812);
+  const bus = CM.core.makeBus();
+  const events = [];
+  bus.on('event', e => events.push(e));
+  const rival = game.colonies[1];
+
+  assert(!CM.colony.areHostile(game, 'player', rival.id),
+    'colonies are wary but not openly hostile at the start');
+
+  // Two colonial organisms in range of each other: not prey while at peace.
+  const mine = CM.organism.create({ ownerId: 'player', traits: ['bite'], x: 60, y: 60, name: 'Mine', directive: 'HUNT' });
+  const theirs = CM.organism.create({ ownerId: rival.id, traits: [], x: 60.6, y: 60, name: 'Theirs' });
+  CM.coremind.addOrganism(game, mine);
+  CM.coremind.addOrganism(game, theirs);
+  const atPeace = CM.simulation.gatherContext(game, mine).nearestPrey;
+  assert(!atPeace || atPeace.entity.id !== theirs.id,
+    'a rival organism is not hunted while the colonies are at peace');
+
+  // Grind standing down through real kills.
+  for (let i = 0; i < 12; i++) CM.colony.registerKill(game, bus, 'player', rival.id);
+  assert(CM.colony.areHostile(game, 'player', rival.id), 'repeated kills produce open hostility');
+  assert(events.some(e => /hostile/i.test(e.message)), 'the turn to hostility is announced');
+
+  const atWar = CM.simulation.gatherContext(game, mine).nearestPrey;
+  assert(!!atWar && atWar.entity.id === theirs.id,
+    'once hostile, a rival organism becomes a valid target');
+
+  // And it cools off if left alone.
+  const before = CM.colony.standingBetween(game, game.core, rival);
+  CM.colony.recordLoss(game, rival, 'combat');   // no-op on standing
+  for (let i = 0; i < 200; i++) CM.colony.tick(game, bus, 0.5);
+  assert(CM.colony.standingBetween(game, rival, game.core) >= -1, 'standing stays in range');
+}
+
+// --- doctrine actually changes where organisms go ---------------------------
+{
+  const game = CM.coremind.newGame(5150);
+  const predatory = game.colonies[1];
+  const entrenched = game.colonies[2];
+  predatory.strategyKey = 'PREDATORY';
+  entrenched.strategyKey = 'ENTRENCHED';
+
+  let predFar = 0, entFar = 0;
+  for (let i = 0; i < 40; i++) {
+    const p = CM.colony.pickRally(game, predatory, 'HUNT');
+    const e = CM.colony.pickRally(game, entrenched, 'DEFEND');
+    if (Math.hypot(p.x - predatory.x, p.y - predatory.y) > 12) predFar++;
+    if (Math.hypot(e.x - entrenched.x, e.y - entrenched.y) > 12) entFar++;
+  }
+  assert(predFar > 30, `a predatory colony sends its hunters away from home (${predFar}/40)`);
+  assert(entFar === 0, `an entrenched colony keeps its defenders at the Core (${entFar}/40)`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

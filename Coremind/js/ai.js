@@ -57,6 +57,21 @@
     if (ctx.canEatPlants) {
       u.SEEK_FOOD = hungerFrac * hungerFrac * (ctx.nearestFood ? 1 : 0.45);
     }
+    /* A gatherer forages for the Core, not only for itself. SEEK_FOOD was
+     * driven purely by hunger, so an organism ordered to GATHER did nothing
+     * at all until its own stomach was empty — which also meant it never
+     * touched a biomass deposit, since deposits are harvested from inside
+     * that state. The drive scales with how much room is left in its load,
+     * so a full organism heads home instead of over-harvesting. */
+    if (org.directive === 'GATHER' && ctx.canEatPlants) {
+      const carryRoom = ctx.carryRoom != null ? ctx.carryRoom : 1;
+      /* Deliberately tuned to sit *below* a small colony's breeding urge and
+       * above a full one's. At 0.6 this drive dominated everything and a
+       * GATHER colony filled its Core to the brim while dwindling to
+       * extinction — it hauled instead of breeding. A young colony grows
+       * first and turns to hauling once it has the numbers to spare. */
+      u.SEEK_FOOD = Math.max(u.SEEK_FOOD, 0.28 * carryRoom * (ctx.nearestFood ? 1 : 0.4));
+    }
     // Thirst curves the same way hunger does, so an organism engineered with a
     // high water_requirement genuinely spends more of its life walking to water
     // instead of doing what the player asked of it.
@@ -75,8 +90,8 @@
      * The simulation still enforces a hard ceiling on top of this; the drive
      * fading out first is what stops the colony from pressing against it. */
     const room = ctx.colonyRoom != null ? ctx.colonyRoom : 0.5;
-    u.REPRODUCE = (energyFrac > 0.72 && healthFrac > 0.7 && (org.reproCooldown || 0) <= 0)
-      ? org.stats.reproduction_rate * 1.8 * (0.35 + room * 2.6) : 0;
+    const canReproduce = energyFrac > 0.72 && healthFrac > 0.7 && (org.reproCooldown || 0) <= 0;
+    u.REPRODUCE = canReproduce ? org.stats.reproduction_rate * 1.8 * (0.35 + room * 2.6) : 0;
     u.INVESTIGATE = ctx.nearestCuriosity ? 0.4 : 0;
 
     // A fight in progress is not re-litigated every re-decision — without
@@ -120,6 +135,19 @@
       } else {
         u.EXPLORE = 0.12; // stay close; movement code keeps DEFEND orbiting the Core
       }
+    }
+
+    /* Growth is an imperative too, when the conditions for it are plainly
+     * met: a colony well below its ceiling, an organism healthy, fed and off
+     * cooldown. Reproduction is a brief discrete act rather than a sustained
+     * job, so making it out-compete a standing work order on raw utility puts
+     * it in a knife-edge contest it loses to hysteresis — measured, a GATHER
+     * colony sat at 0.67 (gather) versus 0.66 (breed) with every organism
+     * eligible, and the "prefer what you're already doing" bonus locked all
+     * fourteen of them into hauling forever while the colony dwindled. This
+     * is deliberately narrow: healthy, unpressured, and real room to grow. */
+    if (canReproduce && room > 0.25 && needPressure < 0.5 && !ctx.nearestThreat) {
+      u.REPRODUCE = Math.max(u.REPRODUCE, 1.7);
     }
 
     // Critical needs are an imperative, not a suggestion — an organism must

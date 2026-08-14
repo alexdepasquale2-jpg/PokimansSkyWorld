@@ -15,7 +15,7 @@
     const c = game.camera;
     c.targetZoom = K.clamp((c.targetZoom || c.zoom) * factor, R.ZOOM_MIN, R.ZOOM_MAX);
   }
-  function focusCore(game) { R.focusOn(game, game.core.x, game.core.y, 16); }
+  function focusCore(game) { R.focusOn(game, game.core.x, game.core.y, 12); }
 
   function hitTestOrganism(game, canvas, screenX, screenY) {
     let best = null, bestD = HIT_RADIUS_PX;
