@@ -16,7 +16,10 @@
     DEFEND: { icon: '\u{1F6E1}', label: 'Defend' },
     REPRODUCE: { icon: '\u{1F95A}', label: 'Reproduce' },
     INVESTIGATE: { icon: '\u{1F50D}', label: 'Investigate' },
-    RETURN: { icon: '\u{1F3E0}', label: 'Return' }
+    RETURN: { icon: '\u{1F3E0}', label: 'Return' },
+    DIG: { icon: '\u{26CF}', label: 'Dig' },
+    SHELTER: { icon: '\u{1F573}', label: 'Shelter' },
+    EXPAND: { icon: '\u{1F578}', label: 'Expand' }
   };
 
   const STAT_ROWS = [
@@ -29,6 +32,75 @@
   const STAT_MAXES = { health: 140, energyMax: 100, speed: 60, size: 40, vision: 70, sense_radius: 45, attack: 70, defense: 70, armor: 45, venom: 45, camouflage: 45, digging: 55, temperature_tolerance: 55, water_requirement: 1.2, reproduction_rate: 1.2, metabolism: 40 };
 
   function el(id) { return document.getElementById(id); }
+
+  /* --- sheets ---------------------------------------------------------------
+   * One controller for every transient panel. Only one sheet is open at a
+   * time, and opening any of them arms the catcher so a tap anywhere on the
+   * world dismisses it. Sheets are deliberately not modal: the simulation
+   * keeps running and stays visible above them, which is the point — the
+   * previous full-screen overlays meant opening the designer blinded you to
+   * whatever was happening to your colony. */
+  const SHEETS = ['designer-overlay', 'inspect-overlay', 'build-overlay'];
+  let openSheetId = null;
+
+  function openSheet(game, id) {
+    if (openSheetId && openSheetId !== id) closeSheet(game, openSheetId, true);
+    const node = el(id);
+    node.classList.remove('hidden', 'closing');
+    node.style.transform = '';
+    el('sheet-catcher').classList.remove('hidden');
+    openSheetId = id;
+  }
+
+  function closeSheet(game, id, immediate) {
+    id = id || openSheetId;
+    if (!id) return;
+    const node = el(id);
+    if (openSheetId === id) {
+      openSheetId = null;
+      el('sheet-catcher').classList.add('hidden');
+    }
+    if (immediate) { node.classList.add('hidden'); node.classList.remove('closing'); }
+    else {
+      node.classList.add('closing');
+      setTimeout(() => { node.classList.add('hidden'); node.classList.remove('closing'); node.style.transform = ''; }, 190);
+    }
+    if (id === 'designer-overlay') stopPreviewLoop(game);
+  }
+
+  function anySheetOpen() { return !!openSheetId; }
+
+  /* Swipe the grip (or the sheet head) downward to dismiss — the gesture a
+   * bottom sheet is expected to answer to on a phone. */
+  function initSheetGestures(game) {
+    el('sheet-catcher').addEventListener('pointerdown', () => closeSheet(game));
+    for (const id of SHEETS) {
+      const node = el(id);
+      const grip = node.querySelector('.sheet-grip');
+      const head = node.querySelector('.sheet-head');
+      let startY = null, dy = 0;
+      const onDown = evt => { startY = evt.clientY; dy = 0; node.style.transition = 'none'; };
+      const onMove = evt => {
+        if (startY == null) return;
+        dy = Math.max(0, evt.clientY - startY);
+        node.style.transform = `translateY(${dy}px)`;
+      };
+      const onUp = () => {
+        if (startY == null) return;
+        node.style.transition = '';
+        node.style.transform = '';
+        if (dy > 60) closeSheet(game, id);
+        startY = null;
+      };
+      for (const handle of [grip, head]) {
+        if (!handle) continue;
+        handle.addEventListener('pointerdown', onDown);
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+      }
+    }
+  }
   function fmt1(n) { return (Math.round(n * 10) / 10).toString(); }
 
   function init(game, bus) {
@@ -43,6 +115,10 @@
     initCamControls(game);
     initDesigner(game, bus);
     initInspect(game);
+    initBuild(game, bus);
+    initSheetGestures(game);
+
+    el('btn-open-build').addEventListener('click', () => openBuild(game));
 
     el('btn-speed').addEventListener('click', () => {
       game.speed = game.speed >= 3 ? 1 : (game.speed === 1 ? 2 : 3);
@@ -227,16 +303,13 @@
   }
 
   function openDesigner(game) {
-    el('designer-overlay').classList.remove('hidden');
+    openSheet(game, 'designer-overlay');
     game.ui.dnaBadgeSeen = Object.keys(game.discovery.discoveredTraits).length;
     updateBadges(game);
     renderDesigner(game);
     startPreviewLoop(game);
   }
-  function closeDesigner(game) {
-    el('designer-overlay').classList.add('hidden');
-    stopPreviewLoop(game);
-  }
+  function closeDesigner(game) { closeSheet(game, 'designer-overlay'); }
 
   function renderDesignerSlots(game) {
     const wrap = el('designer-slots');
@@ -382,7 +455,7 @@
 
   // -- inspect overlay (samples / species / core) --------------------------
   function initInspect(game) {
-    el('btn-inspect-close').addEventListener('click', () => el('inspect-overlay').classList.add('hidden'));
+    el('btn-inspect-close').addEventListener('click', () => closeSheet(game, 'inspect-overlay'));
   }
 
   function showInspect(game, kind, data) {
@@ -397,7 +470,7 @@
         <button class="bigbtn extract-btn" id="btn-do-extract">EXTRACT SAMPLE</button>`;
       el('btn-do-extract').addEventListener('click', () => {
         D.extractSample(game, game.__bus, s.id);
-        el('inspect-overlay').classList.add('hidden');
+        closeSheet(game, 'inspect-overlay');
       });
     } else if (kind === 'core') {
       title.textContent = 'COREMIND';
@@ -428,7 +501,103 @@
       const traitChips = sp.traits.map(id => `<span class="trait-chip">${game.discovery.discoveredTraits[id] ? '' : '\u{1F512} '}${T.TRAITS_BY_ID[id].name}</span>`).join('');
       body.innerHTML = `<div class="kv"><span class="k">Role</span><span>${sp.tier}</span></div><div style="margin-top:6px">${traitChips}</div>`;
     }
-    el('inspect-overlay').classList.remove('hidden');
+    openSheet(game, 'inspect-overlay');
+  }
+
+  /* --- excavation ---------------------------------------------------------
+   * The build sheet is a palette: tap a chamber, then tap the world to place
+   * it. Placement stays live (the banner replaces the sheet) so the player is
+   * choosing a spot while watching the actual ground, not a menu. */
+  function initBuild(game, bus) {
+    el('btn-build-close').addEventListener('click', () => closeSheet(game, 'build-overlay'));
+    el('build-banner').addEventListener('click', evt => {
+      if (evt.target.dataset && evt.target.dataset.act === 'cancel') setBuildMode(game, null);
+    });
+  }
+
+  function openBuild(game) {
+    openSheet(game, 'build-overlay');
+    renderBuild(game);
+  }
+
+  function setBuildMode(game, typeKey) {
+    game.buildMode = typeKey;
+    renderBuildBanner(game);
+    if (typeKey) closeSheet(game, 'build-overlay');
+    else renderBuild(game);
+  }
+
+  function renderBuildBanner(game) {
+    const banner = el('build-banner');
+    if (!game.buildMode) { banner.classList.add('hidden'); return; }
+    const type = CM.structures.TYPES[game.buildMode];
+    banner.innerHTML = `<span>${type.icon}</span>
+      <span class="bb-text">Tap the ground to site a <b>${type.name}</b>.</span>
+      <button data-act="cancel">Cancel</button>`;
+    banner.classList.remove('hidden');
+  }
+
+  function renderBuild(game) {
+    const body = el('build-body');
+    const colony = game.core;
+    const built = CM.structures.completed(game, colony.id);
+    const pending = CM.structures.ofColony(game, colony.id).filter(s => !s.done);
+
+    // Best digging stat available tells the player whether they can even
+    // attempt the deeper chambers — a refusal has to be explicable.
+    let bestDig = 0;
+    for (const o of game.organisms) if (o.ownerId === colony.id && o.stats.digging > bestDig) bestDig = o.stats.digging;
+
+    let html = `<div style="font-size:11.5px;color:var(--fg-dim);margin-bottom:8px">
+      Network: <b style="color:var(--fg)">${built.length}</b> chambers &middot;
+      ${pending.length} under excavation &middot; best digging <b style="color:var(--fg)">${Math.round(bestDig)}</b>
+      </div><div class="build-grid">`;
+
+    for (const key of CM.structures.TYPE_KEYS) {
+      const type = CM.structures.TYPES[key];
+      const cost = CM.structures.cost(key);
+      const afford = colony.biomass >= cost.biomass && colony.energy >= cost.energy;
+      const canDig = bestDig >= type.minDigging;
+      const disabled = !afford || !canDig;
+      let note = `${cost.biomass} biomass · ${cost.energy} energy`;
+      if (!canDig) note = `Needs digging ${type.minDigging} — none of your organisms can cut this.`;
+      else if (!afford) note = `Not enough — needs ${cost.biomass} biomass, ${cost.energy} energy.`;
+      html += `<button class="build-card${game.buildMode === key ? ' active' : ''}" data-type="${key}" ${disabled ? 'disabled' : ''}>
+        <div class="bc-top"><span>${type.icon}</span><span>${type.name}</span></div>
+        <div class="bc-cost">${note}</div>
+        <div class="bc-blurb">${type.blurb}</div>
+      </button>`;
+    }
+    html += '</div>';
+
+    if (pending.length) {
+      html += '<div class="research-head" style="margin-top:12px">UNDER EXCAVATION</div><div class="build-list">';
+      for (const site of pending) {
+        const type = CM.structures.TYPES[site.type];
+        const pct = Math.round(100 * site.work / site.workNeeded);
+        html += `<button class="build-row" data-site="${site.id}">
+          <span>${type.icon}</span><span style="flex:0 0 auto">${type.name}</span>
+          <span class="br-bar"><i style="width:${pct}%"></i></span>
+          <span style="color:var(--fg-dim)">${pct}%</span></button>`;
+      }
+      html += '</div>';
+    }
+    if (!built.length && !pending.length) {
+      html += `<p style="color:var(--fg-dim);font-size:11.5px;margin-top:10px">
+        Start with an <b>Access Shaft</b> — it is the only chamber that can be dug on open ground.
+        Everything else must connect to a finished chamber. Then order your colony to <b>Dig</b>.</p>`;
+    }
+    body.innerHTML = html;
+
+    body.querySelectorAll('.build-card').forEach(btn => {
+      btn.addEventListener('click', () => setBuildMode(game, btn.dataset.type));
+    });
+    body.querySelectorAll('.build-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const site = CM.structures.all(game).find(s => s.id === btn.dataset.site);
+        if (site) { CM.render.focusOn(game, site.x, site.y, 16); closeSheet(game, 'build-overlay'); }
+      });
+    });
   }
 
   // -- world / colony panel -------------------------------------------------
@@ -491,5 +660,6 @@
     }
   }
 
-  CM.ui = { init, render, renderSelection, renderFeed, renderWorldPanel, updateBadges, showInspect, toast, switchTab };
+  CM.ui = { init, render, renderSelection, renderFeed, renderWorldPanel, updateBadges, showInspect, toast, switchTab,
+    openSheet, closeSheet, anySheetOpen, openBuild, renderBuild, renderBuildBanner };
 })(window.CM = window.CM || {});

@@ -12,7 +12,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/traits.js', 'js/flora.js', 'js/world.js', 'js/organism.js',
-  'js/ai.js', 'js/discovery.js', 'js/climate.js', 'js/colony.js',
+  'js/ai.js', 'js/discovery.js', 'js/climate.js', 'js/colony.js', 'js/structures.js',
   'js/coremind.js', 'js/simulation.js'
 ];
 
@@ -481,7 +481,11 @@ function noNaN(org) {
 
   CM.simulation.spawnStarterColony(game, bus);
   CM.simulation.spawnStarterWildlife(game);
-  for (let i = 0; i < 5000; i++) CM.simulation.tick(game, bus, 0.1);
+  /* Long enough that every rival has actually been awake for a while. They
+   * wake on a stagger at roughly 240/330/420 sim-seconds, so a 500s window
+   * left the last one barely started and "rivals revise their genome" failed
+   * on the runs where it simply had not had the chance yet. */
+  for (let i = 0; i < 9000; i++) CM.simulation.tick(game, bus, 0.1);
 
   const rivals = CM.colony.livingRivals(game);
   assert(rivals.length > 0, 'rivals survive a long run');
@@ -727,6 +731,189 @@ function noNaN(org) {
   }
   assert(predFar > 30, `a predatory colony sends its hunters away from home (${predFar}/40)`);
   assert(entFar === 0, `an entrenched colony keeps its defenders at the Core (${entFar}/40)`);
+}
+
+// --- underground: placement rules make it a network, not a scatter --------
+{
+  const game = CM.coremind.newGame(7777);
+  const bus = CM.core.makeBus();
+  const colony = game.core;
+  colony.biomass = 500; colony.energy = 500;
+
+  // Find land near the Core to build on.
+  let spot = null;
+  for (let r = 6; r < 20 && !spot; r += 2) {
+    for (let a = 0; a < 12; a++) {
+      const x = colony.x + Math.cos(a) * r, y = colony.y + Math.sin(a) * r;
+      if (CM.structures.canPlace(game, colony, 'SHAFT', x, y).ok) { spot = { x, y }; break; }
+    }
+  }
+  assert(!!spot, 'a shaft can be sited somewhere near the Core');
+
+  // A warren cannot be the first thing built — the network has to start.
+  const orphan = CM.structures.canPlace(game, colony, 'WARREN', spot.x, spot.y);
+  assert(!orphan.ok, 'a non-standalone chamber cannot be built with no network');
+  assert(/shaft/i.test(orphan.reason), 'and the refusal explains why: ' + orphan.reason);
+
+  const q = CM.structures.queue(game, bus, colony, 'SHAFT', spot.x, spot.y);
+  assert(q.ok, 'the shaft is queued: ' + (q.reason || ''));
+  const site = q.site;
+  assert(!site.done && site.work === 0, 'a queued chamber starts as an unfinished pit');
+
+  // Still not connectable while the shaft is only a hole in the ground.
+  assert(!CM.structures.canPlace(game, colony, 'WARREN', spot.x + 6, spot.y).ok,
+    'a chamber cannot connect to an unfinished one');
+
+  // Dig it out with a burrower, and confirm digging stat drives the rate.
+  const digger = CM.organism.create({ ownerId: 'player', traits: ['burrowing'], x: site.x, y: site.y, name: 'Digger' });
+  const bare = CM.organism.create({ ownerId: 'player', traits: [], x: site.x, y: site.y, name: 'Bare' });
+  assert(digger.stats.digging > bare.stats.digging, 'the burrowing trait grants digging');
+
+  const probe = { work: 0, workNeeded: 999, done: false };
+  CM.structures.addWork(game, bus, probe, digger, 1);
+  const withTrait = probe.work;
+  probe.work = 0;
+  CM.structures.addWork(game, bus, probe, bare, 1);
+  assert(withTrait > probe.work * 1.5, `a burrower digs markedly faster (${withTrait.toFixed(2)} vs ${probe.work.toFixed(2)})`);
+
+  CM.coremind.addOrganism(game, digger);
+  for (let i = 0; i < 400 && !site.done; i++) CM.structures.addWork(game, bus, site, digger, 0.1);
+  assert(site.done, 'sustained digging finishes the chamber');
+
+  // Now the network can grow — and only within reach.
+  const near = CM.structures.canPlace(game, colony, 'WARREN', spot.x + 7, spot.y);
+  const far = CM.structures.canPlace(game, colony, 'WARREN', spot.x + 60, spot.y);
+  assert(near.ok, 'a chamber can be added within reach of a finished one');
+  assert(!far.ok, 'a chamber cannot be added far from the network');
+  assert(near.linkTo && near.linkTo.id === site.id, 'the new chamber links to what it connects to');
+
+  // Placement is refused on impossible ground with an explicable reason.
+  let water = null;
+  for (let y = 0; y < 256 && !water; y++) {
+    for (let x = 0; x < 256; x++) if (CM.world.isWaterAt(game.world, x + 0.5, y + 0.5)) { water = { x: x + 0.5, y: y + 0.5 }; break; }
+  }
+  if (water) assert(!CM.structures.canPlace(game, colony, 'SHAFT', water.x, water.y).ok, 'chambers cannot be dug under open water');
+}
+
+// --- underground: chambers do what they claim -----------------------------
+{
+  const game = CM.coremind.newGame(8888);
+  const bus = CM.core.makeBus();
+  const colony = game.core;
+
+  function plant(typeKey, x, y) {
+    const s = { id: 'test_' + typeKey, colonyId: colony.id, type: typeKey, x, y,
+                work: 1, workNeeded: 1, done: true, linkId: null };
+    game.structures.list.push(s);
+    return s;
+  }
+
+  // Granary raises the Core's storage ceiling.
+  const capBefore = CM.colony.BIOMASS_CAP + CM.structures.storageBonus(game, colony.id);
+  plant('GRANARY', colony.x, colony.y);
+  assert(CM.colony.BIOMASS_CAP + CM.structures.storageBonus(game, colony.id) > capBefore,
+    'a granary raises biomass storage');
+
+  // Warren shelters: an organism inside cannot be sensed.
+  const warren = plant('WARREN', colony.x + 2, colony.y);
+  const hider = CM.organism.create({ ownerId: 'player', traits: [], x: warren.x, y: warren.y, name: 'Hider' });
+  const hunter = CM.organism.create({ ownerId: 'wild', speciesId: 'stalker', traits: ['fast_movement', 'bite'], x: warren.x + 0.5, y: warren.y });
+  CM.coremind.addOrganism(game, hider);
+  CM.coremind.addOrganism(game, hunter);
+  const exposed = CM.simulation.gatherContext(game, hunter).nearestPrey;
+  assert(!!exposed && exposed.entity.id === hider.id, 'an organism outside shelter IS sensed (control)');
+  hider.sheltered = true;
+  const hidden = CM.simulation.gatherContext(game, hunter).nearestPrey;
+  assert(!hidden || hidden.entity.id !== hider.id, 'an organism inside a warren cannot be sensed');
+  hider.sheltered = false;
+
+  // Cistern counts as drinkable water for thirst.
+  const dryOrg = CM.organism.create({ ownerId: 'player', traits: [], x: colony.x, y: colony.y, name: 'Thirsty' });
+  CM.coremind.addOrganism(game, dryOrg);
+  dryOrg.thirst = 80;
+  const cistern = plant('CISTERN', colony.x + 1, colony.y + 1);
+  const ctx = CM.simulation.gatherContext(game, dryOrg);
+  assert(!!ctx.nearestWater, 'a thirsty organism finds water');
+  assert(Math.hypot(ctx.nearestWater.x - cistern.x, ctx.nearestWater.y - cistern.y) < 2.5,
+    'the cistern is what it heads for when it is the closest water');
+
+  // Vault accelerates research.
+  const scholar = CM.organism.create({ ownerId: 'player', traits: [], x: colony.x + 40, y: colony.y, name: 'Scholar' });
+  assert(CM.structures.researchMultiplier(game, scholar) === 1, 'no research bonus away from a vault');
+  plant('VAULT', colony.x + 40, colony.y);
+  assert(CM.structures.researchMultiplier(game, scholar) > 1, 'a vault speeds research for organisms it covers');
+}
+
+// --- digging directives actually produce excavation ------------------------
+{
+  const game = CM.coremind.newGame(9911);
+  const bus = CM.core.makeBus();
+  const colony = game.core;
+  colony.biomass = 500; colony.energy = 500;
+
+  assert(CM.organism.DIRECTIVES.includes('DIG'), 'DIG is an issuable directive');
+  assert(CM.organism.DIRECTIVES.includes('SHELTER'), 'SHELTER is an issuable directive');
+  assert(CM.organism.DIRECTIVES.includes('EXPAND'), 'EXPAND is an issuable directive');
+
+  // Site a shaft by hand, order the colony to dig, and let them get on with it.
+  let spot = null;
+  for (let r = 5; r < 16 && !spot; r += 2) {
+    for (let a = 0; a < 16; a++) {
+      const x = colony.x + Math.cos(a * 0.4) * r, y = colony.y + Math.sin(a * 0.4) * r;
+      if (CM.structures.canPlace(game, colony, 'SHAFT', x, y).ok) { spot = { x, y }; break; }
+    }
+  }
+  const res = CM.structures.queue(game, bus, colony, 'SHAFT', spot.x, spot.y);
+  assert(res.ok, 'shaft queued for the dig test');
+
+  for (let i = 0; i < 4; i++) {
+    const o = CM.organism.create({
+      ownerId: 'player', traits: ['burrowing'], name: 'Dig-' + i,
+      x: colony.x + (Math.random() - 0.5) * 3, y: colony.y + (Math.random() - 0.5) * 3
+    });
+    CM.coremind.addOrganism(game, o);
+  }
+  CM.coremind.issueDirective(game, 'DIG');
+
+  let sawExcavate = false;
+  for (let i = 0; i < 2500 && !res.site.done; i++) {
+    CM.simulation.tick(game, bus, 0.1);
+    if (!sawExcavate) for (const o of game.organisms) if (o.state === 'EXCAVATE') { sawExcavate = true; break; }
+  }
+  assert(sawExcavate, 'organisms ordered to DIG enter the EXCAVATE state');
+  assert(res.site.done, `the colony finished the chamber (work ${res.site.work.toFixed(0)}/${res.site.workNeeded})`);
+  assert(CM.structures.completed(game, colony.id).length >= 1, 'the network now has a finished chamber');
+}
+
+// --- EXPAND plans its own sites -------------------------------------------
+{
+  const game = CM.coremind.newGame(2211);
+  const bus = CM.core.makeBus();
+  game.core.biomass = 500; game.core.energy = 500;
+  CM.simulation.spawnStarterColony(game, bus);
+  CM.coremind.issueDirective(game, 'EXPAND');
+  for (let i = 0; i < 400; i++) CM.simulation.tick(game, bus, 0.1);
+  assert(CM.structures.ofColony(game, game.core.id).length > 0,
+    'EXPAND has the colony choose and queue its own sites');
+}
+
+// --- rivals dig too --------------------------------------------------------
+{
+  const game = CM.coremind.newGame(3322);
+  const bus = CM.core.makeBus();
+  CM.simulation.spawnStarterColony(game, bus);
+  CM.simulation.spawnStarterWildlife(game);
+  for (let i = 0; i < 9000; i++) CM.simulation.tick(game, bus, 0.1);
+  const rivalStructures = CM.structures.all(game).filter(s => s.colonyId !== 'player');
+  assert(rivalStructures.length > 0, 'rival colonies excavate their own networks, got ' + rivalStructures.length);
+
+  // A collapsed colony's network goes with it.
+  const victim = CM.colony.livingRivals(game)[0];
+  if (victim) {
+    CM.colony.damageCore(game, bus, victim, 999);
+    assert(CM.structures.ofColony(game, victim.id).length === 0,
+      'a collapsed colony leaves no chambers behind');
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

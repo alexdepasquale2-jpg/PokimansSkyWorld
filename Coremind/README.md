@@ -109,6 +109,29 @@ The full core loop from the brief, playable end to end:
   - **Burrowing is an escape, not a stat line.** A cornered digger drops
     underground: untargetable, immobile, recovering, and drawn as the mound
     it left behind. That's what makes its speed penalty affordable.
+  - **Digging also builds.** The `digging` stat sets how fast an organism
+    excavates, so the trait is what makes the underground reachable at all —
+    a colony with no burrowers can site chambers but will crawl through them,
+    and the deeper chamber types refuse to be cut without it.
+- **The underground** — a colony's second body, `js/structures.js`. Seven
+  modular chamber types, each answering a pressure the surface game already
+  applies rather than being a generic upgrade:
+  - **Access Shaft** — the only chamber that can be sunk on open ground.
+    Everything else must connect to a *finished* chamber within reach, which
+    is what makes the network a shape the player designs rather than a list
+    of purchases. Tunnels are drawn between linked chambers.
+  - **Warren** — shelter: organisms inside cannot be sensed by predators and
+    the chamber holds a workable temperature whatever the surface is doing.
+  - **Cistern** — taps groundwater, so dry inland ground becomes survivable.
+  - **Granary** — raises the Core's biomass ceiling past its own limit.
+  - **Nursery** — organisms nearby come off reproduction cooldown far faster.
+  - **Analysis Vault** — speeds observations into discoveries.
+  - **Redoubt** — fortified ground; its defenders count for more in a siege.
+  - Three new orders drive it: **DIG** (work the sites you placed), **EXPAND**
+    (the Coremind chooses its own sites from what the colony is short of), and
+    **SHELTER** (retreat underground). Rivals dig too, using the same
+    shortfall reasoning — an inland rival ends up with cisterns, a besieged
+    one with redoubts — and a collapsed colony's network dies with it.
 - **Utility AI**: all 10 states from the brief (IDLE, EXPLORE, SEEK_FOOD,
   FLEE, HUNT, ATTACK, REST, RETURN_TO_CORE, REPRODUCE, INVESTIGATE) plus
   SEEK_WATER, scored from needs + senses + the player's directive, with a
@@ -145,7 +168,15 @@ The full core loop from the brief, playable end to end:
 - **Event feed**: clickable, focuses the camera on the relevant location
   and opens the relevant detail (organism / species / trait).
 - **Touch controls**: one-finger drag pan, two-finger pinch zoom, tap to
-  select/inspect, mouse wheel for desktop dev — `js/input.js`.
+  select/inspect, mouse wheel for desktop dev — `js/input.js`. In build mode
+  a tap is a construction order and short-circuits selection, so aiming at
+  crowded ground still places the chamber.
+- **Transient sheets, not full-screen menus.** The designer, inspector and
+  excavation palette are bottom sheets: the world stays visible and running
+  above them, and any of tap-outside, swipe-the-grip-down, or the close
+  button dismisses them. Choosing a chamber closes the palette and leaves a
+  slim banner, so the player is picking a spot while watching real ground
+  rather than a menu.
 - **Performance**: object pooling for organisms, a uniform spatial grid for
   neighbor queries, simulation LOD (near organisms re-decide every tick,
   mid every 4th, far every 12th — spatial queries only happen at decision

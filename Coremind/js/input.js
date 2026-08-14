@@ -113,6 +113,15 @@
     }
 
     function handleTap(x, y) {
+      /* Build mode short-circuits every other hit test. Otherwise a tap
+       * aimed at open ground that happens to land near an organism selects
+       * it instead of siting the chamber, and the player is left tapping a
+       * crowded area wondering why nothing is being built. While the banner
+       * says "tap the ground", a tap has to mean exactly that. */
+      if (game.buildMode) {
+        handlers.onTapEmpty && handlers.onTapEmpty(R.screenToWorld(game, canvas, x, y));
+        return;
+      }
       const org = hitTestOrganism(game, canvas, x, y);
       if (org) { handlers.onSelectOrganism && handlers.onSelectOrganism(org); return; }
       const sample = hitTestSample(game, canvas, x, y);

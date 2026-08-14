@@ -23,6 +23,12 @@
       case 'REPRODUCE': u.REPRODUCE *= 3; break;
       case 'INVESTIGATE': u.INVESTIGATE *= 3; break;
       case 'RETURN': u.RETURN_TO_CORE = 999; break;
+      // The underground orders. DIG and EXPAND both mean "work the queue";
+      // EXPAND additionally has the colony choose new sites on its own, which
+      // happens in the colony tick rather than here.
+      case 'DIG': u.EXCAVATE *= 3.2; break;
+      case 'EXPAND': u.EXCAVATE *= 3.2; u.EXPLORE *= 1.3; break;
+      case 'SHELTER': u.SHELTER *= 3.5; u.EXPLORE *= 0.25; break;
       default: break;
     }
   }
@@ -36,6 +42,9 @@
    *   nearestCuriosity: {dist, x, y, kind, ref}   // unknown species sighting or sample
    *   mateAvailable:  bool
    *   coreDist: number
+   *   digSite: structure build site this organism could work on
+   *   shelter: finished warren/redoubt in reach
+   *   tempStress: current temperature stress (>1 means it is taking damage)
    *   defendRadius: number  (only meaningful with directive DEFEND)
    */
   function decide(org, ctx) {
@@ -47,7 +56,7 @@
     const healthFrac = CM.core.clamp01(org.health / org.stats.health);
     const critical = hungerFrac > 0.92 || thirstFrac > 0.92 || healthFrac < 0.22;
 
-    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, SEEK_WATER: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0 };
+    const u = { IDLE: 0.05, EXPLORE: 0.22, REST: 0, SEEK_FOOD: 0, SEEK_WATER: 0, HUNT: 0, FLEE: 0, RETURN_TO_CORE: 0, REPRODUCE: 0, INVESTIGATE: 0, ATTACK: 0, EXCAVATE: 0, SHELTER: 0 };
 
     if (ctx.nearestThreat) {
       const closeness = 1 - CM.core.clamp01(ctx.nearestThreat.dist / Math.max(1, org.stats.sense_radius));
@@ -93,6 +102,22 @@
     const canReproduce = energyFrac > 0.72 && healthFrac > 0.7 && (org.reproCooldown || 0) <= 0;
     u.REPRODUCE = canReproduce ? org.stats.reproduction_rate * 1.8 * (0.35 + room * 2.6) : 0;
     u.INVESTIGATE = ctx.nearestCuriosity ? 0.4 : 0;
+
+    /* Digging. An organism only wants to excavate if there is somewhere to
+     * dig and it is physically capable of the work — a creature with no
+     * digging stat can be ordered underground but will make almost no
+     * headway, which is the point of the trait. */
+    if (ctx.digSite) {
+      const capable = 0.35 + CM.core.clamp01((org.stats.digging || 0) / 45) * 0.9;
+      u.EXCAVATE = capable;
+    }
+    /* Shelter is worth taking when something is hunting you, when the
+     * climate is hurting, or simply to rest somewhere safe. */
+    if (ctx.shelter) {
+      const threatened = ctx.nearestThreat ? 0.9 : 0;
+      const exposed = ctx.tempStress > 1 ? 0.7 * Math.min(2, ctx.tempStress - 1) : 0;
+      u.SHELTER = Math.max(threatened, exposed, (1 - healthFrac) * 0.5);
+    }
 
     // A fight in progress is not re-litigated every re-decision — without
     // this an ATTACK organism would be yanked back into HUNT (which
@@ -207,6 +232,12 @@
         }
         if (ctx.nearestCuriosity) return { state: S.INVESTIGATE, target: { type: 'point', x: ctx.nearestCuriosity.x, y: ctx.nearestCuriosity.y, ref: ctx.nearestCuriosity.ref || null } };
         return { state: S.EXPLORE, target: null };
+      case S.EXCAVATE:
+        if (ctx.digSite) return { state: S.EXCAVATE, target: { type: 'dig_site', x: ctx.digSite.x, y: ctx.digSite.y, ref: ctx.digSite } };
+        return { state: S.EXPLORE, target: null };
+      case S.SHELTER:
+        if (ctx.shelter) return { state: S.SHELTER, target: { type: 'shelter', x: ctx.shelter.x, y: ctx.shelter.y, ref: ctx.shelter } };
+        return { state: S.REST, target: null };
       case S.REST:
         return { state: S.REST, target: null };
       default:

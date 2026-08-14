@@ -27,6 +27,7 @@
   const DRINK_DIST = 1.6;
   const BURROW_DURATION = 4.5, BURROW_COOLDOWN = 14;
   const UPKEEP_BASE = 0.022, UPKEEP_PER_TRAIT = 0.006;   // biomass/sec per organism
+  const DIG_REACH = 1.4;
 
   // -- population seeding ---------------------------------------------------
   function randomLandSpot(world, minDistFromCore, maxTries) {
@@ -119,6 +120,7 @@
    * organism's radar — a mechanical payoff for those traits, not just flavour. */
   function isDetected(watcher, target) {
     if (target.burrowed) return false; // underground and out of play
+    if (target.sheltered) return false; // inside a warren, and out of reach
     // Chemical sensing tracks a scent trail, which visual concealment does
     // nothing about — the counter that makes camouflage a choice, not a
     // strictly-correct default.
@@ -181,9 +183,29 @@
     // far more than the thirst system is worth.
     // Search range widens with thirst: a desperate animal ranges much further
     // for water than a comfortable one bothers to.
-    const nearestWater = org.thirst > 25
-      ? W.findNearestWater(game.world, org.x, org.y, senseR * (1.6 + K.clamp01(org.thirst / 100) * 2.6))
-      : null;
+    let nearestWater = null;
+    if (org.thirst > 25) {
+      const reach = senseR * (1.6 + K.clamp01(org.thirst / 100) * 2.6);
+      nearestWater = W.findNearestWater(game.world, org.x, org.y, reach);
+      /* A cistern is water as far as thirst is concerned, and being closer
+       * than the nearest lake is the entire reason to dig one. */
+      if (!isWild(org)) {
+        const cistern = CM.structures.findNearestCistern(game, org.ownerId, org.x, org.y, reach);
+        if (cistern && (!nearestWater || K.dist(cistern.x, cistern.y, org.x, org.y) < K.dist(nearestWater.x, nearestWater.y, org.x, org.y))) {
+          nearestWater = { x: cistern.x, y: cistern.y, cistern: true };
+        }
+      }
+    }
+
+    // Underground context, colonial organisms only — wildlife does not build.
+    let digSite = null, shelter = null;
+    if (!isWild(org)) {
+      digSite = CM.structures.nearestSite(game, org.ownerId, org.x, org.y, senseR * 4);
+      // Searched generously: an organism should be able to decide to run for
+      // a warren it can reach, not only recognise one it is already inside.
+      shelter = CM.structures.findShelter(game, org.ownerId, org.x, org.y, senseR * 4);
+    }
+    const tempStressNow = O.tempStress(org, W.tempAt(game.world, org.x, org.y));
 
     // How much room this organism's colony has left to grow, 0..1.
     let colonyRoom = 0.5;
@@ -201,7 +223,8 @@
     }
 
     return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt,
-      newSightings, observable, colonyRoom, carryRoom: K.clamp01(1 - org.carrying / MAX_CARRY), defendRadius: senseR };
+      newSightings, observable, colonyRoom, carryRoom: K.clamp01(1 - org.carrying / MAX_CARRY),
+      digSite, shelter, tempStress: tempStressNow, defendRadius: senseR };
   }
 
   // -- movement ---------------------------------------------------------------
@@ -486,6 +509,30 @@
         org.energy = Math.min(org.stats.energyMax, org.energy + org.stats.energyMax * 0.08 * dt);
         org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.02 * dt);
         break;
+      case S.EXCAVATE: {
+        const site = org.actionTarget && org.actionTarget.ref;
+        if (!site || site.done) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; break; }
+        const d = moveToward(world, org, site.x, site.y, dt, 0.85);
+        if (d < DIG_REACH) {
+          CM.structures.addWork(game, bus, site, org, dt);
+          // Excavation is work: it burns energy faster than walking.
+          org.energy = Math.max(0, org.energy - (org.stats.metabolism / 11) * 0.6 * dt);
+          if (site.done) { org.actionTarget = null; org.aiCounter = 0; }
+        }
+        break;
+      }
+      case S.SHELTER: {
+        const den = org.actionTarget && org.actionTarget.ref;
+        if (!den) { org.state = S.REST; break; }
+        const d = moveToward(world, org, den.x, den.y, dt, 1);
+        if (d < CM.structures.TYPES[den.type].radius * 0.5) {
+          // Inside: recover quickly and safely.
+          org.energy = Math.min(org.stats.energyMax, org.energy + org.stats.energyMax * 0.12 * dt);
+          org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.05 * dt);
+          org.sheltered = true;
+        }
+        break;
+      }
       case S.RETURN_TO_CORE: {
         // An organism returns to *its own* colony's Core. Routing this through
         // game.core meant every rival's gatherers walked their harvest across
@@ -664,7 +711,11 @@
       if (org.energy <= 0) org.health -= org.stats.health * 0.015 * dt;
 
       const localTemp = W.tempAt(game.world, org.x, org.y);
-      const stress = O.tempStress(org, localTemp);
+      /* Being inside a warren is the point of digging one: the chamber holds
+       * a workable temperature whatever the surface is doing, which is what
+       * lets a colony hold ground its genome could not otherwise survive. */
+      let stress = O.tempStress(org, localTemp);
+      if (org.sheltered) stress *= 0.15;
       if (stress > 1) {
         org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
         // Heat drives thirst: a badly-adapted organism in the wrong climate
@@ -689,7 +740,13 @@
       }
       org.__attackedThisTick = false;
 
-      if (org.reproCooldown > 0) org.reproCooldown -= dt;
+      /* A nursery speeds the colony back into breeding condition. */
+      if (org.reproCooldown > 0) {
+        const nursery = !isWild(org) && CM.structures.nurseryAt(game, org);
+        org.reproCooldown -= dt * (nursery ? 2.6 : 1);
+      }
+      // sheltered is recomputed every tick by the SHELTER state itself.
+      org.sheltered = false;
 
       // Resolve a needs death here, before the organism gets to sense, decide
       // or act. Letting a corpse take another swing is both wrong and the
@@ -705,7 +762,9 @@
         for (const s of ctx.newSightings) D.recordSighting(game, bus, s.speciesId, s.x, s.y);
         // Scaled by the decision interval so an organism's research rate does
         // not depend on how close the camera happens to be to it.
-        if (ctx.observable && ctx.observable.length) D.observeNearby(game, bus, org, ctx.observable, interval * dt);
+        if (ctx.observable && ctx.observable.length) {
+          D.observeNearby(game, bus, org, ctx.observable, interval * dt * CM.structures.researchMultiplier(game, org));
+        }
         const decision = CM.ai.decide(org, ctx);
         const transitioning = decision.state !== org.state;
         if (transitioning) { org.state = decision.state; org.huntTimer = 0; }
@@ -737,7 +796,12 @@
 
     for (let i = 0; i < game.world.food.length; i += 733) plantTotal += game.world.food[i]; // sampled estimate, cheap
     game.stats = { playerPop, herbivorePop, predatorPop, plantTotal: Math.round(plantTotal), colonyPop };
-    if (game.colonies) for (const c of game.colonies) { c.pop = colonyPop[c.id] || 0; c.upkeepRate = colonyUpkeep[c.id] || 0; }
+    if (game.colonies) for (const c of game.colonies) {
+      c.pop = colonyPop[c.id] || 0;
+      c.upkeepRate = colonyUpkeep[c.id] || 0;
+      // Granaries are how a colony grows past the Core's own storage.
+      c.biomassCap = CM.colony.BIOMASS_CAP + CM.structures.storageBonus(game, c.id);
+    }
 
     // slow passive core regeneration — the Coremind's own baseline metabolism
     game.core.energy = Math.min(game.core.energyCap, game.core.energy + 0.9 * dt);
@@ -753,11 +817,28 @@
       colony.biomass = Math.max(0, colony.biomass - colony.upkeepRate * dt);
     }
 
+    playerAutoExpand(game, bus, dt);
     reseedEmptyColonies(game, bus, dt);
     CM.climate.tick(game, bus, dt);
     CM.colony.tick(game, bus, dt);
     coreSiegeTick(game, bus, dt);
     narrateEcosystem(game, bus, dt);
+  }
+
+  /* The EXPAND directive hands site selection to the colony itself: the
+   * player says "grow the network" and the Coremind picks where, using the
+   * same shortfall reasoning the rivals use. DIG, by contrast, only works
+   * sites the player placed by hand. */
+  function playerAutoExpand(game, bus, dt) {
+    const colony = game.core;
+    if (!colony || !colony.alive || game.globalDirective !== 'EXPAND') return;
+    colony.autoDigTimer = (colony.autoDigTimer || 0) - dt;
+    if (colony.autoDigTimer > 0) return;
+    colony.autoDigTimer = 12;
+    const pending = CM.structures.ofColony(game, colony.id).filter(s => !s.done).length;
+    if (pending >= 2) return;
+    const plan = CM.structures.suggestExpansion(game, colony);
+    if (plan) CM.structures.queue(game, bus, colony, plan.typeKey, plan.x, plan.y);
   }
 
   /* A Core with biomass left is never a dead end. If a colony loses every
@@ -827,7 +908,10 @@
         if (isWild(o)) continue;                    // wildlife does not besiege
         if (o.directive === 'HUNT' || o.directive === 'DEFEND') attackers++;
       }
-      const pressure = attackers - defenders * 0.8;
+      /* A redoubt covering the Core makes its defenders count for more —
+       * fortified ground is the whole reason to dig one. */
+      const fortified = CM.structures.redoubtAt(game, { ownerId: colony.id, x: colony.x, y: colony.y }) ? 1.45 : 1;
+      const pressure = attackers - defenders * 0.8 * fortified;
       if (pressure > 0) {
         CM.colony.damageCore(game, bus, colony, pressure * 1.4 * step);
         if (colony.alive && !colony.__siegeWarned) {

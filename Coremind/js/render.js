@@ -331,6 +331,11 @@
       }
     }
 
+    /* The underground. Tunnels first, then chambers on top, all drawn with
+     * dashed, dimmed edges so they read as *below* the surface rather
+     * than as buildings sitting on it. */
+    if (game.structures) drawUnderground(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1);
+
     // Biomass deposits: the thing colonies compete over, so they have to be
     // visible. A claimed one is ringed in its owner's colour; a depleted one
     // fades, so "this patch is stripped" reads at a glance.
@@ -371,6 +376,83 @@
 
   function worldToScreenDpr(game, w, h, zoom, dpr, wx, wy) {
     return { x: (wx - game.camera.x) * zoom + w / 2, y: (wy - game.camera.y) * zoom + h / 2 };
+  }
+
+  function drawUnderground(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1) {
+    const list = CM.structures.all(game);
+    if (!list.length) return;
+    const byId = {};
+    for (const s of list) byId[s.id] = s;
+
+    // tunnels
+    ctx.save();
+    ctx.setLineDash([4, 3]);
+    for (const s of list) {
+      if (!s.linkId) continue;
+      const other = byId[s.linkId];
+      if (!other) continue;
+      if (Math.max(s.x, other.x) < sx0 - 6 || Math.min(s.x, other.x) > sx1 + 6) continue;
+      if (Math.max(s.y, other.y) < sy0 - 6 || Math.min(s.y, other.y) > sy1 + 6) continue;
+      const colony = game.coloniesById && game.coloniesById[s.colonyId];
+      const rgb = hexToRgb(colony ? colony.color : '#8899aa');
+      const a = worldToScreenDpr(game, w, h, zoom, dpr, s.x, s.y);
+      const b = worldToScreenDpr(game, w, h, zoom, dpr, other.x, other.y);
+      ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${s.done ? 0.5 : 0.22})`;
+      ctx.lineWidth = Math.max(1, zoom * 0.12);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.restore();
+
+    // chambers
+    for (const s of list) {
+      if (s.x < sx0 - 8 || s.x > sx1 + 8 || s.y < sy0 - 8 || s.y > sy1 + 8) continue;
+      const type = CM.structures.TYPES[s.type];
+      const colony = game.coloniesById && game.coloniesById[s.colonyId];
+      const rgb = hexToRgb(colony ? colony.color : '#8899aa');
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, s.x, s.y);
+      const r = Math.max(3.5, type.radius * zoom * 0.26);
+
+      if (s.done) {
+        /* Deliberately drawn light. An earlier version filled the chamber
+         * with near-opaque dark and ringed its whole effect radius, which at
+         * a normal zoom turned a developed network into black holes punched
+         * through the map — the terrain, the food and the organisms standing
+         * on it all disappeared. The underground has to be legible *and*
+         * stay out of the way of the world it sits beneath. */
+        ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.22)`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.arc(p.x, p.y, type.radius * zoom, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = 'rgba(10,16,22,.45)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.9)`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        // A pit being dug: dashed outline plus a progress arc.
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.55)`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.95)`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (s.work / s.workNeeded));
+        ctx.stroke();
+      }
+
+      if (zoom > 7) {
+        ctx.fillStyle = 'rgba(255,255,255,.85)';
+        ctx.font = `${Math.max(9, Math.min(15, r * 1.1))}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(type.icon, p.x, p.y);
+        ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+      }
+    }
   }
 
   function drawTerritory(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1) {

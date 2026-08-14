@@ -27,6 +27,7 @@
       seed: game.seed, simTime: game.simTime, speed: game.speed,
       core: { biomass: game.core.biomass, energy: game.core.energy },
       climate: game.climate,
+      structures: CM.structures.serialize(game),
       colonies: game.colonies.map(c => ({
         id: c.id, name: c.name, isPlayer: c.isPlayer, x: c.x, y: c.y, color: c.color,
         strategyKey: c.strategyKey, alive: c.alive, integrity: c.integrity,
@@ -92,6 +93,7 @@
 
     if (data.climate) game.climate = data.climate;
     CM.climate.apply(game);
+    CM.structures.hydrate(game, data.structures);
 
     /* Colonies are restored onto the objects createAll() just built, rather
      * than replacing the array: the Core positions come from the seed and are

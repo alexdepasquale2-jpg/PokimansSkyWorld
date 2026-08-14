@@ -292,6 +292,20 @@
         colony.lastLossCause = null;
       }
 
+      /* Rivals dig too. They queue one chamber at a time against whatever
+       * they are currently short of, so an inland rival ends up with cisterns
+       * and a besieged one with redoubts — the same reasoning the player
+       * applies, run on their own state. */
+      colony.digTimer = (colony.digTimer || 0) - dt;
+      if (colony.digTimer <= 0) {
+        colony.digTimer = 30 + Math.random() * 40;
+        const pending = CM.structures.ofColony(game, colony.id).filter(s => !s.done).length;
+        if (pending < 2) {
+          const plan = CM.structures.suggestExpansion(game, colony);
+          if (plan) CM.structures.queue(game, bus, colony, plan.typeKey, plan.x, plan.y);
+        }
+      }
+
       colony.deployTimer -= dt;
       if (colony.deployTimer <= 0) {
         colony.deployTimer = DEPLOY_INTERVAL / Math.max(0.2, strategyOf(colony).deployRate);
@@ -587,6 +601,9 @@
   function collapse(game, bus, colony) {
     colony.alive = false;
     colony.integrity = 0;
+    // The tunnels go with it — an abandoned network is not a prize another
+    // colony can simply walk into.
+    CM.structures.removeStructuresOf(game, colony.id);
     let released = 0;
     for (const org of game.organisms) {
       if (org.ownerId === colony.id) {

@@ -24,6 +24,8 @@
       core: null,
       colonies: [], coloniesById: {},
       climate: CM.climate.newState(seed),
+      structures: CM.structures.newState(),
+      buildMode: null,          // structure type key the player is placing
       discovery: CM.discovery.newDiscoveryState(),
       designs: [],
       selection: null,

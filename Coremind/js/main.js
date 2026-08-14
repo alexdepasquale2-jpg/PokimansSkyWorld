@@ -19,7 +19,24 @@
       },
       onTapSample(sample) { CM.ui.showInspect(game, 'sample', { sample }); },
       onTapCore() { CM.ui.showInspect(game, 'core', {}); },
-      onTapEmpty() { CM.coremind.selectOrganism(game, null); CM.ui.renderSelection(game); }
+      onTapEmpty(world) {
+        /* Placing a chamber takes priority over clearing the selection: while
+         * build mode is armed a tap on the ground is a construction order. */
+        if (game.buildMode) {
+          const res = CM.structures.queue(game, game.__bus, game.core, game.buildMode, world.x, world.y);
+          if (res.ok) {
+            CM.ui.toast({ kind: 'system', icon: CM.structures.TYPES[game.buildMode].icon,
+              message: `${CM.structures.TYPES[game.buildMode].name} sited. Order your colony to Dig.` });
+            game.buildMode = null;
+            CM.ui.renderBuildBanner(game);
+          } else {
+            CM.ui.toast({ kind: 'warn', icon: '\u{26A0}', message: res.reason });
+          }
+          return;
+        }
+        CM.coremind.selectOrganism(game, null);
+        CM.ui.renderSelection(game);
+      }
     });
   }
 

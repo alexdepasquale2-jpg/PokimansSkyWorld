@@ -14,10 +14,14 @@
   const AI_STATE = {
     IDLE: 'IDLE', EXPLORE: 'EXPLORE', SEEK_FOOD: 'SEEK_FOOD', SEEK_WATER: 'SEEK_WATER',
     FLEE: 'FLEE', HUNT: 'HUNT', ATTACK: 'ATTACK', REST: 'REST',
-    RETURN_TO_CORE: 'RETURN_TO_CORE', REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE'
+    RETURN_TO_CORE: 'RETURN_TO_CORE', REPRODUCE: 'REPRODUCE', INVESTIGATE: 'INVESTIGATE',
+    // The underground states. EXCAVATE is the work itself; SHELTER is taking
+    // cover in something already dug.
+    EXCAVATE: 'EXCAVATE', SHELTER: 'SHELTER'
   };
 
-  const DIRECTIVES = ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND', 'REPRODUCE', 'INVESTIGATE', 'RETURN'];
+  const DIRECTIVES = ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND', 'REPRODUCE', 'INVESTIGATE', 'RETURN',
+    'DIG', 'SHELTER', 'EXPAND'];
 
   const pool = [];
 
@@ -66,6 +70,7 @@
     org.burrowed = false;
     org.burrowTimer = 0;
     org.burrowCooldown = 0;
+    org.sheltered = false;
     org.state = AI_STATE.IDLE;
     org.stateTimer = 0;
     org.directive = opts.directive || null;
