@@ -11,8 +11,9 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const FILES = [
-  'js/core.js', 'js/traits.js', 'js/world.js', 'js/organism.js',
-  'js/ai.js', 'js/discovery.js', 'js/coremind.js', 'js/simulation.js'
+  'js/core.js', 'js/traits.js', 'js/flora.js', 'js/world.js', 'js/organism.js',
+  'js/ai.js', 'js/discovery.js', 'js/climate.js', 'js/colony.js',
+  'js/coremind.js', 'js/simulation.js'
 ];
 
 const sandbox = { console, Math, Set, Map, Object, JSON, Infinity, NaN, Date };
@@ -42,10 +43,20 @@ function noNaN(org) {
   for (let i = 0; i < w1.biome.length; i += 97) if (w1.biome[i] !== w2.biome[i]) { same = false; break; }
   assert(same, 'world generation is deterministic given the same seed');
   assert(w1.size === 256, 'world is 256x256');
-  let grass = 0, water = 0;
-  for (let i = 0; i < w1.biome.length; i++) { if (w1.biome[i] === CM.world.BIOME.GRASS) grass++; if (w1.biome[i] === CM.world.BIOME.WATER) water++; }
-  assert(grass > 1000, 'world generates a meaningful amount of grass, got ' + grass);
-  assert(water > 0, 'world generates some water');
+  // Every biome in the table should be reachable on a real map, or the
+  // classifier has a band no seed can ever land in.
+  const present = new Set(w1.biome);
+  const missing = CM.world.BIOME_INFO.filter(b => !present.has(b.id)).map(b => b.name);
+  assert(missing.length <= 2, 'nearly every biome generates on a single seed; missing: ' + missing.join(', '));
+  let vegetated = 0, water = 0;
+  for (let i = 0; i < w1.biome.length; i++) {
+    if (w1.foodCap[i] > 0) vegetated++;
+    if (CM.world.isWaterBiome(w1.biome[i])) water++;
+  }
+  assert(vegetated > 8000, 'world generates a meaningful amount of vegetated ground, got ' + vegetated);
+  assert(water > 2000, 'world generates open water, got ' + water);
+  assert(w1.regions.length > 5, 'world builds named regions, got ' + w1.regions.length);
+  assert(w1.nearestWater && w1.nearestWater.length === w1.biome.length, 'the nearest-water field is built');
 }
 
 // --- trait system --------------------------------------------------------
@@ -218,20 +229,27 @@ function noNaN(org) {
   const anyThirst = game.organisms.some(o => o.thirst > 0);
   assert(anyThirst, 'thirst accumulates over time');
 
-  // A colony left alone next to the Core (which spawns near water) should not
-  // simply die of thirst — SEEK_WATER has to actually resolve the need.
-  for (let i = 0; i < 3000; i++) CM.simulation.tick(game, bus, 0.1);
-  const alive = game.organisms.filter(o => o.ownerId === 'player').length;
-  assert(alive > 0, 'the colony survives long-run thirst (SEEK_WATER resolves it), alive=' + alive);
-
-  /* Deliberately a population-level assertion, not "nobody is ever at 100".
-   * An organism walking toward a lake it has already located sits at maximum
-   * thirst the whole way there, which is the system working rather than
-   * failing; the meaningful question is whether thirst is being resolved for
-   * the population at large. */
-  const parched = game.organisms.filter(o => o.thirst > 90).length;
-  const parchedFrac = parched / Math.max(1, game.organisms.length);
-  assert(parchedFrac < 0.3, `thirst is resolved for most of the population, ${parched}/${game.organisms.length} parched`);
+  /* Sampled across the run rather than at the end, and across the whole
+   * living population rather than the player's three starters.
+   *
+   * This deliberately does NOT assert that the starter colony survives. It
+   * used to, and that assertion started failing for an entirely correct
+   * reason: with wild predators now populating the map on their own, three
+   * trait-less starter organisms left on their default directive get hunted
+   * down — which is the brief's intended opening beat, not a defect. Testing
+   * survival here would have quietly pressured the world into being safe.
+   * What this test is actually about is whether SEEK_WATER resolves thirst. */
+  let samples = 0, parchedSamples = 0;
+  for (let i = 0; i < 3000; i++) {
+    CM.simulation.tick(game, bus, 0.1);
+    if (i % 100 === 0) {
+      for (const o of game.organisms) { samples++; if (o.thirst > 95) parchedSamples++; }
+    }
+  }
+  assert(samples > 500, 'thirst sampling covered a real population, got ' + samples);
+  const parchedFrac = parchedSamples / samples;
+  assert(parchedFrac < 0.12,
+    `thirst is resolved for the population at large (${(parchedFrac * 100).toFixed(1)}% of samples parched)`);
 }
 
 // --- drinking causally reduces thirst -------------------------------------
@@ -348,6 +366,242 @@ function noNaN(org) {
   assert(!game.byId[attacker.id], 'the starving attacker died during the run');
   const blamed = events.filter(e => e.kind === 'death' && /Grazer/.test(e.message));
   assert(blamed.length === 0, 'a harmless herbivore is never credited with a kill, got: ' + blamed.map(e => e.message).join(' / '));
+}
+
+// --- world: rivers, regions, hazards, colony sites -------------------------
+{
+  const w = CM.world.generate(4242);
+  let river = 0;
+  for (let i = 0; i < w.river.length; i++) if (w.river[i]) river++;
+  assert(river > 100, 'rivers are carved into the map, got ' + river + ' cells');
+  assert(w.hazards.length > 10, 'hazards are placed, got ' + w.hazards.length);
+  assert(w.deposits.length > 5, 'biomass deposits are placed, got ' + w.deposits.length);
+
+  // Every named region must be a real, non-trivial area of its own biome.
+  for (const r of w.regions.slice(1)) {
+    assert(r.size >= 200, `region ${r.name} is a substantial area (${r.size})`);
+    assert(!!r.name && r.name.indexOf('undefined') < 0, `region ${r.id} has a real name: ${r.name}`);
+  }
+
+  // The nearest-water field must agree with a brute-force scan. This is the
+  // optimisation that replaced a live radial search, so it has to be right,
+  // not just fast.
+  let checked = 0, mismatched = 0;
+  for (let t = 0; t < 60; t++) {
+    const x = 20 + Math.floor(Math.random() * 200), y = 20 + Math.floor(Math.random() * 200);
+    const viaField = CM.world.findNearestWater(w, x + 0.5, y + 0.5, 999);
+    let brute = null, bestD = Infinity;
+    for (let yy = 0; yy < 256; yy++) {
+      for (let xx = 0; xx < 256; xx++) {
+        if (!CM.world.isWaterBiome(w.biome[yy * 256 + xx])) continue;
+        const d = Math.hypot(xx + 0.5 - (x + 0.5), yy + 0.5 - (y + 0.5));
+        if (d < bestD) { bestD = d; brute = { x: xx + 0.5, y: yy + 0.5 }; }
+      }
+    }
+    if (!brute || !viaField) continue;
+    checked++;
+    const fieldD = Math.hypot(viaField.x - (x + 0.5), viaField.y - (y + 0.5));
+    // BFS is 8-connected, so it can be marginally off true Euclidean nearest;
+    // a few percent is fine, a wildly wrong answer is not.
+    if (fieldD > bestD * 1.15 + 1.5) mismatched++;
+  }
+  assert(checked > 40, 'water-field check sampled enough points, got ' + checked);
+  assert(mismatched === 0, `nearest-water field agrees with brute force (${mismatched}/${checked} bad)`);
+}
+
+// --- flora ------------------------------------------------------------------
+{
+  const defended = CM.flora.PLANTS.filter(p => p.toxicity > 0 || p.thorns > 0);
+  assert(defended.length >= 3, 'several plant species are defended, got ' + defended.length);
+
+  const toxic = CM.flora.PLANTS.find(p => p.toxicity > 0);
+  const plain = CM.organism.create({ ownerId: 'player', traits: [], x: 5, y: 5 });
+  const venomous = CM.organism.create({ ownerId: 'player', traits: ['venom'], x: 5, y: 5 });
+  const plainBite = CM.flora.biteOutcome(toxic.id, plain, 16);
+  const venomBite = CM.flora.biteOutcome(toxic.id, venomous, 16);
+  assert(plainBite.toxin > 0, 'a toxic plant injures an ordinary organism');
+  assert(venomBite.toxin < plainBite.toxin, 'a venom-producing organism resists ingested toxins');
+
+  const thorny = CM.flora.PLANTS.find(p => p.thorns > 0);
+  const armored = CM.organism.create({ ownerId: 'player', traits: ['armor'], x: 5, y: 5 });
+  assert(CM.flora.biteOutcome(thorny.id, armored, 16).physical
+       < CM.flora.biteOutcome(thorny.id, plain, 16).physical, 'armor blunts thorn damage');
+
+  // Nutrition must actually differentiate the species, or flora is cosmetic.
+  const values = CM.flora.PLANTS.filter(p => p.id).map(p => p.nutrition);
+  assert(new Set(values).size > 3, 'plant species differ in nutrition');
+}
+
+// --- climate ------------------------------------------------------------------
+{
+  const game = CM.coremind.newGame(1234, { rivalCount: 0 });
+  const bus = CM.core.makeBus();
+  const events = [];
+  bus.on('event', e => events.push(e));
+
+  const baseTemp = CM.world.tempAt(game.world, 100, 100);
+  game.climate.seasonIndex = 3;               // Deep Cold
+  CM.climate.apply(game);
+  const coldTemp = CM.world.tempAt(game.world, 100, 100);
+  assert(coldTemp < baseTemp, `season shifts the whole map's temperature (${baseTemp.toFixed(1)} -> ${coldTemp.toFixed(1)})`);
+
+  game.climate.event = { key: 'DROUGHT', remaining: 999 };
+  CM.climate.apply(game);
+  assert(game.world.growthScale < 1, 'a drought suppresses plant regrowth');
+
+  // Seasons must actually advance over a long run.
+  game.climate = CM.climate.newState(1234);
+  let seen = new Set();
+  for (let i = 0; i < 12000; i++) { CM.climate.tick(game, bus, 0.1); seen.add(game.climate.seasonIndex); }
+  assert(seen.size >= 3, 'seasons cycle over a long run, saw ' + seen.size);
+  assert(events.some(e => e.kind === 'climate'), 'season changes are announced');
+}
+
+// --- colonies: they are real, independent Coreminds --------------------------
+{
+  const game = CM.coremind.newGame(2468);
+  const bus = CM.core.makeBus();
+  const events = [];
+  bus.on('event', e => events.push(e));
+
+  assert(game.colonies.length === 4, 'player + 3 rivals exist, got ' + game.colonies.length);
+  assert(game.colonies[0].isPlayer, 'colony 0 is the player');
+  assert(game.core === game.colonies[0], 'game.core aliases the player colony');
+  for (const c of game.colonies) {
+    assert(c.biomassCap > 0, c.id + ' has a storage ceiling');
+    assert(!!c.strategyKey, c.id + ' has a doctrine');
+  }
+  // Rivals must be far enough apart to be distinct powers, not a scrum.
+  for (let i = 1; i < game.colonies.length; i++) {
+    for (let j = i + 1; j < game.colonies.length; j++) {
+      const d = Math.hypot(game.colonies[i].x - game.colonies[j].x, game.colonies[i].y - game.colonies[j].y);
+      assert(d > 25, `colonies ${i} and ${j} are meaningfully separated (${d.toFixed(0)})`);
+    }
+  }
+
+  CM.simulation.spawnStarterColony(game, bus);
+  CM.simulation.spawnStarterWildlife(game);
+  for (let i = 0; i < 5000; i++) CM.simulation.tick(game, bus, 0.1);
+
+  const rivals = CM.colony.livingRivals(game);
+  assert(rivals.length > 0, 'rivals survive a long run');
+  assert(rivals.some(r => r.deployed > 0), 'rivals actually deploy organisms');
+  assert(rivals.some(r => r.designGeneration > 1), 'rivals revise their genome over time');
+  const rivalOrganisms = game.organisms.filter(o => o.ownerId.startsWith('rival_'));
+  assert(rivalOrganisms.length > 0, 'rival organisms are alive in the world, got ' + rivalOrganisms.length);
+
+  // Rival gathering must feed *their* Core. This was a real bug: RETURN_TO_CORE
+  // was hardcoded to game.core, so every rival's gatherers walked their
+  // harvest across the map and handed it to the player.
+  assert(rivals.some(r => r.biomass > 70), 'rivals accumulate their own biomass, max=' +
+    Math.max(...rivals.map(r => r.biomass)).toFixed(0));
+
+  const terr = CM.colony.territoryCounts(game);
+  assert(Object.keys(terr).length === game.colonies.length, 'territory is tracked per colony');
+  assert(terr['player'] > 0, 'the player holds territory');
+  assert(game.colonies.slice(1).some(c => terr[c.id] > 0), 'rivals hold territory too');
+  assert(events.some(e => e.kind === 'rival'), 'rival activity reaches the event feed');
+}
+
+// --- colony collapse releases its organisms ---------------------------------
+{
+  const game = CM.coremind.newGame(1357);
+  const bus = CM.core.makeBus();
+  const rival = game.colonies[1];
+  for (let i = 0; i < 5; i++) {
+    const o = CM.organism.create({ ownerId: rival.id, traits: ['bite'], x: rival.x + i, y: rival.y, name: 'R' + i });
+    CM.coremind.addOrganism(game, o);
+  }
+  const before = game.organisms.filter(o => o.ownerId === rival.id).length;
+  assert(before === 5, 'rival organisms exist before collapse');
+
+  CM.colony.damageCore(game, bus, rival, 999);
+  assert(!rival.alive, 'a Core reduced to zero collapses the colony');
+  assert(game.organisms.filter(o => o.ownerId === rival.id).length === 0, 'no organism still belongs to a dead colony');
+  assert(game.organisms.filter(o => o.ownerId === 'wild').length >= 5,
+    'a collapsed colony\'s organisms go feral rather than vanishing');
+}
+
+// --- colony design responds to local conditions ------------------------------
+{
+  const game = CM.coremind.newGame(8642);
+  const rival = game.colonies[1];
+  // Give it everything, so the choice is driven by conditions rather than by
+  // what it happens to have unlocked.
+  for (const t of CM.traits.TRAITS) rival.discovered[t.id] = true;
+
+  // Plant it somewhere genuinely cold and see what it builds.
+  let coldSpot = null;
+  for (let y = 0; y < 256 && !coldSpot; y++) {
+    for (let x = 0; x < 256; x++) {
+      if (CM.world.tempAt(game.world, x + 0.5, y + 0.5) < -2 && !CM.world.isWaterAt(game.world, x + 0.5, y + 0.5)) {
+        coldSpot = { x: x + 0.5, y: y + 0.5 }; break;
+      }
+    }
+  }
+  if (coldSpot) {
+    rival.x = coldSpot.x; rival.y = coldSpot.y;
+    let sawCold = 0;
+    for (let i = 0; i < 12; i++) if (CM.colony.chooseDesign(game, rival).METABOLISM === 'cold_resistance') sawCold++;
+    assert(sawCold >= 8, `a colony on cold ground favours cold resistance (${sawCold}/12)`);
+  }
+
+  // A design must never contain a declared incompatibility.
+  for (let i = 0; i < 40; i++) {
+    const design = CM.colony.chooseDesign(game, rival);
+    const ids = CM.colony.designTraitIds(design);
+    assert(CM.traits.checkCombination(ids).conflicts.length === 0,
+      'a rival never designs an incompatible genome: ' + ids.join(','));
+  }
+}
+
+// --- no directive is a slow death sentence ---------------------------------
+{
+  /* Every directive must leave a colony viable. EXPLORE in particular is the
+   * one the brief has the player reach for first, and it used to wipe the
+   * colony: the directive multiplier outranked both feeding and breeding, so
+   * organisms sightsaw on an empty stomach and never replaced their losses.
+   * Two of three seeds went extinct. This is the regression guard. */
+  for (const directive of ['EXPLORE', 'GATHER', 'HUNT', 'DEFEND']) {
+    for (const seed of [777, 55]) {
+      const game = CM.coremind.newGame(seed);
+      const bus = CM.core.makeBus();
+      CM.simulation.spawnStarterColony(game, bus);
+      CM.simulation.spawnStarterWildlife(game);
+      CM.coremind.issueDirective(game, directive);
+      for (let i = 0; i < 6000; i++) CM.simulation.tick(game, bus, 0.1);
+      assert(game.stats.playerPop > 0,
+        `a colony on ${directive} (seed ${seed}) is still alive after 600s, pop=${game.stats.playerPop}`);
+    }
+  }
+}
+
+// --- reproduction pressure tracks how full the colony is --------------------
+{
+  const game = CM.coremind.newGame(99);
+  const org = CM.organism.create({ ownerId: 'player', traits: [], x: 20, y: 20, name: 'A' });
+  org.energy = org.stats.energyMax; org.health = org.stats.health; org.reproCooldown = 0;
+  const base = { canEatPlants: true, canHunt: false, newSightings: [] };
+
+  const empty = CM.ai.decide(org, Object.assign({}, base, { colonyRoom: 1 }));
+  org.state = 'IDLE';
+  const full = CM.ai.decide(org, Object.assign({}, base, { colonyRoom: 0 }));
+  assert(empty.state === 'REPRODUCE', 'a nearly empty colony prioritises breeding, got ' + empty.state);
+  assert(full.state !== 'REPRODUCE', 'a colony at its ceiling stops breeding, got ' + full.state);
+}
+
+// --- needs outrank a standing directive before they turn critical -----------
+{
+  const game = CM.coremind.newGame(98);
+  const org = CM.organism.create({ ownerId: 'player', traits: [], x: 20, y: 20, name: 'B', directive: 'EXPLORE' });
+  org.hunger = 70;           // hungry, but well short of the 92 critical cliff
+  org.energy = org.stats.energyMax * 0.5;
+  const decision = CM.ai.decide(org, {
+    canEatPlants: true, canHunt: false, newSightings: [], colonyRoom: 0.2,
+    nearestFood: { x: 21, y: 20, dist: 1 }
+  });
+  assert(decision.state === 'SEEK_FOOD',
+    'a hungry organism eats rather than continuing to explore, got ' + decision.state);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

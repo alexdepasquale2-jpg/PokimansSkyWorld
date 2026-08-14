@@ -12,12 +12,10 @@
   const ZOOM_MIN = 5, ZOOM_MAX = 46;
   const CAM_EASE = 6.5; // per-second convergence rate toward the camera target
 
-  const BIOME_COLOR = {
-    [W.BIOME.WATER]: [26, 61, 92],
-    [W.BIOME.SOIL]: [90, 68, 48],
-    [W.BIOME.ROCK]: [78, 80, 84]
-  };
-
+  /* The terrain is baked once into a 1px-per-cell offscreen canvas and blitted
+   * with a single drawImage per frame at any zoom. Shading is done here, at
+   * bake time, so the per-frame cost stays one blit no matter how much detail
+   * the map gains. */
   function buildTerrainCache(world) {
     const size = world.size;
     const canvas = (typeof OffscreenCanvas !== 'undefined')
@@ -25,36 +23,76 @@
       : Object.assign(document.createElement('canvas'), { width: size, height: size });
     const ctx = canvas.getContext('2d');
     const img = ctx.createImageData(size, size);
+    const data = img.data;
+
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const i = y * size + x;
         const p = i * 4;
         const b = world.biome[i];
-        let rgb;
-        if (b === W.BIOME.GRASS) {
-          const lush = K.clamp01(world.food[i] / Math.max(1, world.foodCap[i]));
-          const t = K.clamp01(K.invLerp(-4, 30, world.temp[i]));
-          const g1 = [107, 66, 38], g2 = [63, 138, 58], g3 = [150, 168, 60];
-          const cold = [K.lerp(g1[0], g2[0], lush), K.lerp(g1[1], g2[1], lush), K.lerp(g1[2], g2[2], lush)];
-          const warm = [K.lerp(g1[0], g3[0], lush), K.lerp(g1[1], g3[1], lush), K.lerp(g1[2], g3[2], lush)];
-          rgb = [K.lerp(cold[0], warm[0], t), K.lerp(cold[1], warm[1], t), K.lerp(cold[2], warm[2], t)];
-        } else {
-          rgb = BIOME_COLOR[b] || [50, 50, 50];
+        const info = W.BIOME_INFO[b];
+        let r = info.color[0], g = info.color[1], bl = info.color[2];
+
+        // Vegetated ground darkens and yellows as it is grazed down, so the
+        // food web is legible in the terrain itself rather than only in a
+        // population graph.
+        const cap = world.foodCap[i];
+        if (cap > 0) {
+          const lush = K.clamp01(world.food[i] / cap);
+          const bare = [118, 98, 62];
+          r = K.lerp(bare[0], r, 0.35 + lush * 0.65);
+          g = K.lerp(bare[1], g, 0.35 + lush * 0.65);
+          bl = K.lerp(bare[2], bl, 0.35 + lush * 0.65);
         }
-        img.data[p] = rgb[0] | 0; img.data[p + 1] = rgb[1] | 0; img.data[p + 2] = rgb[2] | 0; img.data[p + 3] = 255;
+
+        // Relief: light from the north-west, using the elevation gradient.
+        // Cheap, and it is what stops a 14-colour map from reading flat.
+        if (!info.water) {
+          const eL = world.elevation[y * size + Math.max(0, x - 1)];
+          const eU = world.elevation[Math.max(0, y - 1) * size + x];
+          const e = world.elevation[i];
+          const slope = ((e - eL) + (e - eU)) * 0.5;
+          const shade = K.clamp(1 + slope * 6.5, 0.72, 1.32);
+          r *= shade; g *= shade; bl *= shade;
+        } else {
+          // Depth shading for water.
+          const depth = K.clamp01((0.305 - world.elevation[i]) / 0.3);
+          r *= 1 - depth * 0.45; g *= 1 - depth * 0.4; bl *= 1 - depth * 0.2;
+        }
+
+        const hz = world.hazard[i];
+        if (hz) {
+          const hc = W.HAZARD_INFO[hz].color;
+          r = K.lerp(r, hc[0], 0.35); g = K.lerp(g, hc[1], 0.35); bl = K.lerp(bl, hc[2], 0.35);
+        }
+
+        data[p] = K.clamp(r, 0, 255) | 0;
+        data[p + 1] = K.clamp(g, 0, 255) | 0;
+        data[p + 2] = K.clamp(bl, 0, 255) | 0;
+        data[p + 3] = 255;
       }
     }
     ctx.putImageData(img, 0, 0);
     return canvas;
   }
 
+  /* Rebaked periodically as well as on world change, because the vegetation
+   * shading above is a snapshot of a field that keeps moving — grazing,
+   * regrowth and drought all change it. Every ~12s of simulation is often
+   * enough to read as alive without paying 65k pixels every frame. */
+  const TERRAIN_REFRESH = 12;
   function ensureCache(game) {
     if (!game.render) game.render = {};
-    if (!game.render.terrainCanvas || game.render.terrainSeed !== game.seed) {
-      game.render.terrainCanvas = buildTerrainCache(game.world);
-      game.render.terrainSeed = game.seed;
+    const r = game.render;
+    if (!r.terrainCanvas || r.terrainSeed !== game.seed) {
+      r.terrainCanvas = buildTerrainCache(game.world);
+      r.terrainSeed = game.seed;
+      r.terrainBakedAt = game.simTime;
+    } else if (game.simTime - r.terrainBakedAt > TERRAIN_REFRESH) {
+      r.terrainCanvas = buildTerrainCache(game.world);
+      r.terrainBakedAt = game.simTime;
     }
-    return game.render.terrainCanvas;
+    return r.terrainCanvas;
   }
 
   function resizeCanvas(canvas) {
@@ -258,20 +296,39 @@
       ctx.drawImage(cache, csx0, csy0, csx1 - csx0, csy1 - csy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
     }
 
-    // Core
-    {
-      const p = worldToScreenDpr(game, w, h, zoom, dpr, game.core.x, game.core.y);
-      const r = game.core.radius * zoom;
-      const pulse = 0.85 + Math.sin(game.simTime * 2) * 0.08;
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * pulse);
-      grad.addColorStop(0, 'rgba(51,230,176,.55)');
-      grad.addColorStop(1, 'rgba(51,230,176,0)');
+    // Territory: drawn under everything living, as flat translucent blocks on
+    // the coarse influence grid. Contested cells are hatched brighter, which
+    // is where the player should expect trouble.
+    if (game.territory && game.showTerritory !== false) drawTerritory(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1);
+
+    // Cores — the player's and every rival's, drawn identically apart from
+    // colour, because a rival Core is the same kind of object.
+    for (const colony of (game.colonies || [])) {
+      if (!colony.alive) continue;
+      if (colony.x < sx0 - 12 || colony.x > sx1 + 12 || colony.y < sy0 - 12 || colony.y > sy1 + 12) continue;
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, colony.x, colony.y);
+      const r = colony.radius * zoom;
+      const pulse = 0.85 + Math.sin(game.simTime * 2 + (colony.isPlayer ? 0 : 1.7)) * 0.08;
+      const rgb = hexToRgb(colony.color);
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, Math.max(1, r * pulse));
+      grad.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.5)`);
+      grad.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r * pulse, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#0f2e26';
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(4, r * 0.32), 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#33e6b0'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(4, r * 0.32), 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1, r * pulse), 0, Math.PI * 2); ctx.fill();
+
+      const inner = Math.max(4, r * 0.32);
+      ctx.fillStyle = 'rgba(8,16,20,.9)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, inner, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = colony.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, inner, 0, Math.PI * 2); ctx.stroke();
+
+      // Integrity ring: a Core losing a siege visibly empties out.
+      if (colony.integrity < 100) {
+        ctx.strokeStyle = '#ef5b5b'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, inner + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (colony.integrity / 100));
+        ctx.stroke();
+      }
     }
 
     // samples
@@ -298,6 +355,32 @@
 
   function worldToScreenDpr(game, w, h, zoom, dpr, wx, wy) {
     return { x: (wx - game.camera.x) * zoom + w / 2, y: (wy - game.camera.y) * zoom + h / 2 };
+  }
+
+  function drawTerritory(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1) {
+    const terr = game.territory;
+    const cell = terr.cell;
+    const x0 = Math.max(0, Math.floor(sx0 / cell)), y0 = Math.max(0, Math.floor(sy0 / cell));
+    const x1 = Math.min(terr.size - 1, Math.ceil(sx1 / cell)), y1 = Math.min(terr.size - 1, Math.ceil(sy1 / cell));
+    const px = cell * zoom;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const ti = ty * terr.size + tx;
+        const owner = terr.owner[ti];
+        if (owner < 0) continue;
+        const colony = game.colonies[owner];
+        if (!colony || !colony.alive) continue;
+        const p = worldToScreenDpr(game, w, h, zoom, dpr, tx * cell, ty * cell);
+        const rgb = hexToRgb(colony.color);
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${terr.contested[ti] ? 0.24 : 0.12})`;
+        ctx.fillRect(p.x, p.y, px + 1, px + 1);
+        if (terr.contested[ti]) {
+          ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.5)`;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(p.x + 1, p.y + 1, px - 1, px - 1);
+        }
+      }
+    }
   }
 
   CM.render = {

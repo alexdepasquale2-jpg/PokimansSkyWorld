@@ -217,3 +217,22 @@ body{
   #selection-panel.card{max-width:320px;}
   #designer-slots{grid-template-columns:repeat(6,1fr);}
 }
+
+/* world / colony roster */
+#world-readout{margin-bottom:10px;}
+#colony-roster{display:flex;flex-direction:column;gap:6px;}
+.colony-row{
+  display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;text-align:left;color:var(--fg);width:100%;min-height:44px;
+}
+.colony-row.dead{opacity:.45;}
+.colony-row .swatch{width:12px;height:12px;border-radius:3px;flex:0 0 auto;}
+.colony-row .cbody{flex:1;min-width:0;display:flex;flex-direction:column;}
+.colony-row .cname{font-size:12.5px;font-weight:600;}
+.colony-row .cname em{color:var(--fg-dim);font-style:normal;font-weight:400;}
+.colony-row .cmeta{font-size:10.5px;color:var(--fg-dim);}
+.colony-row .cint{font-size:11px;color:var(--danger);flex:0 0 auto;}
+.event-row.rival{border-left:3px solid #a26bd6;}
+.event-row.climate{border-left:3px solid #4fa9e0;}
+#stat-climate{color:#9fd0e6;font-size:11.5px;}
+#stat-climate span{white-space:nowrap;}

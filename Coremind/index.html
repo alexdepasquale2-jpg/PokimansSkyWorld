@@ -20,6 +20,7 @@
     <div class="stat" id="stat-biomass" title="Biomass"><i>&#127793;</i><span>0</span></div>
     <div class="stat" id="stat-energy" title="Energy"><i>&#9889;</i><span>0</span></div>
     <div class="stat" id="stat-pop" title="Population"><i>&#129440;</i><span>0</span></div>
+    <div class="stat" id="stat-climate" title="Season and weather"><i>&#127777;</i><span>—</span></div>
     <button id="btn-speed" class="iconbtn" title="Simulation speed">1x</button>
   </div>
 
@@ -43,11 +44,17 @@
     <button data-tab="explore" class="tab active">EXPLORE</button>
     <button data-tab="analyze" class="tab">ANALYZE<span id="badge-analyze" class="badge hidden">0</span></button>
     <button data-tab="dna" class="tab">DNA<span id="badge-dna" class="badge hidden">!</span></button>
+    <button data-tab="world" class="tab">WORLD</button>
   </div>
 
   <div id="panel-explore" class="panel active">
     <div id="selection-summary">Tap an organism to select it, or issue a directive to your whole colony.</div>
     <div id="directive-bar"></div>
+  </div>
+
+  <div id="panel-world" class="panel">
+    <div id="world-readout"></div>
+    <div id="colony-roster"></div>
   </div>
 
   <div id="panel-analyze" class="panel">
@@ -98,10 +105,13 @@
 
 <script src="js/core.js"></script>
 <script src="js/traits.js"></script>
+<script src="js/flora.js"></script>
 <script src="js/world.js"></script>
 <script src="js/organism.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/discovery.js"></script>
+<script src="js/climate.js"></script>
+<script src="js/colony.js"></script>
 <script src="js/coremind.js"></script>
 <script src="js/simulation.js"></script>
 <script src="js/render.js"></script>

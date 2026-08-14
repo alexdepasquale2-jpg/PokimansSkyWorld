@@ -48,9 +48,35 @@ node tools/build.mjs           # -> dist/coremind.html, one self-contained file
 
 The full core loop from the brief, playable end to end:
 
-- **World**: a seeded, deterministic 256×256 cell ecosystem (grass / water /
-  soil / rock, temperature and moisture fields, plant biomass that regrows
-  and gets grazed down) — `js/world.js`.
+- **World**: a seeded, deterministic 256×256 cell ecosystem generated as a
+  named pipeline of stages, each drawing from its own seed offset so changing
+  one cannot silently shift the others — `js/world.js`.
+  - **14 biomes** classified jointly from elevation, temperature and
+    moisture: deep water, shallows, marsh, sands, desert, savanna, grassland,
+    forest, jungle, taiga, tundra, ice sheet, rocky waste, mountains. Each
+    carries its own food ceiling, movement cost, and shelter from temperature
+    extremes.
+  - **Rivers** traced from high ground to the sea by steepest descent, adding
+    moisture along their length. They are what makes the interior habitable —
+    without them every inland region is a death sentence for anything that
+    needs to drink.
+  - **Named regions** (~40–55 per map) flood-filled from contiguous biome
+    areas, so the map has places worth talking about rather than coordinates.
+  - **Hazards** (thermal vents, toxic bogs, frost hollows) that shift local
+    temperature and injure whatever stands in them, and **biomass deposits**
+    placed only on productive ground so contested land is also land worth
+    holding.
+- **Flora**: nine plant species distributed by biome and low-frequency noise,
+  differing in nutrition, regrowth rate, and how hard they fight back —
+  `js/flora.js`. Bitterleaf and bloodcap are toxic; thornscrub and succulents
+  are physically defended. Venom-producing organisms resist ingested toxins
+  and armor blunts thorns, so a defended meadow is a design problem rather
+  than a wall. Organisms avoid defended forage unless genuinely hungry.
+- **Climate**: a four-season cycle plus weather events (drought, rains, cold
+  snap, heatwave) that shift the whole map's temperature and plant growth —
+  `js/climate.js`. This is the main engine of "a new ecological problem
+  emerges": a colony bred entirely for heat is in real trouble when Deep Cold
+  arrives.
 - **Organisms**: one reusable data-driven system for every creature, player-
   designed or wild — every stat the brief lists (health, energy, hunger,
   speed, size, vision, sense_radius, attack, defense, temperature_tolerance,
@@ -127,10 +153,33 @@ The full core loop from the brief, playable end to end:
   canvas and blitted with a single `drawImage` regardless of zoom, and a
   soft population ceiling per ecosystem tier so the world plateaus instead
   of one species filling the entire active-organism cap.
+- **Rival Coreminds**: three other colonies run the same loop the player
+  does — `js/colony.js`. Each gathers biomass into its own Core, keeps its
+  own ledger of what it has fought, unlocks traits from those observations,
+  and designs an organism by scoring its known traits against its doctrine
+  *and* the conditions it can actually perceive around its own Core. A rival
+  on cold ground reaches for cold resistance; one that keeps losing organisms
+  to combat reaches for armor. They redesign when their losses tell them to,
+  and the feed reports it.
+  - Four doctrines — Expansionist, Entrenched, Predatory, Adaptive — which are
+    weights rather than scripts, so two colonies sharing a doctrine on
+    different ground still diverge.
+  - Rivals **wake on a stagger** (~4/5.5/7 minutes) and grow into their
+    ceiling, so the brief's quiet opening survives and rivals are the
+    escalation that follows it.
+  - **Territory** is a coarse influence field fed by Cores and living
+    organisms; where two colonies overlap comparably the cell is *contested*,
+    which is the border friction that produces raids without a scripted war.
+  - **Cores can fall.** Hostile organisms standing on a Core with no
+    defenders grind its integrity down; at zero the colony collapses and its
+    organisms go feral rather than vanishing. This applies to the player's
+    Core on exactly the same terms.
 - **Save/load**: autosaves on discoveries/deaths/creation (throttled) plus
   every 20s and on tab-hide/page-hide; `Continue` on the boot screen
   restores seed, discovered species/traits (with partial observation
-  progress), samples, designs, every living organism, and Core resources.
+  progress), samples, designs, every living organism, Core resources, every
+  colony's identity/knowledge/genome, and the climate state. The format is
+  versioned and loads v1 saves forward rather than discarding a campaign.
 
 ### What's deliberately out of scope for this pass
 

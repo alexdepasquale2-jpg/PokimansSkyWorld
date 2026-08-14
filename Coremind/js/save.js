@@ -7,7 +7,13 @@
 (function (CM) {
   'use strict';
   const KEY = 'coremind/save/v1';
-  const VERSION = 1;
+  /* v2 adds colonies, climate and flora knowledge. A v1 save has no rivals
+   * recorded, so rather than refuse it we load it and let createAll() seed a
+   * fresh set — the player keeps their discoveries and organisms, and the
+   * world simply acquires neighbours. Losing a campaign to a schema bump is
+   * never worth the tidiness. */
+  const VERSION = 2;
+  const MIN_LOADABLE = 1;
   const MIN_SAVE_INTERVAL_MS = 5000;
   const PERIODIC_MS = 20000;
 
@@ -20,13 +26,23 @@
       v: VERSION, savedAt: Date.now(),
       seed: game.seed, simTime: game.simTime, speed: game.speed,
       core: { biomass: game.core.biomass, energy: game.core.energy },
+      climate: game.climate,
+      colonies: game.colonies.map(c => ({
+        id: c.id, name: c.name, isPlayer: c.isPlayer, x: c.x, y: c.y, color: c.color,
+        strategyKey: c.strategyKey, alive: c.alive, integrity: c.integrity,
+        biomass: c.biomass, energy: c.energy,
+        observations: c.observations, discovered: c.discovered,
+        currentDesign: c.currentDesign, designGeneration: c.designGeneration,
+        losses: c.losses, kills: c.kills, deployed: c.deployed, standing: c.standing
+      })),
       camera: { x: game.camera.x, y: game.camera.y, zoom: game.camera.zoom },
       discovery: {
         observations: game.discovery.observations,
         discoveredTraits: game.discovery.discoveredTraits,
         knownSpecies: game.discovery.knownSpecies,
         events: game.discovery.events.slice(0, 150),
-        samples: game.discovery.samples
+        samples: game.discovery.samples,
+        knownFlora: game.discovery.knownFlora || {}
       },
       designs: game.designs,
       nextDesignId: game.nextDesignId,
@@ -59,7 +75,7 @@
       const raw = localStorage.getItem(KEY);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (!data || data.v !== VERSION) return null;
+      if (!data || !(data.v >= MIN_LOADABLE && data.v <= VERSION)) return null;
       return data;
     } catch (e) {
       console.warn('[coremind] read failed', e);
@@ -73,6 +89,31 @@
     const game = CM.coremind.newGame(data.seed);
     game.simTime = data.simTime || 0;
     game.speed = data.speed || 1;
+
+    if (data.climate) game.climate = data.climate;
+    CM.climate.apply(game);
+
+    /* Colonies are restored onto the objects createAll() just built, rather
+     * than replacing the array: the Core positions come from the seed and are
+     * already correct, and game.core has to keep pointing at the same object
+     * the rest of the game holds a reference to. */
+    if (data.colonies && data.colonies.length) {
+      for (const saved of data.colonies) {
+        const colony = game.coloniesById[saved.id];
+        if (!colony) continue;
+        Object.assign(colony, {
+          name: saved.name, color: saved.color, strategyKey: saved.strategyKey,
+          alive: saved.alive !== false, integrity: saved.integrity != null ? saved.integrity : 100,
+          biomass: saved.biomass, energy: saved.energy,
+          observations: saved.observations || {}, discovered: saved.discovered || {},
+          currentDesign: saved.currentDesign || colony.currentDesign,
+          designGeneration: saved.designGeneration || 1,
+          losses: saved.losses || 0, kills: saved.kills || 0, deployed: saved.deployed || 0,
+          standing: saved.standing || colony.standing
+        });
+        if (saved.x != null) { colony.x = saved.x; colony.y = saved.y; }
+      }
+    }
     game.core.biomass = data.core.biomass;
     game.core.energy = data.core.energy;
     if (data.camera) {
@@ -85,6 +126,7 @@
     game.discovery.knownSpecies = disc.knownSpecies || {};
     game.discovery.events = disc.events || [];
     game.discovery.samples = disc.samples || [];
+    game.discovery.knownFlora = disc.knownFlora || {};
     let maxEvtId = 0, maxSampleId = 0;
     for (const e of game.discovery.events) { const n = parseInt(String(e.id).split('_')[1], 10); if (n > maxEvtId) maxEvtId = n; }
     for (const s of game.discovery.samples) { const n = parseInt(String(s.id).split('_')[1], 10); if (n > maxSampleId) maxSampleId = n; }

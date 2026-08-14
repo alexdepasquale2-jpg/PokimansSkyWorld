@@ -232,6 +232,25 @@ body{
   #designer-slots{grid-template-columns:repeat(6,1fr);}
 }
 
+/* world / colony roster */
+#world-readout{margin-bottom:10px;}
+#colony-roster{display:flex;flex-direction:column;gap:6px;}
+.colony-row{
+  display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;text-align:left;color:var(--fg);width:100%;min-height:44px;
+}
+.colony-row.dead{opacity:.45;}
+.colony-row .swatch{width:12px;height:12px;border-radius:3px;flex:0 0 auto;}
+.colony-row .cbody{flex:1;min-width:0;display:flex;flex-direction:column;}
+.colony-row .cname{font-size:12.5px;font-weight:600;}
+.colony-row .cname em{color:var(--fg-dim);font-style:normal;font-weight:400;}
+.colony-row .cmeta{font-size:10.5px;color:var(--fg-dim);}
+.colony-row .cint{font-size:11px;color:var(--danger);flex:0 0 auto;}
+.event-row.rival{border-left:3px solid #a26bd6;}
+.event-row.climate{border-left:3px solid #4fa9e0;}
+#stat-climate{color:#9fd0e6;font-size:11.5px;}
+#stat-climate span{white-space:nowrap;}
+
 </style>
 </head>
 <body>
@@ -241,6 +260,7 @@ body{
     <div class="stat" id="stat-biomass" title="Biomass"><i>&#127793;</i><span>0</span></div>
     <div class="stat" id="stat-energy" title="Energy"><i>&#9889;</i><span>0</span></div>
     <div class="stat" id="stat-pop" title="Population"><i>&#129440;</i><span>0</span></div>
+    <div class="stat" id="stat-climate" title="Season and weather"><i>&#127777;</i><span>—</span></div>
     <button id="btn-speed" class="iconbtn" title="Simulation speed">1x</button>
   </div>
 
@@ -264,11 +284,17 @@ body{
     <button data-tab="explore" class="tab active">EXPLORE</button>
     <button data-tab="analyze" class="tab">ANALYZE<span id="badge-analyze" class="badge hidden">0</span></button>
     <button data-tab="dna" class="tab">DNA<span id="badge-dna" class="badge hidden">!</span></button>
+    <button data-tab="world" class="tab">WORLD</button>
   </div>
 
   <div id="panel-explore" class="panel active">
     <div id="selection-summary">Tap an organism to select it, or issue a directive to your whole colony.</div>
     <div id="directive-bar"></div>
+  </div>
+
+  <div id="panel-world" class="panel">
+    <div id="world-readout"></div>
+    <div id="colony-roster"></div>
   </div>
 
   <div id="panel-analyze" class="panel">
@@ -710,120 +736,564 @@ body{
 
 </script>
 <script>
-/* Coremind — procedural world: a 256x256 cell ecosystem grid, plus a uniform
- * spatial grid used to query organisms by position cheaply.
+/* Coremind — flora. Plants are not one undifferentiated "food" number: each
+ * biome grows particular species, and those species differ in how much they
+ * feed a grazer, how fast they come back, and how hard they fight back.
  *
- * The terrain is regenerated from the seed on every load (world.js never
- * touches localStorage); only the *deltas* worth keeping — food levels drift
- * back to their natural carrying capacity fast enough that they are not
- * saved at all; see save.js for what actually persists.
+ * Defended plants are what make herbivory a design problem rather than a
+ * formality — and they are a discovery source in their own right, since an
+ * organism poisoned by a toxin has observed a real chemical defense.
  */
 (function (CM) {
   'use strict';
   const K = CM.core;
 
-  const SIZE = 256; // cells per side
-  const BIOME = { WATER: 0, GRASS: 1, SOIL: 2, ROCK: 3 };
-  const BIOME_NAMES = ['Water', 'Grass', 'Soil', 'Rock'];
+  /* Ids are indices into this array and are written into a Uint8Array per
+   * cell, so this list is append-only. 0 is reserved for "nothing grows". */
+  const PLANTS = [
+    { id: 0, key: 'none', name: 'Barren', nutrition: 0, regrowth: 0, toxicity: 0, thorns: 0,
+      color: [0, 0, 0], biomes: [] },
+
+    { id: 1, key: 'grass', name: 'Meadow Grass', nutrition: 1, regrowth: 0.022, toxicity: 0, thorns: 0,
+      color: [122, 168, 74],
+      biomes: ['GRASSLAND', 'SAVANNA'] },
+
+    { id: 2, key: 'fernbed', name: 'Fernbed', nutrition: 1.25, regrowth: 0.016, toxicity: 0, thorns: 0,
+      color: [76, 136, 78],
+      biomes: ['FOREST', 'TAIGA'] },
+
+    { id: 3, key: 'bitterleaf', name: 'Bitterleaf', nutrition: 1.5, regrowth: 0.014, toxicity: 0.55, thorns: 0,
+      color: [110, 154, 196],
+      biomes: ['FOREST', 'JUNGLE', 'MARSH'] },
+
+    { id: 4, key: 'thornscrub', name: 'Thornscrub', nutrition: 1.7, regrowth: 0.011, toxicity: 0, thorns: 0.6,
+      color: [150, 126, 66],
+      biomes: ['SAVANNA', 'DESERT', 'ROCK'] },
+
+    { id: 5, key: 'succulent', name: 'Water Succulent', nutrition: 1.1, regrowth: 0.008, toxicity: 0, thorns: 0.25,
+      // The desert's compromise: feeds badly, but drinking from it is the
+      // difference between crossing a waste and dying in it.
+      water: 26,
+      color: [128, 176, 140],
+      biomes: ['DESERT', 'BEACH'] },
+
+    { id: 6, key: 'canopy_fruit', name: 'Canopy Fruit', nutrition: 2.4, regrowth: 0.013, toxicity: 0, thorns: 0,
+      color: [206, 138, 74],
+      biomes: ['JUNGLE'] },
+
+    { id: 7, key: 'bloodcap', name: 'Bloodcap Fungus', nutrition: 2.0, regrowth: 0.02, toxicity: 0.85, thorns: 0,
+      color: [172, 66, 74],
+      biomes: ['MARSH', 'JUNGLE', 'TAIGA'] },
+
+    { id: 8, key: 'lichen', name: 'Frost Lichen', nutrition: 0.8, regrowth: 0.006, toxicity: 0, thorns: 0,
+      color: [168, 180, 168],
+      biomes: ['TUNDRA', 'ICE', 'MOUNTAIN'] },
+
+    { id: 9, key: 'reedmat', name: 'Reed Mat', nutrition: 1.15, regrowth: 0.026, toxicity: 0, thorns: 0,
+      water: 14,
+      color: [96, 148, 104],
+      biomes: ['MARSH', 'SHALLOWS'] }
+  ];
+
+  const BY_ID = PLANTS;
+  const BY_KEY = {};
+  for (const p of PLANTS) BY_KEY[p.key] = p;
+
+  // biome key -> candidate plant ids, built once
+  const BY_BIOME = {};
+  for (const p of PLANTS) {
+    for (const b of p.biomes) (BY_BIOME[b] || (BY_BIOME[b] = [])).push(p.id);
+  }
+
+  function get(id) { return BY_ID[id] || BY_ID[0]; }
+  function regrowthRate(id) { return (BY_ID[id] || BY_ID[0]).regrowth; }
+  function isDefended(id) { const p = get(id); return p.toxicity > 0 || p.thorns > 0; }
+
+  /* Assign a plant species and a food capacity to every cell. Which of a
+   * biome's candidate species grows where is driven by low-frequency noise,
+   * so species form patches a player can actually learn the shape of rather
+   * than salt-and-pepper randomness. */
+  function populate(world, seed) {
+    const W = CM.world;
+    const n = world.size * world.size;
+    for (let y = 0; y < world.size; y++) {
+      for (let x = 0; x < world.size; x++) {
+        const i = W.idx(x, y);
+        const info = W.BIOME_INFO[world.biome[i]];
+        const candidates = BY_BIOME[info.key];
+        if (!candidates || !candidates.length || info.foodCap <= 0) {
+          world.flora[i] = 0; world.foodCap[i] = 0; world.food[i] = 0;
+          continue;
+        }
+        // fbm rather than a single noise2 octave: raw value noise is
+        // axis-aligned and paints visible vertical banding into the terrain.
+        const pick = K.clamp01(K.fbm(seed + 9100, x * 0.045, y * 0.045, 3));
+        const plant = candidates[Math.min(candidates.length - 1, Math.floor(pick * candidates.length))];
+        world.flora[i] = plant;
+
+        // Capacity blends the biome's ceiling with local moisture/warmth, so
+        // the same biome is richer in its wetter, milder parts.
+        const m = world.moisture[i];
+        const t = K.clamp01(K.invLerp(-8, 30, world.temp[i]));
+        const quality = 0.45 + m * 0.35 + t * 0.2;
+        const cap = info.foodCap * quality;
+        world.foodCap[i] = cap;
+        world.food[i] = cap * (0.45 + 0.55 * K.clamp01(K.fbm(seed + 5000, x * 0.09, y * 0.09, 3)));
+      }
+    }
+  }
+
+  /* What eating one mouthful of this plant does. Nutrition scales the food
+   * value; toxin and thorn damage are returned separately so the caller can
+   * decide who resists them — that is where traits get to matter. */
+  function biteOutcome(plantId, eater, amount) {
+    const p = get(plantId);
+    const food = amount * p.nutrition;
+    let toxin = 0, physical = 0;
+    if (p.toxicity > 0) {
+      // Venom-producing organisms have the biochemistry to handle toxins;
+      // this is the payoff for a trait that otherwise only does damage.
+      const resist = eater.behaviors && eater.behaviors.has('damage_over_time') ? 0.25 : 1;
+      toxin = p.toxicity * amount * 0.12 * resist;
+    }
+    if (p.thorns > 0) {
+      // Armor is literally for this.
+      const armor = K.clamp01((eater.stats.armor || 0) / 40);
+      physical = p.thorns * amount * 0.10 * (1 - armor);
+    }
+    return { food, toxin, physical, water: (p.water || 0) * (amount / 16) };
+  }
+
+  CM.flora = {
+    PLANTS, BY_KEY, get, regrowthRate, isDefended, populate, biteOutcome
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — procedural world: a 256x256 cell ecosystem.
+ *
+ * Terrain is regenerated from the seed on every load and never saved, so
+ * everything here must be deterministic given the same seed. What the player
+ * *changed* (food levels, colonies, discoveries) lives in save.js.
+ *
+ * Generation runs as a pipeline of named stages, each drawing from its own
+ * offset of the seed, so changing one stage's algorithm cannot silently
+ * shift the output of the others.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+
+  const SIZE = 256;
+
+  /* Biome ids are append-only: they are written into save-adjacent code
+   * paths and compared numerically all over the simulation. Insert new
+   * biomes at the end, never in the middle. */
+  const BIOME = {
+    DEEP_WATER: 0, SHALLOWS: 1, MARSH: 2, BEACH: 3, DESERT: 4, SAVANNA: 5,
+    GRASSLAND: 6, FOREST: 7, JUNGLE: 8, TAIGA: 9, TUNDRA: 10, ICE: 11,
+    ROCK: 12, MOUNTAIN: 13
+  };
+
+  /* foodCap: peak plant biomass a cell of this biome can hold.
+   * moveCost: multiplier on movement speed (1 = normal ground).
+   * water:    can be drunk from / counts as open water.
+   * shelter:  reduces how exposed an organism is to temperature swings. */
+  const BIOME_INFO = [
+    { id: 0,  key: 'DEEP_WATER', name: 'Deep Water', color: [22, 52, 84],   foodCap: 0,   moveCost: 0.35, water: true,  shelter: 0,    passable: true },
+    { id: 1,  key: 'SHALLOWS',   name: 'Shallows',   color: [42, 96, 130],  foodCap: 14,  moveCost: 0.6,  water: true,  shelter: 0,    passable: true },
+    { id: 2,  key: 'MARSH',      name: 'Marsh',      color: [64, 92, 66],   foodCap: 78,  moveCost: 0.7,  water: true,  shelter: 0.25, passable: true },
+    { id: 3,  key: 'BEACH',      name: 'Sands',      color: [178, 162, 116],foodCap: 8,   moveCost: 0.9,  water: false, shelter: 0,    passable: true },
+    { id: 4,  key: 'DESERT',     name: 'Desert',     color: [186, 148, 92], foodCap: 6,   moveCost: 0.95, water: false, shelter: 0,    passable: true },
+    { id: 5,  key: 'SAVANNA',    name: 'Savanna',    color: [152, 152, 74], foodCap: 46,  moveCost: 1,    water: false, shelter: 0.1,  passable: true },
+    { id: 6,  key: 'GRASSLAND',  name: 'Grassland',  color: [96, 142, 62],  foodCap: 84,  moveCost: 1,    water: false, shelter: 0.1,  passable: true },
+    { id: 7,  key: 'FOREST',     name: 'Forest',     color: [52, 104, 54],  foodCap: 104, moveCost: 0.82, water: false, shelter: 0.45, passable: true },
+    { id: 8,  key: 'JUNGLE',     name: 'Jungle',     color: [34, 92, 48],   foodCap: 128, moveCost: 0.68, water: false, shelter: 0.55, passable: true },
+    { id: 9,  key: 'TAIGA',      name: 'Taiga',      color: [58, 88, 74],   foodCap: 58,  moveCost: 0.85, water: false, shelter: 0.4,  passable: true },
+    { id: 10, key: 'TUNDRA',     name: 'Tundra',     color: [122, 128, 112],foodCap: 22,  moveCost: 0.92, water: false, shelter: 0.05, passable: true },
+    { id: 11, key: 'ICE',        name: 'Ice Sheet',  color: [206, 218, 226],foodCap: 2,   moveCost: 0.75, water: false, shelter: 0,    passable: true },
+    { id: 12, key: 'ROCK',       name: 'Rocky Waste',color: [104, 100, 96], foodCap: 10,  moveCost: 0.7,  water: false, shelter: 0.3,  passable: true },
+    { id: 13, key: 'MOUNTAIN',   name: 'Mountains',  color: [140, 138, 140],foodCap: 0,   moveCost: 0.45, water: false, shelter: 0.35, passable: true }
+  ];
+  const BIOME_NAMES = BIOME_INFO.map(b => b.name);
+
+  function isWaterBiome(b) { return BIOME_INFO[b] && BIOME_INFO[b].water; }
+
+  // --- hazards -------------------------------------------------------------
+  const HAZARD = { NONE: 0, THERMAL_VENT: 1, TOXIC_BOG: 2, HARD_FROST: 3 };
+  const HAZARD_INFO = [
+    null,
+    { key: 'THERMAL_VENT', name: 'Thermal Vent', tempDelta: 26,  damage: 0.9, color: [214, 96, 48] },
+    { key: 'TOXIC_BOG',    name: 'Toxic Bog',    tempDelta: 0,   damage: 1.6, color: [126, 176, 62] },
+    { key: 'HARD_FROST',   name: 'Frost Hollow', tempDelta: -24, damage: 0.9, color: [150, 200, 224] }
+  ];
 
   function idx(x, y) { return y * SIZE + x; }
   function inBounds(x, y) { return x >= 0 && y >= 0 && x < SIZE && y < SIZE; }
 
+  // --- region naming -------------------------------------------------------
+  const NAME_PREFIX = ['Ashen', 'Verdant', 'Hollow', 'Sunken', 'Pale', 'Bitter', 'Amber', 'Quiet',
+    'Broken', 'Long', 'Deep', 'First', 'Salt', 'Iron', 'Glass', 'Low', 'Far', 'Old'];
+  const NAME_SUFFIX = {
+    DEEP_WATER: 'Deep', SHALLOWS: 'Shoal', MARSH: 'Fen', BEACH: 'Strand', DESERT: 'Waste',
+    SAVANNA: 'Flats', GRASSLAND: 'Meadows', FOREST: 'Wood', JUNGLE: 'Tangle', TAIGA: 'Pinewood',
+    TUNDRA: 'Barrens', ICE: 'Whiteness', ROCK: 'Scree', MOUNTAIN: 'Spine'
+  };
+
+  function regionName(rng, biomeId) {
+    return NAME_PREFIX[Math.floor(rng() * NAME_PREFIX.length)] + ' ' + NAME_SUFFIX[BIOME_INFO[biomeId].key];
+  }
+
   /* --- generation ---------------------------------------------------------
-   * Elevation carves water / land / rock. Moisture (itself elevation-biased,
-   * so basins are wetter) decides grass vs bare soil. Temperature follows a
-   * latitude band across the y axis plus noise, so the world has a cold edge,
-   * a warm middle, and local variation neither alone would produce. */
+   * Elevation carves sea, land and highland. Moisture is elevation-biased so
+   * basins are wetter, then rivers add moisture along their length.
+   * Temperature follows a latitude band plus a lapse rate with altitude.
+   * Biome is the joint classification of the three. */
   function generate(seed) {
     seed = (seed >>> 0) || 1;
     const n = SIZE * SIZE;
-    const biome = new Uint8Array(n);
-    const temp = new Float32Array(n);      // degrees C
-    const moisture = new Float32Array(n);
-    const food = new Float32Array(n);      // current plant biomass per cell
-    const foodCap = new Float32Array(n);   // carrying capacity per cell
 
+    const elevation = new Float32Array(n);
+    const moisture = new Float32Array(n);
+    const temp = new Float32Array(n);
+    const biome = new Uint8Array(n);
+    const food = new Float32Array(n);
+    const foodCap = new Float32Array(n);
+    const flora = new Uint8Array(n);
+    const regionId = new Uint16Array(n);
+    const river = new Uint8Array(n);
+    const hazard = new Uint8Array(n);
+
+    // stage 1: elevation ---------------------------------------------------
     for (let y = 0; y < SIZE; y++) {
       for (let x = 0; x < SIZE; x++) {
         const i = idx(x, y);
-        const e = K.fbm(seed, x * 0.02, y * 0.02, 5) * 0.75 + K.fbm(seed + 1, x * 0.06, y * 0.06, 3) * 0.25;
-        let m = K.fbm(seed + 2000, x * 0.035, y * 0.035, 4) * 0.7 + (1 - e) * 0.3;
-        m = K.clamp01(m);
+        let e = K.fbm(seed, x * 0.018, y * 0.018, 5) * 0.7
+              + K.fbm(seed + 1, x * 0.055, y * 0.055, 3) * 0.3;
+        /* Raw fbm clusters hard around its midpoint, which leaves a map that
+         * is half ocean and has no highland at all — every threshold above
+         * ~0.75 goes unused. Stretching around a pivot below the mean widens
+         * both tails, so the same noise yields real mountains and real deeps.
+         * Measured over three seeds: ~25% water, ~65% habitable, ~10% highland. */
+        e = K.clamp01(0.5 + (e - 0.45) * 1.7);
+        // Pull the map's rim down so the playable landmass is enclosed by sea
+        // rather than being cut off arbitrarily by the array bounds. Kept
+        // narrow (10%) so the cold polar rows survive as land — a wider skirt
+        // drowns them and the tundra/ice biomes never generate.
+        const edge = Math.min(x, y, SIZE - 1 - x, SIZE - 1 - y) / (SIZE * 0.10);
+        e *= K.clamp01(edge);
+        elevation[i] = e;
+      }
+    }
 
-        // latitude-ish temperature band centred on the vertical middle,
-        // warmest at the equator (mid-row), coldest at the poles (edges).
-        const lat = Math.abs(y / SIZE - 0.5) * 2; // 0 at equator, 1 at pole
-        let t = K.lerp(34, -12, lat) + (K.fbm(seed + 4000, x * 0.05, y * 0.05, 3) - 0.5) * 14;
-        t -= K.clamp01(e - 0.6) * 18; // higher ground runs cooler
-
-        let b;
-        if (e < 0.30) b = BIOME.WATER;
-        else if (e > 0.80 || (e > 0.62 && m < 0.22)) b = BIOME.ROCK;
-        else if (m > 0.38 && t > -4) b = BIOME.GRASS;
-        else b = BIOME.SOIL;
-
-        biome[i] = b;
+    // stage 2: moisture + temperature --------------------------------------
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const i = idx(x, y);
+        const e = elevation[i];
+        moisture[i] = K.clamp01(K.fbm(seed + 2000, x * 0.03, y * 0.03, 4) * 0.72 + (1 - e) * 0.28);
+        const lat = Math.abs(y / SIZE - 0.5) * 2;             // 0 equator, 1 pole
+        let t = K.lerp(34, -12, lat)
+              + (K.fbm(seed + 4000, x * 0.045, y * 0.045, 3) - 0.5) * 12;
+        t -= Math.max(0, e - 0.45) * 42;                      // lapse rate with altitude
         temp[i] = t;
-        moisture[i] = m;
-        if (b === BIOME.GRASS) {
-          const cap = K.clamp01(m * 0.7 + K.invLerp(-4, 30, t) * 0.3) * 90 + 10;
-          foodCap[i] = cap;
-          // Coherent noise, not a raw per-cell hash — a hash decorrelates
-          // completely between neighbours, which reads as TV static once
-          // painted into the terrain cache. Real grass patchiness (and the
-          // grazing pressure that later shows through it) should look like
-          // patches, not salt-and-pepper noise.
-          food[i] = cap * (0.45 + 0.55 * K.noise2(seed + 5000, x * 0.12, y * 0.12));
-        } else {
-          foodCap[i] = 0;
-          food[i] = 0;
+      }
+    }
+
+    // stage 3: rivers -------------------------------------------------------
+    const rngRiver = K.rngFrom(seed ^ 0x5bf03635);
+    carveRivers(elevation, moisture, river, rngRiver);
+
+    // stage 4: biome classification ----------------------------------------
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const i = idx(x, y);
+        biome[i] = classify(elevation[i], temp[i], moisture[i], river[i]);
+      }
+    }
+    // Beaches read from the finished biome map, so they need their own pass.
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const i = idx(x, y);
+        const b = biome[i];
+        if (b === BIOME.DESERT || b === BIOME.SAVANNA || b === BIOME.GRASSLAND || b === BIOME.TUNDRA) {
+          if (elevation[i] < 0.38 && touchesDeepWater(biome, x, y)) biome[i] = BIOME.BEACH;
         }
       }
     }
 
+    // stage 5: flora + food capacity ---------------------------------------
     const world = {
-      seed, size: SIZE, biome, temp, moisture, food, foodCap,
+      seed, size: SIZE,
+      elevation, moisture, temp, biome, food, foodCap, flora, regionId, river, hazard,
       foodCursor: 0,
+      regions: [],
+      hazards: [],
+      deposits: [],
       grid: makeSpatialGrid(SIZE, 6)
     };
-    world.coreSpawn = findCoreSpawn(world, K.rngFrom(seed ^ 0x9e3779b9));
+    CM.flora.populate(world, seed);
+
+    // stage 6: regions + derived fields -------------------------------------
+    world.regions = buildRegions(world, K.rngFrom(seed ^ 0x27d4eb2f));
+    buildWaterField(world);
+
+    // stage 7: hazards + deposits ------------------------------------------
+    placeHazards(world, K.rngFrom(seed ^ 0x165667b1));
+    placeDeposits(world, K.rngFrom(seed ^ 0x9e3779b1));
+
+    world.coreSpawn = findColonySite(world, K.rngFrom(seed ^ 0x9e3779b9), []);
     return world;
   }
 
-  /* A grassy, temperate, non-coastal patch near the middle of the map — a
-   * reasonable home base regardless of seed. */
-  function findCoreSpawn(world, rng) {
-    let best = null, bestScore = -Infinity;
-    for (let tries = 0; tries < 400; tries++) {
-      const x = K.rndInt(rng, SIZE * 0.25, SIZE * 0.75);
-      const y = K.rndInt(rng, SIZE * 0.25, SIZE * 0.75);
-      const i = idx(x, y);
-      if (world.biome[i] !== BIOME.GRASS) continue;
-      const t = world.temp[i];
-      let score = -Math.abs(t - 18) - K.dist(x, y, SIZE / 2, SIZE / 2) * 0.02;
-      // reward being near water (drinkable, but not flooded)
-      let nearWater = false;
-      for (let dy = -3; dy <= 3 && !nearWater; dy++) {
-        for (let dx = -3; dx <= 3; dx++) {
-          const nx = x + dx, ny = y + dy;
-          if (inBounds(nx, ny) && world.biome[idx(nx, ny)] === BIOME.WATER) { nearWater = true; break; }
+  function classify(e, t, m, isRiver) {
+    if (e < 0.24) return BIOME.DEEP_WATER;
+    if (e < 0.305) return BIOME.SHALLOWS;
+    if (isRiver) return BIOME.SHALLOWS;
+    if (e > 0.86) return BIOME.MOUNTAIN;
+    if (e > 0.75) return BIOME.ROCK;
+    if (e < 0.40 && m > 0.66 && t > 2) return BIOME.MARSH;
+    if (t < -11) return BIOME.ICE;
+    if (t < 1) return m > 0.46 ? BIOME.TAIGA : BIOME.TUNDRA;
+    if (t < 12) return m > 0.58 ? BIOME.FOREST : (m > 0.32 ? BIOME.GRASSLAND : BIOME.TUNDRA);
+    if (t < 25) {
+      if (m > 0.66) return BIOME.FOREST;
+      if (m > 0.4) return BIOME.GRASSLAND;
+      if (m > 0.22) return BIOME.SAVANNA;
+      return BIOME.DESERT;
+    }
+    if (m > 0.6) return BIOME.JUNGLE;
+    if (m > 0.42) return BIOME.SAVANNA;
+    return BIOME.DESERT;
+  }
+
+  function touchesDeepWater(biome, x, y) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (inBounds(nx, ny)) {
+          const b = biome[idx(nx, ny)];
+          if (b === BIOME.DEEP_WATER || b === BIOME.SHALLOWS) return true;
         }
       }
-      if (nearWater) score += 5;
+    }
+    return false;
+  }
+
+  /* Rivers run from high ground to the sea by steepest descent, with a small
+   * random nudge so they meander instead of drawing straight lines. They are
+   * what makes the interior of a continent habitable: without them, every
+   * inland region is a death sentence for anything that needs to drink. */
+  function carveRivers(elevation, moisture, river, rng) {
+    const RIVER_COUNT = 26, MAX_LEN = 420;
+    for (let r = 0; r < RIVER_COUNT; r++) {
+      // start somewhere high
+      let sx = 0, sy = 0, bestE = -1;
+      for (let tries = 0; tries < 40; tries++) {
+        const x = 4 + Math.floor(rng() * (SIZE - 8));
+        const y = 4 + Math.floor(rng() * (SIZE - 8));
+        const e = elevation[idx(x, y)];
+        if (e > bestE) { bestE = e; sx = x; sy = y; }
+      }
+      if (bestE < 0.5) continue;
+
+      let x = sx, y = sy;
+      for (let step = 0; step < MAX_LEN; step++) {
+        const i = idx(x, y);
+        if (elevation[i] < 0.305) break;   // reached the sea
+        river[i] = 1;
+        // widen the moisture influence around the channel
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (!inBounds(nx, ny)) continue;
+            const d = Math.abs(dx) + Math.abs(dy);
+            const j = idx(nx, ny);
+            moisture[j] = K.clamp01(moisture[j] + (d <= 1 ? 0.3 : d <= 2 ? 0.16 : 0.07));
+          }
+        }
+        // steepest descent among the 8 neighbours, with a little noise
+        let nx = x, ny = y, bestScore = Infinity;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const cx = x + dx, cy = y + dy;
+            if (!inBounds(cx, cy)) continue;
+            const score = elevation[idx(cx, cy)] + (rng() - 0.5) * 0.02;
+            if (score < bestScore) { bestScore = score; nx = cx; ny = cy; }
+          }
+        }
+        if (nx === x && ny === y) break;          // local minimum: a lake
+        if (bestScore >= elevation[i] + 0.004) break;
+        x = nx; y = ny;
+      }
+    }
+  }
+
+  /* Contiguous same-biome areas become named regions. Small blobs are folded
+   * into region 0 ("unremarkable ground") so the map has a handful of places
+   * worth naming rather than thousands. */
+  function buildRegions(world, rng) {
+    const { biome, regionId } = world;
+    const n = SIZE * SIZE;
+    const MIN_REGION = 220;
+    const regions = [{ id: 0, name: 'Uncharted', biome: BIOME.GRASSLAND, size: 0, cx: 0, cy: 0 }];
+    const stack = new Int32Array(n);
+    const visited = new Uint8Array(n);
+
+    for (let start = 0; start < n; start++) {
+      if (visited[start]) continue;
+      const b = biome[start];
+      let sp = 0, count = 0, sumX = 0, sumY = 0;
+      stack[sp++] = start;
+      visited[start] = 1;
+      const cells = [];
+      while (sp > 0) {
+        const cur = stack[--sp];
+        cells.push(cur);
+        count++;
+        sumX += cur % SIZE; sumY += (cur / SIZE) | 0;
+        const cx = cur % SIZE, cy = (cur / SIZE) | 0;
+        for (let d = 0; d < 4; d++) {
+          const nx = cx + (d === 0 ? 1 : d === 1 ? -1 : 0);
+          const ny = cy + (d === 2 ? 1 : d === 3 ? -1 : 0);
+          if (!inBounds(nx, ny)) continue;
+          const j = idx(nx, ny);
+          if (visited[j] || biome[j] !== b) continue;
+          visited[j] = 1;
+          stack[sp++] = j;
+        }
+      }
+      if (count >= MIN_REGION && regions.length < 64) {
+        const id = regions.length;
+        regions.push({ id, name: regionName(rng, b), biome: b, size: count, cx: sumX / count, cy: sumY / count });
+        for (const c of cells) regionId[c] = id;
+      }
+    }
+    return regions;
+  }
+
+  function placeHazards(world, rng) {
+    const { biome, hazard, temp } = world;
+    const wanted = 34;
+    for (let placed = 0; placed < wanted; ) {
+      const x = Math.floor(rng() * SIZE), y = Math.floor(rng() * SIZE);
+      const i = idx(x, y);
+      const b = biome[i];
+      let kind = HAZARD.NONE;
+      if (b === BIOME.ROCK || b === BIOME.MOUNTAIN) kind = HAZARD.THERMAL_VENT;
+      else if (b === BIOME.MARSH || b === BIOME.JUNGLE) kind = HAZARD.TOXIC_BOG;
+      else if (b === BIOME.ICE || b === BIOME.TUNDRA) kind = HAZARD.HARD_FROST;
+      if (kind === HAZARD.NONE) continue;
+
+      const radius = 2 + Math.floor(rng() * 3);
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (dx * dx + dy * dy > radius * radius) continue;
+          const nx = x + dx, ny = y + dy;
+          if (!inBounds(nx, ny)) continue;
+          hazard[idx(nx, ny)] = kind;
+        }
+      }
+      world.hazards.push({ x: x + 0.5, y: y + 0.5, kind, radius, name: HAZARD_INFO[kind].name });
+      placed++;
+    }
+  }
+
+  /* Dense biomass deposits: the thing colonies actually compete over. Placed
+   * only on productive land so contested ground is also ground worth living
+   * on, rather than an arbitrary objective marker in a wasteland. */
+  function placeDeposits(world, rng) {
+    const wanted = 20;
+    for (let placed = 0; placed < wanted; ) {
+      const x = Math.floor(rng() * SIZE), y = Math.floor(rng() * SIZE);
+      const i = idx(x, y);
+      const b = world.biome[i];
+      if (b !== BIOME.FOREST && b !== BIOME.JUNGLE && b !== BIOME.GRASSLAND && b !== BIOME.MARSH && b !== BIOME.SAVANNA) continue;
+      if (world.hazard[i] !== HAZARD.NONE) continue;
+      world.deposits.push({
+        id: 'dep_' + placed,
+        x: x + 0.5, y: y + 0.5,
+        richness: 60 + rng() * 140,
+        remaining: 60 + rng() * 140,
+        claimedBy: null
+      });
+      placed++;
+    }
+  }
+
+  /* Somewhere a colony can actually live: productive, temperate, near water,
+   * and away from every site already taken. Used for the player's Core and
+   * for every rival. */
+  function findColonySite(world, rng, avoid) {
+    let best = null, bestScore = -Infinity;
+    for (let tries = 0; tries < 900; tries++) {
+      const x = K.rndInt(rng, 12, SIZE - 12);
+      const y = K.rndInt(rng, 12, SIZE - 12);
+      const i = idx(x, y);
+      const b = world.biome[i];
+      if (b !== BIOME.GRASSLAND && b !== BIOME.FOREST && b !== BIOME.SAVANNA && b !== BIOME.JUNGLE && b !== BIOME.MARSH) continue;
+      if (world.hazard[i] !== HAZARD.NONE) continue;
+
+      const t = world.temp[i];
+      let score = -Math.abs(t - 18) * 0.6 + world.foodCap[i] * 0.06;
+
+      let nearWater = false;
+      for (let dy = -4; dy <= 4 && !nearWater; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (inBounds(nx, ny) && isWaterBiome(world.biome[idx(nx, ny)])) { nearWater = true; break; }
+        }
+      }
+      if (!nearWater) continue;      // a colony without water is not a colony
+      score += 6;
+
+      let tooClose = false;
+      for (const a of avoid) {
+        const d = K.dist(x, y, a.x, a.y);
+        if (d < 55) { tooClose = true; break; }
+        score += Math.min(12, d * 0.04);
+      }
+      if (tooClose) continue;
+
       if (score > bestScore) { bestScore = score; best = { x: x + 0.5, y: y + 0.5 }; }
     }
+    // Relax the spacing rule rather than fail outright on a cramped map.
+    if (!best && avoid.length) return findColonySite(world, rng, avoid.slice(0, -1));
     return best || { x: SIZE / 2, y: SIZE / 2 };
   }
 
+  // --- lookups --------------------------------------------------------------
   function biomeAt(world, x, y) {
     const xi = Math.floor(x), yi = Math.floor(y);
-    if (!inBounds(xi, yi)) return BIOME.ROCK;
+    if (!inBounds(xi, yi)) return BIOME.DEEP_WATER;
     return world.biome[idx(xi, yi)];
   }
+  function biomeInfoAt(world, x, y) { return BIOME_INFO[biomeAt(world, x, y)]; }
+  function isWaterAt(world, x, y) { return isWaterBiome(biomeAt(world, x, y)); }
+  function moveCostAt(world, x, y) { return BIOME_INFO[biomeAt(world, x, y)].moveCost; }
+
+  function hazardAt(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return HAZARD.NONE;
+    return world.hazard[idx(xi, yi)];
+  }
+
+  /* Effective temperature, including the local hazard's contribution and the
+   * shelter a dense biome gives against it. */
   function tempAt(world, x, y) {
     const xi = K.clamp(Math.floor(x), 0, SIZE - 1), yi = K.clamp(Math.floor(y), 0, SIZE - 1);
-    return world.temp[idx(xi, yi)];
+    const i = idx(xi, yi);
+    let t = world.temp[i] + (world.climateOffset || 0);
+    const hz = world.hazard[i];
+    if (hz) t += HAZARD_INFO[hz].tempDelta;
+    const shelter = BIOME_INFO[world.biome[i]].shelter;
+    // Shelter pulls the local reading back toward the comfortable middle.
+    if (shelter > 0) t = K.lerp(t, 19, shelter * 0.45);
+    return t;
   }
+
   function moistureAt(world, x, y) {
     const xi = Math.floor(x), yi = Math.floor(y);
     if (!inBounds(xi, yi)) return 0;
@@ -834,6 +1304,12 @@ body{
     if (!inBounds(xi, yi)) return 0;
     return world.food[idx(xi, yi)];
   }
+  function regionAt(world, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    if (!inBounds(xi, yi)) return world.regions[0];
+    return world.regions[world.regionId[idx(xi, yi)]] || world.regions[0];
+  }
+
   function consumeFood(world, x, y, amount) {
     const xi = Math.floor(x), yi = Math.floor(y);
     if (!inBounds(xi, yi)) return 0;
@@ -843,26 +1319,37 @@ body{
     return taken;
   }
 
-  /* Regrowth runs on a rolling cursor instead of a full 65k-cell sweep every
-   * call, so cost per call is bounded regardless of world size. */
+  /* Regrowth runs on a rolling cursor rather than a full 65k sweep, so cost
+   * per call is bounded. Rate is scaled by the current climate so a drought
+   * genuinely starves the map. */
   function tickFood(world, batchSize) {
     const n = world.food.length;
+    const growth = world.growthScale == null ? 1 : world.growthScale;
     let c = world.foodCursor;
     for (let k = 0; k < batchSize; k++) {
       const i = c;
-      if (world.foodCap[i] > 0) {
-        const cap = world.foodCap[i];
-        world.food[i] += (cap - world.food[i]) * 0.02;
+      const cap = world.foodCap[i];
+      if (cap > 0) {
+        const rate = CM.flora.regrowthRate(world.flora[i]) * growth;
+        world.food[i] += (cap - world.food[i]) * rate;
         if (world.food[i] < 0.01) world.food[i] = 0;
+        else if (world.food[i] > cap) world.food[i] = cap;
       }
       c = (c + 1) % n;
     }
     world.foodCursor = c;
   }
 
-  function findNearestFood(world, x, y, radius, minAmount) {
+  /* avoidDefended: skip toxic/thorned species. Animals do not graze poison
+   * when there is anything else going, and without this a colony that spawns
+   * in a bitterleaf forest quietly poisons itself to death while its hunger
+   * and thirst read perfectly normal — which is indistinguishable, from the
+   * outside, from a bug. Desperation overrides it (see the caller), so the
+   * defended plants still matter; they are just no longer a silent trap. */
+  function findNearestFood(world, x, y, radius, minAmount, avoidDefended) {
     const xi = Math.floor(x), yi = Math.floor(y);
     let best = null, bestD = Infinity;
+    let fallback = null, fallbackD = Infinity;
     const r = Math.ceil(radius);
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
@@ -871,43 +1358,108 @@ body{
         const d2 = dx * dx + dy * dy;
         if (d2 > radius * radius) continue;
         const i = idx(nx, ny);
-        if (world.food[i] >= minAmount) {
-          if (d2 < bestD) { bestD = d2; best = { x: nx + 0.5, y: ny + 0.5, amount: world.food[i] }; }
+        if (world.food[i] < minAmount) continue;
+        const defended = avoidDefended && CM.flora.isDefended(world.flora[i]);
+        if (defended) {
+          if (d2 < fallbackD) { fallbackD = d2; fallback = { x: nx + 0.5, y: ny + 0.5, amount: world.food[i], flora: world.flora[i] }; }
+          continue;
         }
+        if (d2 < bestD) { bestD = d2; best = { x: nx + 0.5, y: ny + 0.5, amount: world.food[i], flora: world.flora[i] }; }
       }
     }
-    return best;
+    // Nothing safe within reach: a defended plant beats starving.
+    return best || fallback;
   }
 
-  /* Nearest drinkable cell. Organisms drink from the shore rather than
-   * swimming, so this returns the water cell itself and the caller treats
-   * "adjacent" as close enough (see DRINK_DIST in simulation.js). */
+  /* Nearest-water is a multi-source BFS computed once at generation, storing
+   * the index of the closest water cell for every cell on the map.
+   *
+   * It was previously a live radial scan, and because the thirst search
+   * widens with desperation it reached a 77x77 sweep per thirsty organism per
+   * decision — 46% of total simulation time, measured. Water is static
+   * terrain, so paying for it once at load turns the query into a lookup. */
+  /* 8SSEDT (Danielsson): two sweeps propagating the *vector* to the nearest
+   * water cell, comparing true squared distance at every step.
+   *
+   * A plain 8-connected BFS was tried first and is wrong in a way that
+   * matters: it spreads by hop count, i.e. Chebyshev distance, so a cell
+   * whose real nearest water lies along a diagonal gets pointed at a
+   * different source entirely. Measured against brute force it overshot by
+   * up to 10 cells on a 34-cell true distance — a 30% error, paid by exactly
+   * the organism least able to afford it, the one already dying of thirst.
+   * This version's error against brute force is zero on the same sample. */
+  function buildWaterField(world) {
+    const n = SIZE * SIZE;
+    const FAR = 30000;
+    const dx = new Int16Array(n).fill(FAR);
+    const dy = new Int16Array(n).fill(FAR);
+
+    for (let i = 0; i < n; i++) {
+      if (isWaterBiome(world.biome[i])) { dx[i] = 0; dy[i] = 0; }
+    }
+
+    const d2 = i => {
+      const a = dx[i], b = dy[i];
+      return a >= FAR || b >= FAR ? Infinity : a * a + b * b;
+    };
+    function relax(i, j, sx, sy) {
+      if (dx[j] >= FAR) return;
+      const nx = dx[j] + sx, ny = dy[j] + sy;
+      if (nx * nx + ny * ny < d2(i)) { dx[i] = nx; dy[i] = ny; }
+    }
+
+    // forward sweep: from the top-left
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const i = idx(x, y);
+        if (y > 0) relax(i, i - SIZE, 0, 1);
+        if (x > 0) relax(i, i - 1, 1, 0);
+        if (x > 0 && y > 0) relax(i, i - SIZE - 1, 1, 1);
+        if (x < SIZE - 1 && y > 0) relax(i, i - SIZE + 1, -1, 1);
+      }
+      for (let x = SIZE - 2; x >= 0; x--) relax(idx(x, y), idx(x + 1, y), -1, 0);
+    }
+    // backward sweep: from the bottom-right
+    for (let y = SIZE - 1; y >= 0; y--) {
+      for (let x = SIZE - 1; x >= 0; x--) {
+        const i = idx(x, y);
+        if (y < SIZE - 1) relax(i, i + SIZE, 0, -1);
+        if (x < SIZE - 1) relax(i, i + 1, -1, 0);
+        if (x < SIZE - 1 && y < SIZE - 1) relax(i, i + SIZE + 1, -1, -1);
+        if (x > 0 && y < SIZE - 1) relax(i, i + SIZE - 1, 1, -1);
+      }
+      for (let x = 1; x < SIZE; x++) relax(idx(x, y), idx(x - 1, y), 1, 0);
+    }
+
+    // Collapse the vectors into the source cell index each one points at.
+    const nearest = new Int32Array(n).fill(-1);
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const i = idx(x, y);
+        if (dx[i] >= FAR) continue;
+        const sx = x - dx[i], sy = y - dy[i];
+        if (sx >= 0 && sy >= 0 && sx < SIZE && sy < SIZE) nearest[i] = idx(sx, sy);
+      }
+    }
+    world.nearestWater = nearest;
+  }
+
   function findNearestWater(world, x, y, radius) {
-    const xi = Math.floor(x), yi = Math.floor(y);
-    let best = null, bestD = Infinity;
-    const r = Math.ceil(radius);
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        const nx = xi + dx, ny = yi + dy;
-        if (!inBounds(nx, ny)) continue;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > radius * radius || d2 >= bestD) continue;
-        if (world.biome[idx(nx, ny)] === BIOME.WATER) {
-          bestD = d2; best = { x: nx + 0.5, y: ny + 0.5 };
-        }
-      }
-    }
-    return best;
+    const xi = K.clamp(Math.floor(x), 0, SIZE - 1), yi = K.clamp(Math.floor(y), 0, SIZE - 1);
+    const field = world.nearestWater;
+    if (!field) return null;
+    const src = field[idx(xi, yi)];
+    if (src < 0) return null;                       // a map with no water at all
+    const wx = (src % SIZE) + 0.5, wy = ((src / SIZE) | 0) + 0.5;
+    return K.dist(x, y, wx, wy) <= radius ? { x: wx, y: wy } : null;
   }
 
-  /* Is this position at or beside open water — i.e. can something standing
-   * here drink without entering the lake? */
   function atWaterEdge(world, x, y) {
     const xi = Math.floor(x), yi = Math.floor(y);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const nx = xi + dx, ny = yi + dy;
-        if (inBounds(nx, ny) && world.biome[idx(nx, ny)] === BIOME.WATER) return true;
+        if (inBounds(nx, ny) && isWaterBiome(world.biome[idx(nx, ny)])) return true;
       }
     }
     return false;
@@ -919,9 +1471,7 @@ body{
     const buckets = new Map();
     const key = (cx, cy) => cx * 100000 + cy;
 
-    function bucketOf(x, y) {
-      return [Math.floor(x / cellSize), Math.floor(y / cellSize)];
-    }
+    function bucketOf(x, y) { return [Math.floor(x / cellSize), Math.floor(y / cellSize)]; }
     function insert(entity) {
       const [cx, cy] = bucketOf(entity.x, entity.y);
       entity.__gx = cx; entity.__gy = cy;
@@ -950,9 +1500,7 @@ body{
         for (let gx = cx - r; gx <= cx + r; gx++) {
           const b = buckets.get(key(gx, gy));
           if (!b) continue;
-          for (const e of b) {
-            if (K.dist2(e.x, e.y, x, y) <= r2) out.push(e);
-          }
+          for (const e of b) if (K.dist2(e.x, e.y, x, y) <= r2) out.push(e);
         }
       }
       return out;
@@ -975,9 +1523,11 @@ body{
   }
 
   CM.world = {
-    SIZE, BIOME, BIOME_NAMES, idx, inBounds,
-    generate, biomeAt, tempAt, moistureAt, foodAt, consumeFood, tickFood, findNearestFood,
-    findNearestWater, atWaterEdge, makeSpatialGrid
+    SIZE, BIOME, BIOME_INFO, BIOME_NAMES, HAZARD, HAZARD_INFO, idx, inBounds,
+    generate, classify, findColonySite,
+    biomeAt, biomeInfoAt, isWaterBiome, isWaterAt, moveCostAt, hazardAt,
+    tempAt, moistureAt, foodAt, regionAt, consumeFood, tickFood,
+    findNearestFood, findNearestWater, atWaterEdge, makeSpatialGrid
   };
 })(window.CM = window.CM || {});
 
@@ -1163,8 +1713,16 @@ body{
 
     u.REST = Math.max(0, (1 - energyFrac) * 0.75 + (1 - healthFrac) * 0.25 - (ctx.nearestThreat ? 0.6 : 0));
     u.RETURN_TO_CORE = org.carrying > 0 ? 0.85 + Math.min(0.4, org.carrying / 40) : 0;
+    /* Reproduction pressure scales with how far below its ceiling the colony
+     * is. A colony of three is under real pressure to breed; one at its cap
+     * has none. Without this, a standing directive simply outranked breeding
+     * forever — an EXPLORE colony never replaced its losses and dwindled to
+     * extinction, which is the last thing the *default* directive should do.
+     * The simulation still enforces a hard ceiling on top of this; the drive
+     * fading out first is what stops the colony from pressing against it. */
+    const room = ctx.colonyRoom != null ? ctx.colonyRoom : 0.5;
     u.REPRODUCE = (energyFrac > 0.72 && healthFrac > 0.7 && (org.reproCooldown || 0) <= 0)
-      ? org.stats.reproduction_rate * 1.8 : 0;
+      ? org.stats.reproduction_rate * 1.8 * (0.35 + room * 2.6) : 0;
     u.INVESTIGATE = ctx.nearestCuriosity ? 0.4 : 0;
 
     // A fight in progress is not re-litigated every re-decision — without
@@ -1177,6 +1735,27 @@ body{
     }
 
     applyDirectiveBias(org.directive, u);
+
+    /* Standing orders yield to physiology, progressively.
+     *
+     * The directive multipliers above are large by design, and EXPLORE's 2.2x
+     * put it above SEEK_FOOD until hunger passed ~70% — so an exploring
+     * organism sightsaw its way across the map on an empty stomach, arrived
+     * somewhere far from food and water already weak, and died there. Measured
+     * over three seeds: EXPLORE went extinct in two of them within ten minutes
+     * while GATHER and DEFEND both reached the population cap. Since EXPLORE
+     * is also the *default* directive, a player who opened the game and simply
+     * watched lost their colony.
+     *
+     * The critical-needs override further down is a cliff at 92%; this is the
+     * ramp that should have been there under it. Discretionary activity —
+     * wandering, investigating, breeding — fades as need rises, so an organism
+     * drifts back to feeding on its own long before it is desperate. */
+    const needPressure = Math.max(hungerFrac, thirstFrac);
+    const discretionary = 1 - needPressure * 0.85;
+    u.EXPLORE *= discretionary;
+    u.INVESTIGATE *= discretionary;
+    u.REPRODUCE *= discretionary;
 
     // A guarding organism holds position near the Core and only leaves the
     // utility loop to fight something that gets close, or to flee if truly
@@ -1437,6 +2016,666 @@ body{
 
 </script>
 <script>
+/* Coremind — climate. A season cycle plus occasional weather events shift
+ * the whole map's temperature and plant growth over a session.
+ *
+ * This exists so that a design that was correct an hour ago can stop being
+ * correct: a cold snap punishes a colony bred entirely for heat, a drought
+ * turns a comfortable grassland into a contested one. It is the engine's
+ * main source of "a new ecological problem emerges" without scripting one.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+
+  const SEASON_LENGTH = 260;                   // sim-seconds per season
+  const SEASONS = ['Thaw', 'High Sun', 'Fade', 'Deep Cold'];
+  const SEASON_TEMP = [2, 9, 0, -9];           // degrees added to the whole map
+  const SEASON_GROWTH = [1.15, 1.0, 0.85, 0.55];
+
+  const EVENTS = {
+    DROUGHT:   { key: 'DROUGHT',   name: 'Drought',    temp: 5,   growth: 0.25, minDur: 90, maxDur: 200,
+                 icon: '\u{1F525}', message: 'A drought has set in — plant growth is collapsing.' },
+    RAINS:     { key: 'RAINS',     name: 'Rains',      temp: -2,  growth: 1.9,  minDur: 70, maxDur: 150,
+                 icon: '\u{1F327}', message: 'Heavy rains — the land is growing back fast.' },
+    COLD_SNAP: { key: 'COLD_SNAP', name: 'Cold Snap',  temp: -14, growth: 0.6,  minDur: 60, maxDur: 130,
+                 icon: '\u{2744}',  message: 'A cold snap is sweeping the region.' },
+    HEATWAVE:  { key: 'HEATWAVE',  name: 'Heatwave',   temp: 13,  growth: 0.7,  minDur: 60, maxDur: 130,
+                 icon: '\u{1F321}', message: 'A heatwave is pushing temperatures past what most life tolerates.' }
+  };
+  const EVENT_KEYS = Object.keys(EVENTS);
+
+  function newState(seed) {
+    return {
+      rngSeed: (seed ^ 0x7f4a7c15) >>> 0,
+      seasonIndex: 0,
+      seasonTimer: 0,
+      event: null,          // {key, remaining}
+      nextEventIn: 120 + Math.random() * 180
+    };
+  }
+
+  function seasonName(state) { return SEASONS[state.seasonIndex]; }
+
+  /* The two numbers the rest of the simulation actually reads:
+   *   world.climateOffset — degrees added to every temperature lookup
+   *   world.growthScale   — multiplier on plant regrowth
+   * Keeping it to exactly two channels is deliberate: every system that
+   * cares about weather already cares about temperature or food, and a
+   * third channel would mean auditing all of them again. */
+  function apply(game) {
+    const c = game.climate;
+    const season = c.seasonIndex;
+    let temp = SEASON_TEMP[season];
+    let growth = SEASON_GROWTH[season];
+    if (c.event) {
+      const info = EVENTS[c.event.key];
+      temp += info.temp;
+      growth *= info.growth;
+    }
+    game.world.climateOffset = temp;
+    game.world.growthScale = growth;
+  }
+
+  function tick(game, bus, dt) {
+    const c = game.climate;
+    if (!c) return;
+
+    c.seasonTimer += dt;
+    if (c.seasonTimer >= SEASON_LENGTH) {
+      c.seasonTimer -= SEASON_LENGTH;
+      c.seasonIndex = (c.seasonIndex + 1) % SEASONS.length;
+      CM.discovery.pushEvent(game, bus, {
+        kind: 'climate', icon: '\u{1F5D3}',
+        message: `The season turns: ${SEASONS[c.seasonIndex]}.`
+      });
+    }
+
+    if (c.event) {
+      c.event.remaining -= dt;
+      if (c.event.remaining <= 0) {
+        const ended = EVENTS[c.event.key];
+        c.event = null;
+        c.nextEventIn = 200 + Math.random() * 320;
+        CM.discovery.pushEvent(game, bus, {
+          kind: 'climate', icon: '\u{1F324}',
+          message: `The ${ended.name.toLowerCase()} has broken.`
+        });
+      }
+    } else {
+      c.nextEventIn -= dt;
+      if (c.nextEventIn <= 0) {
+        // Weight the roll by season, so a drought in Deep Cold is unlikely
+        // and a cold snap in High Sun is a genuine surprise rather than noise.
+        const key = rollEvent(c.seasonIndex);
+        const info = EVENTS[key];
+        c.event = { key, remaining: info.minDur + Math.random() * (info.maxDur - info.minDur) };
+        CM.discovery.pushEvent(game, bus, {
+          kind: 'warn', icon: info.icon, message: info.message
+        });
+      }
+    }
+
+    apply(game);
+  }
+
+  function rollEvent(seasonIndex) {
+    const weights = {
+      DROUGHT:   [0.8, 1.8, 0.9, 0.15],
+      RAINS:     [1.5, 0.9, 1.4, 0.5],
+      COLD_SNAP: [0.9, 0.2, 1.0, 1.9],
+      HEATWAVE:  [0.5, 1.9, 0.6, 0.1]
+    };
+    let total = 0;
+    for (const k of EVENT_KEYS) total += weights[k][seasonIndex];
+    let roll = Math.random() * total;
+    for (const k of EVENT_KEYS) {
+      roll -= weights[k][seasonIndex];
+      if (roll <= 0) return k;
+    }
+    return EVENT_KEYS[0];
+  }
+
+  function describe(game) {
+    const c = game.climate;
+    if (!c) return '';
+    const season = SEASONS[c.seasonIndex];
+    if (!c.event) return season;
+    return `${season} · ${EVENTS[c.event.key].name}`;
+  }
+
+  CM.climate = { SEASONS, SEASON_LENGTH, EVENTS, newState, seasonName, tick, apply, describe };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
+/* Coremind — colonies. The player is one Coremind among several.
+ *
+ * A rival is not a spawner with a hostile flag: it runs the same loop the
+ * player does. It gathers biomass, accumulates observations of what it has
+ * fought, unlocks traits from those observations, designs an organism against
+ * the pressures it can actually perceive near its own Core, deploys it, and
+ * changes its mind when the design fails. The player's advantage is judgement,
+ * not information.
+ *
+ * `game.colonies[0]` is always the player, and `game.core` aliases it, so the
+ * rest of the simulation can keep treating "the Core" as one object.
+ */
+(function (CM) {
+  'use strict';
+  const K = CM.core;
+  const T = CM.traits;
+  const W = CM.world;
+
+  const PLAYER_ID = 'player';
+  const WILD_ID = 'wild';
+
+  /* Strategy archetypes. These are weights, not scripts — two colonies with
+   * the same strategy on different ground still end up with different
+   * organisms, because the design scorer reads local conditions. */
+  const STRATEGIES = {
+    EXPANSIONIST: {
+      key: 'EXPANSIONIST', label: 'Expansionist',
+      blurb: 'Spreads fast and thin, claiming ground before it can be contested.',
+      deployRate: 0.72, aggression: 0.4, expansion: 1.5, defense: 0.6,
+      favor: { BODY: 1.5, SENSE: 1.2, METABOLISM: 1.3, DEFENSE: 0.6, OFFENSE: 0.8, REPRODUCTION: 1.6 },
+      directiveMix: { EXPLORE: 0.4, GATHER: 0.4, HUNT: 0.1, DEFEND: 0.1 }
+    },
+    ENTRENCHED: {
+      key: 'ENTRENCHED', label: 'Entrenched',
+      blurb: 'Builds heavy, slow organisms and refuses to yield ground near its Core.',
+      deployRate: 0.5, aggression: 0.2, expansion: 0.4, defense: 1.8,
+      favor: { BODY: 0.7, SENSE: 0.9, METABOLISM: 1.1, DEFENSE: 2.0, OFFENSE: 1.1, REPRODUCTION: 0.7 },
+      directiveMix: { EXPLORE: 0.15, GATHER: 0.4, HUNT: 0.05, DEFEND: 0.4 }
+    },
+    PREDATORY: {
+      key: 'PREDATORY', label: 'Predatory',
+      blurb: 'Feeds by killing. Treats neighbours as a food source.',
+      deployRate: 0.62, aggression: 1.6, expansion: 0.9, defense: 0.7,
+      favor: { BODY: 1.2, SENSE: 1.3, METABOLISM: 0.9, DEFENSE: 0.8, OFFENSE: 2.1, REPRODUCTION: 0.8 },
+      directiveMix: { EXPLORE: 0.2, GATHER: 0.2, HUNT: 0.55, DEFEND: 0.05 }
+    },
+    ADAPTIVE: {
+      key: 'ADAPTIVE', label: 'Adaptive',
+      blurb: 'Slow to commit, but rebuilds its organisms around whatever is killing them.',
+      deployRate: 0.55, aggression: 0.7, expansion: 0.9, defense: 1.1,
+      favor: { BODY: 1.1, SENSE: 1.5, METABOLISM: 1.4, DEFENSE: 1.2, OFFENSE: 1.1, REPRODUCTION: 1.0 },
+      directiveMix: { EXPLORE: 0.3, GATHER: 0.35, HUNT: 0.2, DEFEND: 0.15 }
+    }
+  };
+  const STRATEGY_KEYS = Object.keys(STRATEGIES);
+
+  const RIVAL_NAMES = ['Thren', 'Ossuary', 'Kel-Var', 'Sable Choir', 'Meridian', 'Umbral Host', 'Cassiel'];
+  const RIVAL_COLORS = ['#e0714f', '#a26bd6', '#4fa9e0', '#d6b34f', '#5fd67f', '#d64f9e'];
+
+  const DEPLOY_INTERVAL = 11;      // sim-seconds between deploy decisions
+  const REDESIGN_INTERVAL = 46;    // how often a rival reconsiders its genome
+  /* A Core can only hold so much living matter. Without a ceiling, income
+   * scales with population while nothing scales against it, biomass runs to
+   * five figures, and every design cost becomes a rounding error — the
+   * genome designer stops being a decision at all. Capping storage makes
+   * hoarding pointless and spending the obvious move. */
+  const BIOMASS_CAP = 500, ENERGY_CAP = 500;
+  const TERR_CELL = 8;             // world cells per territory cell
+  const TERR_SIZE = 32;            // 32*8 = 256
+
+  function newColony(opts) {
+    return {
+      id: opts.id,
+      name: opts.name,
+      isPlayer: !!opts.isPlayer,
+      x: opts.x, y: opts.y,
+      radius: 7,
+      biomass: opts.biomass != null ? opts.biomass : 60,
+      energy: opts.energy != null ? opts.energy : 55,
+      biomassCap: BIOMASS_CAP,
+      energyCap: ENERGY_CAP,
+      color: opts.color || '#33e6b0',
+      strategyKey: opts.strategyKey || 'ADAPTIVE',
+      alive: true,
+      integrity: 100,                 // Core health; rivals collapse at 0
+      // Rivals run their own discovery ledger — they know what they have met,
+      // not what the player has met.
+      observations: {},
+      discovered: Object.assign({}, opts.discovered || {}),
+      currentDesign: null,            // {BODY, SENSE, ...}
+      designGeneration: 1,
+      deployTimer: Math.random() * DEPLOY_INTERVAL,
+      redesignTimer: Math.random() * REDESIGN_INTERVAL,
+      losses: 0, kills: 0, deployed: 0,
+      lastLossCause: null,            // drives ADAPTIVE redesign
+      pop: 0,
+      standing: {}                    // colonyId -> -1..1 (negative = hostile)
+    };
+  }
+
+  function strategyOf(colony) { return STRATEGIES[colony.strategyKey] || STRATEGIES.ADAPTIVE; }
+
+  /* Place the player plus `rivalCount` rivals, each on its own viable site. */
+  function createAll(game, rivalCount) {
+    const world = game.world;
+    const rng = K.rngFrom(world.seed ^ 0x1b873593);
+    const taken = [{ x: world.coreSpawn.x, y: world.coreSpawn.y }];
+
+    const player = newColony({
+      id: PLAYER_ID, name: 'Coremind', isPlayer: true,
+      x: world.coreSpawn.x, y: world.coreSpawn.y, color: '#33e6b0'
+    });
+    const colonies = [player];
+
+    for (let i = 0; i < rivalCount; i++) {
+      const site = W.findColonySite(world, rng, taken);
+      taken.push(site);
+      const strategyKey = STRATEGY_KEYS[Math.floor(rng() * STRATEGY_KEYS.length)];
+      const rival = newColony({
+        id: 'rival_' + (i + 1),
+        name: RIVAL_NAMES[Math.floor(rng() * RIVAL_NAMES.length)] + ' ' + romanNumeral(i + 1),
+        x: site.x, y: site.y,
+        color: RIVAL_COLORS[i % RIVAL_COLORS.length],
+        strategyKey,
+        biomass: 70, energy: 60,
+        // A rival starts knowing a little, so it is a going concern from the
+        // first minute rather than a colony of blank starter organisms.
+        discovered: seedKnowledge(rng, strategyKey)
+      });
+      rival.awakenAt = RIVAL_WAKE_BASE + i * RIVAL_WAKE_STAGGER;
+      rival.announced = false;
+      rival.currentDesign = chooseDesign(game, rival);
+      colonies.push(rival);
+    }
+
+    game.colonies = colonies;
+    game.coloniesById = {};
+    for (const c of colonies) game.coloniesById[c.id] = c;
+    game.core = player;
+
+    // pairwise standing, mildly hostile by default
+    for (const a of colonies) {
+      for (const b of colonies) {
+        if (a.id !== b.id) a.standing[b.id] = -0.25;
+      }
+    }
+    initTerritory(game);
+    return colonies;
+  }
+
+  function romanNumeral(n) { return ['I', 'II', 'III', 'IV', 'V', 'VI'][n - 1] || String(n); }
+
+  function seedKnowledge(rng, strategyKey) {
+    const base = { basic_legs: true, bite: true };
+    const extras = {
+      EXPANSIONIST: ['vision', 'prolific_broodsac'],
+      ENTRENCHED: ['armor', 'regeneration'],
+      PREDATORY: ['claws', 'fast_movement'],
+      ADAPTIVE: ['chem_sense', 'efficient_metabolism']
+    }[strategyKey] || [];
+    for (const id of extras) base[id] = true;
+    // plus one wildcard, so two colonies of the same strategy still differ
+    const all = T.TRAITS.map(t => t.id);
+    base[all[Math.floor(rng() * all.length)]] = true;
+    return base;
+  }
+
+  // --- rival design ---------------------------------------------------------
+  /* Score every discovered trait against the strategy's preferences and the
+   * conditions the colony can actually observe around its own Core, then take
+   * the best legal trait per slot. This is why a rival on an ice sheet builds
+   * differently from the same strategy on a savanna. */
+  function chooseDesign(game, colony) {
+    const strategy = strategyOf(colony);
+    const world = game.world;
+    const localTemp = W.tempAt(world, colony.x, colony.y);
+    const localWater = W.findNearestWater(world, colony.x, colony.y, 26) ? 1 : 0;
+    const threat = perceivedThreat(game, colony);
+
+    const draft = {};
+    for (const cat of T.CATEGORIES) {
+      let best = null, bestScore = 0;
+      for (const trait of T.TRAITS_BY_CATEGORY[cat]) {
+        if (!colony.discovered[trait.id]) continue;
+        if (T.conflictsWith(Object.values(draft), trait.id)) continue;
+
+        let score = strategy.favor[cat] || 1;
+        const mods = trait.stat_modifiers;
+
+        // environmental fit
+        if (trait.id === 'cold_resistance') score *= localTemp < 8 ? 3.2 : 0.25;
+        if (trait.id === 'heat_resistance') score *= localTemp > 27 ? 3.2 : 0.25;
+        if (trait.id === 'efficient_metabolism') score *= localWater ? 1.1 : 1.9;
+        if (mods.water_requirement) score *= localWater ? 1 : (mods.water_requirement < 0 ? 1.8 : 0.5);
+
+        // pressure fit: something is killing us, build against it
+        if (threat > 0.5 && (cat === 'DEFENSE' || cat === 'OFFENSE')) score *= 1 + threat;
+        if (colony.lastLossCause === 'combat' && cat === 'DEFENSE') score *= 1.6;
+        if (colony.lastLossCause === 'starved' && trait.id === 'efficient_metabolism') score *= 2.2;
+        if (colony.lastLossCause === 'thirst' && mods.water_requirement < 0) score *= 2.4;
+        if (colony.lastLossCause === 'cold' && trait.id === 'cold_resistance') score *= 2.6;
+        if (colony.lastLossCause === 'heat' && trait.id === 'heat_resistance') score *= 2.6;
+
+        // synergy with what is already slotted
+        const withDraft = Object.values(draft).concat([trait.id]);
+        score *= 1 + T.checkCombination(withDraft).synergies.length * 0.35;
+
+        // cheaper traits are more attractive when poor
+        const afford = colony.biomass / Math.max(1, trait.biomass_cost * 4);
+        score *= K.clamp(afford, 0.35, 1.4);
+
+        score *= 0.9 + Math.random() * 0.2;   // keep colonies from converging
+
+        /* Incumbency bonus. The jitter above exists so two colonies don't
+         * converge on identical genomes, but without stickiness it also makes
+         * a colony flip between two near-equal designs every single review —
+         * which reads in the feed as an intelligence that cannot make up its
+         * mind, and churns the announcement channel. A design has to be
+         * clearly better to displace the one already in service. */
+        if (colony.currentDesign && colony.currentDesign[cat] === trait.id) score *= 1.35;
+
+        if (score > bestScore) { bestScore = score; best = trait.id; }
+      }
+      // Leaving a slot empty is a legitimate choice: it is cheaper, and a
+      // colony that fills every slot on principle deploys half as often.
+      if (best && bestScore > 0.75) draft[cat] = best;
+    }
+    for (const cat of T.CATEGORIES) if (!draft[cat]) draft[cat] = null;
+    return draft;
+  }
+
+  function designTraitIds(design) {
+    return design ? T.CATEGORIES.map(c => design[c]).filter(Boolean) : [];
+  }
+
+  /* How dangerous the colony's surroundings look right now, 0..1+. Read from
+   * the same spatial grid everything else uses. */
+  function perceivedThreat(game, colony) {
+    const near = game.world.grid.queryRadius(colony.x, colony.y, 32, []);
+    let hostile = 0;
+    for (const o of near) {
+      if (!o.alive) continue;
+      if (o.ownerId === colony.id) continue;
+      if (o.ownerId === WILD_ID) {
+        const sp = T.WILD_BY_ID[o.speciesId];
+        if (sp && sp.tier === 'predator') hostile += 0.5;
+      } else hostile += 1;
+    }
+    return K.clamp01(hostile / 12) + (colony.losses > 4 ? 0.3 : 0);
+  }
+
+  // --- rival economy + deployment ------------------------------------------
+  function tick(game, bus, dt) {
+    if (!game.colonies) return;
+    for (const colony of game.colonies) {
+      if (colony.isPlayer || !colony.alive) continue;
+      if (!isAwake(colony, game.simTime)) continue;
+      if (!colony.announced) {
+        colony.announced = true;
+        CM.discovery.pushEvent(game, bus, {
+          kind: 'rival', icon: '\u{1F4E1}',
+          message: `Another Coremind has become active: ${colony.name}. Doctrine reads as ${strategyOf(colony).label.toLowerCase()}.`,
+          x: colony.x, y: colony.y, colonyId: colony.id
+        });
+      }
+
+      // Rivals get a modest passive income so they remain a going concern
+      // even when their gatherers are being picked off; the bulk of their
+      // economy still comes from organisms returning to their Core.
+      colony.biomass = Math.min(colony.biomassCap, colony.biomass + 0.55 * dt);
+      colony.energy = Math.min(colony.energyCap, colony.energy + 0.7 * dt);
+
+      colony.redesignTimer -= dt;
+      if (colony.redesignTimer <= 0) {
+        colony.redesignTimer = REDESIGN_INTERVAL * (0.7 + Math.random() * 0.6);
+        const next = chooseDesign(game, colony);
+        const changed = T.CATEGORIES.filter(c => next[c] !== (colony.currentDesign || {})[c]).length;
+        if (changed > 0) {
+          colony.currentDesign = next;
+          colony.designGeneration++;
+          /* Only a substantive revision is worth the player's attention, and
+           * never more than once every couple of minutes per colony. The feed
+           * is the game's narration channel; a rival muttering about a single
+           * swapped slot every 46 seconds drowns out actual news. */
+          const now = game.simTime;
+          if (changed >= 2 && now - (colony.lastAnnouncedAt || -999) > 120) {
+            colony.lastAnnouncedAt = now;
+            announceRedesign(game, bus, colony);
+          }
+        }
+        colony.lastLossCause = null;
+      }
+
+      colony.deployTimer -= dt;
+      if (colony.deployTimer <= 0) {
+        colony.deployTimer = DEPLOY_INTERVAL / Math.max(0.2, strategyOf(colony).deployRate);
+        tryDeploy(game, bus, colony);
+      }
+    }
+    updateTerritory(game, dt);
+  }
+
+  function announceRedesign(game, bus, colony) {
+    const ids = designTraitIds(colony.currentDesign);
+    const names = ids.map(id => T.TRAITS_BY_ID[id].name).join(', ') || 'a stripped-down form';
+    CM.discovery.pushEvent(game, bus, {
+      kind: 'rival', icon: '\u{1F9EC}',
+      message: `${colony.name} has redesigned its organisms: ${names}.`,
+      x: colony.x, y: colony.y, colonyId: colony.id
+    });
+  }
+
+  /* Rivals wake up on a stagger and grow into their ceiling rather than
+   * starting at full strength.
+   *
+   * With rivals fully operational from t=0 — five known traits, deploying
+   * immediately, capped at 34 — the player's three trait-less scouts were
+   * simply erased inside the first fifteen minutes, measured. The brief's
+   * opening is meant to be a quiet stretch of exploration, a first death
+   * around minute three, and a discovery around minute five; a rival army at
+   * minute one deletes that entirely. Rivals are the escalation *after* the
+   * player has found their footing, so they arrive on a timer and ramp. */
+  const RIVAL_WAKE_BASE = 240;    // sim-seconds before the first rival deploys
+  const RIVAL_WAKE_STAGGER = 90;  // and each subsequent one waits longer
+  const RIVAL_GROWTH_PERIOD = 150; // how often a rival's ceiling rises
+
+  function isAwake(colony, simTime) {
+    return colony.isPlayer || simTime >= (colony.awakenAt || 0);
+  }
+
+  function populationCap(colony, simTime) {
+    if (colony.isPlayer) return 60;
+    const t = simTime == null ? 1e9 : simTime;
+    if (t < (colony.awakenAt || 0)) return 0;
+    const grown = 6 + Math.floor((t - colony.awakenAt) / RIVAL_GROWTH_PERIOD) * 5;
+    return Math.max(0, Math.min(34, grown));
+  }
+
+  function tryDeploy(game, bus, colony) {
+    if (colony.pop >= populationCap(colony, game.simTime)) return;
+    if (game.organisms.length >= CM.simulation.MAX_ACTIVE) return;
+    if (!colony.currentDesign) colony.currentDesign = chooseDesign(game, colony);
+
+    const traits = designTraitIds(colony.currentDesign);
+    const cost = T.resolveCost(traits);
+    if (colony.biomass < cost.biomass || colony.energy < cost.energy) return;
+    colony.biomass -= cost.biomass;
+    colony.energy -= cost.energy;
+
+    const a = Math.random() * Math.PI * 2, r = 1.5 + Math.random() * 2.5;
+    const org = CM.organism.create({
+      ownerId: colony.id,
+      traits,
+      name: colony.name + '-' + (++colony.deployed),
+      x: K.clamp(colony.x + Math.cos(a) * r, 1, game.world.size - 1),
+      y: K.clamp(colony.y + Math.sin(a) * r, 1, game.world.size - 1),
+      color: colony.color,
+      diet: 'omnivore',
+      directive: rollDirective(colony)
+    });
+    CM.coremind.addOrganism(game, org);
+  }
+
+  function rollDirective(colony) {
+    const mix = strategyOf(colony).directiveMix;
+    let total = 0;
+    for (const k in mix) total += mix[k];
+    let roll = Math.random() * total;
+    for (const k in mix) { roll -= mix[k]; if (roll <= 0) return k; }
+    return 'EXPLORE';
+  }
+
+  /* Rivals learn the way the player does — from what their organisms meet.
+   * Called by the simulation whenever one of their organisms is in a fight. */
+  function creditObservation(game, bus, colony, traitIds, amount) {
+    if (!colony || colony.isPlayer || !colony.alive) return;
+    for (const traitId of traitIds) {
+      if (colony.discovered[traitId]) continue;
+      colony.observations[traitId] = (colony.observations[traitId] || 0) + amount;
+      if (colony.observations[traitId] >= CM.discovery.OBSERVATION_THRESHOLD + 2) {
+        colony.discovered[traitId] = true;
+        colony.redesignTimer = Math.min(colony.redesignTimer, 6); // reconsider soon
+      }
+    }
+  }
+
+  function recordLoss(game, colony, cause) {
+    if (!colony || colony.isPlayer) return;
+    colony.losses++;
+    colony.lastLossCause = cause;
+    // A colony bleeding organisms rethinks sooner than its normal cadence.
+    if (colony.losses % 3 === 0) colony.redesignTimer = Math.min(colony.redesignTimer, 8);
+  }
+
+  // --- territory -------------------------------------------------------------
+  function initTerritory(game) {
+    game.territory = {
+      cell: TERR_CELL, size: TERR_SIZE,
+      owner: new Int8Array(TERR_SIZE * TERR_SIZE).fill(-1),  // colony index, -1 unclaimed
+      strength: new Float32Array(TERR_SIZE * TERR_SIZE),
+      contested: new Uint8Array(TERR_SIZE * TERR_SIZE),
+      timer: 0
+    };
+  }
+
+  /* Recomputed on a slow cadence rather than per tick: it is a coarse 32x32
+   * field and nothing about it needs to be frame-accurate. Influence comes
+   * from Cores (strong, fixed) and from living organisms (weak, mobile), so
+   * territory follows where a colony actually *is*, not where it claims. */
+  function updateTerritory(game, dt) {
+    const terr = game.territory;
+    if (!terr) return;
+    terr.timer -= dt;
+    if (terr.timer > 0) return;
+    terr.timer = 2.5;
+
+    const n = TERR_SIZE * TERR_SIZE;
+    const colonies = game.colonies;
+    const influence = [];
+    for (let c = 0; c < colonies.length; c++) influence.push(new Float32Array(n));
+
+    for (let c = 0; c < colonies.length; c++) {
+      const colony = colonies[c];
+      if (!colony.alive) continue;
+      stamp(influence[c], colony.x, colony.y, 5, 9);
+    }
+    for (const org of game.organisms) {
+      if (!org.alive || org.ownerId === WILD_ID) continue;
+      const ci = colonies.findIndex(c => c.id === org.ownerId);
+      if (ci < 0) continue;
+      stamp(influence[ci], org.x, org.y, 2, 1.1);
+    }
+
+    for (let i = 0; i < n; i++) {
+      let bestC = -1, best = 0, second = 0;
+      for (let c = 0; c < colonies.length; c++) {
+        const v = influence[c][i];
+        if (v > best) { second = best; best = v; bestC = c; }
+        else if (v > second) second = v;
+      }
+      terr.owner[i] = best > 0.8 ? bestC : -1;
+      terr.strength[i] = best;
+      // "Contested" means two colonies have comparable presence here — the
+      // border friction that drives raids without any scripted war.
+      terr.contested[i] = (best > 0.8 && second > best * 0.55) ? 1 : 0;
+    }
+
+    function stamp(field, wx, wy, radius, weight) {
+      const cx = Math.floor(wx / TERR_CELL), cy = Math.floor(wy / TERR_CELL);
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const tx = cx + dx, ty = cy + dy;
+          if (tx < 0 || ty < 0 || tx >= TERR_SIZE || ty >= TERR_SIZE) continue;
+          const d = Math.hypot(dx, dy);
+          if (d > radius) continue;
+          field[ty * TERR_SIZE + tx] += weight * (1 - d / (radius + 1));
+        }
+      }
+    }
+  }
+
+  function territoryOwnerAt(game, x, y) {
+    const terr = game.territory;
+    if (!terr) return null;
+    const tx = Math.floor(x / TERR_CELL), ty = Math.floor(y / TERR_CELL);
+    if (tx < 0 || ty < 0 || tx >= TERR_SIZE || ty >= TERR_SIZE) return null;
+    const owner = terr.owner[ty * TERR_SIZE + tx];
+    return owner >= 0 ? game.colonies[owner] : null;
+  }
+
+  function territoryCounts(game) {
+    const terr = game.territory;
+    const out = {};
+    if (!terr) return out;
+    for (const c of game.colonies) out[c.id] = 0;
+    for (let i = 0; i < terr.owner.length; i++) {
+      const o = terr.owner[i];
+      if (o >= 0 && game.colonies[o]) out[game.colonies[o].id]++;
+    }
+    return out;
+  }
+
+  /* A Core takes damage when hostile organisms stand on it with nothing left
+   * to stop them. A colony whose Core reaches zero collapses: its organisms
+   * are released as wild rather than vanishing, because a population does not
+   * evaporate when its leadership does. */
+  function damageCore(game, bus, colony, amount) {
+    if (!colony.alive) return;
+    colony.integrity -= amount;
+    if (colony.integrity <= 0) collapse(game, bus, colony);
+  }
+
+  function collapse(game, bus, colony) {
+    colony.alive = false;
+    colony.integrity = 0;
+    let released = 0;
+    for (const org of game.organisms) {
+      if (org.ownerId === colony.id) {
+        org.ownerId = WILD_ID;
+        org.speciesId = org.speciesId || 'grazer';
+        org.directive = null;
+        released++;
+      }
+    }
+    CM.discovery.pushEvent(game, bus, {
+      kind: 'rival', icon: '\u{1F480}',
+      message: `${colony.name} has collapsed. ${released} of its organisms are now feral.`,
+      x: colony.x, y: colony.y, colonyId: colony.id
+    });
+  }
+
+  function livingRivals(game) {
+    return game.colonies ? game.colonies.filter(c => !c.isPlayer && c.alive) : [];
+  }
+
+  CM.colony = {
+    PLAYER_ID, WILD_ID, STRATEGIES, STRATEGY_KEYS, TERR_CELL, TERR_SIZE,
+    BIOMASS_CAP, ENERGY_CAP,
+    newColony, createAll, strategyOf, chooseDesign, designTraitIds,
+    tick, tryDeploy, creditObservation, recordLoss, perceivedThreat, isAwake,
+    initTerritory, updateTerritory, territoryOwnerAt, territoryCounts,
+    damageCore, collapse, livingRivals, populationCap
+  };
+})(window.CM = window.CM || {});
+
+</script>
+<script>
 /* Coremind — the player's own entity: the Core (biomass/energy pool),
  * directive issuance, selection, and the organism designer's draft buffer.
  * Also owns the shape of the overall game object every other system reads.
@@ -1447,7 +2686,9 @@ body{
   const T = CM.traits;
   const O = CM.organism;
 
-  function newGame(seed) {
+  const RIVAL_COUNT = 3;
+
+  function newGame(seed, opts) {
     seed = seed >>> 0;
     const world = CM.world.generate(seed);
     const game = {
@@ -1455,16 +2696,25 @@ body{
       world,
       organisms: [],
       byId: {},
-      core: { x: world.coreSpawn.x, y: world.coreSpawn.y, biomass: 60, energy: 55, radius: 7 },
+      // core is assigned by CM.colony.createAll below, which makes the player
+      // colony object itself the Core — one object, so nothing has to keep a
+      // separate Core and colony record in sync.
+      core: null,
+      colonies: [], coloniesById: {},
+      climate: CM.climate.newState(seed),
       discovery: CM.discovery.newDiscoveryState(),
       designs: [],
       selection: null,
       camera: { x: world.coreSpawn.x, y: world.coreSpawn.y, zoom: 18, targetX: world.coreSpawn.x, targetY: world.coreSpawn.y, targetZoom: 18, dragging: false },
-      stats: { playerPop: 0, herbivorePop: 0, predatorPop: 0, plantTotal: 0 },
+      stats: { playerPop: 0, herbivorePop: 0, predatorPop: 0, plantTotal: 0, colonyPop: {} },
       designerDraft: { BODY: null, SENSE: null, METABOLISM: null, DEFENSE: null, OFFENSE: null, REPRODUCTION: null },
-      globalDirective: 'EXPLORE',
+      // GATHER, not EXPLORE: a colony's first job is to feed itself, and the
+      // player chooses to send scouts out as a deliberate, riskier act.
+      globalDirective: 'GATHER',
       nextDesignId: 1
     };
+    CM.colony.createAll(game, (opts && opts.rivalCount != null) ? opts.rivalCount : RIVAL_COUNT);
+    CM.climate.apply(game);
     return game;
   }
 
@@ -1492,8 +2742,8 @@ body{
     return true;
   }
   function deposit(game, biomass, energy) {
-    game.core.biomass += biomass || 0;
-    game.core.energy += energy || 0;
+    game.core.biomass = Math.min(game.core.biomassCap, game.core.biomass + (biomass || 0));
+    game.core.energy = Math.min(game.core.energyCap, game.core.energy + (energy || 0));
   }
 
   // --- selection & directives -------------------------------------------
@@ -1633,13 +2883,14 @@ body{
   const WATER_SPEED_MUL = 0.4;
   const DRINK_DIST = 1.6;
   const BURROW_DURATION = 4.5, BURROW_COOLDOWN = 14;
+  const UPKEEP_BASE = 0.022, UPKEEP_PER_TRAIT = 0.006;   // biomass/sec per organism
 
   // -- population seeding ---------------------------------------------------
   function randomLandSpot(world, minDistFromCore, maxTries) {
     for (let i = 0; i < maxTries; i++) {
       const x = Math.random() * world.size, y = Math.random() * world.size;
       const b = W.biomeAt(world, x, y);
-      if (b === W.BIOME.WATER || b === W.BIOME.ROCK) continue;
+      if (W.isWaterBiome(b) || b === W.BIOME.MOUNTAIN || b === W.BIOME.ICE) continue;
       if (minDistFromCore && K.dist(x, y, world.coreSpawn.x, world.coreSpawn.y) < minDistFromCore) continue;
       return { x, y };
     }
@@ -1681,24 +2932,37 @@ body{
   }
 
   // -- sensing ----------------------------------------------------------------
+  /* Every predicate below is colony-relative rather than player-vs-wild.
+   * "Mine" means the same colony; everything else is either prey, a rival, or
+   * scenery, and the player's colony gets no special case in any of it. */
+  const WILD = 'wild';
+  function isWild(org) { return org.ownerId === WILD; }
+  function sameColony(a, b) { return a.ownerId === b.ownerId && !isWild(a); }
+
   function isPredatorLike(org) {
-    if (org.ownerId === 'wild') return T.WILD_BY_ID[org.speciesId].diet === 'carnivore';
-    return org.ownerId === 'player' && (org.directive === 'HUNT' || org.directive === 'DEFEND');
+    if (isWild(org)) return T.WILD_BY_ID[org.speciesId].diet === 'carnivore';
+    return org.directive === 'HUNT' || org.directive === 'DEFEND';
   }
   function validHuntTarget(hunter, other) {
-    if (other.ownerId === hunter.ownerId && hunter.ownerId === 'player') return false;
-    if (hunter.ownerId === 'wild') {
-      if (other.ownerId === 'player') return true;
-      return other.ownerId === 'wild' && T.WILD_BY_ID[other.speciesId].tier === 'prey';
+    if (sameColony(hunter, other)) return false;          // never eat your own
+    if (isWild(hunter)) {
+      if (!isWild(other)) return true;                    // any colonial organism is meat
+      return T.WILD_BY_ID[other.speciesId].tier === 'prey';
     }
-    // player, directed to HUNT or defending
-    return other.ownerId === 'wild';
+    // A colonial hunter will take wild game or a rival colony's organisms.
+    return true;
   }
   function isThreatTo(org, other) {
-    if (org.ownerId === 'player') return other.ownerId === 'wild' && T.WILD_BY_ID[other.speciesId].diet === 'carnivore';
-    if (org.ownerId === 'wild' && T.WILD_BY_ID[org.speciesId].tier === 'prey') {
-      return (other.ownerId === 'wild' && T.WILD_BY_ID[other.speciesId].diet === 'carnivore')
-        || (other.ownerId === 'player' && (other.directive === 'HUNT'));
+    if (sameColony(org, other)) return false;
+    if (!isWild(org)) {
+      // Wild carnivores are always a threat; a rival's organisms are a threat
+      // when they are postured to fight.
+      if (isWild(other)) return T.WILD_BY_ID[other.speciesId].diet === 'carnivore';
+      return other.directive === 'HUNT' || other.directive === 'DEFEND';
+    }
+    if (T.WILD_BY_ID[org.speciesId].tier === 'prey') {
+      return (isWild(other) && T.WILD_BY_ID[other.speciesId].diet === 'carnivore')
+        || (!isWild(other) && other.directive === 'HUNT');
     }
     return false;
   }
@@ -1732,10 +2996,10 @@ body{
 
       if (d <= threatR && isThreatTo(org, other) && d < bestThreatD) { bestThreatD = d; nearestThreat = { dist: d, entity: other }; }
       if (d <= senseR && validHuntTarget(org, other) && d < bestPreyD) {
-        const canHuntNow = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
+        const canHuntNow = isPredatorLike(org);
         if (canHuntNow) { bestPreyD = d; nearestPrey = { dist: d, entity: other }; }
       }
-      if (d <= senseR && other.ownerId === 'wild' && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
+      if (d <= senseR && isWild(other) && !game.discovery.knownSpecies[other.speciesId]) newSightings.push({ speciesId: other.speciesId, x: other.x, y: other.y });
     }
 
     for (const sample of game.discovery.samples) {
@@ -1744,8 +3008,10 @@ body{
     }
 
     const canEatPlants = org.diet !== 'carnivore';
-    const canHunt = org.ownerId === 'wild' ? isPredatorLike(org) : org.directive === 'HUNT';
-    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, senseR, 4) : null;
+    const canHunt = isPredatorLike(org);
+    // Only a genuinely hungry organism will touch defended forage.
+    const desperate = org.hunger > 78;
+    const nearestFood = canEatPlants ? W.findNearestFood(game.world, org.x, org.y, senseR, 4, !desperate) : null;
     // Water is only looked up when the organism actually cares — this is a
     // grid scan, and running it for every organism every decision would cost
     // far more than the thirst system is worth.
@@ -1755,7 +3021,22 @@ body{
       ? W.findNearestWater(game.world, org.x, org.y, senseR * (1.6 + K.clamp01(org.thirst / 100) * 2.6))
       : null;
 
-    return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt, newSightings, defendRadius: senseR };
+    // How much room this organism's colony has left to grow, 0..1.
+    let colonyRoom = 0.5;
+    if (!isWild(org)) {
+      const colony = colonyOf(game, org);
+      if (colony) {
+        const cap = CM.colony.populationCap(colony, game.simTime);
+        colonyRoom = cap > 0 ? K.clamp01(1 - colony.pop / cap) : 0;
+      }
+    } else {
+      const tier = T.WILD_BY_ID[org.speciesId].tier;
+      const cap = tier === 'predator' ? PRED_TARGET * 2 : PREY_TARGET * 2;
+      const cur = tier === 'predator' ? game.stats.predatorPop : game.stats.herbivorePop;
+      colonyRoom = K.clamp01(1 - cur / cap);
+    }
+
+    return { nearestThreat, nearestPrey, nearestFood, nearestWater, nearestCuriosity, canEatPlants, canHunt, newSightings, colonyRoom, defendRadius: senseR };
   }
 
   // -- movement ---------------------------------------------------------------
@@ -1770,7 +3051,7 @@ body{
     if (d < 1e-4) return 0;
     const desired = Math.atan2(dy, dx);
     org.heading = K.turnToward(org.heading, desired, 5 * dt);
-    const terrain = W.biomeAt(world, org.x, org.y) === W.BIOME.WATER ? WATER_SPEED_MUL : 1;
+    const terrain = W.moveCostAt(world, org.x, org.y);
     const spd = (org.stats.speed / SPEED_DIV) * (mul || 1) * terrain;
     const step = Math.min(d, spd * dt);
     org.x += Math.cos(org.heading) * step;
@@ -1791,7 +3072,7 @@ body{
       const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * radius;
       const x = K.clamp(org.x + Math.cos(a) * r, 1, world.size - 1);
       const y = K.clamp(org.y + Math.sin(a) * r, 1, world.size - 1);
-      if (W.biomeAt(world, x, y) === W.BIOME.WATER) continue;
+      if (W.isWaterAt(world, x, y)) continue;
       if (!thirsty) return { x, y };
       const m = W.moistureAt(world, x, y);
       if (m > bestMoisture) { bestMoisture = m; best = { x, y }; }
@@ -1800,17 +3081,69 @@ body{
   }
 
   // -- combat / death -----------------------------------------------------
-  function resolveDeath(game, bus, victim, killer) {
-    if (victim.ownerId === 'wild') {
-      if (killer && killer.ownerId === 'player') {
+  /* cause: 'combat' | 'starved' | 'thirst' | 'cold' | 'heat' | 'toxin' | null.
+   * Rivals steer their next genome off this, so it is worth being accurate
+   * about *why* something died rather than only that it did. */
+  function resolveDeath(game, bus, victim, killer, cause) {
+    const victimColony = colonyOf(game, victim);
+    const killerColony = killer ? colonyOf(game, killer) : null;
+
+    if (killer && !isWild(killer)) {
+      // The killer's colony always feeds; only the player's colony builds a
+      // sample and a discovery entry, because only the player has a lab.
+      killer.carrying = Math.min(MAX_CARRY, killer.carrying + 9 + victim.stats.size * 0.25);
+      if (killerColony && !killerColony.isPlayer) {
+        killerColony.kills++;
+        CM.colony.creditObservation(game, bus, killerColony, victim.traits, 1);
+      }
+    }
+
+    if (isWild(victim)) {
+      if (killer && killer.ownerId === CM.colony.PLAYER_ID) {
         D.spawnSample(game, game.world, victim.x, victim.y, victim);
         D.recordEncounter(game, bus, killer, victim, 'wild_killed', victim.x, victim.y);
-        killer.carrying = Math.min(MAX_CARRY, killer.carrying + 9 + victim.stats.size * 0.25);
       }
-    } else {
-      if (killer) D.recordEncounter(game, bus, victim, killer, 'player_killed', victim.x, victim.y);
+    } else if (victimColony) {
+      if (victimColony.isPlayer) {
+        if (killer) D.recordEncounter(game, bus, victim, killer, 'player_killed', victim.x, victim.y);
+      } else {
+        CM.colony.recordLoss(game, victimColony, cause || (killer ? 'combat' : null));
+        if (killer) CM.colony.creditObservation(game, bus, victimColony, killer.traits, 1);
+        // A rival organism killed by the player is a sample too — this is how
+        // the player steals a rival's biology instead of only the wildlife's.
+        if (killer && killer.ownerId === CM.colony.PLAYER_ID) {
+          D.spawnSample(game, game.world, victim.x, victim.y, victim);
+          D.recordEncounter(game, bus, killer, victim, 'wild_killed', victim.x, victim.y);
+        }
+      }
     }
     CM.coremind.removeOrganism(game, victim);
+  }
+
+  function colonyOf(game, org) {
+    if (!game.coloniesById || isWild(org)) return null;
+    return game.coloniesById[org.ownerId] || null;
+  }
+
+  /* "Plant produces chemical defense" is one of the brief's own example
+   * observations. Reported once per plant species so a colony grazing a
+   * bitterleaf meadow does not bury the feed. */
+  function noteFloraDefense(game, bus, org, plantId) {
+    if (org.ownerId !== CM.colony.PLAYER_ID) return;
+    game.discovery.knownFlora = game.discovery.knownFlora || {};
+    if (game.discovery.knownFlora[plantId]) return;
+    game.discovery.knownFlora[plantId] = true;
+    const plant = CM.flora.get(plantId);
+    D.pushEvent(game, bus, {
+      kind: 'discovery', icon: '\u{1F33F}',
+      message: `${plant.name} is chemically defended — ${org.name} was injured feeding on it.`,
+      observation: {
+        species: plant.name,
+        damageType: plant.toxicity > 0 ? 'Toxin (ingested)' : 'Physical (thorns)',
+        defense: plant.toxicity > 0 ? 'Chemical deterrent' : 'Structural spines'
+      },
+      x: org.x, y: org.y
+    });
   }
 
   function meleeTick(game, bus, org, dt) {
@@ -1826,8 +3159,8 @@ body{
     target.health -= dmg;
     if (org.behaviors.has('passive_heal')) target.__attackedThisTick = true;
 
-    const retaliates = (target.ownerId === 'wild' && T.WILD_BY_ID[target.speciesId].diet === 'carnivore')
-      || (target.ownerId === 'player' && (target.directive === 'DEFEND' || target.directive === 'HUNT'));
+    const retaliates = (isWild(target) && T.WILD_BY_ID[target.speciesId].diet === 'carnivore')
+      || (!isWild(target) && (target.directive === 'DEFEND' || target.directive === 'HUNT'));
     let retaliationDealt = 0;
     if (retaliates && target.health > 0) {
       const rEffDef = org.stats.defense;
@@ -1836,14 +3169,14 @@ body{
       retaliationDealt = rDmg;
     }
 
-    if (target.health <= 0) { resolveDeath(game, bus, target, org); org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; }
+    if (target.health <= 0) { resolveDeath(game, bus, target, org, 'combat'); org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; }
     // Credit the kill to the target only if it actually fought back. An
     // attacker that was already starving or dehydrated can cross zero during
     // its own attack, and blaming whatever it happened to be biting produced
     // reports like "Grazer killed Scout" — a herbivore that never deals
     // damage. Those reports are the evidence the player designs from, so a
     // false one is worse than none.
-    if (org.health <= 0) resolveDeath(game, bus, org, retaliationDealt > 0 ? target : null);
+    if (org.health <= 0) resolveDeath(game, bus, org, retaliationDealt > 0 ? target : null, retaliationDealt > 0 ? 'combat' : org.deathCause);
   }
 
   // -- per-organism step ------------------------------------------------------
@@ -1852,7 +3185,7 @@ body{
     switch (org.state) {
       case S.EXPLORE: {
         if (!org.actionTarget || K.dist(org.x, org.y, org.actionTarget.x, org.actionTarget.y) < ARRIVE_DIST) {
-          const radius = (org.ownerId === 'player' && org.directive === 'EXPLORE') ? 26 : 10;
+          const radius = (!isWild(org) && org.directive === 'EXPLORE') ? 17 : 10;
           org.actionTarget = pickWanderTarget(org, world, radius);
         }
         moveToward(world, org, org.actionTarget.x, org.actionTarget.y, dt, 0.55);
@@ -1863,11 +3196,21 @@ body{
         if (!tgt) { org.state = S.EXPLORE; break; }
         const d = moveToward(world, org, tgt.x, tgt.y, dt, 0.8);
         if (d < ARRIVE_DIST) {
+          const plantId = world.flora[W.idx(K.clamp(Math.floor(tgt.x), 0, world.size - 1), K.clamp(Math.floor(tgt.y), 0, world.size - 1))];
           const taken = W.consumeFood(world, tgt.x, tgt.y, 16);
-          org.hunger = Math.max(0, org.hunger - taken * 3.2);
-          org.energy = Math.min(org.stats.energyMax, org.energy + taken * 0.6);
-          if (org.ownerId === 'player' && org.directive === 'GATHER') {
-            org.carrying = Math.min(MAX_CARRY, org.carrying + taken * 0.5);
+          const bite = CM.flora.biteOutcome(plantId, org, taken);
+          org.hunger = Math.max(0, org.hunger - bite.food * 3.2);
+          org.energy = Math.min(org.stats.energyMax, org.energy + bite.food * 0.6);
+          if (bite.water) org.thirst = Math.max(0, org.thirst - bite.water);
+          // A defended plant is a real encounter: it costs health, and for the
+          // player it is evidence of a chemical defense worth understanding.
+          if (bite.toxin > 0 || bite.physical > 0) {
+            org.health -= (bite.toxin + bite.physical);
+            if (bite.toxin > 0) org.deathCause = 'toxin';
+            noteFloraDefense(game, bus, org, plantId);
+          }
+          if (!isWild(org) && org.directive === 'GATHER') {
+            org.carrying = Math.min(MAX_CARRY, org.carrying + bite.food * 0.5);
           }
           org.actionTarget = null; org.aiCounter = 0;
         }
@@ -1905,7 +3248,7 @@ body{
         // reason the trait's speed penalty is affordable.
         if (org.behaviors.has('can_burrow_flee') && !org.burrowed && org.burrowCooldown <= 0
             && away && K.dist(org.x, org.y, away.x, away.y) < 7
-            && W.biomeAt(world, org.x, org.y) !== W.BIOME.WATER) {
+            && !W.isWaterAt(world, org.x, org.y)) {
           org.burrowed = true;
           org.burrowTimer = BURROW_DURATION * (0.6 + org.stats.digging / 90);
           break;
@@ -1921,10 +3264,18 @@ body{
         org.health = Math.min(org.stats.health, org.health + org.stats.health * 0.02 * dt);
         break;
       case S.RETURN_TO_CORE: {
-        const d = moveToward(world, org, game.core.x, game.core.y, dt, 1);
-        if (d < game.core.radius) {
+        // An organism returns to *its own* colony's Core. Routing this through
+        // game.core meant every rival's gatherers walked their harvest across
+        // the map and handed it to the player.
+        const home = colonyOf(game, org);
+        if (!home || !home.alive) { org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0; break; }
+        const d = moveToward(world, org, home.x, home.y, dt, 1);
+        if (d < home.radius) {
           if (org.carrying > 0) {
-            CM.coremind.deposit(game, org.carrying, org.carrying * 0.25);
+            // Overflow past the Core's storage is simply lost, which is what
+            // makes "keep gathering" stop being the answer to everything.
+            home.biomass = Math.min(home.biomassCap, home.biomass + org.carrying);
+            home.energy = Math.min(home.energyCap, home.energy + org.carrying * 0.25);
             org.carrying = 0;
           }
           org.aiCounter = 0;
@@ -1961,29 +3312,31 @@ body{
       const tier = T.WILD_BY_ID[org.speciesId].tier;
       if (tier === 'prey' && game.stats.herbivorePop >= PREY_TARGET * 2) return;
       if (tier === 'predator' && game.stats.predatorPop >= PRED_TARGET * 2) return;
-    } else if (game.stats.playerPop >= PLAYER_REPRO_SOFT_CAP) {
-      // Auto-reproduction pauses once the colony is sizeable so it never
-      // crowds out the wildlife or the player's own room to deploy fresh
-      // designs — deliberate CREATE ORGANISM spend is never blocked by this.
-      return;
+    } else {
+      // Auto-reproduction pauses once a colony is at its own ceiling so it
+      // never crowds out the wildlife or the colony's room to deploy fresh
+      // designs — deliberate deployment spend is never blocked by this.
+      const colony = colonyOf(game, org);
+      const cap = colony ? CM.colony.populationCap(colony, game.simTime) : PLAYER_REPRO_SOFT_CAP;
+      if ((colony ? colony.pop : game.stats.playerPop) >= cap) return;
     }
     org.energy -= org.stats.energyMax * 0.42;
     org.health -= org.stats.health * 0.08;
     const jitter = () => (Math.random() - 0.5) * 2.4;
     let traits = org.traits.slice();
-    if (org.ownerId === 'wild' && Math.random() < 0.08) {
+    if (isWild(org) && Math.random() < 0.08) {
       const cat = K.pick(Math.random, T.CATEGORIES);
       const options = T.TRAITS_BY_CATEGORY[cat];
       if (options.length) traits = traits.filter(id => T.TRAITS_BY_ID[id].category !== cat).concat([K.pick(Math.random, options).id]);
     }
     const child = O.create({
       ownerId: org.ownerId, speciesId: org.speciesId, designId: org.designId,
-      name: org.ownerId === 'player' ? org.name : org.name,
+      name: org.name,
       traits, diet: org.diet, color: org.color,
       x: K.clamp(org.x + jitter(), 1, game.world.size - 1),
       y: K.clamp(org.y + jitter(), 1, game.world.size - 1),
       generation: org.generation + 1,
-      directive: org.ownerId === 'player' ? org.directive : null
+      directive: isWild(org) ? null : org.directive
     });
     CM.coremind.addOrganism(game, child);
     return child;
@@ -2017,6 +3370,24 @@ body{
 
     const camX = game.camera.x, camY = game.camera.y;
     let playerPop = 0, herbivorePop = 0, predatorPop = 0, plantTotal = 0;
+    const colonyPop = {};
+    if (game.colonies) for (const c of game.colonies) colonyPop[c.id] = 0;
+
+    const colonyUpkeep = {};
+    if (game.colonies) for (const c of game.colonies) colonyUpkeep[c.id] = 0;
+
+    function countOrganism(org) {
+      if (isWild(org)) {
+        const sp = T.WILD_BY_ID[org.speciesId];
+        if (sp && sp.tier === 'predator') predatorPop++; else herbivorePop++;
+        return;
+      }
+      if (colonyPop[org.ownerId] != null) {
+        colonyPop[org.ownerId]++;
+        colonyUpkeep[org.ownerId] += UPKEEP_BASE + org.traits.length * UPKEEP_PER_TRAIT;
+      }
+      if (org.ownerId === CM.colony.PLAYER_ID) playerPop++;
+    }
 
     // Snapshot the roster before iterating: resolveDeath() splices
     // game.organisms as organisms die (natural causes below, or combat
@@ -2043,11 +3414,7 @@ body{
           org.burrowCooldown = BURROW_COOLDOWN;
           org.state = S.EXPLORE; org.actionTarget = null; org.aiCounter = 0;
         }
-        playerPop += org.ownerId === 'player' ? 1 : 0;
-        if (org.ownerId === 'wild') {
-          const sp = T.WILD_BY_ID[org.speciesId];
-          if (sp && sp.tier === 'predator') predatorPop++; else herbivorePop++;
-        }
+        countOrganism(org);
         continue;
       }
       if (org.burrowCooldown > 0) org.burrowCooldown -= dt;
@@ -2058,16 +3425,29 @@ body{
       org.thirst = K.clamp(org.thirst + metaRate * org.stats.water_requirement * 1.6 * dt, 0, 100);
       const moving = org.state === S.EXPLORE || org.state === S.HUNT || org.state === S.FLEE || org.state === S.SEEK_FOOD || org.state === S.SEEK_WATER || org.state === S.RETURN_TO_CORE;
       org.energy = K.clamp(org.energy - metaRate * (moving ? 0.9 : 0.35) * dt, 0, org.stats.energyMax);
-      if (org.hunger >= 100) org.health -= org.stats.health * 0.03 * dt;
-      if (org.thirst >= 100) org.health -= org.stats.health * 0.035 * dt;
+      if (org.hunger >= 100) { org.health -= org.stats.health * 0.03 * dt; org.deathCause = 'starved'; }
+      if (org.thirst >= 100) { org.health -= org.stats.health * 0.035 * dt; org.deathCause = 'thirst'; }
       if (org.energy <= 0) org.health -= org.stats.health * 0.015 * dt;
 
-      const stress = O.tempStress(org, W.tempAt(game.world, org.x, org.y));
+      const localTemp = W.tempAt(game.world, org.x, org.y);
+      const stress = O.tempStress(org, localTemp);
       if (stress > 1) {
         org.health -= org.stats.health * 0.02 * (stress - 1) * dt;
         // Heat drives thirst: a badly-adapted organism in the wrong climate
         // dies of the heat *and* of the water it costs to cope with it.
         org.thirst = K.clamp(org.thirst + (stress - 1) * 1.2 * dt, 0, 100);
+        org.deathCause = localTemp > O.COMFORT_TEMP ? 'heat' : 'cold';
+      }
+
+      // Hazards: standing in a vent field or a toxic bog hurts continuously.
+      // Armor blunts the physical ones, so terrain is another thing a genome
+      // can be designed against rather than only avoided.
+      const hz = W.hazardAt(game.world, org.x, org.y);
+      if (hz) {
+        const info = W.HAZARD_INFO[hz];
+        const resist = 1 - K.clamp01((org.stats.armor || 0) / 60) * 0.5;
+        org.health -= info.damage * resist * dt;
+        org.deathCause = hz === W.HAZARD.TOXIC_BOG ? 'toxin' : (info.tempDelta > 0 ? 'heat' : 'cold');
       }
 
       if (org.behaviors.has('passive_heal') && org.hunger < 85 && !org.__attackedThisTick) {
@@ -2080,7 +3460,7 @@ body{
       // Resolve a needs death here, before the organism gets to sense, decide
       // or act. Letting a corpse take another swing is both wrong and the
       // source of misattributed kills further down.
-      if (org.health <= 0) { resolveDeath(game, bus, org, null); continue; }
+      if (org.health <= 0) { resolveDeath(game, bus, org, null, org.deathCause); continue; }
 
       // AI re-decision, throttled by LOD
       org.aiCounter = (org.aiCounter || 0) - 1;
@@ -2113,22 +3493,75 @@ body{
       org.y = K.clamp(org.y, 0.1, game.world.size - 0.1);
       game.world.grid.update(org);
 
-      if (org.health <= 0) { resolveDeath(game, bus, org, null); continue; }
+      if (org.health <= 0) { resolveDeath(game, bus, org, null, org.deathCause); continue; }
 
-      if (org.ownerId === 'player') playerPop++;
-      else {
-        const sp = T.WILD_BY_ID[org.speciesId];
-        if (sp && sp.tier === 'predator') predatorPop++; else herbivorePop++;
-      }
+      countOrganism(org);
     }
 
     for (let i = 0; i < game.world.food.length; i += 733) plantTotal += game.world.food[i]; // sampled estimate, cheap
-    game.stats = { playerPop, herbivorePop, predatorPop, plantTotal: Math.round(plantTotal) };
+    game.stats = { playerPop, herbivorePop, predatorPop, plantTotal: Math.round(plantTotal), colonyPop };
+    if (game.colonies) for (const c of game.colonies) { c.pop = colonyPop[c.id] || 0; c.upkeepRate = colonyUpkeep[c.id] || 0; }
 
     // slow passive core regeneration — the Coremind's own baseline metabolism
-    game.core.energy = Math.min(999, game.core.energy + 0.9 * dt);
+    game.core.energy = Math.min(game.core.energyCap, game.core.energy + 0.9 * dt);
 
+    /* Upkeep. Without it a colony's income scales with its population while
+     * nothing scales against it, so biomass runs away into the thousands and
+     * every design cost becomes a rounding error — the genome designer stops
+     * being a decision. Charging per organism, weighted by how elaborate that
+     * organism is, means a big colony of heavy builds is genuinely expensive
+     * to sustain, and expanding is a choice rather than a free action. */
+    for (const colony of (game.colonies || [])) {
+      if (!colony.alive) continue;
+      colony.biomass = Math.max(0, colony.biomass - colony.upkeepRate * dt);
+    }
+
+    CM.climate.tick(game, bus, dt);
+    CM.colony.tick(game, bus, dt);
+    coreSiegeTick(game, bus, dt);
     narrateEcosystem(game, bus, dt);
+  }
+
+  /* A Core under siege. Hostile organisms standing on an enemy Core grind its
+   * integrity down; a Core with defenders present holds. This is the only way
+   * a colony is removed from the game, and it applies to the player's Core on
+   * exactly the same terms as everyone else's. */
+  function coreSiegeTick(game, bus, dt) {
+    if (!game.colonies) return;
+    game.__siegeAcc = (game.__siegeAcc || 0) + dt;
+    if (game.__siegeAcc < 1) return;
+    const step = game.__siegeAcc;
+    game.__siegeAcc = 0;
+
+    for (const colony of game.colonies) {
+      if (!colony.alive) continue;
+      const near = game.world.grid.queryRadius(colony.x, colony.y, colony.radius, []);
+      let attackers = 0, defenders = 0;
+      for (const o of near) {
+        if (!o.alive) continue;
+        if (o.ownerId === colony.id) { defenders++; continue; }
+        if (isWild(o)) continue;                    // wildlife does not besiege
+        if (o.directive === 'HUNT' || o.directive === 'DEFEND') attackers++;
+      }
+      const pressure = attackers - defenders * 0.8;
+      if (pressure > 0) {
+        CM.colony.damageCore(game, bus, colony, pressure * 1.4 * step);
+        if (colony.alive && !colony.__siegeWarned) {
+          colony.__siegeWarned = true;
+          D.pushEvent(game, bus, {
+            kind: colony.isPlayer ? 'warn' : 'rival', icon: '\u{2694}',
+            message: colony.isPlayer
+              ? 'Your Core is under attack.'
+              : `${colony.name}'s Core is under attack.`,
+            x: colony.x, y: colony.y, colonyId: colony.id
+          });
+        }
+      } else {
+        colony.__siegeWarned = false;
+        // A Core that is not being pressed slowly knits itself back together.
+        if (colony.integrity < 100) colony.integrity = Math.min(100, colony.integrity + 0.8 * step);
+      }
+    }
   }
 
   /* The food web has to visibly react on its own, not just in the player's
@@ -2154,6 +3587,19 @@ body{
       eco.predSurge = true;
       D.pushEvent(game, bus, { kind: 'warn', icon: '\u{1F43A}', message: 'Predator population increasing.' });
     } else if (s.predatorPop < eco.prevPred * 1.15) eco.predSurge = false;
+
+    /* The colony's own economy is an ecological signal too. A colony left on
+     * HUNT gathers almost nothing while upkeep keeps running, and without
+     * this the player just finds the CREATE ORGANISM button greyed out with
+     * no idea why. */
+    if (game.core.biomass < 1 && !eco.bankrupt) {
+      eco.bankrupt = true;
+      D.pushEvent(game, bus, {
+        kind: 'warn', icon: '\u{1FA78}',
+        message: 'Core biomass exhausted — upkeep is outrunning what your organisms bring home. Send some to GATHER.',
+        x: game.core.x, y: game.core.y
+      });
+    } else if (game.core.biomass > 25) eco.bankrupt = false;
 
     if (eco.prevHerb > 10 && s.herbivorePop < eco.prevHerb * 0.55 && !eco.herbCrash) {
       eco.herbCrash = true;
@@ -2184,12 +3630,10 @@ body{
   const ZOOM_MIN = 5, ZOOM_MAX = 46;
   const CAM_EASE = 6.5; // per-second convergence rate toward the camera target
 
-  const BIOME_COLOR = {
-    [W.BIOME.WATER]: [26, 61, 92],
-    [W.BIOME.SOIL]: [90, 68, 48],
-    [W.BIOME.ROCK]: [78, 80, 84]
-  };
-
+  /* The terrain is baked once into a 1px-per-cell offscreen canvas and blitted
+   * with a single drawImage per frame at any zoom. Shading is done here, at
+   * bake time, so the per-frame cost stays one blit no matter how much detail
+   * the map gains. */
   function buildTerrainCache(world) {
     const size = world.size;
     const canvas = (typeof OffscreenCanvas !== 'undefined')
@@ -2197,36 +3641,76 @@ body{
       : Object.assign(document.createElement('canvas'), { width: size, height: size });
     const ctx = canvas.getContext('2d');
     const img = ctx.createImageData(size, size);
+    const data = img.data;
+
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const i = y * size + x;
         const p = i * 4;
         const b = world.biome[i];
-        let rgb;
-        if (b === W.BIOME.GRASS) {
-          const lush = K.clamp01(world.food[i] / Math.max(1, world.foodCap[i]));
-          const t = K.clamp01(K.invLerp(-4, 30, world.temp[i]));
-          const g1 = [107, 66, 38], g2 = [63, 138, 58], g3 = [150, 168, 60];
-          const cold = [K.lerp(g1[0], g2[0], lush), K.lerp(g1[1], g2[1], lush), K.lerp(g1[2], g2[2], lush)];
-          const warm = [K.lerp(g1[0], g3[0], lush), K.lerp(g1[1], g3[1], lush), K.lerp(g1[2], g3[2], lush)];
-          rgb = [K.lerp(cold[0], warm[0], t), K.lerp(cold[1], warm[1], t), K.lerp(cold[2], warm[2], t)];
-        } else {
-          rgb = BIOME_COLOR[b] || [50, 50, 50];
+        const info = W.BIOME_INFO[b];
+        let r = info.color[0], g = info.color[1], bl = info.color[2];
+
+        // Vegetated ground darkens and yellows as it is grazed down, so the
+        // food web is legible in the terrain itself rather than only in a
+        // population graph.
+        const cap = world.foodCap[i];
+        if (cap > 0) {
+          const lush = K.clamp01(world.food[i] / cap);
+          const bare = [118, 98, 62];
+          r = K.lerp(bare[0], r, 0.35 + lush * 0.65);
+          g = K.lerp(bare[1], g, 0.35 + lush * 0.65);
+          bl = K.lerp(bare[2], bl, 0.35 + lush * 0.65);
         }
-        img.data[p] = rgb[0] | 0; img.data[p + 1] = rgb[1] | 0; img.data[p + 2] = rgb[2] | 0; img.data[p + 3] = 255;
+
+        // Relief: light from the north-west, using the elevation gradient.
+        // Cheap, and it is what stops a 14-colour map from reading flat.
+        if (!info.water) {
+          const eL = world.elevation[y * size + Math.max(0, x - 1)];
+          const eU = world.elevation[Math.max(0, y - 1) * size + x];
+          const e = world.elevation[i];
+          const slope = ((e - eL) + (e - eU)) * 0.5;
+          const shade = K.clamp(1 + slope * 6.5, 0.72, 1.32);
+          r *= shade; g *= shade; bl *= shade;
+        } else {
+          // Depth shading for water.
+          const depth = K.clamp01((0.305 - world.elevation[i]) / 0.3);
+          r *= 1 - depth * 0.45; g *= 1 - depth * 0.4; bl *= 1 - depth * 0.2;
+        }
+
+        const hz = world.hazard[i];
+        if (hz) {
+          const hc = W.HAZARD_INFO[hz].color;
+          r = K.lerp(r, hc[0], 0.35); g = K.lerp(g, hc[1], 0.35); bl = K.lerp(bl, hc[2], 0.35);
+        }
+
+        data[p] = K.clamp(r, 0, 255) | 0;
+        data[p + 1] = K.clamp(g, 0, 255) | 0;
+        data[p + 2] = K.clamp(bl, 0, 255) | 0;
+        data[p + 3] = 255;
       }
     }
     ctx.putImageData(img, 0, 0);
     return canvas;
   }
 
+  /* Rebaked periodically as well as on world change, because the vegetation
+   * shading above is a snapshot of a field that keeps moving — grazing,
+   * regrowth and drought all change it. Every ~12s of simulation is often
+   * enough to read as alive without paying 65k pixels every frame. */
+  const TERRAIN_REFRESH = 12;
   function ensureCache(game) {
     if (!game.render) game.render = {};
-    if (!game.render.terrainCanvas || game.render.terrainSeed !== game.seed) {
-      game.render.terrainCanvas = buildTerrainCache(game.world);
-      game.render.terrainSeed = game.seed;
+    const r = game.render;
+    if (!r.terrainCanvas || r.terrainSeed !== game.seed) {
+      r.terrainCanvas = buildTerrainCache(game.world);
+      r.terrainSeed = game.seed;
+      r.terrainBakedAt = game.simTime;
+    } else if (game.simTime - r.terrainBakedAt > TERRAIN_REFRESH) {
+      r.terrainCanvas = buildTerrainCache(game.world);
+      r.terrainBakedAt = game.simTime;
     }
-    return game.render.terrainCanvas;
+    return r.terrainCanvas;
   }
 
   function resizeCanvas(canvas) {
@@ -2430,20 +3914,39 @@ body{
       ctx.drawImage(cache, csx0, csy0, csx1 - csx0, csy1 - csy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
     }
 
-    // Core
-    {
-      const p = worldToScreenDpr(game, w, h, zoom, dpr, game.core.x, game.core.y);
-      const r = game.core.radius * zoom;
-      const pulse = 0.85 + Math.sin(game.simTime * 2) * 0.08;
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * pulse);
-      grad.addColorStop(0, 'rgba(51,230,176,.55)');
-      grad.addColorStop(1, 'rgba(51,230,176,0)');
+    // Territory: drawn under everything living, as flat translucent blocks on
+    // the coarse influence grid. Contested cells are hatched brighter, which
+    // is where the player should expect trouble.
+    if (game.territory && game.showTerritory !== false) drawTerritory(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1);
+
+    // Cores — the player's and every rival's, drawn identically apart from
+    // colour, because a rival Core is the same kind of object.
+    for (const colony of (game.colonies || [])) {
+      if (!colony.alive) continue;
+      if (colony.x < sx0 - 12 || colony.x > sx1 + 12 || colony.y < sy0 - 12 || colony.y > sy1 + 12) continue;
+      const p = worldToScreenDpr(game, w, h, zoom, dpr, colony.x, colony.y);
+      const r = colony.radius * zoom;
+      const pulse = 0.85 + Math.sin(game.simTime * 2 + (colony.isPlayer ? 0 : 1.7)) * 0.08;
+      const rgb = hexToRgb(colony.color);
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, Math.max(1, r * pulse));
+      grad.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.5)`);
+      grad.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r * pulse, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#0f2e26';
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(4, r * 0.32), 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#33e6b0'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(4, r * 0.32), 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1, r * pulse), 0, Math.PI * 2); ctx.fill();
+
+      const inner = Math.max(4, r * 0.32);
+      ctx.fillStyle = 'rgba(8,16,20,.9)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, inner, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = colony.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, inner, 0, Math.PI * 2); ctx.stroke();
+
+      // Integrity ring: a Core losing a siege visibly empties out.
+      if (colony.integrity < 100) {
+        ctx.strokeStyle = '#ef5b5b'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, inner + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (colony.integrity / 100));
+        ctx.stroke();
+      }
     }
 
     // samples
@@ -2470,6 +3973,32 @@ body{
 
   function worldToScreenDpr(game, w, h, zoom, dpr, wx, wy) {
     return { x: (wx - game.camera.x) * zoom + w / 2, y: (wy - game.camera.y) * zoom + h / 2 };
+  }
+
+  function drawTerritory(game, ctx, w, h, zoom, dpr, sx0, sy0, sx1, sy1) {
+    const terr = game.territory;
+    const cell = terr.cell;
+    const x0 = Math.max(0, Math.floor(sx0 / cell)), y0 = Math.max(0, Math.floor(sy0 / cell));
+    const x1 = Math.min(terr.size - 1, Math.ceil(sx1 / cell)), y1 = Math.min(terr.size - 1, Math.ceil(sy1 / cell));
+    const px = cell * zoom;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const ti = ty * terr.size + tx;
+        const owner = terr.owner[ti];
+        if (owner < 0) continue;
+        const colony = game.colonies[owner];
+        if (!colony || !colony.alive) continue;
+        const p = worldToScreenDpr(game, w, h, zoom, dpr, tx * cell, ty * cell);
+        const rgb = hexToRgb(colony.color);
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${terr.contested[ti] ? 0.24 : 0.12})`;
+        ctx.fillRect(p.x, p.y, px + 1, px + 1);
+        if (terr.contested[ti]) {
+          ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.5)`;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(p.x + 1, p.y + 1, px - 1, px - 1);
+        }
+      }
+    }
   }
 
   CM.render = {
@@ -2685,6 +4214,7 @@ body{
         document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
         document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
         if (tab === 'analyze') { game.ui.unreadAnalyze = 0; renderFeed(game); updateBadges(game); }
+        if (tab === 'world') renderWorldPanel(game);
       });
     });
   }
@@ -2755,7 +4285,7 @@ body{
   function onEvent(game, evt) {
     game.ui.unreadAnalyze++;
     updateBadges(game);
-    if (evt.kind === 'discovery' || evt.kind === 'death' || evt.kind === 'warn') toast(evt);
+    if (evt.kind === 'discovery' || evt.kind === 'death' || evt.kind === 'warn' || evt.kind === 'rival') toast(evt);
     if (el('panel-analyze').classList.contains('active')) renderFeed(game);
   }
 
@@ -2795,7 +4325,8 @@ body{
     feed.innerHTML = '';
     for (const evt of events.slice(0, 80)) {
       const row = document.createElement('button');
-      row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death' : evt.kind === 'warn' ? ' warn' : '');
+      row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death'
+        : evt.kind === 'warn' ? ' warn' : evt.kind === 'rival' ? ' rival' : evt.kind === 'climate' ? ' climate' : '');
       const mins = Math.floor(evt.time / 60), secs = Math.floor(evt.time % 60);
       const obs = evt.observation
         ? `<div class="obs">Species: <b>${evt.observation.species}</b><br>Damage type: <b>${evt.observation.damageType}</b><br>Observed defense: <b>${evt.observation.defense}</b></div>`
@@ -2810,6 +4341,9 @@ body{
     if (evt.x != null && evt.y != null) CM.render.focusOn(game, evt.x, evt.y, 22);
     if (evt.traitId) { openDesigner(game); return; }
     if (evt.orgId && game.byId[evt.orgId]) { CORE.selectOrganism(game, evt.orgId); renderSelection(game); switchTab('explore'); return; }
+    if (evt.colonyId && game.coloniesById && game.coloniesById[evt.colonyId]) {
+      showInspect(game, 'colony', { colony: game.coloniesById[evt.colonyId] }); return;
+    }
     if (evt.speciesId) showInspect(game, 'species', { speciesId: evt.speciesId });
   }
 
@@ -3021,6 +4555,23 @@ body{
         <div class="kv"><span class="k">Energy</span><span>${Math.floor(game.core.energy)}</span></div>
         <div class="kv"><span class="k">Population</span><span>${game.stats.playerPop}</span></div>
         <p style="color:var(--fg-dim);font-size:12.5px;margin-top:10px">Every organism you deploy is grown from biomass and energy gathered by the colony. Send organisms to GATHER to keep the Core supplied.</p>`;
+    } else if (kind === 'colony') {
+      const colony = data.colony;
+      const strategy = CM.colony.strategyOf(colony);
+      title.textContent = colony.name.toUpperCase();
+      const design = CM.colony.designTraitIds(colony.currentDesign)
+        .map(id => `<span class="trait-chip">${T.TRAITS_BY_ID[id].name}</span>`).join('');
+      body.innerHTML = `
+        <div class="kv"><span class="k">Status</span><span>${colony.alive ? 'Active' : 'Collapsed'}</span></div>
+        <div class="kv"><span class="k">Doctrine</span><span>${strategy.label}</span></div>
+        <div class="kv"><span class="k">Population</span><span>${colony.pop}</span></div>
+        <div class="kv"><span class="k">Core integrity</span><span>${Math.round(colony.integrity)}%</span></div>
+        <div class="kv"><span class="k">Traits known</span><span>${Object.keys(colony.discovered).length}</span></div>
+        <div class="kv"><span class="k">Kills / losses</span><span>${colony.kills} / ${colony.losses}</span></div>
+        <div class="kv"><span class="k">Genome revision</span><span>${colony.designGeneration}</span></div>
+        <p style="color:var(--fg-dim);font-size:12px;margin:10px 0 4px">${strategy.blurb}</p>
+        <div class="research-head" style="margin-top:10px">CURRENT GENOME</div>
+        <div>${design || '<span style="color:var(--fg-dim)">Unknown — no organism of theirs has been observed closely.</span>'}</div>`;
     } else if (kind === 'species') {
       const sp = T.WILD_BY_ID[data.speciesId];
       title.textContent = sp.name.toUpperCase();
@@ -3030,14 +4581,67 @@ body{
     el('inspect-overlay').classList.remove('hidden');
   }
 
-  // -- per-frame refresh (cheap: text only) --------------------------------
-  function render(game) {
-    el('stat-biomass').querySelector('span').textContent = K.fmt(game.core.biomass);
-    el('stat-energy').querySelector('span').textContent = K.fmt(game.core.energy);
-    el('stat-pop').querySelector('span').textContent = game.stats.playerPop + game.stats.herbivorePop + game.stats.predatorPop;
+  // -- world / colony panel -------------------------------------------------
+  /* Refreshed on a slow cadence rather than per frame: it is a wall of text
+   * whose numbers move slowly, and rebuilding it 60 times a second would cost
+   * more than the whole simulation. */
+  function renderWorldPanel(game) {
+    const region = CM.world.regionAt(game.world, game.camera.x, game.camera.y);
+    const biome = CM.world.biomeInfoAt(game.world, game.camera.x, game.camera.y);
+    const temp = CM.world.tempAt(game.world, game.camera.x, game.camera.y);
+    const hazard = CM.world.hazardAt(game.world, game.camera.x, game.camera.y);
+    const hazardInfo = hazard ? CM.world.HAZARD_INFO[hazard] : null;
+
+    el('world-readout').innerHTML =
+      `<div class="kv"><span class="k">Region</span><span>${region && region.id ? region.name : 'Uncharted'}</span></div>
+       <div class="kv"><span class="k">Terrain</span><span>${biome.name}</span></div>
+       <div class="kv"><span class="k">Temperature</span><span>${Math.round(temp)}&deg;C</span></div>
+       <div class="kv"><span class="k">Climate</span><span>${CM.climate.describe(game)}</span></div>
+       ${hazardInfo ? `<div class="kv"><span class="k">Hazard</span><span style="color:var(--danger)">${hazardInfo.name}</span></div>` : ''}`;
+
+    const counts = CM.colony.territoryCounts(game);
+    const roster = el('colony-roster');
+    roster.innerHTML = '<div class="research-head">COREMINDS</div>';
+    for (const colony of game.colonies) {
+      const row = document.createElement('button');
+      row.className = 'colony-row' + (colony.alive ? '' : ' dead');
+      const strategy = CM.colony.strategyOf(colony);
+      const known = Object.keys(colony.discovered).length;
+      row.innerHTML =
+        `<span class="swatch" style="background:${colony.color}"></span>
+         <span class="cbody">
+           <span class="cname">${colony.name}${colony.isPlayer ? ' <em>(you)</em>' : ''}</span>
+           <span class="cmeta">${colony.alive
+             ? `${strategy.label} &middot; pop ${colony.pop} &middot; ${known} traits &middot; ${counts[colony.id] || 0} territory`
+             : 'collapsed'}</span>
+         </span>
+         ${colony.alive && colony.integrity < 100 ? `<span class="cint">${Math.round(colony.integrity)}%</span>` : ''}`;
+      row.addEventListener('click', () => {
+        CM.render.focusOn(game, colony.x, colony.y, 14);
+        showInspect(game, 'colony', { colony });
+      });
+      roster.appendChild(row);
+    }
   }
 
-  CM.ui = { init, render, renderSelection, renderFeed, updateBadges, showInspect, toast, switchTab };
+  // -- per-frame refresh (cheap: text only) --------------------------------
+  function render(game) {
+    el('stat-biomass').querySelector('span').textContent = Math.floor(game.core.biomass) + '/' + game.core.biomassCap;
+    el('stat-energy').querySelector('span').textContent = Math.floor(game.core.energy);
+    el('stat-pop').querySelector('span').textContent = game.stats.playerPop + game.stats.herbivorePop + game.stats.predatorPop;
+    el('stat-climate').querySelector('span').textContent = CM.climate.describe(game);
+
+    // The world panel is text-heavy and slow-moving; refresh it about twice a
+    // second and only while it is actually the visible tab.
+    const ui = game.ui;
+    ui.worldPanelAcc = (ui.worldPanelAcc || 0) + 1;
+    if (ui.worldPanelAcc >= 30 && el('panel-world').classList.contains('active')) {
+      ui.worldPanelAcc = 0;
+      renderWorldPanel(game);
+    }
+  }
+
+  CM.ui = { init, render, renderSelection, renderFeed, renderWorldPanel, updateBadges, showInspect, toast, switchTab };
 })(window.CM = window.CM || {});
 
 </script>
@@ -3051,7 +4655,13 @@ body{
 (function (CM) {
   'use strict';
   const KEY = 'coremind/save/v1';
-  const VERSION = 1;
+  /* v2 adds colonies, climate and flora knowledge. A v1 save has no rivals
+   * recorded, so rather than refuse it we load it and let createAll() seed a
+   * fresh set — the player keeps their discoveries and organisms, and the
+   * world simply acquires neighbours. Losing a campaign to a schema bump is
+   * never worth the tidiness. */
+  const VERSION = 2;
+  const MIN_LOADABLE = 1;
   const MIN_SAVE_INTERVAL_MS = 5000;
   const PERIODIC_MS = 20000;
 
@@ -3064,13 +4674,23 @@ body{
       v: VERSION, savedAt: Date.now(),
       seed: game.seed, simTime: game.simTime, speed: game.speed,
       core: { biomass: game.core.biomass, energy: game.core.energy },
+      climate: game.climate,
+      colonies: game.colonies.map(c => ({
+        id: c.id, name: c.name, isPlayer: c.isPlayer, x: c.x, y: c.y, color: c.color,
+        strategyKey: c.strategyKey, alive: c.alive, integrity: c.integrity,
+        biomass: c.biomass, energy: c.energy,
+        observations: c.observations, discovered: c.discovered,
+        currentDesign: c.currentDesign, designGeneration: c.designGeneration,
+        losses: c.losses, kills: c.kills, deployed: c.deployed, standing: c.standing
+      })),
       camera: { x: game.camera.x, y: game.camera.y, zoom: game.camera.zoom },
       discovery: {
         observations: game.discovery.observations,
         discoveredTraits: game.discovery.discoveredTraits,
         knownSpecies: game.discovery.knownSpecies,
         events: game.discovery.events.slice(0, 150),
-        samples: game.discovery.samples
+        samples: game.discovery.samples,
+        knownFlora: game.discovery.knownFlora || {}
       },
       designs: game.designs,
       nextDesignId: game.nextDesignId,
@@ -3103,7 +4723,7 @@ body{
       const raw = localStorage.getItem(KEY);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (!data || data.v !== VERSION) return null;
+      if (!data || !(data.v >= MIN_LOADABLE && data.v <= VERSION)) return null;
       return data;
     } catch (e) {
       console.warn('[coremind] read failed', e);
@@ -3117,6 +4737,31 @@ body{
     const game = CM.coremind.newGame(data.seed);
     game.simTime = data.simTime || 0;
     game.speed = data.speed || 1;
+
+    if (data.climate) game.climate = data.climate;
+    CM.climate.apply(game);
+
+    /* Colonies are restored onto the objects createAll() just built, rather
+     * than replacing the array: the Core positions come from the seed and are
+     * already correct, and game.core has to keep pointing at the same object
+     * the rest of the game holds a reference to. */
+    if (data.colonies && data.colonies.length) {
+      for (const saved of data.colonies) {
+        const colony = game.coloniesById[saved.id];
+        if (!colony) continue;
+        Object.assign(colony, {
+          name: saved.name, color: saved.color, strategyKey: saved.strategyKey,
+          alive: saved.alive !== false, integrity: saved.integrity != null ? saved.integrity : 100,
+          biomass: saved.biomass, energy: saved.energy,
+          observations: saved.observations || {}, discovered: saved.discovered || {},
+          currentDesign: saved.currentDesign || colony.currentDesign,
+          designGeneration: saved.designGeneration || 1,
+          losses: saved.losses || 0, kills: saved.kills || 0, deployed: saved.deployed || 0,
+          standing: saved.standing || colony.standing
+        });
+        if (saved.x != null) { colony.x = saved.x; colony.y = saved.y; }
+      }
+    }
     game.core.biomass = data.core.biomass;
     game.core.energy = data.core.energy;
     if (data.camera) {
@@ -3129,6 +4774,7 @@ body{
     game.discovery.knownSpecies = disc.knownSpecies || {};
     game.discovery.events = disc.events || [];
     game.discovery.samples = disc.samples || [];
+    game.discovery.knownFlora = disc.knownFlora || {};
     let maxEvtId = 0, maxSampleId = 0;
     for (const e of game.discovery.events) { const n = parseInt(String(e.id).split('_')[1], 10); if (n > maxEvtId) maxEvtId = n; }
     for (const s of game.discovery.samples) { const n = parseInt(String(s.id).split('_')[1], 10); if (n > maxSampleId) maxSampleId = n; }

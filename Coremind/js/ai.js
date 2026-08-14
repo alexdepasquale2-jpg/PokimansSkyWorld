@@ -67,8 +67,16 @@
 
     u.REST = Math.max(0, (1 - energyFrac) * 0.75 + (1 - healthFrac) * 0.25 - (ctx.nearestThreat ? 0.6 : 0));
     u.RETURN_TO_CORE = org.carrying > 0 ? 0.85 + Math.min(0.4, org.carrying / 40) : 0;
+    /* Reproduction pressure scales with how far below its ceiling the colony
+     * is. A colony of three is under real pressure to breed; one at its cap
+     * has none. Without this, a standing directive simply outranked breeding
+     * forever — an EXPLORE colony never replaced its losses and dwindled to
+     * extinction, which is the last thing the *default* directive should do.
+     * The simulation still enforces a hard ceiling on top of this; the drive
+     * fading out first is what stops the colony from pressing against it. */
+    const room = ctx.colonyRoom != null ? ctx.colonyRoom : 0.5;
     u.REPRODUCE = (energyFrac > 0.72 && healthFrac > 0.7 && (org.reproCooldown || 0) <= 0)
-      ? org.stats.reproduction_rate * 1.8 : 0;
+      ? org.stats.reproduction_rate * 1.8 * (0.35 + room * 2.6) : 0;
     u.INVESTIGATE = ctx.nearestCuriosity ? 0.4 : 0;
 
     // A fight in progress is not re-litigated every re-decision — without
@@ -81,6 +89,27 @@
     }
 
     applyDirectiveBias(org.directive, u);
+
+    /* Standing orders yield to physiology, progressively.
+     *
+     * The directive multipliers above are large by design, and EXPLORE's 2.2x
+     * put it above SEEK_FOOD until hunger passed ~70% — so an exploring
+     * organism sightsaw its way across the map on an empty stomach, arrived
+     * somewhere far from food and water already weak, and died there. Measured
+     * over three seeds: EXPLORE went extinct in two of them within ten minutes
+     * while GATHER and DEFEND both reached the population cap. Since EXPLORE
+     * is also the *default* directive, a player who opened the game and simply
+     * watched lost their colony.
+     *
+     * The critical-needs override further down is a cliff at 92%; this is the
+     * ramp that should have been there under it. Discretionary activity —
+     * wandering, investigating, breeding — fades as need rises, so an organism
+     * drifts back to feeding on its own long before it is desperate. */
+    const needPressure = Math.max(hungerFrac, thirstFrac);
+    const discretionary = 1 - needPressure * 0.85;
+    u.EXPLORE *= discretionary;
+    u.INVESTIGATE *= discretionary;
+    u.REPRODUCE *= discretionary;
 
     // A guarding organism holds position near the Core and only leaves the
     // utility loop to fight something that gets close, or to flee if truly

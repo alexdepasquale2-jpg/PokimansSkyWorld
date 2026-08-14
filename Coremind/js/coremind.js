@@ -8,7 +8,9 @@
   const T = CM.traits;
   const O = CM.organism;
 
-  function newGame(seed) {
+  const RIVAL_COUNT = 3;
+
+  function newGame(seed, opts) {
     seed = seed >>> 0;
     const world = CM.world.generate(seed);
     const game = {
@@ -16,16 +18,25 @@
       world,
       organisms: [],
       byId: {},
-      core: { x: world.coreSpawn.x, y: world.coreSpawn.y, biomass: 60, energy: 55, radius: 7 },
+      // core is assigned by CM.colony.createAll below, which makes the player
+      // colony object itself the Core — one object, so nothing has to keep a
+      // separate Core and colony record in sync.
+      core: null,
+      colonies: [], coloniesById: {},
+      climate: CM.climate.newState(seed),
       discovery: CM.discovery.newDiscoveryState(),
       designs: [],
       selection: null,
       camera: { x: world.coreSpawn.x, y: world.coreSpawn.y, zoom: 18, targetX: world.coreSpawn.x, targetY: world.coreSpawn.y, targetZoom: 18, dragging: false },
-      stats: { playerPop: 0, herbivorePop: 0, predatorPop: 0, plantTotal: 0 },
+      stats: { playerPop: 0, herbivorePop: 0, predatorPop: 0, plantTotal: 0, colonyPop: {} },
       designerDraft: { BODY: null, SENSE: null, METABOLISM: null, DEFENSE: null, OFFENSE: null, REPRODUCTION: null },
-      globalDirective: 'EXPLORE',
+      // GATHER, not EXPLORE: a colony's first job is to feed itself, and the
+      // player chooses to send scouts out as a deliberate, riskier act.
+      globalDirective: 'GATHER',
       nextDesignId: 1
     };
+    CM.colony.createAll(game, (opts && opts.rivalCount != null) ? opts.rivalCount : RIVAL_COUNT);
+    CM.climate.apply(game);
     return game;
   }
 
@@ -53,8 +64,8 @@
     return true;
   }
   function deposit(game, biomass, energy) {
-    game.core.biomass += biomass || 0;
-    game.core.energy += energy || 0;
+    game.core.biomass = Math.min(game.core.biomassCap, game.core.biomass + (biomass || 0));
+    game.core.energy = Math.min(game.core.energyCap, game.core.energy + (energy || 0));
   }
 
   // --- selection & directives -------------------------------------------

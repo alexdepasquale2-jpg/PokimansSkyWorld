@@ -64,6 +64,7 @@
         document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
         document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
         if (tab === 'analyze') { game.ui.unreadAnalyze = 0; renderFeed(game); updateBadges(game); }
+        if (tab === 'world') renderWorldPanel(game);
       });
     });
   }
@@ -134,7 +135,7 @@
   function onEvent(game, evt) {
     game.ui.unreadAnalyze++;
     updateBadges(game);
-    if (evt.kind === 'discovery' || evt.kind === 'death' || evt.kind === 'warn') toast(evt);
+    if (evt.kind === 'discovery' || evt.kind === 'death' || evt.kind === 'warn' || evt.kind === 'rival') toast(evt);
     if (el('panel-analyze').classList.contains('active')) renderFeed(game);
   }
 
@@ -174,7 +175,8 @@
     feed.innerHTML = '';
     for (const evt of events.slice(0, 80)) {
       const row = document.createElement('button');
-      row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death' : evt.kind === 'warn' ? ' warn' : '');
+      row.className = 'event-row' + (evt.kind === 'discovery' ? ' discovery' : evt.kind === 'death' ? ' death'
+        : evt.kind === 'warn' ? ' warn' : evt.kind === 'rival' ? ' rival' : evt.kind === 'climate' ? ' climate' : '');
       const mins = Math.floor(evt.time / 60), secs = Math.floor(evt.time % 60);
       const obs = evt.observation
         ? `<div class="obs">Species: <b>${evt.observation.species}</b><br>Damage type: <b>${evt.observation.damageType}</b><br>Observed defense: <b>${evt.observation.defense}</b></div>`
@@ -189,6 +191,9 @@
     if (evt.x != null && evt.y != null) CM.render.focusOn(game, evt.x, evt.y, 22);
     if (evt.traitId) { openDesigner(game); return; }
     if (evt.orgId && game.byId[evt.orgId]) { CORE.selectOrganism(game, evt.orgId); renderSelection(game); switchTab('explore'); return; }
+    if (evt.colonyId && game.coloniesById && game.coloniesById[evt.colonyId]) {
+      showInspect(game, 'colony', { colony: game.coloniesById[evt.colonyId] }); return;
+    }
     if (evt.speciesId) showInspect(game, 'species', { speciesId: evt.speciesId });
   }
 
@@ -400,6 +405,23 @@
         <div class="kv"><span class="k">Energy</span><span>${Math.floor(game.core.energy)}</span></div>
         <div class="kv"><span class="k">Population</span><span>${game.stats.playerPop}</span></div>
         <p style="color:var(--fg-dim);font-size:12.5px;margin-top:10px">Every organism you deploy is grown from biomass and energy gathered by the colony. Send organisms to GATHER to keep the Core supplied.</p>`;
+    } else if (kind === 'colony') {
+      const colony = data.colony;
+      const strategy = CM.colony.strategyOf(colony);
+      title.textContent = colony.name.toUpperCase();
+      const design = CM.colony.designTraitIds(colony.currentDesign)
+        .map(id => `<span class="trait-chip">${T.TRAITS_BY_ID[id].name}</span>`).join('');
+      body.innerHTML = `
+        <div class="kv"><span class="k">Status</span><span>${colony.alive ? 'Active' : 'Collapsed'}</span></div>
+        <div class="kv"><span class="k">Doctrine</span><span>${strategy.label}</span></div>
+        <div class="kv"><span class="k">Population</span><span>${colony.pop}</span></div>
+        <div class="kv"><span class="k">Core integrity</span><span>${Math.round(colony.integrity)}%</span></div>
+        <div class="kv"><span class="k">Traits known</span><span>${Object.keys(colony.discovered).length}</span></div>
+        <div class="kv"><span class="k">Kills / losses</span><span>${colony.kills} / ${colony.losses}</span></div>
+        <div class="kv"><span class="k">Genome revision</span><span>${colony.designGeneration}</span></div>
+        <p style="color:var(--fg-dim);font-size:12px;margin:10px 0 4px">${strategy.blurb}</p>
+        <div class="research-head" style="margin-top:10px">CURRENT GENOME</div>
+        <div>${design || '<span style="color:var(--fg-dim)">Unknown — no organism of theirs has been observed closely.</span>'}</div>`;
     } else if (kind === 'species') {
       const sp = T.WILD_BY_ID[data.speciesId];
       title.textContent = sp.name.toUpperCase();
@@ -409,12 +431,65 @@
     el('inspect-overlay').classList.remove('hidden');
   }
 
-  // -- per-frame refresh (cheap: text only) --------------------------------
-  function render(game) {
-    el('stat-biomass').querySelector('span').textContent = K.fmt(game.core.biomass);
-    el('stat-energy').querySelector('span').textContent = K.fmt(game.core.energy);
-    el('stat-pop').querySelector('span').textContent = game.stats.playerPop + game.stats.herbivorePop + game.stats.predatorPop;
+  // -- world / colony panel -------------------------------------------------
+  /* Refreshed on a slow cadence rather than per frame: it is a wall of text
+   * whose numbers move slowly, and rebuilding it 60 times a second would cost
+   * more than the whole simulation. */
+  function renderWorldPanel(game) {
+    const region = CM.world.regionAt(game.world, game.camera.x, game.camera.y);
+    const biome = CM.world.biomeInfoAt(game.world, game.camera.x, game.camera.y);
+    const temp = CM.world.tempAt(game.world, game.camera.x, game.camera.y);
+    const hazard = CM.world.hazardAt(game.world, game.camera.x, game.camera.y);
+    const hazardInfo = hazard ? CM.world.HAZARD_INFO[hazard] : null;
+
+    el('world-readout').innerHTML =
+      `<div class="kv"><span class="k">Region</span><span>${region && region.id ? region.name : 'Uncharted'}</span></div>
+       <div class="kv"><span class="k">Terrain</span><span>${biome.name}</span></div>
+       <div class="kv"><span class="k">Temperature</span><span>${Math.round(temp)}&deg;C</span></div>
+       <div class="kv"><span class="k">Climate</span><span>${CM.climate.describe(game)}</span></div>
+       ${hazardInfo ? `<div class="kv"><span class="k">Hazard</span><span style="color:var(--danger)">${hazardInfo.name}</span></div>` : ''}`;
+
+    const counts = CM.colony.territoryCounts(game);
+    const roster = el('colony-roster');
+    roster.innerHTML = '<div class="research-head">COREMINDS</div>';
+    for (const colony of game.colonies) {
+      const row = document.createElement('button');
+      row.className = 'colony-row' + (colony.alive ? '' : ' dead');
+      const strategy = CM.colony.strategyOf(colony);
+      const known = Object.keys(colony.discovered).length;
+      row.innerHTML =
+        `<span class="swatch" style="background:${colony.color}"></span>
+         <span class="cbody">
+           <span class="cname">${colony.name}${colony.isPlayer ? ' <em>(you)</em>' : ''}</span>
+           <span class="cmeta">${colony.alive
+             ? `${strategy.label} &middot; pop ${colony.pop} &middot; ${known} traits &middot; ${counts[colony.id] || 0} territory`
+             : 'collapsed'}</span>
+         </span>
+         ${colony.alive && colony.integrity < 100 ? `<span class="cint">${Math.round(colony.integrity)}%</span>` : ''}`;
+      row.addEventListener('click', () => {
+        CM.render.focusOn(game, colony.x, colony.y, 14);
+        showInspect(game, 'colony', { colony });
+      });
+      roster.appendChild(row);
+    }
   }
 
-  CM.ui = { init, render, renderSelection, renderFeed, updateBadges, showInspect, toast, switchTab };
+  // -- per-frame refresh (cheap: text only) --------------------------------
+  function render(game) {
+    el('stat-biomass').querySelector('span').textContent = Math.floor(game.core.biomass) + '/' + game.core.biomassCap;
+    el('stat-energy').querySelector('span').textContent = Math.floor(game.core.energy);
+    el('stat-pop').querySelector('span').textContent = game.stats.playerPop + game.stats.herbivorePop + game.stats.predatorPop;
+    el('stat-climate').querySelector('span').textContent = CM.climate.describe(game);
+
+    // The world panel is text-heavy and slow-moving; refresh it about twice a
+    // second and only while it is actually the visible tab.
+    const ui = game.ui;
+    ui.worldPanelAcc = (ui.worldPanelAcc || 0) + 1;
+    if (ui.worldPanelAcc >= 30 && el('panel-world').classList.contains('active')) {
+      ui.worldPanelAcc = 0;
+      renderWorldPanel(game);
+    }
+  }
+
+  CM.ui = { init, render, renderSelection, renderFeed, renderWorldPanel, updateBadges, showInspect, toast, switchTab };
 })(window.CM = window.CM || {});
