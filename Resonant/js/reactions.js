@@ -1,0 +1,318 @@
+/* Resonant — reactions. One place where "something happened" becomes
+ * "the player felt it".
+ *
+ * Every other module emits plain events and knows nothing about presentation.
+ * All the shake, sound, haptics and text live here, which means the answer to
+ * "why did that feel flat?" is always in one file, and adding a channel to an
+ * event never means touching the simulation.
+ *
+ * The scaling discipline that keeps this from turning into noise: feedback
+ * strength is proportional to how *rare* the event is, not how often it fires.
+ * A detent tick happens thirty times a second and gets a 6 ms haptic pulse and
+ * a click. A first contact with a new reality layer happens maybe twelve times
+ * in the whole game and gets everything the engine has. Anything in between is
+ * scaled between those poles.
+ */
+(function (RS) {
+  'use strict';
+
+  function wire(game, bus) {
+    // ── dial handling ────────────────────────────────────────────────────
+    bus.on('dial:tick', ({ dial, ticks, speed, fine }) => {
+      const def = RS.dials.defOf(dial.id);
+      /* Pitch the click by which dial it is, so a player working two dials at
+       * once can hear which one they are moving without looking. */
+      const pitch = RS.dials.DEFS.indexOf(def) / 3;
+      const strength = fine ? 0.45 : Math.min(1, 0.5 + ticks * 0.25);
+      RS.audio.click(strength, pitch);
+      RS.feel.FX.dialTick(strength, def.hue);
+    });
+
+    bus.on('dial:seat', ({ dial, detent }) => {
+      const def = RS.dials.defOf(dial.id);
+      const pitch = RS.dials.DEFS.indexOf(def) / 3;
+      RS.audio.seat(pitch);
+      RS.feel.FX.dialSeat(def.hue);
+      if (detent.label) {
+        RS.ui.toast({ kind: 'seat', icon: def.symbol, title: detent.label, hue: def.hue, ms: 1400 });
+      }
+    });
+
+    bus.on('dial:fine', ({ dial }) => {
+      const def = RS.dials.defOf(dial.id);
+      RS.audio.seat(0.8);
+      RS.feel.buzz('seat');
+      RS.ui.toast({
+        kind: 'info', icon: def.symbol, hue: def.hue, ms: 1600,
+        title: def.name + (dial.fine ? ' — FINE' : ' — COARSE'),
+        body: dial.fine ? 'Travel divided by ' + RS.dials.fineRatio(dial).toFixed(0) + '×' : null
+      });
+    });
+
+    bus.on('dial:jump', ({ dial }) => {
+      RS.audio.seat(0.3);
+      RS.feel.aberrate(2);
+    });
+
+    bus.on('input:outofreach', () => {
+      RS.audio.deny();
+      RS.feel.FX.deny();
+      RS.ui.toast({
+        kind: 'warn', icon: '⊘', title: 'Beyond your reach',
+        body: 'Buy φ RANGE to extend the dial.', ms: 2400
+      });
+    });
+
+    // ── the hold ─────────────────────────────────────────────────────────
+    bus.on('node:step', ({ node, mark }) => {
+      RS.audio.step(mark, node.man.bandIndex);
+      RS.feel.FX.coherenceStep(node.x, node.y, mark, node.man.hue);
+    });
+
+    bus.on('node:crystallise', ({ node, amount, man, recognition }) => {
+      RS.audio.crystal(man.bandIndex, man.rarity, man.potency);
+      RS.feel.FX.crystallise(node.x, node.y, man.hue, man.rarity, amount);
+      if (man.rarity >= 2) {
+        RS.ui.toast({
+          kind: 'rare', icon: man.glyph, hue: man.hue, ms: 3000,
+          title: man.name, body: '★'.repeat(man.rarity) + ' · ' + RS.core.fmt(amount) + ' Ψ'
+        });
+      }
+    });
+
+    // ── discovery: the loud end of the scale ─────────────────────────────
+    bus.on('discover:band', ({ band }) => {
+      /* Reaching a new layer for the first time is the biggest thing that
+       * happens in this game and it gets treated that way. */
+      RS.audio.discover(1.4);
+      RS.feel.FX.discovery(band.hue, 1.25);
+      RS.ui.toast({
+        kind: 'major', icon: band.glyph, hue: band.hue, ms: 6000,
+        title: band.name.toUpperCase() + ' LAYER HELD',
+        body: band.blurb + ' — ' + band.rules
+      });
+    });
+
+    bus.on('discover:tier', ({ tier }) => {
+      RS.audio.discover(1.1);
+      RS.feel.FX.discovery(tier.hue, 1.1);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: tier.hue, ms: 6000,
+        title: tier.name.toUpperCase() + (tier.root ? ' · ROOT' : ''),
+        body: tier.sci
+      });
+    });
+
+    bus.on('discover:gnosis', ({ essence, level, man }) => {
+      /* Recognising the same essence in a new context is the fractal payoff —
+       * the moment the premise clicks. Named explicitly so it cannot be
+       * mistaken for an ordinary payout. */
+      RS.audio.discover(0.6 + level * 0.1);
+      RS.feel.FX.discovery(man.hue, 0.55 + Math.min(0.5, level * 0.08));
+      RS.ui.toast({
+        kind: 'gnosis', icon: essence.glyph, hue: man.hue, ms: 5000,
+        title: essence.name.toUpperCase() + ' — recognised again',
+        body: 'Seen here as ' + man.name + '. Same essence, ' + level + ' context' +
+          (level === 1 ? '' : 's') + ' known. +' +
+          ((RS.fractal.gnosisBonus(game, essence.id) - 1) * 100).toFixed(0) + '% yield everywhere.'
+      });
+    });
+
+    // ── reach ────────────────────────────────────────────────────────────
+    bus.on('reach:band', ({ band }) => {
+      RS.ui.toast({
+        kind: 'major', icon: band.glyph, hue: band.hue, ms: 5200,
+        title: band.name.toUpperCase() + ' NOW IN REACH',
+        body: 'Tune φ to ' + band.centre + '.' +
+          (band.minFocus > RS.dials.focusOf(game.dials.frequency)
+            ? ' Your focus is too broad to hold it yet.' : '')
+      });
+    });
+
+    bus.on('reach:tier', ({ tier }) => {
+      RS.ui.toast({ kind: 'info', icon: '◈', hue: tier.hue, ms: 4200,
+        title: tier.name + ' in reach', body: tier.sci });
+    });
+
+    bus.on('reach:cohere', ({ band }) => {
+      RS.audio.discover(1.0);
+      RS.feel.FX.discovery(band.hue, 0.9);
+      RS.ui.toast({
+        kind: 'major', icon: band.glyph, hue: band.hue, ms: 5200,
+        title: band.name.toUpperCase() + ' WILL NOW COHERE',
+        body: 'It was always there. You are sharp enough to hold it now.'
+      });
+    });
+
+    // ── reality shifting under the player ────────────────────────────────
+    bus.on('field:shift', ({ tierIndex, bandIndex, big }) => {
+      const hue = big ? RS.cosmos.TIERS[tierIndex].hue : RS.spectrum.BANDS[bandIndex].hue;
+      RS.audio.upheaval(big ? 1.3 : 0.6);
+      RS.feel.FX.upheaval(hue, big ? 1.15 : 0.5);
+    });
+
+    // ── economy ──────────────────────────────────────────────────────────
+    bus.on('upgrade', ({ dial, kind, level }) => {
+      const def = RS.dials.defOf(dial.id);
+      RS.audio.purchase();
+      RS.feel.FX.purchase(def.hue);
+      RS.ui.toast({
+        kind: 'buy', icon: def.symbol, hue: def.hue, ms: 2600,
+        title: def.name + ' ' + kind.toUpperCase() + ' ' + RS.core.romanize(level),
+        body: kind === 'range' ? 'Reach extended.'
+          : kind === 'precision' ? 'Step now ' + RS.dials.tickStep(dial).toFixed(4) + '.'
+            : 'Focus now ' + (RS.dials.focusOf(dial) * 100).toFixed(0) + '%.'
+      });
+    });
+
+    bus.on('ui:deny', res => {
+      RS.audio.deny();
+      RS.feel.FX.deny();
+      if (res.message) {
+        RS.ui.toast({ kind: 'warn', icon: '\u26A0', title: 'Cannot do that', body: res.message, ms: 2600 });
+      } else if (res.reason === 'insufficient') {
+        RS.ui.toast({ kind: 'warn', icon: 'Ψ', title: 'Not enough insight',
+          body: 'Needs ' + RS.core.fmt(res.cost) + ' Ψ.', ms: 2200 });
+      }
+    });
+
+    // ── the solar layer ──────────────────────────────────────────────────
+    bus.on('scene:change', ({ kind, from, scene }) => {
+      /* Arriving in a different world is the biggest transition the game has
+       * after a first-contact discovery, so it gets a full upheaval. */
+      const hue = kind === 'system' ? 285 : kind === 'planet' ? 130 : 200;
+      RS.audio.upheaval(1.4);
+      RS.feel.FX.upheaval(hue, 1.3);
+      RS.feel.vignette(0.5);
+      const label = kind === 'system' ? (scene.system ? scene.system.name : 'a system')
+        : kind === 'planet' ? (scene.planet ? scene.planet.name : 'a world')
+          : 'the attunement field';
+      RS.ui.toast({
+        kind: 'major', icon: kind === 'system' ? '◇' : kind === 'planet' ? '●' : '◉',
+        hue, ms: 4200, title: label.toUpperCase(),
+        body: kind === 'field' ? 'Tuning again. φ selects the layer.'
+          : kind === 'system' ? 'Unembodied: τ scrubs this system’s history. Tap a world to select it.'
+            : 'Take a body to touch this world.'
+      });
+    });
+
+    bus.on('discover:system', ({ system }) => {
+      game.stats.systemsSeen++;
+      RS.audio.discover(1.2);
+      RS.feel.FX.discovery(system.primary.cls.hue, 1.0);
+      RS.ui.toast({
+        kind: 'major', icon: '◉', hue: system.primary.cls.hue, ms: 6000,
+        title: system.name.toUpperCase(),
+        body: system.primary.cls.c + system.primary.sub + ' ' + system.primary.cls.name +
+          ' · ' + system.bodies.length + ' bodies · habitable zone ' +
+          system.hz.inner.toFixed(2) + '–' + system.hz.outer.toFixed(2) + ' AU'
+      });
+    });
+
+    bus.on('discover:planet', ({ planet }) => {
+      game.stats.worldsSeen++;
+      /* Feedback scales with what was actually found. A barren rock is a
+       * footnote; a living world is an event; an inhabited one stops the
+       * screen. That ordering is the whole reward structure of exploring. */
+      const civ = RS.civ.civOf(planet, game.scene.tGyr);
+      const magnitude = civ ? 1.5 : planet.biosphere ? 1.0 : 0.35;
+      RS.audio.discover(magnitude);
+      RS.feel.FX.discovery(planet.type.hue, magnitude);
+      RS.ui.toast({
+        kind: civ || planet.biosphere ? 'major' : 'info',
+        icon: '●', hue: planet.type.hue, ms: civ ? 7000 : 4000,
+        title: planet.name + ' — ' + planet.type.name,
+        body: (civ ? 'INHABITED: ' + civ.name + ', ' + civ.tier.name + '. '
+          : planet.biosphere ? 'Life: ' + planet.biosphere.stage.name + '. ' : '') +
+          Math.round(planet.surfaceTemp) + ' K · ' + planet.gravity.toFixed(2) + ' g · ' +
+          (planet.pressure < 0.01 ? 'no atmosphere' : planet.pressure.toFixed(2) + ' bar')
+      });
+    });
+
+    bus.on('vessel:embark', ({ arch }) => {
+      RS.audio.purchase();
+      RS.feel.FX.purchase(arch.hue);
+      RS.feel.punch(0.09);
+      const dm = arch.dialMap;
+      RS.ui.toast({
+        kind: 'major', icon: arch.glyph, hue: arch.hue, ms: 5200,
+        title: arch.name.toUpperCase() + ' — INHABITED',
+        body: 'τ ' + dm.time + ' · Σ ' + dm.space + ' · Δ ' + dm.phase +
+          ' · φ ' + dm.frequency + '. Drag the world to shove.'
+      });
+    });
+
+    bus.on('vessel:disembark', ({ arch }) => {
+      RS.audio.seat(0.2);
+      RS.feel.FX.upheaval(200, 0.6);
+      RS.ui.toast({ kind: 'info', icon: '·', ms: 2600,
+        title: 'Unembodied',
+        body: 'τ scrubs time again. Σ moves the scale ladder.' });
+    });
+
+    bus.on('vessel:blocked', ({ reason, arch }) => {
+      RS.audio.deny();
+      RS.feel.FX.deny();
+      RS.ui.toast({ kind: 'warn', icon: '⚠', ms: 3600,
+        title: arch.name + ' cannot work here', body: reason });
+    });
+
+    bus.on('vessel:lost', ({ arch }) => {
+      RS.audio.upheaval(1.6);
+      RS.feel.shake(0.45);
+      RS.feel.FX.deny();
+      RS.ui.toast({ kind: 'warn', icon: '⚠', ms: 5000,
+        title: arch.name + ' lost',
+        body: 'Charge exhausted under strain. The body is gone; you are not.' });
+    });
+
+    bus.on('research', ({ node }) => {
+      RS.audio.discover(1.1);
+      RS.feel.FX.discovery(node.hue, 0.95);
+      const v = (node.unlocks.vessels || []).map(id => RS.vessel.BY_ID[id].name);
+      const st = (node.unlocks.structures || []).map(id => RS.influence.STRUCT_BY_ID[id].name);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: node.hue, ms: 5200,
+        title: node.name.toUpperCase() + ' RESEARCHED',
+        body: [v.length ? 'Bodies: ' + v.join(', ') : null,
+          st.length ? 'Structures: ' + st.join(', ') : null].filter(Boolean).join(' · ') || node.blurb
+      });
+    });
+
+    bus.on('structure:place', ({ planet, struct }) => {
+      RS.audio.purchase();
+      RS.feel.FX.purchase(struct.hue);
+      RS.ui.toast({
+        kind: 'major', icon: struct.glyph, hue: struct.hue, ms: 5200,
+        title: struct.name.toUpperCase() + ' SITED',
+        body: struct.effect + ' It matures over time — come back and see what it did.'
+      });
+    });
+
+    bus.on('extract', ({ id, amount, planet }) => {
+      const c = RS.civ.COMM_BY_ID[id];
+      RS.audio.crystal(2, 1, amount);
+      RS.feel.FX.crystallise(0, 0.2, c ? c.hue : 40, 0, amount);
+      RS.ui.toast({ kind: 'buy', icon: '⊞', hue: c ? c.hue : 40, ms: 2200,
+        title: 'Extracted ' + RS.core.fmt(amount) + ' ' + (c ? c.name : id) });
+    });
+
+    bus.on('sell', ({ total, civ }) => {
+      RS.audio.purchase();
+      RS.feel.FX.crystallise(0, 0, 45, 2, total);
+      RS.ui.toast({ kind: 'buy', icon: 'Ψ', hue: 45, ms: 3000,
+        title: 'Sold to ' + civ.name,
+        body: '+' + RS.core.fmt(total) + ' Ψ at local prices.' });
+    });
+
+    bus.on('scene:aim', () => { RS.audio.click(0.6, 0.4); RS.feel.buzz('tick'); });
+
+    bus.on('settings', ({ key, value }) => {
+      if (key === 'audio') RS.audio.setEnabled(value);
+      if (key === 'haptics') RS.feel.setHaptics(value);
+      if (key === 'reduceMotion') RS.feel.setReduceMotion(value);
+    });
+  }
+
+  RS.reactions = { wire };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

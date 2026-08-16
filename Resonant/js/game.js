@@ -1,0 +1,202 @@
+/* Resonant — game state, economy and progression gates.
+ *
+ * Two currencies, and they are deliberately different in kind:
+ *
+ *   INSIGHT (Ψ)  spent. Buys dial upgrades. Flows in from crystallising
+ *                manifestations, so it measures activity.
+ *   GNOSIS       never spent. Counts distinct (essence, tier, band) contexts
+ *                a player has recognised an essence in, so it measures
+ *                *understanding* — and because it is stored against the
+ *                essence rather than the instance, it pays out everywhere at
+ *                once. That is the fractal premise expressed as an economy:
+ *                learn a thing anywhere, know it everywhere.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp01 } = RS.core;
+
+  const SAVE_VERSION = 1;
+
+  function newGame(seed) {
+    const game = {
+      version: SAVE_VERSION,
+      seed: (seed >>> 0) || 0x5EED1,
+      createdAt: Date.now(),
+      savedAt: Date.now(),
+
+      dials: RS.dials.newSet(),
+      field: RS.field.newField(),
+
+      insight: 0,
+      lifetimeInsight: 0,
+      passiveRate: 0,
+      yieldMul: 1,
+
+      /* The map the player is filling in. Both start with only what the point
+       * of consciousness is issued with: the root tier and the layer it is
+       * already inside. */
+      known: {
+        tiers: { [RS.cosmos.TIERS[RS.cosmos.ROOT_INDEX].id]: true },
+        bands: { baryonic: true },
+        /* Systems and planets are recorded by address, not by content — the
+         * worlds themselves re-derive, so this is a visited-list, not a
+         * world-save. A thousand explored systems is a few kilobytes. */
+        systems: Object.create(null),
+        planets: Object.create(null)
+      },
+      gnosis: Object.create(null),
+
+      /* ── the embodied half ─────────────────────────────────────────────── */
+      scene: RS.scenes.newScene(),
+      body: RS.vessel.newBody('mote'),
+      inhabiting: false,
+      vessels: { unlocked: { mote: true } },
+      research: Object.create(null),
+      structuresUnlocked: Object.create(null),
+      /* Sparse deltas: the only thing the player can permanently change about
+       * a world, keyed by planet address. See influence.js. */
+      deltas: Object.create(null),
+      fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
+      senseBonus: 0,
+
+      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0 },
+
+      /* Transient, rebuilt every frame — never saved. */
+      focusNode: null,
+      __spec: null,
+
+      settings: { audio: true, haptics: true, reduceMotion: false, showSci: true },
+      flags: Object.create(null)
+    };
+    RS.dials.refreshReach(game.dials);
+    RS.influence.recomputeFields(game);
+    return game;
+  }
+
+  // --- upgrades ------------------------------------------------------------
+
+  function tryUpgrade(game, bus, dialId, kind) {
+    const dial = game.dials[dialId];
+    if (!dial || !RS.dials.canUpgrade(dial, kind)) return { ok: false, reason: 'maxed' };
+    const cost = RS.dials.costOf(dial, kind);
+    if (!Number.isFinite(cost)) return { ok: false, reason: 'maxed' };
+    if (game.insight < cost) return { ok: false, reason: 'insufficient', cost };
+
+    game.insight -= cost;
+    const beforeMax = dial.max;
+    RS.dials.applyUpgrade(dial, kind);
+
+    bus.emit('upgrade', { dial, kind, cost, level: dial.levels[kind] });
+
+    /* Reaching further along the frequency axis can put a whole layer inside
+     * the dial's travel for the first time. That is the biggest moment the
+     * game has and it deserves its own event. */
+    if (dialId === 'frequency' && kind === 'range') {
+      for (const b of RS.spectrum.BANDS) {
+        const nowReachable = b.centre <= dial.max;
+        const wasReachable = b.centre <= beforeMax;
+        if (nowReachable && !wasReachable) bus.emit('reach:band', { band: b });
+      }
+    }
+    if (dialId === 'space' && kind === 'range') {
+      for (const t of RS.cosmos.TIERS) {
+        const now = t.index >= dial.min && t.index <= dial.max;
+        const was = t.index >= (beforeMax === dial.max ? dial.min : dial.min) && t.index <= beforeMax;
+        if (now && !was) bus.emit('reach:tier', { tier: t });
+      }
+    }
+    /* Focus can lift a band out of ghost state without any dial movement — the
+     * layer was always there and the observer simply became able to hold it. */
+    if (dialId === 'frequency' && kind === 'focus') {
+      const foc = RS.dials.focusOf(dial);
+      const prevFoc = 1 - Math.pow(0.855, dial.levels.focus - 1);
+      for (const b of RS.spectrum.BANDS) {
+        if (b.minFocus > prevFoc && b.minFocus <= foc) bus.emit('reach:cohere', { band: b });
+      }
+    }
+    return { ok: true, cost };
+  }
+
+  /* What the player should be told to do next. Kept as an explicit function
+   * rather than a scripted tutorial so it stays correct at every point in the
+   * game, including after a load. */
+  function nextObjective(game) {
+    const D = game.dials;
+    const foc = RS.dials.focusOf(D.frequency);
+
+    if (game.stats.crystals === 0) {
+      return { text: 'Sweep φ until a smudge resolves, then hold the lock.', kind: 'tutorial' };
+    }
+    /* A band inside the dial's reach but never crystallised is the strongest
+     * pull the game has — it is visible, it is close, and it is not yours. */
+    for (const b of RS.spectrum.BANDS) {
+      if (game.known.bands[b.id]) continue;
+      if (b.centre > D.frequency.max) continue;
+      if (RS.spectrum.isGhost(b, foc)) {
+        return { text: 'The ' + b.name + ' layer is in reach but will not cohere. Buy φ FOCUS.', kind: 'focus', band: b };
+      }
+      return { text: 'Untouched layer inside your reach: ' + b.name + ' at φ' + b.centre.toFixed(0) + '.', kind: 'tune', band: b };
+    }
+    /* Everything reachable is taken; the next thing is more reach. */
+    const nextBand = RS.spectrum.BANDS.find(b => b.centre > D.frequency.max);
+    if (nextBand) {
+      return { text: 'Nothing new within φ' + D.frequency.max.toFixed(0) + '. Buy φ RANGE to reach ' + nextBand.name + '.', kind: 'range', band: nextBand };
+    }
+    const nextTier = RS.cosmos.TIERS.find(t => !game.known.tiers[t.id] && t.index >= D.space.min && t.index <= D.space.max);
+    if (nextTier) return { text: 'Unvisited scale in reach: ' + nextTier.name + '.', kind: 'tier', tier: nextTier };
+    return { text: 'Buy Σ RANGE to open the ladder further within, or beyond.', kind: 'range' };
+  }
+
+  /* The objective line inside an embodied scene is a different question, so it
+   * gets its own function rather than overloading the tuning one. */
+  function sceneObjective(game) {
+    const s = game.scene;
+    if (s.kind === 'system') {
+      if (!Object.keys(game.research).length) {
+        return { text: 'Research LOCOMOTION to build a body you can land with.', kind: 'research' };
+      }
+      if (s.planet && !s.planet.type.landable) {
+        return { text: s.planet.name + ' has no surface. Select a rocky world, then turn Σ inward to descend.', kind: 'select' };
+      }
+      if (s.planet) {
+        return { text: 'Turn Σ inward to descend to ' + s.planet.name + '. τ scrubs its history while you are unembodied.', kind: 'descend' };
+      }
+      return { text: 'Tap a world to select it.', kind: 'select' };
+    }
+    if (s.kind === 'planet') {
+      if (!game.inhabiting) {
+        return { text: 'Take a body to touch this world. Unembodied, you can only watch it.', kind: 'embark' };
+      }
+      const env = RS.vessel.environmentFor(game);
+      const blocked = RS.vessel.canOperate(RS.vessel.archOf(game.body), env);
+      if (blocked) return { text: 'This body cannot work here: ' + blocked + '.', kind: 'blocked' };
+      return { text: 'τ throttle · Σ vertical · Δ heading · φ senses.', kind: 'pilot' };
+    }
+    return nextObjective(game);
+  }
+
+  /* Overall completion, for the readout. Weighted so the player can see that
+   * the ladder is the long game and the spectrum is the near one. */
+  function progress(game) {
+    const bands = Object.keys(game.known.bands).length / RS.spectrum.BANDS.length;
+    const tiers = Object.keys(game.known.tiers).length / RS.cosmos.TIERS.length;
+    const maxG = RS.fractal.ESSENCES.length * 6;
+    const gn = Math.min(1, RS.fractal.totalGnosis(game) / maxG);
+    /* The embodied half counts too, or the bar would stop moving the moment a
+     * player commits to exploring rather than tuning. */
+    const res = Object.keys(game.research).length / RS.influence.RESEARCH.length;
+    const worlds = Math.min(1, Object.keys(game.known.planets).length / 60);
+    return clamp01(bands * 0.24 + tiers * 0.24 + gn * 0.22 + res * 0.18 + worlds * 0.12);
+  }
+
+  function tickMeta(game, dt) {
+    game.stats.playSeconds += dt;
+    game.stats.ticks++;
+    if (game.insight > game.__lastInsight) {
+      game.lifetimeInsight += game.insight - game.__lastInsight;
+    }
+    game.__lastInsight = game.insight;
+  }
+
+  RS.game = { SAVE_VERSION, newGame, tryUpgrade, nextObjective, sceneObjective, progress, tickMeta };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
