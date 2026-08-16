@@ -651,7 +651,9 @@
      * like one game rather than three minigames. */
     const kind = game.scene ? game.scene.kind : 'field';
 
-    if (kind === 'system') {
+    if (kind === 'galaxy') {
+      RS.galaxy.draw(ctx, game, dt);
+    } else if (kind === 'system') {
       RS.worldrender.drawSystem(ctx, game, dt);
     } else if (kind === 'planet') {
       RS.worldrender.drawPlanet(ctx, game, dt);

@@ -179,7 +179,10 @@
         /* What a tap on the world means depends on which world it is. Each
          * scene resolves it to something; none of them swallow it. */
         const scene = game.scene;
-        if (scene.kind === 'system') {
+        if (scene.kind === 'galaxy') {
+          const st = RS.galaxy.pick(game, a.startX, a.startY);
+          if (st && handlers && handlers.onPickStar) handlers.onPickStar(st);
+        } else if (scene.kind === 'system') {
           const idx = pickBody(game, a.startX, a.startY);
           if (idx >= 0 && handlers && handlers.onPickBody) handlers.onPickBody(idx);
         } else if (scene.kind === 'planet') {

@@ -74,6 +74,20 @@
           RS.feel.ripple(node.x, node.y, { r0: 0.02, r1: 0.14, life: 0.5, hue: node.man.hue });
         }
       },
+      /* Selecting a star on the galactic map. Tapping selects; tapping the
+       * already-selected star commits to travelling there, so one gesture
+       * covers both without a separate confirm button. */
+      onPickStar(st) {
+        const already = game.galaxy.target && game.galaxy.target.key === st.key;
+        const r = already ? RS.galaxy.travelTo(game, bus, st)
+          : RS.galaxy.selectStar(game, bus, st);
+        if (!r.ok) {
+          bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+        } else {
+          RS.audio.seat(0.6);
+          RS.feel.FX.dialSeat(st.star.cls.hue);
+        }
+      },
       /* Selecting a world in the system view. */
       onPickBody(index) {
         RS.scenes.selectBody(game, bus, index);
@@ -124,6 +138,12 @@
     setTimeout(() => RS.ui.toast({ kind: 'info', icon: '◈', hue: 43, ms: 7000,
       title: 'Hold the lock',
       body: 'Line up the arcs around yourself. Coherence fills while you hold.' }), 8400);
+    /* The game is genuinely deep and the guide is written against live state,
+     * so pointing at it is worth more than any amount of additional tutorial
+     * text here. */
+    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '?', hue: 200, ms: 9000,
+      title: 'Lost? Tap ? at any time',
+      body: 'The guide describes whatever is actually in front of you — this scene, these dials, this mode.' }), 12600);
   }
 
   function onResize() {

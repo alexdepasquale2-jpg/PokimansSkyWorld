@@ -28,15 +28,24 @@
   'use strict';
   const { clamp, clamp01, lerp, damp, TAU, hashF, hashN } = RS.core;
 
-  const TIER_PLANET = RS.cosmos.BY_ID.planetary.index;   // 8
-  const TIER_STELLAR = RS.cosmos.BY_ID.stellar.index;    // 9
-  const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;      // 10
+  const TIER_PLANET = RS.cosmos.BY_ID.planetary.index;      // 8
+  const TIER_STELLAR = RS.cosmos.BY_ID.stellar.index;       // 9
+  const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;         // 10
+  const TIER_CLUSTER = RS.cosmos.BY_ID.cluster.index;       // 12
 
   /* Which scene a given rung of the scale ladder shows. The ladder *is* the
-   * navigation, so there is no separate "travel" mode to learn. */
+   * navigation, so there is no separate "travel" mode to learn — and the four
+   * scenes line up with what you would actually perceive at each scale:
+   *
+   *   ≤ planetary     a surface you can stand on
+   *   ≤ system        one gravity well and everything bound to it
+   *   ≤ cluster       neighbouring stars — the scale at which you choose
+   *   > cluster       the attunement field, where layers are tuned
+   */
   function sceneForTier(idx) {
     if (idx <= TIER_PLANET) return 'planet';
     if (idx <= TIER_SYSTEM) return 'system';
+    if (idx <= TIER_CLUSTER) return 'galaxy';
     return 'field';
   }
 
@@ -162,6 +171,7 @@
 
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
+    else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -176,9 +186,27 @@
     s.kind = kind;
     s.transition = 1;
 
-    if (kind === 'system') {
+    if (kind === 'galaxy') {
+      /* The map centres on wherever the player currently is, so zooming out
+       * from a system always shows that system's own neighbourhood. */
+      if (s.systemAddr) {
+        game.galaxy.sx = s.systemAddr.sx;
+        game.galaxy.sy = s.systemAddr.sy;
+      }
+      game.galaxy.cacheKey = '';
+      RS.galaxy.refresh(game);
+    } else if (kind === 'system') {
       /* Entering the system layer with no system chosen derives one from where
-       * the player has tuned — there is always somewhere to arrive. */
+       * the player has tuned — there is always somewhere to arrive. Once the
+       * galactic map exists, a chosen target takes priority: picking a star and
+       * turning Σ inward is the normal way to travel. */
+      const tgt = game.galaxy && game.galaxy.target;
+      if (tgt && (!s.systemAddr || s.systemAddr.sx !== tgt.sx ||
+          s.systemAddr.sy !== tgt.sy || s.systemAddr.index !== tgt.index)) {
+        enterSystem(game, bus, { sx: tgt.sx, sy: tgt.sy, index: tgt.index });
+        game.galaxy.sx = tgt.sx; game.galaxy.sy = tgt.sy;
+        game.galaxy.cacheKey = '';
+      }
       if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
       /* Default the selection to the most interesting world present, which is
        * almost always what the player wants to look at first. */
@@ -259,7 +287,52 @@
       if (!s.planet || s.deriveAcc > 0.25) {
         s.deriveAcc = 0;
         s.planet = derivePlanet(game, s.system, s.bodyIndex);
-        if (s.planet) s.planet.civ = RS.civ.civOf(s.planet, s.tGyr);
+        if (s.planet) s.planet.civ = civAt(game, s.planet, s.tGyr);
+      }
+    }
+
+    /* Anyone in this system slowly becomes aware of you while you are in it.
+     * Awareness is what makes a carrier lock answerable, so simply being
+     * present is the first half of making contact. */
+    tickContact(game, bus, dt);
+  }
+
+  /* A civilisation with the player's influence applied — uplift, standing,
+   * awareness. Same pattern as derivePlanet: derive, then layer deltas. */
+  function civAt(game, planet, tGyr) {
+    const civ = RS.civ.civOf(planet, tGyr);
+    return civ ? RS.contact.applyTo(game, planet, civ) : null;
+  }
+
+  /* Contact bookkeeping, run in both the system and planet scenes. Emits the
+   * one-shot events that make first contact an occasion rather than a state
+   * change nobody noticed. */
+  function tickContact(game, bus, dt) {
+    const s = game.scene;
+    const p = s.planet;
+    if (!p) return;
+    const civ = p.civ || civAt(game, p, s.tGyr);
+    if (!civ) { s.contact = null; return; }
+
+    RS.contact.accrueAwareness(game, p, civ, dt);
+    const lock = RS.contact.lockOf(game, p, civ);
+    const state = RS.contact.stateOf(game, p, civ, lock);
+    const prev = s.contact && s.contact.state;
+
+    s.contact = { civ, lock, state, planet: p };
+
+    if (prev !== state) {
+      if (state === RS.contact.STATES.detected && prev !== RS.contact.STATES.open) {
+        bus.emit('contact:detected', { planet: p, civ });
+      }
+      if ((state === RS.contact.STATES.open || state === RS.contact.STATES.warm) &&
+          prev !== RS.contact.STATES.open && prev !== RS.contact.STATES.warm) {
+        const rec = RS.contact.recordOf(game, p);
+        const first = !rec.met;
+        rec.met = true;
+        rec.name = civ.name;
+        rec.where = p.name;
+        bus.emit('contact:open', { planet: p, civ, first, lock });
       }
     }
   }
@@ -307,8 +380,9 @@
     if (s.deriveAcc > 0.25 && s.bodyIndex >= 0) {
       s.deriveAcc = 0;
       const fresh = derivePlanet(game, s.system, s.bodyIndex);
-      if (fresh) { fresh.civ = RS.civ.civOf(fresh, s.tGyr); s.planet = fresh; }
+      if (fresh) { fresh.civ = civAt(game, fresh, s.tGyr); s.planet = fresh; }
     }
+    tickContact(game, bus, dt);
 
     /* Walking moves you along the planet's longitude. The body's x velocity is
      * in scene units; converting to radians uses the planet's actual radius,
@@ -545,6 +619,7 @@
     TIER_PLANET, TIER_STELLAR, TIER_SYSTEM,
     sceneForTier, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
-    sampleSurface, embark, disembark, extract, sell, PROFILE_N
+    sampleSurface, embark, disembark, extract, sell, PROFILE_N,
+    TIER_CLUSTER, civAt, tickContact
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

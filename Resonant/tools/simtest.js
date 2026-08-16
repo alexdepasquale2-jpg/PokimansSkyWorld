@@ -22,8 +22,8 @@ const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js',
   'js/field.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
-  'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/scenes.js',
-  'js/game.js', 'js/save.js'
+  'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
+  'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
 ];
 
 const sandbox = {
@@ -1230,5 +1230,404 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   const ms = Date.now() - tS;
   assert(ms < 3000, '2000 systems derive in ' + ms + 'ms');
 }
+
+// ── the galactic map ─────────────────────────────────────────────────────
+{
+  const g = RS.game.newGame(4100);
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.cluster.index) === 'galaxy',
+    'the cluster tier shows the galactic map');
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.interstellar.index) === 'galaxy',
+    'so does the interstellar tier');
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.galactic.index) === 'field',
+    'the galactic tier is still the attunement field');
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.system.index) === 'system',
+    'the system tier is unchanged');
+
+  /* The map must actually be populated, and stars must be deterministic. */
+  const stars = RS.galaxy.refresh(g);
+  assert(stars.length > 20, 'the map window holds a real neighbourhood (' + stars.length + ' stars)');
+  const a1 = RS.galaxy.starsIn(g.seed, 3, 4);
+  const a2 = RS.galaxy.starsIn(g.seed, 3, 4);
+  assert(a1.length === a2.length && (a1.length === 0 || a1[0].jx === a2[0].jx),
+    'a sector always contains the same stars');
+
+  /* Sorted by distance, and distances agree with the sector geometry. */
+  let sorted = true;
+  for (let i = 1; i < stars.length; i++) if (stars[i].dist < stars[i - 1].dist) sorted = false;
+  assert(sorted, 'stars are ordered by distance');
+  assert(stars[0].dist < RS.galaxy.LY_PER_SECTOR * 2, 'something is nearby');
+
+  /* Reach is the exploration gate: far stars are visible and not selectable. */
+  const far = stars[stars.length - 1];
+  const near = stars[0];
+  assert(!far.inReach, 'the far edge of the window is beyond reach');
+  assert(!far.resolved, 'and therefore unresolved');
+  assert(RS.galaxy.surveyOf(g, far) === null, 'an unresolved star surveys to nothing');
+  assert(!RS.galaxy.selectStar(g, nullBus, far).ok, 'an out-of-reach star cannot be selected');
+  assert(RS.galaxy.selectStar(g, nullBus, near).ok, 'a near star can be');
+
+  /* Expanding the field must genuinely open the map up. */
+  const before = stars.filter(x => x.inReach).length;
+  for (const n of RS.influence.RESEARCH) g.research[n.id] = true;
+  g.gnosis.spiral = new Array(40).fill(0).map((_, i) => 'spiral@' + i + ':0');
+  RS.influence.recomputeFields(g);
+  g.galaxy.cacheKey = '';
+  const after = RS.galaxy.refresh(g).filter(x => x.inReach).length;
+  assert(after > before, 'expanding the consciousness field reaches more stars (' +
+    before + ' → ' + after + ')');
+
+  /* Travel re-centres the window, so the horizon moves with you. */
+  const target = RS.galaxy.refresh(g).find(x => x.inReach && x.dist > 1);
+  if (target) {
+    RS.galaxy.travelTo(g, nullBus, target);
+    assert(g.galaxy.sx === target.sx && g.galaxy.sy === target.sy, 'travel re-centres the map');
+    assert(g.scene.system && g.scene.systemAddr.sx === target.sx, 'and enters that system');
+    assert(g.known.systems[target.key], 'and records the visit');
+    const newStars = RS.galaxy.refresh(g);
+    assert(newStars.length > 20, 'the new neighbourhood is populated too');
+    assert(newStars[0].dist < RS.galaxy.LY_PER_SECTOR * 2, 'and has its own near neighbours');
+  }
+}
+
+// ── contact ──────────────────────────────────────────────────────────────
+{
+  /* Find a real civilisation in the galaxy, then run the whole relationship
+   * end to end. If this fails, the headline feature does not work. */
+  const g = RS.game.newGame(12345);
+  let found = null;
+  outer:
+  for (let sx = 0; sx < 40; sx++) {
+    for (let sy = 0; sy < 8; sy++) {
+      for (let ix = 0; ix < 3; ix++) {
+        const sys = RS.stellar.systemAt(g.seed, sx, sy, ix);
+        for (let j = 0; j < sys.bodies.length; j++) {
+          if (sys.bodies[j].kind !== 'planet') continue;
+          const p = RS.planet.planetAt(sys, j);
+          if (!p) continue;
+          const civ = RS.civ.civOf(p, 0);
+          if (civ) { found = { sys, j, p, civ, sx, sy, ix }; break outer; }
+        }
+      }
+    }
+  }
+  assert(found, 'a civilisation exists somewhere findable in the galaxy');
+
+  if (found) {
+    const { p, civ } = found;
+
+    /* The carrier must sit inside its declared band, so tuning to the band
+     * genuinely gets you into the neighbourhood of the signal. */
+    const carrier = RS.contact.carrierOf(g, p, civ);
+    assert(Math.abs(carrier.phi - carrier.band.centre) <= carrier.band.width,
+      'the carrier lies inside its own band');
+    /* And the band must climb with technology — talking to an advanced
+     * culture has to be an endgame act, not an early one. */
+    const low = RS.contact.carrierBandOf({ tech: 0.1 });
+    const high = RS.contact.carrierBandOf({ tech: 0.95 });
+    assert(RS.spectrum.BY_ID[low.band].centre < RS.spectrum.BY_ID[high.band].centre,
+      'advanced cultures broadcast on higher, harder bands');
+    assert(RS.spectrum.BY_ID[high.band].minFocus > RS.spectrum.BY_ID[low.band].minFocus,
+      'and therefore demand more focus');
+
+    /* Set the scene up as the game would. */
+    g.scene.systemAddr = { sx: found.sx, sy: found.sy, index: found.ix };
+    g.scene.system = found.sys;
+    RS.scenes.selectBody(g, nullBus, found.j);
+    g.scene.kind = 'system';
+
+    /* Untuned and unnoticed: no channel. */
+    let lock = RS.contact.lockOf(g, p, civ);
+    assert(RS.contact.stateOf(g, p, civ, lock) === RS.contact.STATES.unaware,
+      'an unnoticed, untuned civilisation is not contactable');
+
+    /* Reaching the carrier needs dial range — the gate is real. */
+    assert(!lock.inReach || carrier.phi <= g.dials.frequency.max,
+      'reachability is reported honestly');
+
+    /* Give the player the instrument, tune onto the carrier exactly. */
+    for (let i = 0; i < RS.dials.UPGRADE.range.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'range')) RS.dials.applyUpgrade(g.dials.frequency, 'range');
+    }
+    for (let i = 0; i < RS.dials.UPGRADE.focus.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'focus')) RS.dials.applyUpgrade(g.dials.frequency, 'focus');
+      if (RS.dials.canUpgrade(g.dials.phase, 'focus')) RS.dials.applyUpgrade(g.dials.phase, 'focus');
+    }
+    RS.dials.setValue(g, g.dials.frequency, carrier.phi);
+    RS.dials.setValue(g, g.dials.phase, carrier.phase);
+
+    lock = RS.contact.lockOf(g, p, civ);
+    assert(lock.total > 0.9, 'tuning exactly onto the carrier gives a near-perfect lock (' +
+      lock.total.toFixed(3) + ')');
+    assert(!lock.ghost, 'a fully-focused observer does not ghost the carrier band');
+
+    /* Still not open — they have to notice you too. That two-sided condition
+     * is the whole point of awareness. */
+    assert(RS.contact.stateOf(g, p, civ, lock) === RS.contact.STATES.reachable,
+      'a perfect lock alone does not open a channel — they must know you exist');
+
+    /* Awareness accrues with presence. */
+    const rec = RS.contact.recordOf(g, p);
+    let ticks = 0;
+    while (rec.awareness < 0.36 && ticks < 60 * 60 * 20) {
+      RS.contact.accrueAwareness(g, p, civ, 1 / 60);
+      ticks++;
+    }
+    assert(rec.awareness >= 0.35, 'awareness accrues while you are present');
+    assert(ticks < 60 * 60 * 20, 'and does so in a bounded amount of time (' +
+      (ticks / 60).toFixed(0) + 's)');
+
+    lock = RS.contact.lockOf(g, p, civ);
+    const st = RS.contact.stateOf(g, p, civ, lock);
+    assert(st === RS.contact.STATES.open || st === RS.contact.STATES.warm,
+      'lock + awareness opens the channel');
+    assert(RS.contact.isOpen(g, p, civ), 'and isOpen agrees');
+
+    /* Mistuning must close it again — the channel is held, not toggled. */
+    RS.dials.setValue(g, g.dials.frequency, carrier.phi + 40);
+    assert(!RS.contact.isOpen(g, p, civ), 'drifting off the carrier closes the channel');
+    RS.dials.setValue(g, g.dials.frequency, carrier.phi);
+    assert(RS.contact.isOpen(g, p, civ), 'and returning re-opens it');
+
+    /* They must have something to say, and it must reflect the situation. */
+    const lines = RS.contact.greeting(g, p, civ);
+    assert(lines.length > 0 && lines[0].length > 10, 'they say something');
+
+    /* Every offer must be well-formed. */
+    const offers = RS.contact.offersFor(g, p, civ);
+    assert(offers.length >= 4, 'there are things to do (' + offers.length + ')');
+    assert(offers.every(o => o.id && o.name && o.blurb && o.effect),
+      'every offer is fully described');
+    assert(offers.some(o => o.id === 'listen' && o.available), 'listening is always available');
+
+    // LISTEN
+    const insight0 = g.insight, gn0 = RS.fractal.totalGnosis(g), stand0 = rec.standing;
+    const rL = RS.contact.act(g, nullBus, p, civ, 'listen');
+    assert(rL.ok && g.insight > insight0, 'listening pays insight');
+    assert(RS.fractal.totalGnosis(g) >= gn0, 'and can pay gnosis');
+    assert(rec.standing > stand0, 'and warms them');
+    assert(rec.met, 'and marks them as met');
+
+    /* Regression: what the panel offers and what the action permits must
+     * agree. They did not — `offersFor` greyed out `survey` for a
+     * pre-industrial culture and `act` performed it anyway, so the UI was
+     * telling the player something false about the world. */
+    for (const o of RS.contact.offersFor(g, p, civ)) {
+      if (o.available) continue;
+      if (o.id === 'trade' || o.id === 'gift') continue;   // resource-gated, checked elsewhere
+      const r = RS.contact.act(g, nullBus, p, civ, o.id);
+      assert(!r.ok, 'an offer shown as unavailable ("' + o.id + '") is genuinely refused');
+    }
+
+    /* Regression: the opening line must survive until it is read. `met` is set
+     * when the channel opens, which happens before the player looks at the
+     * panel, so it cannot gate the greeting. */
+    {
+      const g2 = RS.game.newGame(12345);
+      const r2 = RS.contact.recordOf(g2, p);
+      r2.met = true;                     // as the channel-open event would leave it
+      const first = RS.contact.greeting(g2, p, civ);
+      const second = RS.contact.greeting(g2, p, civ);
+      assert(first[0] !== second[0],
+        'the first thing a culture says is distinct from what it says afterwards');
+      assert(first[0] === RS.contact.VOICE[civ.disposition.id].open,
+        'and it is their disposition\'s own opening line');
+    }
+
+    // SURVEY — the charts
+    const charted0 = Object.keys(g.known.charted).length;
+    const rS = RS.contact.act(g, nullBus, p, civ, 'survey');
+    if (civ.tier.reach >= 1) {
+      assert(rS.ok, 'a spacefaring culture will share charts');
+      assert(Object.keys(g.known.charted).length > charted0,
+        'and that actually reveals stars (' + rS.revealed + ')');
+      /* The charts must genuinely bypass the reach gate. */
+      g.galaxy.cacheKey = '';
+      const chartedStars = RS.galaxy.refresh(g).filter(x => x.charted && !x.inReach);
+      if (chartedStars.length) {
+        assert(chartedStars[0].resolved, 'a charted star is resolved despite being out of reach');
+        assert(RS.galaxy.selectStar(g, nullBus, chartedStars[0]).ok,
+          'and can be selected — charts are a real shortcut through the exploration gate');
+      }
+    }
+
+    // GIFT — buying standing, with diminishing returns
+    g.insight = 1e7;
+    const s1 = rec.standing;
+    assert(RS.contact.act(g, nullBus, p, civ, 'gift').ok, 'you can give freely');
+    const d1 = rec.standing - s1;
+    const s2 = rec.standing;
+    RS.contact.act(g, nullBus, p, civ, 'gift');
+    const d2 = rec.standing - s2;
+    assert(d1 > 0 && d2 > 0 && d2 < d1, 'gifts help, and help less each time');
+
+    // LEARN — gated on standing, then real
+    rec.standing = 0.2;
+    assert(!RS.contact.act(g, nullBus, p, civ, 'learn').ok, 'they will not teach a stranger');
+    rec.standing = 0.9;
+    const before = Object.keys(g.research).length;
+    const rT = RS.contact.act(g, nullBus, p, civ, 'learn');
+    if (rT.ok) {
+      assert(Object.keys(g.research).length === before + 1, 'being taught unlocks a research node');
+      assert(g.research[rT.node.id], 'the right one');
+      assert(rec.standing < 0.9, 'and teaching costs them standing');
+    }
+
+    // UPLIFT — gated on the lattice, and disposition-dependent
+    assert(!RS.contact.act(g, nullBus, p, civ, 'uplift').ok, 'uplift needs a lattice');
+    g.structuresUnlocked.lattice = true;
+    g.insight = 1e9; g.passiveRate = 1e6;
+    RS.influence.place(g, nullBus, p, 'lattice');
+    const tech0 = civ.tech;
+    const standBefore = rec.standing;
+    const rU = RS.contact.act(g, nullBus, p, civ, 'uplift');
+    assert(rU.ok, 'uplift works once a lattice is sited');
+    assert(rec.uplifted === 1, 'and is recorded');
+    /* Whether it was welcome depends on who they are — help is not neutral. */
+    const welcomingDisps = ['curious', 'distributed', 'contemplative'];
+    const expectWelcome = welcomingDisps.indexOf(civ.disposition.id) >= 0;
+    assert(rU.welcomed === expectWelcome, 'reception matches their disposition');
+    assert(expectWelcome ? rec.standing > standBefore : rec.standing < standBefore,
+      'and standing moves the right way');
+
+    /* Uplift must actually change the derived civilisation. */
+    const upCiv = RS.contact.applyTo(g, p, RS.civ.civOf(p, 0));
+    assert(upCiv.tech > tech0, 'an uplifted culture really is more advanced (' +
+      tech0.toFixed(3) + ' → ' + upCiv.tech.toFixed(3) + ')');
+
+    /* Hostility is reachable and closes the channel. */
+    rec.standing = -0.8;
+    assert(RS.contact.stateOf(g, p, civ, RS.contact.lockOf(g, p, civ)) === RS.contact.STATES.cold,
+      'a badly-treated culture refuses you');
+
+    /* And the whole relationship must survive a save. */
+    rec.standing = 0.62;
+    RS.save.writeNow(g);
+    const h = RS.save.hydrate(RS.save.readRaw());
+    const hk = RS.contact.contactKey(p);
+    assert(h.contacts[hk] && Math.abs(h.contacts[hk].standing - 0.62) < 1e-6,
+      'standing round-trips');
+    assert(h.contacts[hk].uplifted === 1, 'uplift round-trips');
+    assert(h.contacts[hk].met, 'having met them round-trips');
+    assert(Object.keys(h.known.charted).length === Object.keys(g.known.charted).length,
+      'given charts round-trip');
+    assert(h.galaxy.sx === g.galaxy.sx && h.galaxy.sy === g.galaxy.sy,
+      'galactic position round-trips');
+    assert(RS.contact.totalMet(h) >= 1, 'the roster survives');
+  }
+}
+
+// ── contact does not leak into worlds that have nobody ───────────────────
+{
+  const g = RS.game.newGame(555);
+  const sys = RS.stellar.systemAt(g.seed, 2, 2, 0);
+  let idx = -1;
+  for (let j = 0; j < sys.bodies.length; j++) {
+    if (sys.bodies[j].kind !== 'planet') continue;
+    const p = RS.planet.planetAt(sys, j);
+    if (p && !RS.civ.civOf(p, 0)) { idx = j; break; }
+  }
+  if (idx >= 0) {
+    g.scene.system = sys;
+    g.scene.systemAddr = { sx: 2, sy: 2, index: 0 };
+    RS.scenes.selectBody(g, nullBus, idx);
+    g.scene.kind = 'system';
+    for (let i = 0; i < 120; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+    assert(!g.scene.contact, 'an empty world produces no contact state');
+    assert(Object.keys(g.contacts).length === 0, 'and no relationship record');
+  }
+}
+
+
+// ── the guide must never break, in any state ─────────────────────────────
+{
+  /* The guide is generated from live state in every scene and both modes, so
+   * it touches more of the game than anything else in the UI. A crash here
+   * would hit exactly the player who is already confused enough to open it. */
+  const scenarios = [];
+
+  // fresh game, every scene
+  for (const tier of ['galactic', 'cluster', 'system', 'planetary']) {
+    const g = RS.game.newGame(9100 + tier.length);
+    for (let i = 0; i < 14; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+    RS.dials.setValue(g, g.dials.space, RS.cosmos.BY_ID[tier].index);
+    for (let i = 0; i < 90; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+    scenarios.push([tier + ' (observing)', g]);
+  }
+
+  // embodied
+  {
+    const g = RS.game.newGame(9200);
+    for (let i = 0; i < 14; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+    RS.dials.setValue(g, g.dials.space, RS.cosmos.BY_ID.planetary.index);
+    for (let i = 0; i < 90; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+    g.vessels.unlocked.walker = true;
+    RS.scenes.embark(g, nullBus, 'walker');
+    scenarios.push(['planet (piloting)', g]);
+  }
+
+  // fully progressed
+  {
+    const g = RS.game.newGame(9300);
+    g.insight = 1e9;
+    for (const n of RS.influence.RESEARCH) RS.influence.tryResearch(g, nullBus, n.id);
+    for (const b of RS.spectrum.BANDS) g.known.bands[b.id] = true;
+    for (const t of RS.cosmos.TIERS) g.known.tiers[t.id] = true;
+    for (let i = 0; i < RS.dials.UPGRADE.range.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'range')) RS.dials.applyUpgrade(g.dials.frequency, 'range');
+      if (RS.dials.canUpgrade(g.dials.space, 'range')) RS.dials.applyUpgrade(g.dials.space, 'range');
+    }
+    for (let i = 0; i < RS.dials.UPGRADE.focus.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'focus')) RS.dials.applyUpgrade(g.dials.frequency, 'focus');
+    }
+    RS.influence.recomputeFields(g);
+    scenarios.push(['fully progressed', g]);
+  }
+
+  let broke = [];
+  for (const [label, g] of scenarios) {
+    for (const [name, fn] of [['guide', RS.guide.guideHTML], ['pathways', RS.guide.pathwaysHTML]]) {
+      try {
+        const html = fn(g);
+        if (typeof html !== 'string' || html.length < 200) broke.push(label + '/' + name + ' (too short)');
+        if (/undefined|NaN|\[object/.test(html)) broke.push(label + '/' + name + ' (leaked a raw value)');
+      } catch (e) {
+        broke.push(label + '/' + name + ': ' + e.message);
+      }
+    }
+    /* And the objective line, which the guide quotes. */
+    try {
+      const o = RS.game.sceneObjective(g);
+      if (!o || !o.text || o.text.length < 8) broke.push(label + '/objective');
+    } catch (e) { broke.push(label + '/objective: ' + e.message); }
+  }
+  assert(broke.length === 0, 'the guide renders in every scene and mode: ' + broke.join('; '));
+
+  /* The dial rows must describe the mode the player is actually in — that is
+   * the single most confusing thing about this game and the guide's main job. */
+  const gObs = RS.game.newGame(9400);
+  const obsRows = RS.guide.dialRows(gObs);
+  assert(obsRows.length === 4, 'all four dials are described');
+  assert(/scrub/i.test(obsRows[0].does), 'unembodied, τ is described as scrubbing time');
+  assert(/ladder/i.test(obsRows[1].does), 'and Σ as moving the ladder');
+
+  const gPil = RS.game.newGame(9401);
+  gPil.vessels.unlocked.walker = true;
+  gPil.body = RS.vessel.newBody('walker');
+  gPil.inhabiting = true;
+  const pilRows = RS.guide.dialRows(gPil);
+  assert(pilRows[0].does === RS.vessel.BY_ID.walker.dialMap.time,
+    'embodied, τ is described as the vessel says it is');
+  assert(pilRows[1].does !== obsRows[1].does,
+    'and Σ means something different from what it means unembodied');
+
+  /* Every pathway must always have a concrete next step — "you have finished"
+   * is not something this game should ever say by accident. */
+  for (const [label, g] of scenarios) {
+    const html = RS.guide.pathwaysHTML(g);
+    const arrows = (html.match(/→/g) || []).length;
+    assert(arrows >= 3, 'all three pathways state a next step in ' + label + ' (' + arrows + ')');
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

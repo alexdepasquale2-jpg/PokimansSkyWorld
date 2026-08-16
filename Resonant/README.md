@@ -3,12 +3,16 @@
 You are a single point of consciousness. You cannot move. You have four dials,
 and everything you will ever perceive is a consequence of where they sit.
 
+Tune reality until it manifests. Descend the scale ladder from the galaxy to a
+world you can stand on. Find somebody out there, and learn to talk to them by
+ear.
+
 **Stack:** vanilla JS + Canvas2D + WebAudio. No build step, no dependencies, no
 backend, no assets. Runs offline from `index.html`.
 
 ```
 python3 -m http.server 8000      # then open http://localhost:8000/index.html
-node tools/simtest.js            # 232 headless assertions, no DOM
+node tools/simtest.js            # 315 headless assertions, no DOM
 node tools/build.mjs             # -> dist/resonant.html, one self-contained file
 ```
 
@@ -28,7 +32,7 @@ game — the dials get *reinterpreted* instead (see [Bodies](#bodies)).
 
 ---
 
-## The two halves
+## The three layers
 
 ### 1. The attunement field — tuning reality
 
@@ -67,11 +71,31 @@ baryonic layer asks only for φ and Σ; by the causal layer all four are live.
 That ramp is the difficulty curve and the tutorial at once: each new layer
 introduces exactly one more thing to think about.
 
-### 2. The solar layer — inhabiting it
+### 2. The galactic map — choosing where to go
 
-Turn **Σ** inward past the stellar tier and the ladder itself becomes the
-navigation: galactic field → solar system → planet surface. There is no travel
-menu.
+Turn **Σ** inward past the galactic tier and you arrive at the scale where what
+you can see *is* neighbouring stars. That is the scale at which choosing a
+destination is the meaningful act, so that is where the map lives.
+
+The map is a window onto an unbounded sector grid — every star derived by
+`stellar.systemAt`, so the galaxy is a function rather than a list, and panning
+just asks it about different arguments. Roughly 300 stars are on screen at once
+at ~12 light years per sector, coloured by real spectral class and sized by real
+luminosity, with stellar density falling off toward the rim on the same
+galactocentric gradient that sets metallicity.
+
+What makes it feel vast rather than merely large is that **you can see much
+further than you can reach.** Beyond the consciousness field, a star is a dim
+unnamed point. Inside it, it resolves: planet count, life, civilisations. A
+green ring means life; an amber pulse means somebody lives there, and it is the
+rarest marker in the game. Expanding the field turns lights into places, and the
+horizon recedes as you go — travelling re-centres the window, so each hop
+becomes the origin of the next.
+
+### 3. The solar layer — inhabiting it
+
+Turn **Σ** inward again and the ladder keeps being the navigation: map → system
+→ planet surface. There is no travel menu anywhere in the game.
 
 Everything in it is derived from real astrophysics. A star's **mass is the only
 free parameter**; its luminosity (piecewise mass–luminosity), radius,
@@ -158,6 +182,76 @@ not want. The bias decays when you stop, so influence is a sustained act, not
 mind control. Cost: 200 multiply-adds per mind per tick.
 
 ---
+
+## Contact
+
+Civilisations are rare — roughly one system in 190 — and finding one is only
+half of it. **You reach them by tuning.** A culture broadcasts on a carrier
+frequency, and you open the channel the same way you open anything else in this
+game: land φ on it, hold Δ, and listen to the beat. Everything the player has
+spent the game learning is exactly the apparatus for the most important content
+in it.
+
+The carrier band climbs with their technology:
+
+| Their era | Band | |
+|---|---|---|
+| Pre-industrial · Industrial | Mnemonic φ437 | you are reading their records, not a signal |
+| Atomic · Orbital | Causal φ542 | a deliberate broadcast; they are calling out |
+| Interplanetary · System-wide | Archetypal φ655 | structured, symbolic, patient |
+| Interstellar · Post-material | Noetic φ771 | no carrier at all — thought, already understood |
+
+So talking to a young culture is merely hard and talking to an old one is an
+endgame act: you must be able to *hold the layer minds live in* before a mind
+will hold still for you.
+
+**Awareness runs the other way.** They have to notice you too, and that accrues
+from your reality field, from time in their system, and from anything you have
+built there. A perfect carrier lock on a culture that has never detected you
+opens nothing. When they notice you first, the game says so — it is the only
+event where something else acts on you.
+
+Once open, everything has a real mechanical consequence:
+
+- **Listen** — their account of the world. Pays insight, and pays *gnosis*,
+  because another mind recognising the same essence is literally a new context.
+- **Ask what they know** — they hand you their charts. Stars within their
+  technological reach become resolved on your map *regardless of your own
+  field*, which is a genuine shortcut through the exploration gate and the best
+  reason to talk to anyone.
+- **Trade** — your hold at their prices, scaled by standing and disposition.
+- **Give freely** — buys standing, and buys less each time, because the fifth
+  unprompted gift reads differently from the first.
+- **Ask to be taught** — an ally will hand you a research node outright. It
+  costs them standing to give, and they know it.
+- **Raise what they can reach** — uplift, gated on a Cognition Lattice.
+  Whether it is welcomed depends on who they are: a curious or distributed
+  culture absorbs it and asks for more; an insular or hierarchic one did not ask
+  to be raised and knows exactly who did it. **Help is not neutral.**
+
+Everything they say is composed rather than scripted — disposition picks the
+voice, standing picks the warmth, and the situation supplies the subject, so a
+culture can remark on the beacon you put in their sky or on the fact that their
+oldest records describe a world that was sterile before you seeded it.
+
+Standing is four numbers per culture in the save. The civilisation itself stays
+derived.
+
+## Understanding the game
+
+Two panels exist because this game asks a lot of a new player, and both are
+generated from live state rather than written out:
+
+- **? — How this works.** Describes the thing actually in front of you: what τ
+  means *in this mode, in this body*, which rungs of the ladder are open, what
+  each symbol on screen is, and how the beat works. A player who is confused
+  reads about their situation, not about the game in the abstract.
+- **◈ — Pathways.** The game has three genuinely different routes forward and no
+  way to tell from the inside. **TUNE** is pure dial skill and needs nothing.
+  **REACH** is research, bodies, worlds and structures. **CONTACT** is the
+  shortcut — a culture hands you charts and research you would otherwise buy.
+  They feed each other, none is mandatory, and each one always states a concrete
+  next step.
 
 ## Why it is all formulae
 
@@ -277,6 +371,9 @@ All audio is synthesised at runtime — there are no sound files.
 | `stellar.js` | IMF, mass–luminosity, habitable zones, system architecture |
 | `planet.js` | Jeans escape, greenhouse, terrain fields, biomes, resources |
 | `civ.js` | closed-form biospheres, civilisations, markets, emergent trade, fauna |
+| `galaxy.js` | the star map: unbounded sector grid, reach gating, charts |
+| `contact.js` | carriers, awareness, standing, dialogue, uplift |
+| `guide.js` | the live guide and the three pathways |
 | `neural.js` | derived recurrent minds; the influence channel |
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
@@ -293,7 +390,7 @@ presentation.
 
 ## Tests
 
-`node tools/simtest.js` — 232 assertions under a `window` shim, exercising the
+`node tools/simtest.js` — 315 assertions under a `window` shim, exercising the
 same files the browser loads. It protects the things that are invisible until
 they are catastrophic:
 
@@ -316,12 +413,29 @@ they are catastrophic:
   ~99 units of altitude from every dry surface, freezing 640 K greenhouse worlds
   into ice sheets. Invisible, because the global temperature stayed correct and
   only local samples were wrong — 9,984 of 12,660 samples. Now asserted.
+- **The whole contact lifecycle**, end to end against a civilisation actually
+  found in the galaxy: carrier inside its band, bands climbing with technology,
+  a perfect lock alone *not* opening a channel, awareness accruing in bounded
+  time, drifting off the carrier closing it again, every offer, uplift
+  reception matching disposition, hostility reachable, and the relationship
+  surviving a save.
+- **That the panel never lies**: any offer shown as unavailable is genuinely
+  refused. It was not, once — `survey` was greyed out for a pre-industrial
+  culture and worked anyway.
+- **That the opening line survives until it is read.** `met` is set when the
+  channel opens, before the player looks at the panel, so it could not gate the
+  greeting — the first thing a culture ever said to you was being consumed by a
+  state change nobody saw.
+- **The guide renders in every scene and both modes** without leaking a raw
+  `undefined`/`NaN`, and every pathway always states a next step.
 - Vessel integration stability through 0.25 s frames, neural minds bounded and
   behaviourally diverse, influence decaying, every research node reachable,
   every vessel and structure unlocked by something.
 
-Verified in Chromium via Playwright: zero console errors, 55–60 fps across all
-three scenes, ~1.4 kB saves.
+Verified in Chromium via Playwright: zero console errors, 54–60 fps across all
+four scenes, ~1.7 kB saves — including a full run that finds a Post-material
+Insular culture, opens its channel, listens, takes its charts (45 stars
+revealed) and reads its dialogue off the rendered DOM.
 
 ---
 
@@ -336,11 +450,12 @@ to accommodate them:
 
 - **Per-layer gameplay modes as full scenes.** The twelve `mode` rules currently
   vary the attunement field; the framework is there for each to become its own
-  view the way the solar layer did.
-- **Multi-system travel.** `reachRadius` and the courier exist; the galactic map
-  between systems does not yet.
-- **First contact.** `civ.js` derives dispositions, contact thresholds and
-  Kardashev indices, and nothing yet talks to you.
-- **Deeper inhabitation.** Riding a mind works; riding a *civilisation* — biasing
-  a culture's trajectory rather than a creature's — is the same mechanic one
-  scale up.
+  view the way the solar and galactic layers did.
+- **Culture-to-culture relations.** Standing is per-player right now. Cultures
+  knowing about *each other* — and about what you did to their neighbours — is
+  the same derived-plus-delta pattern with one more index.
+- **Riding a civilisation.** Riding a mind works. Biasing a culture's
+  trajectory rather than a creature's is the same influence mechanic one scale
+  up, and `civOf` is already a closed-form curve waiting to be perturbed.
+- **Contact at range.** Carriers currently need you in the system. A probe left
+  behind, or a beacon network, could hold a channel open across light years.
