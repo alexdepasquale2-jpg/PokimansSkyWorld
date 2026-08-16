@@ -1,0 +1,2991 @@
+<title>DoomSpire</title>
+<style>
+/* DoomSpire — phone-first skin. Simple rendering, deep menus: the canvas
+ * gets no texture budget, so the panels are where the game gets to look
+ * like an MMO. Every tap target is at least 40px and nothing important
+ * sits inside the safe-area insets.
+ */
+:root {
+  --bg: #0a0608; --panel: #16101a; --panel-2: #1d1522; --line: #34222e;
+  --ink: #e6ecf7; --dim: #9a8ea6; --dimmer: #6a5f70;
+  --gold: #e8b23a; --amber: #f0a52e; --good: #79c07a; --bad: #d8564a; --warn: #e0a83f;
+  --radius: 12px;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overscroll-behavior: none; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.4 var(--sans);
+  overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+h1, h2, h3, h4 { margin: 10px 0 6px; }
+p { margin: 4px 0; }
+
+#app { position: fixed; inset: 0; }
+#stage { position: absolute; inset: 0; touch-action: none; background: #000; }
+#scene { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* ---------- top HUD ---------- */
+#hud { position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; }
+#hud-top {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 8px) 0 calc(var(--safe-l) + 8px);
+}
+#vitals { width: 46%; max-width: 240px; margin-left: 40px; }
+.who { display: flex; align-items: baseline; gap: 6px; text-shadow: 0 1px 3px #000; margin-bottom: 4px; }
+.who b { font-size: 14px; }
+.who span { font-size: 11px; color: var(--dim); }
+.bar {
+  position: relative; height: 12px; border-radius: 6px; background: rgba(6, 4, 8, 0.66);
+  overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 3px;
+}
+.bar i { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 6px; transition: width .15s linear; }
+.bar b {
+  position: relative; display: block; font-size: 9px; font-weight: 600; line-height: 12px;
+  padding-left: 6px; letter-spacing: .02em; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); color: #fff;
+}
+.bar.hp i { background: linear-gradient(90deg, #a63f38, #d8564a); }
+.bar.res i { background: #2f6fb0; }
+.bar.xp { height: 5px; }
+.bar.xp i { background: linear-gradient(90deg, #9a6fd0, #c08fe8); }
+.bar.target i { background: linear-gradient(90deg, #a63f38, #d8564a); }
+#combo-points { display: flex; gap: 3px; margin-top: 2px; }
+#combo-points i { width: 10px; height: 10px; border-radius: 2px; background: rgba(255, 255, 255, .12); border: 1px solid var(--line); display: inline-block; }
+#combo-points i.on { background: var(--amber); border-color: var(--amber); }
+
+#hud-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#wallet { font-size: 11px; color: var(--dim); text-shadow: 0 1px 3px #000; line-height: 1.5; }
+#minimap { width: 88px; height: 88px; border-radius: 50%; border: 2px solid rgba(230, 236, 247, .3); }
+
+#target-bar { align-self: center; width: 58%; max-width: 320px; margin-top: 4px; text-align: center; }
+#target-bar span { font-size: 11px; text-shadow: 0 1px 3px #000; }
+#target-bar.hidden { display: none; }
+
+#combat-log {
+  position: absolute; left: calc(var(--safe-l) + 10px); bottom: 168px; width: 56%; max-width: 280px;
+  font-size: 11px; color: rgba(230, 236, 247, .82); text-shadow: 0 1px 3px #000;
+  display: flex; flex-direction: column-reverse; max-height: 90px; overflow: hidden; pointer-events: none;
+}
+
+#interact-btn {
+  position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%);
+  pointer-events: auto; background: rgba(20, 12, 18, .82); border: 1px solid var(--gold);
+  color: var(--gold); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  white-space: nowrap;
+}
+#interact-btn.hidden { display: none; }
+
+/* ---------- movement stick ---------- */
+#stick {
+  position: absolute; left: calc(var(--safe-l) + 14px); bottom: calc(var(--safe-b) + 16px);
+  width: 104px; height: 104px; border-radius: 50%; background: rgba(230, 236, 247, .08);
+  border: 1px solid rgba(230, 236, 247, .18); pointer-events: none;
+}
+#knob {
+  position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px;
+  border-radius: 50%; background: rgba(230, 236, 247, .28); border: 1px solid rgba(230, 236, 247, .4);
+}
+
+/* ---------- ability bar ---------- */
+#ability-bar {
+  position: absolute; right: calc(var(--safe-r) + 10px); bottom: calc(var(--safe-b) + 16px);
+  display: grid; grid-template-columns: repeat(4, 50px); grid-auto-rows: 50px; gap: 6px;
+  pointer-events: auto;
+}
+.ability-btn {
+  position: relative; background: rgba(22, 16, 26, .82); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center;
+}
+.ability-btn .ab-icon { font-size: 22px; }
+.ability-btn .ab-cd {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: rgba(0, 0, 0, .68);
+  pointer-events: none;
+}
+.ability-btn .ab-key {
+  position: absolute; top: 2px; left: 4px; font-size: 8px; color: var(--dim);
+}
+.ability-btn.unaffordable { opacity: .45; }
+.ability-btn:active { border-color: var(--gold); }
+
+/* ---------- tabs / menu ---------- */
+#tabs {
+  position: absolute; top: calc(var(--safe-t) + 74px); left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; background: rgba(20, 12, 18, .7); border-radius: 16px; padding: 4px;
+  pointer-events: auto; z-index: 15;
+}
+#tabs button { width: 30px; height: 30px; border-radius: 10px; font-size: 15px; }
+#tabs button.active { background: rgba(232, 178, 58, .22); }
+#menu-btn {
+  position: absolute; top: calc(var(--safe-t) + 8px); left: calc(var(--safe-l) + 8px);
+  width: 34px; height: 34px; border-radius: 50%; background: rgba(20, 12, 18, .7);
+  border: 1px solid var(--line); pointer-events: auto; font-size: 15px; z-index: 15;
+}
+
+/* ---------- panels ---------- */
+#panels {
+  position: absolute; left: 3%; right: 3%; top: 14%; bottom: 12%; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius); pointer-events: auto;
+  display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); z-index: 10;
+}
+#panels.hidden { display: none; }
+.panel-head {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 14px;
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.panel-title { font-weight: 700; font-size: 15px; }
+.panel-close { width: 30px; height: 30px; border-radius: 8px; background: var(--panel-2); font-size: 14px; }
+.panel-body { padding: 12px 14px; overflow-y: auto; flex: 1; }
+
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 12px; margin-bottom: 8px; }
+.stat-grid b { float: right; color: var(--gold); }
+.slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.slot-cell {
+  text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px; min-height: 40px; display: flex; flex-direction: column; gap: 2px; font-size: 11px;
+}
+.slot-cell b { font-size: 12px; }
+.slot-cell:disabled { opacity: .55; }
+
+.talent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
+.talent-tier { margin-bottom: 10px; }
+.talent-tier.locked { opacity: .4; }
+.tier-label { font-size: 11px; color: var(--dim); margin-bottom: 4px; }
+.talent-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.talent-cell {
+  width: 108px; text-align: left; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px; font-size: 10px; position: relative;
+}
+.talent-cell.ranked { border-color: var(--gold); }
+.talent-cell b { display: block; font-size: 11px; margin: 2px 0; }
+.talent-cell .t-icon { font-size: 16px; }
+.talent-cell .t-rank { position: absolute; top: 6px; right: 6px; color: var(--dim); font-size: 9px; }
+.talent-cell .t-desc { color: var(--dim); font-size: 9px; line-height: 1.3; }
+.talent-cell:disabled { opacity: .4; }
+
+.mini-btn {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px;
+  padding: 6px 9px; font-size: 11px; white-space: nowrap;
+}
+.mini-btn:disabled { opacity: .4; }
+.mini-btn:active { border-color: var(--gold); }
+
+.item-row, .quest-row, .prof-block, .rep-row, .party-row, .recipe-row {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 10px; margin-bottom: 6px;
+}
+.item-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.item-main b { font-size: 12px; }
+.item-sub { color: var(--dim); font-size: 10px; margin-left: 6px; }
+.item-stats { color: var(--dim); font-size: 10px; margin-top: 2px; }
+.item-btns { display: flex; gap: 4px; flex: none; }
+.bag-header { font-size: 12px; color: var(--dim); margin-bottom: 8px; }
+.empty { color: var(--dim); font-size: 12px; }
+
+.quest-sub { color: var(--dim); font-size: 10px; }
+.quest-text { font-size: 11px; margin: 4px 0; }
+.quest-row.dim { opacity: .6; }
+.party-row.dim { opacity: .55; }
+
+.skillbar {
+  position: relative; height: 8px; border-radius: 4px; background: rgba(0, 0, 0, .4);
+  overflow: hidden; margin: 4px 0;
+}
+.skillbar i { position: absolute; inset: 0 auto 0 0; background: var(--gold); display: block; }
+.learn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.recipe-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: absolute; inset: 0; background: rgba(6, 4, 8, .92); display: flex;
+  align-items: center; justify-content: center; z-index: 20; pointer-events: auto;
+  padding: calc(var(--safe-t) + 12px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
+}
+.overlay.hidden { display: none; }
+.overlay-box { max-width: 420px; width: 100%; text-align: center; max-height: 100%; overflow-y: auto; }
+.overlay-box h1 { font-size: 26px; letter-spacing: .04em; color: var(--gold); }
+.overlay-box .tagline { color: var(--dim); margin-bottom: 16px; }
+.overlay-box h2 { color: var(--bad); }
+.wide-btn {
+  display: block; width: 100%; padding: 12px; margin: 10px 0; background: var(--gold);
+  color: #1a0f06; font-weight: 700; border-radius: 10px; font-size: 15px;
+}
+.wide-btn:disabled { opacity: .4; }
+.wide-btn.hidden { display: none; }
+#name-input {
+  display: block; width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 14px;
+}
+#class-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+.class-card {
+  text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.class-card.sel { border-color: var(--gold); background: rgba(232, 178, 58, .12); }
+.cc-icon { font-size: 22px; }
+.cc-name { font-weight: 700; font-size: 13px; }
+.cc-role { color: var(--gold); font-size: 10px; }
+.cc-blurb { color: var(--dim); font-size: 10px; line-height: 1.3; }
+.respawn-btn { padding: 12px 22px; background: var(--bad); color: #fff; border-radius: 10px; font-weight: 700; margin-top: 12px; }
+
+.hidden { display: none !important; }
+
+</style>
+
+<div id="app">
+
+  <div id="stage">
+    <canvas id="scene"></canvas>
+
+    <div id="hud">
+      <div id="hud-top">
+        <div id="vitals">
+          <div class="who"><b id="name-text"></b> <span id="lvl-text"></span></div>
+          <div class="bar hp"><i id="hp-fill"></i><b id="hp-text"></b></div>
+          <div class="bar res"><i id="res-fill"></i><b id="res-text"></b></div>
+          <div class="bar xp"><i id="xp-fill"></i></div>
+          <div id="combo-points"></div>
+        </div>
+        <div id="hud-right">
+          <div id="wallet"><span id="zone-text"></span><br><span id="gold-text"></span></div>
+          <canvas id="minimap"></canvas>
+        </div>
+      </div>
+
+      <div id="target-bar" class="hidden">
+        <span id="target-name"></span>
+        <div class="bar target"><i id="target-fill"></i></div>
+      </div>
+
+      <div id="combat-log"></div>
+
+      <button id="interact-btn" class="hidden"></button>
+    </div>
+
+    <div id="stick"><div id="knob"></div></div>
+
+    <div id="ability-bar"></div>
+
+    <div id="tabs">
+      <button data-tab="character">👤</button>
+      <button data-tab="talents">🌟</button>
+      <button data-tab="bags">🎒</button>
+      <button data-tab="quests">📜</button>
+      <button data-tab="professions">⚙️</button>
+      <button data-tab="reputation">🏳️</button>
+      <button data-tab="party">🤝</button>
+    </div>
+    <button id="menu-btn">☰</button>
+
+    <div id="panels" class="hidden panel">
+      <div class="panel-head">
+        <span class="panel-title"></span>
+        <button class="panel-close">✕</button>
+      </div>
+      <div class="panel-body"></div>
+    </div>
+
+    <div id="deathscreen" class="hidden overlay">
+      <div class="overlay-box">
+        <h2>YOU HAVE FALLEN</h2>
+        <p>The Scar remembers everyone eventually.</p>
+        <button class="respawn-btn">Return to Camp</button>
+      </div>
+    </div>
+
+    <div id="charcreate" class="overlay">
+      <div class="overlay-box wide">
+        <h1>DoomSpire</h1>
+        <p class="tagline">Simple halls. Deep character.</p>
+        <button id="continue-btn" class="hidden wide-btn">Continue</button>
+        <input id="name-input" placeholder="Your name" maxlength="18">
+        <div id="class-list"></div>
+        <button id="begin-btn" class="wide-btn" disabled>Begin</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>
+/* DoomSpire — shared helpers: RNG, math, formatting, persistence.
+ *
+ * Nothing here knows about walls or talents. Content and systems build on
+ * top of this the way PrimalIsle's core.js underpins that game.
+ */
+(function (DS) {
+  'use strict';
+
+  const SAVE_KEY = 'doomspire/save/v1';
+  const SAVE_VERSION = 1;
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const clamp01 = v => clamp(v, 0, 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const rndInt = (a, b) => Math.floor(rnd(a, b + 1));
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const chance = p => Math.random() < p;
+  const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; };
+  const dist = (ax, ay, bx, by) => Math.sqrt(dist2(ax, ay, bx, by));
+
+  /* Angle difference wrapped to [-PI, PI], and a turn that never overshoots. */
+  function angDelta(a, b) {
+    let d = (b - a) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+  function turnToward(a, b, maxStep) {
+    const d = angDelta(a, b);
+    return a + clamp(d, -maxStep, maxStep);
+  }
+
+  /* Seeded RNG (mulberry32), used for loot rolls and anything that should be
+   * reproducible from a saved seed rather than the wall-clock RNG. */
+  function rngFrom(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // --- formatting ----------------------------------------------------------
+  function fmt(n) {
+    n = Math.floor(n);
+    if (Math.abs(n) < 1000) return String(n);
+    if (Math.abs(n) < 1e6) return (n / 1000).toFixed(Math.abs(n) < 1e4 ? 1 : 0).replace(/\.0$/, '') + 'k';
+    return (n / 1e6).toFixed(2).replace(/\.0+$/, '') + 'M';
+  }
+  const pct = v => Math.round(v * 100) + '%';
+  function titleCase(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // --- persistence -----------------------------------------------------------
+  function save(game) {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_VERSION, t: Date.now(), g: game }));
+      return true;
+    } catch (e) { console.warn('[doomspire] save failed', e); return false; }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const payload = JSON.parse(raw);
+      if (!payload || payload.v !== SAVE_VERSION || !payload.g) return null;
+      return payload.g;
+    } catch (e) { console.warn('[doomspire] load failed', e); return null; }
+  }
+  function wipe() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } }
+
+  DS.core = {
+    SAVE_KEY, clamp, clamp01, lerp, rnd, rndInt, pick, chance, dist, dist2,
+    angDelta, turnToward, rngFrom, fmt, pct, titleCase, save, load, wipe
+  };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — every static number in the game: classes, talents, items,
+ * the bestiary, the four maps, quests, professions and factions.
+ *
+ * Nothing in here touches the DOM or the canvas. It is a book of facts that
+ * every other module reads from, exactly the role PrimalIsle's content.js
+ * plays for that game.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+
+  const LEVEL_CAP = 30;
+  const TALENT_START_LEVEL = 10;
+
+  // --- gear slots & quality --------------------------------------------------
+  const SLOTS = [
+    'head', 'neck', 'shoulder', 'cloak', 'chest', 'wrist', 'hands', 'waist',
+    'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'mainhand', 'offhand'
+  ];
+  const SLOT_WEIGHT = {
+    head: 1, neck: 0.5, shoulder: 0.75, cloak: 0.5, chest: 1, wrist: 0.4,
+    hands: 0.6, waist: 0.6, legs: 1, feet: 0.75, ring1: 0.5, ring2: 0.5,
+    trinket1: 0.6, trinket2: 0.6, mainhand: 1.25, offhand: 0.85
+  };
+  const QUALITIES = [
+    { key: 'poor', name: 'Poor', color: '#9d9d9d', mult: 0.6, weight: 0 },
+    { key: 'common', name: 'Common', color: '#e6ecf7', mult: 1.0, weight: 60 },
+    { key: 'uncommon', name: 'Uncommon', color: '#1eff00', mult: 1.4, weight: 30 },
+    { key: 'rare', name: 'Rare', color: '#2f9dff', mult: 1.9, weight: 8.5 },
+    { key: 'epic', name: 'Epic', color: '#c86dff', mult: 2.6, weight: 1.4 },
+    { key: 'legendary', name: 'Legendary', color: '#ff8000', mult: 3.6, weight: 0.1 }
+  ];
+  const QUALITY_BY_KEY = Object.fromEntries(QUALITIES.map(q => [q.key, q]));
+
+  function rollQuality(rng, floorKey) {
+    const floorIdx = floorKey ? QUALITIES.findIndex(q => q.key === floorKey) : 1;
+    const pool = QUALITIES.filter((q, i) => i >= Math.max(1, floorIdx) && q.weight > 0);
+    const total = pool.reduce((s, q) => s + q.weight, 0);
+    let r = rng() * total;
+    for (const q of pool) { if ((r -= q.weight) <= 0) return q.key; }
+    return pool[0].key;
+  }
+
+  /* Stat budget for a rolled item: level, slot and quality all scale it, then
+   * the budget is spread over a primary pool (armor type/class flavour),
+   * stamina (always present — nobody wants a purely offensive MMO), and a
+   * chance at one secondary rating. */
+  function rollItem(rng, ilvl, slot, qKey, styleHint) {
+    qKey = qKey || rollQuality(rng);
+    const q = QUALITY_BY_KEY[qKey];
+    const w = SLOT_WEIGHT[slot] || 0.6;
+    const budget = Math.max(1, Math.round(ilvl * 0.9 * q.mult * w));
+    const isWeapon = slot === 'mainhand' || slot === 'offhand';
+    const primaryPool = styleHint === 'str' ? ['str'] : styleHint === 'agi' ? ['agi'] : styleHint === 'int' ? ['int'] : ['str', 'agi', 'int'];
+    const primary = primaryPool.length === 1 ? primaryPool[0] : primaryPool[Math.floor(rng() * primaryPool.length)];
+    const stats = {};
+    const staShare = isWeapon ? 0 : Math.round(budget * 0.35);
+    const primShare = Math.round(budget * (isWeapon ? 0.55 : 0.4));
+    if (staShare) stats.sta = staShare;
+    if (primShare) stats[primary] = primShare;
+    let rest = budget - staShare - primShare;
+    if (!isWeapon) { stats.armor = Math.round(budget * 1.8); rest = Math.max(0, rest); }
+    if (rest > 0 && rng() < 0.75) {
+      const sec = rng() < 0.5 ? 'crit' : 'haste';
+      stats[sec] = (stats[sec] || 0) + rest;
+    } else if (rest > 0) {
+      stats[primary] = (stats[primary] || 0) + rest;
+    }
+    let dmgLo = 0, dmgHi = 0, speed = 0;
+    if (isWeapon) {
+      speed = slot === 'offhand' ? 1.8 + rng() * 0.6 : 2.2 + rng() * 1.2;
+      const dps = 1.1 * ilvl * q.mult;
+      dmgLo = Math.max(1, Math.round(dps * speed * 0.8));
+      dmgHi = Math.round(dps * speed * 1.2);
+    }
+    const name = nameItem(rng, slot, q, styleHint);
+    return {
+      iid: 'i' + Math.floor(rng() * 1e9).toString(36),
+      name, slot, quality: qKey, ilvl, stats, dmgLo, dmgHi, speed,
+      sell: Math.max(1, Math.round(budget * q.mult * (isWeapon ? 3 : 1.6)))
+    };
+  }
+
+  const NAME_PREFIX = {
+    poor: ['Battered', 'Cracked', 'Worn'],
+    common: ['Sturdy', 'Plain', 'Trusty'],
+    uncommon: ['Vigil-Marked', 'Ashwrought', 'Warden’s'],
+    rare: ['Bloomforged', 'Frostbound', 'Sigil-Etched'],
+    epic: ['Hollowbane', 'Emberfall', 'Wraithcarved'],
+    legendary: ['Kingsbane', 'Doomspire', 'the Last Vigil’s']
+  };
+  const NAME_NOUN = {
+    head: ['Helm', 'Crown', 'Hood'], neck: ['Talisman', 'Chain', 'Amulet'],
+    shoulder: ['Mantle', 'Pauldrons', 'Spaulders'], cloak: ['Cloak', 'Cape', 'Drape'],
+    chest: ['Cuirass', 'Vestment', 'Hauberk'], wrist: ['Bracers', 'Wraps', 'Vambraces'],
+    hands: ['Gauntlets', 'Gloves', 'Grips'], waist: ['Girdle', 'Belt', 'Sash'],
+    legs: ['Legplates', 'Leggings', 'Greaves'], feet: ['Sabatons', 'Boots', 'Treads'],
+    ring1: ['Band', 'Signet', 'Loop'], ring2: ['Band', 'Signet', 'Loop'],
+    trinket1: ['Charm', 'Relic', 'Idol'], trinket2: ['Charm', 'Relic', 'Idol'],
+    mainhand: ['Blade', 'Warhammer', 'Staff', 'Bow', 'Dagger'],
+    offhand: ['Shield', 'Tome', 'Off-Blade']
+  };
+  function nameItem(rng, slot, q, styleHint) {
+    const p = C.pick(NAME_PREFIX[q.key]);
+    const n = C.pick(NAME_NOUN[slot]);
+    return `${p} ${n}`;
+  }
+
+  const CURATED_ITEMS = {
+    ashguard_cinderplate: { iid: 'u_ashguard', name: 'Ashguard Cinderplate', slot: 'chest', quality: 'rare', ilvl: 10, stats: { str: 9, sta: 14, armor: 120 }, sell: 40 },
+    vigils_blessed_ring: { iid: 'u_vigilring', name: 'Vigil’s Blessed Ring', slot: 'ring1', quality: 'uncommon', ilvl: 8, stats: { int: 6, sta: 6 }, sell: 22 },
+    bloomreach_wardstaff: { iid: 'u_wardstaff', name: 'Bloomreach Wardstaff', slot: 'mainhand', quality: 'rare', ilvl: 16, stats: { int: 14, sta: 8 }, dmgLo: 22, dmgHi: 34, speed: 2.9, sell: 70 },
+    frostmarch_bulwark: { iid: 'u_bulwark', name: 'Frostmarch Bulwark', slot: 'offhand', quality: 'rare', ilvl: 20, stats: { sta: 20, armor: 220 }, sell: 80 },
+    vault_sigil: { iid: 'u_sigil', name: 'Vault Sigil', slot: null, quality: 'uncommon', ilvl: 0, stats: {}, sell: 0, questItem: true },
+    sulfur_shard: { iid: 'u_sulfur', name: 'Sulfur Shard', slot: null, quality: 'common', ilvl: 0, stats: {}, sell: 1, questItem: true },
+    hollow_kings_crown: { iid: 'u_hkcrown', name: 'The Hollow King’s Crown', slot: 'head', quality: 'epic', ilvl: 28, stats: { sta: 22, int: 16, crit: 10 }, sell: 220 }
+  };
+
+  // --- classes ----------------------------------------------------------------
+  /* Ability `kind` and flags are read generically by combat.js so adding a
+   * class means adding data here, not new engine code. */
+  const CLASSES = {
+    warrior: {
+      id: 'warrior', name: 'Warrior', icon: '⚔️', resource: 'rage', armor: 'plate', role: 'Melee / Tank',
+      primary: 'str', growth: { str: 2.4, agi: 1.1, int: 0.3, sta: 2.0, spirit: 0.4 },
+      blurb: 'Rage builds in the swing of the fight and burns fast once it does.',
+      abilities: [
+        { id: 'w_heroic', name: 'Heroic Strike', icon: '🗡️', kind: 'melee', cost: 15, cd: 0, range: 1.6, power: 1.6, scalesWith: 'ap' },
+        { id: 'w_rend', name: 'Rend', icon: '🩸', kind: 'melee', cost: 10, cd: 6, range: 1.6, power: 0.5, scalesWith: 'ap', dot: { ticks: 4, interval: 3 } },
+        { id: 'w_charge', name: 'Charge', icon: '💨', kind: 'gap', cost: 0, cd: 15, range: 8, rageGen: 20 },
+        { id: 'w_shieldblock', name: 'Shield Block', icon: '🛡️', kind: 'buff', cost: 10, cd: 20, self: true, buff: { armorPct: 0.35, dur: 5 } },
+        { id: 'w_shout', name: 'Battle Shout', icon: '📣', kind: 'buff', cost: 5, cd: 30, self: true, buff: { apFlat: 25, dur: 120 } },
+        { id: 'w_execute', name: 'Execute', icon: '💀', kind: 'melee', cost: 15, cd: 0, range: 1.6, power: 3.2, scalesWith: 'ap', execute: 0.2 },
+        { id: 'w_bloodthirst', name: 'Bloodthirst', icon: '🪣', kind: 'melee', cost: 30, cd: 6, range: 1.6, power: 2.0, scalesWith: 'ap', lifeStealPct: 0.25, requiresTalent: 'w_t5' }
+      ],
+      talents: [
+        { id: 'w_t1a', tier: 1, name: 'Improved Heroic Strike', icon: '🗡️', maxRank: 3, desc: 'Heroic Strike costs less rage.', mod: { key: 'w_heroic.costPct', perRank: -0.08 } },
+        { id: 'w_t1b', tier: 1, name: 'Deflection', icon: '🩹', maxRank: 3, desc: '+ parry chance.', mod: { key: 'parry', perRank: 0.02 } },
+        { id: 'w_t1c', tier: 1, name: 'Booming Voice', icon: '📣', maxRank: 3, desc: 'Battle Shout lasts longer.', mod: { key: 'w_shout.durPct', perRank: 0.2 } },
+        { id: 'w_t2a', tier: 2, name: 'Improved Rend', icon: '🩸', maxRank: 3, desc: '+ Rend damage.', mod: { key: 'w_rend.powerPct', perRank: 0.12 } },
+        { id: 'w_t2b', tier: 2, name: 'Anger Management', icon: '🔥', maxRank: 3, desc: 'Rage drains slower out of combat.', mod: { key: 'rageDecayPct', perRank: -0.15 } },
+        { id: 'w_t2c', tier: 2, name: 'Toughness', icon: '🪖', maxRank: 3, desc: '+ armor from all sources.', mod: { key: 'armorPct', perRank: 0.05 } },
+        { id: 'w_t3a', tier: 3, name: 'Unbridled Wrath', icon: '💢', maxRank: 5, desc: 'Chance to gain rage on hit.', mod: { key: 'rageOnHitChance', perRank: 0.06 } },
+        { id: 'w_t3b', tier: 3, name: 'Improved Execute', icon: '💀', maxRank: 2, desc: 'Execute usable below a higher health threshold.', mod: { key: 'w_execute.executeThreshold', perRank: 0.05 } },
+        { id: 'w_t4a', tier: 4, name: 'Death Wish', icon: '🖤', maxRank: 1, desc: 'Active: +20% damage dealt, +10% damage taken, 15s.', unlockAbility: { id: 'w_deathwish', name: 'Death Wish', icon: '🖤', kind: 'buff', cost: 10, cd: 90, self: true, buff: { dmgPct: 0.2, dmgTakenPct: 0.1, dur: 15 } } },
+        { id: 'w_t4b', tier: 4, name: 'Blood Craze', icon: '🩸', maxRank: 3, desc: 'Heal a sliver of max health when you land a crit.', mod: { key: 'critHealPct', perRank: 0.01 } },
+        { id: 'w_t5', tier: 5, name: 'Bloodthirst', icon: '🪣', maxRank: 1, desc: 'Unlocks Bloodthirst — a rage-hungry strike that heals you.', capstone: true }
+      ]
+    },
+    paladin: {
+      id: 'paladin', name: 'Paladin', icon: '🛡️', resource: 'mana', armor: 'plate', role: 'Melee / Heal / Tank',
+      primary: 'str', growth: { str: 1.8, agi: 0.6, int: 1.6, sta: 1.8, spirit: 1.2 },
+      blurb: 'Holy light and plate armor. Slow to fall, slower to give up.',
+      abilities: [
+        { id: 'p_judge', name: 'Judgement', icon: '⚖️', kind: 'melee', cost: 18, cd: 8, range: 1.6, power: 1.4, scalesWith: 'sp' },
+        { id: 'p_holylight', name: 'Holy Light', icon: '✨', kind: 'heal', cost: 30, cd: 0, castTime: 2.2, range: 20, power: 2.6, scalesWith: 'sp' },
+        { id: 'p_flash', name: 'Flash of Light', icon: '💡', kind: 'heal', cost: 18, cd: 0, castTime: 1.2, range: 20, power: 1.3, scalesWith: 'sp' },
+        { id: 'p_conc', name: 'Consecration', icon: '🔆', kind: 'aoe', cost: 22, cd: 8, range: 0, power: 0.7, scalesWith: 'sp', dot: { ticks: 4, interval: 1 } },
+        { id: 'p_might', name: 'Blessing of Might', icon: '💪', kind: 'buff', cost: 15, cd: 30, self: true, buff: { apFlat: 30, dur: 180 } },
+        { id: 'p_shield', name: 'Divine Shield', icon: '❇️', kind: 'buff', cost: 10, cd: 300, self: true, buff: { immune: true, dur: 8 } },
+        { id: 'p_holyshock', name: 'Holy Shock', icon: '⚡', kind: 'heal', cost: 28, cd: 6, range: 20, power: 2.0, scalesWith: 'sp', requiresTalent: 'p_t5' }
+      ],
+      talents: [
+        { id: 'p_t1a', tier: 1, name: 'Improved Judgement', icon: '⚖️', maxRank: 3, desc: '- Judgement cooldown.', mod: { key: 'p_judge.cdPct', perRank: -0.1 } },
+        { id: 'p_t1b', tier: 1, name: 'Divine Intellect', icon: '📘', maxRank: 3, desc: '+ Intellect.', mod: { key: 'statPct.int', perRank: 0.03 } },
+        { id: 'p_t1c', tier: 1, name: 'Redoubt', icon: '🩹', maxRank: 3, desc: '+ block chance.', mod: { key: 'block', perRank: 0.02 } },
+        { id: 'p_t2a', tier: 2, name: 'Improved Blessing of Might', icon: '💪', maxRank: 3, desc: '+ Blessing of Might attack power.', mod: { key: 'p_might.apFlatPct', perRank: 0.15 } },
+        { id: 'p_t2b', tier: 2, name: 'Illumination', icon: '🌟', maxRank: 3, desc: 'Healing crits refund mana.', mod: { key: 'healCritManaRefundPct', perRank: 0.15 } },
+        { id: 'p_t2c', tier: 2, name: 'Sanctity Aura', icon: '🌞', maxRank: 3, desc: '+ holy damage dealt.', mod: { key: 'holyDmgPct', perRank: 0.03 } },
+        { id: 'p_t3a', tier: 3, name: 'Seal of Command', icon: '🧷', maxRank: 3, desc: 'Melee hits proc bonus holy damage.', mod: { key: 'sealOfCommandChance', perRank: 0.06 } },
+        { id: 'p_t3b', tier: 3, name: 'Consecrated Ground', icon: '🔆', maxRank: 2, desc: '+ Consecration damage.', mod: { key: 'p_conc.powerPct', perRank: 0.15 } },
+        { id: 'p_t4a', tier: 4, name: 'Improved Holy Light', icon: '✨', maxRank: 2, desc: '+ Holy Light healing.', mod: { key: 'p_holylight.powerPct', perRank: 0.1 } },
+        { id: 'p_t4b', tier: 4, name: 'Sacred Duty', icon: '🛡️', maxRank: 3, desc: '+ Stamina.', mod: { key: 'statPct.sta', perRank: 0.03 } },
+        { id: 'p_t5', tier: 5, name: 'Holy Shock', icon: '⚡', maxRank: 1, desc: 'Unlocks Holy Shock — instant light that heals or burns.', capstone: true }
+      ]
+    },
+    hunter: {
+      id: 'hunter', name: 'Hunter', icon: '🏹', resource: 'mana', armor: 'mail', role: 'Ranged DPS',
+      primary: 'agi', growth: { str: 1.0, agi: 2.3, int: 0.9, sta: 1.5, spirit: 0.8 },
+      blurb: 'Never lets anything get close enough to matter.',
+      abilities: [
+        { id: 'h_arcane', name: 'Arcane Shot', icon: '🏹', kind: 'ranged', cost: 20, cd: 0, range: 18, power: 1.5, scalesWith: 'ap' },
+        { id: 'h_multi', name: 'Multi-Shot', icon: '🏹', kind: 'aoe', cost: 30, cd: 10, range: 18, power: 1.1, scalesWith: 'ap' },
+        { id: 'h_serpent', name: 'Serpent Sting', icon: '🐍', kind: 'ranged', cost: 15, cd: 0, range: 18, power: 0.35, scalesWith: 'ap', dot: { ticks: 5, interval: 3 } },
+        { id: 'h_concuss', name: 'Concussive Shot', icon: '❄️', kind: 'ranged', cost: 12, cd: 8, range: 18, power: 0.6, scalesWith: 'ap', snarePct: 0.5, snareDur: 4 },
+        { id: 'h_aimed', name: 'Aimed Shot', icon: '🎯', kind: 'ranged', cost: 30, cd: 6, castTime: 1.6, range: 24, power: 2.4, scalesWith: 'ap' },
+        { id: 'h_feign', name: 'Feign Death', icon: '💀', kind: 'utility', cost: 10, cd: 30, self: true, dropAggro: true },
+        { id: 'h_barrage', name: 'Barrage', icon: '💫', kind: 'aoe', cost: 35, cd: 15, range: 18, power: 2.0, scalesWith: 'ap', requiresTalent: 'h_t5' }
+      ],
+      talents: [
+        { id: 'h_t1a', tier: 1, name: 'Improved Arcane Shot', icon: '🏹', maxRank: 3, desc: '+ Arcane Shot damage.', mod: { key: 'h_arcane.powerPct', perRank: 0.1 } },
+        { id: 'h_t1b', tier: 1, name: 'Efficiency', icon: '📘', maxRank: 3, desc: '- ability mana costs.', mod: { key: 'costPct', perRank: -0.05 } },
+        { id: 'h_t1c', tier: 1, name: 'Lethal Shots', icon: '🎯', maxRank: 3, desc: '+ ranged crit chance.', mod: { key: 'rangedCrit', perRank: 0.02 } },
+        { id: 'h_t2a', tier: 2, name: 'Improved Serpent Sting', icon: '🐍', maxRank: 3, desc: '+ Serpent Sting damage.', mod: { key: 'h_serpent.powerPct', perRank: 0.12 } },
+        { id: 'h_t2b', tier: 2, name: 'Careful Aim', icon: '👁️', maxRank: 3, desc: '+ crit chance vs targets above 80% health.', mod: { key: 'carefulAimCrit', perRank: 0.05 } },
+        { id: 'h_t2c', tier: 2, name: 'Endurance Training', icon: '🩶', maxRank: 3, desc: '+ Stamina.', mod: { key: 'statPct.sta', perRank: 0.03 } },
+        { id: 'h_t3a', tier: 3, name: 'Rapid Killing', icon: '⏱️', maxRank: 2, desc: '- Aimed Shot cooldown.', mod: { key: 'h_aimed.cdPct', perRank: -0.15 } },
+        { id: 'h_t3b', tier: 3, name: 'Deterrence', icon: '🛡️', maxRank: 3, desc: '+ armor.', mod: { key: 'armorPct', perRank: 0.04 } },
+        { id: 'h_t4a', tier: 4, name: 'Trueshot', icon: '🏹', maxRank: 2, desc: '+ attack power.', mod: { key: 'apFlatPerRank', perRank: 12 } },
+        { id: 'h_t4b', tier: 4, name: 'Survivalist', icon: '❤️', maxRank: 3, desc: '+ max health.', mod: { key: 'healthPct', perRank: 0.03 } },
+        { id: 'h_t5', tier: 5, name: 'Barrage', icon: '💫', maxRank: 1, desc: 'Unlocks Barrage — a spread of arrows across every target ahead.', capstone: true }
+      ]
+    },
+    mage: {
+      id: 'mage', name: 'Mage', icon: '🔥', resource: 'mana', armor: 'cloth', role: 'Ranged DPS',
+      primary: 'int', growth: { str: 0.5, agi: 0.8, int: 2.5, sta: 1.2, spirit: 1.6 },
+      blurb: 'Fire, frost, and a way out of any room.',
+      abilities: [
+        { id: 'm_frostbolt', name: 'Frostbolt', icon: '❄️', kind: 'ranged', cost: 20, cd: 0, castTime: 1.6, range: 22, power: 1.7, scalesWith: 'sp', snarePct: 0.3, snareDur: 4 },
+        { id: 'm_fireball', name: 'Fireball', icon: '🔥', kind: 'ranged', cost: 26, cd: 0, castTime: 2.0, range: 22, power: 2.1, scalesWith: 'sp' },
+        { id: 'm_fireblast', name: 'Fire Blast', icon: '💥', kind: 'ranged', cost: 18, cd: 8, range: 18, power: 1.3, scalesWith: 'sp' },
+        { id: 'm_frostnova', name: 'Frost Nova', icon: '❆️', kind: 'aoe', cost: 20, cd: 25, range: 5, power: 0.4, scalesWith: 'sp', rootDur: 5 },
+        { id: 'm_arcane', name: 'Arcane Missiles', icon: '✨', kind: 'ranged', cost: 30, cd: 0, castTime: 2.4, range: 22, power: 2.6, scalesWith: 'sp' },
+        { id: 'm_barrier', name: 'Ice Barrier', icon: '🧊', kind: 'buff', cost: 24, cd: 30, self: true, buff: { shield: 2.0, dur: 60, scalesWith: 'sp' } },
+        { id: 'm_blink', name: 'Blink', icon: '🌀', kind: 'gap', cost: 10, cd: 15, range: 6, blink: true },
+        { id: 'm_pyroblast', name: 'Pyroblast', icon: '☄️', kind: 'ranged', cost: 40, cd: 8, castTime: 3.0, range: 22, power: 3.6, scalesWith: 'sp', requiresTalent: 'm_t5' }
+      ],
+      talents: [
+        { id: 'm_t1a', tier: 1, name: 'Improved Fireball', icon: '🔥', maxRank: 3, desc: '- Fireball cast time.', mod: { key: 'm_fireball.castPct', perRank: -0.08 } },
+        { id: 'm_t1b', tier: 1, name: 'Piercing Ice', icon: '❄️', maxRank: 3, desc: '+ frost damage.', mod: { key: 'frostDmgPct', perRank: 0.04 } },
+        { id: 'm_t1c', tier: 1, name: 'Arcane Focus', icon: '📘', maxRank: 3, desc: '- ability mana costs.', mod: { key: 'costPct', perRank: -0.05 } },
+        { id: 'm_t2a', tier: 2, name: 'Ignite', icon: '🔥', maxRank: 3, desc: 'Fire crits leave a burning dot.', mod: { key: 'ignitePct', perRank: 0.12 } },
+        { id: 'm_t2b', tier: 2, name: 'Arcane Concentration', icon: '✨', maxRank: 3, desc: 'Chance for your next cast to be instant.', mod: { key: 'clearcastChance', perRank: 0.03 } },
+        { id: 'm_t2c', tier: 2, name: 'Frost Warding', icon: '🧊', maxRank: 3, desc: '+ armor.', mod: { key: 'armorPct', perRank: 0.04 } },
+        { id: 'm_t3a', tier: 3, name: 'Improved Blink', icon: '🌀', maxRank: 2, desc: '- Blink cooldown.', mod: { key: 'm_blink.cdPct', perRank: -0.25 } },
+        { id: 'm_t3b', tier: 3, name: 'Winter’s Chill', icon: '❆️', maxRank: 3, desc: '+ crit chance vs snared targets.', mod: { key: 'critVsSnaredPct', perRank: 0.03 } },
+        { id: 'm_t4a', tier: 4, name: 'Arcane Instability', icon: '💫', maxRank: 3, desc: '+ spell damage and crit.', mod: { key: 'spellDmgPct', perRank: 0.02 } },
+        { id: 'm_t4b', tier: 4, name: 'Presence of Mind', icon: '🧠', maxRank: 3, desc: '+ max mana.', mod: { key: 'manaPct', perRank: 0.04 } },
+        { id: 'm_t5', tier: 5, name: 'Pyroblast', icon: '☄️', maxRank: 1, desc: 'Unlocks Pyroblast — a slow, devastating bolt of fire.', capstone: true }
+      ]
+    },
+    priest: {
+      id: 'priest', name: 'Priest', icon: '✝️', resource: 'mana', armor: 'cloth', role: 'Heal / Shadow DPS',
+      primary: 'int', growth: { str: 0.5, agi: 0.7, int: 2.3, sta: 1.3, spirit: 2.0 },
+      blurb: 'Light for the party, shadow for everyone else.',
+      abilities: [
+        { id: 'pr_smite', name: 'Smite', icon: '☀️', kind: 'ranged', cost: 18, cd: 0, castTime: 1.8, range: 20, power: 1.6, scalesWith: 'sp' },
+        { id: 'pr_heal', name: 'Heal', icon: '💚', kind: 'heal', cost: 26, cd: 0, castTime: 2.4, range: 20, power: 2.4, scalesWith: 'sp' },
+        { id: 'pr_pws', name: 'Power Word: Shield', icon: '🛡️', kind: 'buff', cost: 20, cd: 4, range: 20, buff: { shield: 1.6, dur: 30, scalesWith: 'sp' } },
+        { id: 'pr_renew', name: 'Renew', icon: '💚', kind: 'heal', cost: 16, cd: 0, range: 20, power: 0.5, scalesWith: 'sp', dot: { ticks: 5, interval: 3, heal: true } },
+        { id: 'pr_mindblast', name: 'Mind Blast', icon: '🧠', kind: 'ranged', cost: 22, cd: 8, range: 20, power: 1.8, scalesWith: 'sp' },
+        { id: 'pr_swp', name: 'Shadow Word: Pain', icon: '🌑', kind: 'ranged', cost: 14, cd: 0, range: 20, power: 0.3, scalesWith: 'sp', dot: { ticks: 6, interval: 3 } },
+        { id: 'pr_fade', name: 'Fade', icon: '👻', kind: 'utility', cost: 8, cd: 30, self: true, dropAggro: true },
+        { id: 'pr_mindflay', name: 'Mind Flay', icon: '🌀', kind: 'ranged', cost: 24, cd: 6, castTime: 3.0, range: 20, power: 2.4, scalesWith: 'sp', requiresTalent: 'pr_t5' }
+      ],
+      talents: [
+        { id: 'pr_t1a', tier: 1, name: 'Improved Healing', icon: '💚', maxRank: 3, desc: '+ Heal and Renew power.', mod: { key: 'healPowerPct', perRank: 0.04 } },
+        { id: 'pr_t1b', tier: 1, name: 'Spirit Tap', icon: '🌬️', maxRank: 3, desc: '+ mana regen from Spirit.', mod: { key: 'statPct.spirit', perRank: 0.03 } },
+        { id: 'pr_t1c', tier: 1, name: 'Improved Shield', icon: '🛡️', maxRank: 3, desc: '+ Power Word: Shield absorb.', mod: { key: 'pr_pws.shieldPct', perRank: 0.1 } },
+        { id: 'pr_t2a', tier: 2, name: 'Shadow Weaving', icon: '🌑', maxRank: 5, desc: 'Shadow Word: Pain stacks shadow damage taken.', mod: { key: 'shadowWeavingPct', perRank: 0.02 } },
+        { id: 'pr_t2b', tier: 2, name: 'Meditation', icon: '🧠', maxRank: 3, desc: 'Regenerate mana while casting.', mod: { key: 'manaRegenWhileCastingPct', perRank: 0.1 } },
+        { id: 'pr_t2c', tier: 2, name: 'Twin Disciplines', icon: '✝️', maxRank: 3, desc: '+ spell damage and healing.', mod: { key: 'spellDmgPct', perRank: 0.02 } },
+        { id: 'pr_t3a', tier: 3, name: 'Improved Mind Blast', icon: '🧠', maxRank: 2, desc: '- Mind Blast cooldown.', mod: { key: 'pr_mindblast.cdPct', perRank: -0.15 } },
+        { id: 'pr_t3b', tier: 3, name: 'Martyrdom', icon: '❤️', maxRank: 3, desc: '+ max health.', mod: { key: 'healthPct', perRank: 0.03 } },
+        { id: 'pr_t4a', tier: 4, name: 'Searing Light', icon: '☀️', maxRank: 2, desc: '+ Smite and Holy damage.', mod: { key: 'holyDmgPct', perRank: 0.05 } },
+        { id: 'pr_t4b', tier: 4, name: 'Focused Will', icon: '🛡️', maxRank: 3, desc: '- damage taken while below 50% health.', mod: { key: 'lowHealthMitigationPct', perRank: 0.03 } },
+        { id: 'pr_t5', tier: 5, name: 'Mind Flay', icon: '🌀', maxRank: 1, desc: 'Unlocks Mind Flay — a channelled lash of shadow.', capstone: true }
+      ]
+    },
+    rogue: {
+      id: 'rogue', name: 'Rogue', icon: '🗡️', resource: 'energy', armor: 'leather', role: 'Melee DPS',
+      primary: 'agi', growth: { str: 1.2, agi: 2.4, int: 0.4, sta: 1.6, spirit: 0.5 },
+      blurb: 'Energy regenerates fast. Combo points are what you do with it.',
+      comboPoints: true,
+      abilities: [
+        { id: 'r_sinister', name: 'Sinister Strike', icon: '🗡️', kind: 'melee', cost: 40, cd: 0, range: 1.6, power: 1.2, scalesWith: 'ap', generatesCombo: 1 },
+        { id: 'r_backstab', name: 'Backstab', icon: '🔪', kind: 'melee', cost: 55, cd: 0, range: 1.6, power: 1.7, scalesWith: 'ap', generatesCombo: 1 },
+        { id: 'r_eviscerate', name: 'Eviscerate', icon: '💢', kind: 'melee', cost: 35, cd: 0, range: 1.6, power: 1.1, scalesWith: 'ap', finisher: true },
+        { id: 'r_rupture', name: 'Rupture', icon: '🪨', kind: 'melee', cost: 30, cd: 0, range: 1.6, power: 0.5, scalesWith: 'ap', finisher: true, dot: { ticks: 4, interval: 2 } },
+        { id: 'r_sprint', name: 'Sprint', icon: '💨', kind: 'buff', cost: 0, cd: 120, self: true, buff: { speedPct: 0.5, dur: 15 } },
+        { id: 'r_kick', name: 'Kick', icon: '🦵', kind: 'melee', cost: 25, cd: 10, range: 1.6, power: 0.2, scalesWith: 'ap', interrupt: true },
+        { id: 'r_evasion', name: 'Evasion', icon: '💨', kind: 'buff', cost: 0, cd: 90, self: true, buff: { dodgeFlat: 0.5, dur: 10 } },
+        { id: 'r_adrenaline', name: 'Adrenaline Rush', icon: '⚡', kind: 'buff', cost: 0, cd: 120, self: true, buff: { energyRegenPct: 1.0, dur: 15 }, requiresTalent: 'r_t5' }
+      ],
+      talents: [
+        { id: 'r_t1a', tier: 1, name: 'Improved Sinister Strike', icon: '🗡️', maxRank: 3, desc: '+ Sinister Strike damage.', mod: { key: 'r_sinister.powerPct', perRank: 0.1 } },
+        { id: 'r_t1b', tier: 1, name: 'Lightning Reflexes', icon: '💨', maxRank: 3, desc: '+ Agility.', mod: { key: 'statPct.agi', perRank: 0.03 } },
+        { id: 'r_t1c', tier: 1, name: 'Malice', icon: '🎯', maxRank: 3, desc: '+ crit chance.', mod: { key: 'meleeCrit', perRank: 0.01 } },
+        { id: 'r_t2a', tier: 2, name: 'Improved Eviscerate', icon: '💢', maxRank: 3, desc: '+ Eviscerate damage per combo point.', mod: { key: 'r_eviscerate.powerPct', perRank: 0.08 } },
+        { id: 'r_t2b', tier: 2, name: 'Ruthlessness', icon: '🪨', maxRank: 3, desc: 'Finishers have a chance to leave a combo point behind.', mod: { key: 'ruthlessnessChance', perRank: 0.15 } },
+        { id: 'r_t2c', tier: 2, name: 'Precision', icon: '🎯', maxRank: 3, desc: '+ hit chance.', mod: { key: 'hitPct', perRank: 0.02 } },
+        { id: 'r_t3a', tier: 3, name: 'Dagger Specialization', icon: '🔪', maxRank: 3, desc: '+ damage with fast weapons.', mod: { key: 'meleeDmgPct', perRank: 0.03 } },
+        { id: 'r_t3b', tier: 3, name: 'Improved Kick', icon: '🦵', maxRank: 2, desc: '- Kick cooldown.', mod: { key: 'r_kick.cdPct', perRank: -0.2 } },
+        { id: 'r_t4a', tier: 4, name: 'Deadliness', icon: '🗡️', maxRank: 5, desc: '+ attack power.', mod: { key: 'apFlatPerRank', perRank: 6 } },
+        { id: 'r_t4b', tier: 4, name: 'Elusiveness', icon: '💨', maxRank: 2, desc: '+ dodge chance.', mod: { key: 'dodge', perRank: 0.03 } },
+        { id: 'r_t5', tier: 5, name: 'Adrenaline Rush', icon: '⚡', maxRank: 1, desc: 'Unlocks Adrenaline Rush — energy floods back for fifteen seconds.', capstone: true }
+      ]
+    }
+  };
+
+  function talentTiers() { return [0, 0, 5, 10, 15, 20]; } // index by tier (1..5)
+
+  // --- map builder --------------------------------------------------------
+  /* Rooms are rectangles, corridors are rectangles, and the border is
+   * whatever the grid started filled with — a small level-compiler instead
+   * of hand-aligned ASCII art, so every map is guaranteed rectangular and
+   * every carve is guaranteed to stay inside the walls. */
+  function mkGrid(w, h, fill) {
+    const cells = [];
+    for (let y = 0; y < h; y++) cells.push(new Array(w).fill(fill == null ? 1 : fill));
+    return { w, h, cells };
+  }
+  function carve(m, x0, y0, x1, y1, val) {
+    val = val == null ? 0 : val;
+    for (let y = Math.max(1, y0); y <= Math.min(m.h - 2, y1); y++)
+      for (let x = Math.max(1, x0); x <= Math.min(m.w - 2, x1); x++)
+        m.cells[y][x] = val;
+  }
+
+  // --- zones ----------------------------------------------------------------
+  const ZONES = {};
+
+  (function buildScar() {
+    const m = mkGrid(32, 26, 1);
+    carve(m, 2, 2, 9, 9);      // R1 Landing (spawn)
+    carve(m, 10, 5, 13, 6);    // corridor R1->R2
+    carve(m, 14, 2, 25, 10);   // R2 Vigil Camp (hub)
+    carve(m, 18, 11, 20, 14);  // corridor R2->R3
+    carve(m, 12, 15, 27, 23);  // R3 Cracked Yard
+    carve(m, 4, 10, 6, 13);    // corridor R1->R4
+    carve(m, 2, 14, 10, 23);   // R4 Ash Grove
+    carve(m, 28, 17, 30, 19);  // exit corridor R3 -> east
+    carve(m, 16, 6, 16, 6, 2); carve(m, 22, 6, 22, 6, 2); // hub pillars, accent colour
+    ZONES.scar = {
+      id: 'scar', name: 'The Scar', levelRange: [1, 8], grid: m,
+      palette: { wall1: '#7a2a1e', wall2: '#a9432c', floor: '#241512', ceil: '#120a08', fog: '#1a0d0a' },
+      spawn: { x: 5.5, y: 5.5, facing: 0 },
+      npcs: [
+        { id: 'scar_quartermaster', name: 'Quartermaster Ashe', kind: 'vendor', x: 17, y: 5, vendor: 'scar_vendor', icon: '🏰' },
+        { id: 'scar_trainer', name: 'Weaponsmaster Coll', kind: 'trainer', x: 22, y: 5, icon: '🏛️' },
+        { id: 'scar_proftrainer', name: 'Artisan Vey', kind: 'proftrainer', x: 20, y: 8, icon: '⚙️' },
+        { id: 'scar_qgiver1', name: 'Sentinel Dara', kind: 'quest', x: 15, y: 4, quests: ['scar_q1'], icon: '❗' },
+        { id: 'scar_qgiver2', name: 'Provisioner Holt', kind: 'quest', x: 19, y: 9, quests: ['scar_q2'], icon: '❗' },
+        { id: 'scar_commander', name: 'Vigil Commander Rask', kind: 'quest', x: 24, y: 4, quests: ['scar_q3', 'scar_q4'], icon: '❗' }
+      ],
+      nodes: [
+        { id: 'n1', kind: 'mining', tier: 1, x: 4, y: 17 }, { id: 'n2', kind: 'mining', tier: 1, x: 8, y: 20 },
+        { id: 'n3', kind: 'herb', tier: 1, x: 3, y: 21 }, { id: 'n4', kind: 'herb', tier: 1, x: 9, y: 15 }
+      ],
+      mobs: [
+        { tpl: 'ash_imp', x: 16, y: 19, n: 5, radius: 6 }, { tpl: 'cinder_whelp', x: 22, y: 20, n: 3, radius: 5 },
+        { tpl: 'branded_cultist', x: 5, y: 18, n: 3, radius: 4 }, { tpl: 'grudge_branded', x: 24, y: 21, n: 1, radius: 2, elite: true }
+      ],
+      exits: [{ x: 30, y: 18, r: 1.4, toZone: 'bloomreach', toX: 3, toY: 15.5, toFacing: 0 }]
+    };
+  })();
+
+  (function buildBloomreach() {
+    const m = mkGrid(32, 28, 1);
+    carve(m, 1, 12, 9, 19);    // R1 arrival (from scar)
+    carve(m, 10, 14, 12, 15);  // corridor R1->R2
+    carve(m, 13, 10, 24, 19);  // R2 Grove Heart (hub)
+    carve(m, 17, 8, 20, 10);   // corridor R2->R3
+    carve(m, 12, 2, 27, 8);    // R3 Wither Fields
+    carve(m, 17, 20, 20, 21);  // corridor R2->R4
+    carve(m, 13, 21, 24, 26);  // R4 Matriarch's Hollow
+    carve(m, 2, 3, 8, 7);      // Bruggo's cage room
+    carve(m, 9, 4, 11, 5);     // corridor cage->R3
+    carve(m, 25, 13, 30, 15);  // exit corridor -> east (frostmarch)
+    ZONES.bloomreach = {
+      id: 'bloomreach', name: 'Bloomreach', levelRange: [6, 14], grid: m,
+      palette: { wall1: '#274f2a', wall2: '#3f7a3c', floor: '#132015', ceil: '#0a120b', fog: '#0d160e' },
+      spawn: { x: 5.5, y: 15.5, facing: 0 },
+      npcs: [
+        { id: 'bloom_vendor', name: 'Circle Warden Fenn', kind: 'vendor', x: 15, y: 14, vendor: 'bloom_vendor', icon: '🌿' },
+        { id: 'bloom_qgiver1', name: 'Seedkeeper Yara', kind: 'quest', x: 18, y: 13, quests: ['bloom_q1'], icon: '❗' },
+        { id: 'bloom_qgiver2', name: 'Ranger Tolvain', kind: 'quest', x: 20, y: 15, quests: ['bloom_q2', 'bloom_q3'], icon: '❗' },
+        { id: 'bloom_finale', name: 'Elder Sythe', kind: 'quest', x: 16, y: 17, quests: ['bloom_q4'], icon: '❗' },
+        { id: 'bruggo', name: 'Bruggo Ironhide', kind: 'companion', x: 5, y: 5, quests: ['bloom_q_bruggo'], companion: 'bruggo', icon: '🫥' }
+      ],
+      nodes: [
+        { id: 'n1', kind: 'herb', tier: 2, x: 15, y: 4 }, { id: 'n2', kind: 'herb', tier: 2, x: 24, y: 6 },
+        { id: 'n3', kind: 'mining', tier: 2, x: 20, y: 3 }
+      ],
+      mobs: [
+        { tpl: 'withered_sapling', x: 16, y: 5, n: 5, radius: 6 }, { tpl: 'withered_treant', x: 22, y: 5, n: 3, radius: 5 },
+        { tpl: 'blight_hound', x: 14, y: 3, n: 4, radius: 5 }, { tpl: 'matriarch_withered', x: 18, y: 24, n: 1, radius: 3, elite: true }
+      ],
+      exits: [
+        { x: 1, y: 15, r: 1.4, toZone: 'scar', toX: 29, toY: 18, toFacing: Math.PI },
+        { x: 30, y: 14, r: 1.4, toZone: 'frostmarch', toX: 3, toY: 6, toFacing: 0 }
+      ]
+    };
+  })();
+
+  (function buildFrostmarch() {
+    const m = mkGrid(32, 28, 1);
+    carve(m, 2, 5, 12, 7);     // arrival corridor
+    carve(m, 13, 2, 24, 10);   // R1 Warden Hold (hub)
+    carve(m, 15, 11, 17, 13);  // corridor R1->R2
+    carve(m, 2, 14, 17, 23);   // R2 Wraith Hollow
+    carve(m, 22, 11, 24, 13);  // corridor R1->R3
+    carve(m, 20, 14, 29, 23);  // R3 Sigil Crypt
+    ZONES.frostmarch = {
+      id: 'frostmarch', name: 'Frostmarch', levelRange: [12, 22], grid: m,
+      palette: { wall1: '#1f3a52', wall2: '#3a6a90', floor: '#0d1620', ceil: '#070d12', fog: '#0a141c' },
+      spawn: { x: 3, y: 6, facing: 0 },
+      npcs: [
+        { id: 'frost_vendor', name: 'Quartermaster Bren', kind: 'vendor', x: 18, y: 5, vendor: 'frost_vendor', icon: '❄️' },
+        { id: 'frost_qgiver1', name: 'Warden Iska', kind: 'quest', x: 15, y: 7, quests: ['frost_q1'], icon: '❗' },
+        { id: 'frost_qgiver2', name: 'Scout Perren', kind: 'quest', x: 21, y: 7, quests: ['frost_q2', 'frost_q3'], icon: '❗' },
+        { id: 'frost_sigilgiver', name: 'Commander Vashe', kind: 'quest', x: 18, y: 3, quests: ['frost_q4', 'frost_q5'], icon: '❗' },
+        { id: 'sistervell', name: 'Sister Vell', kind: 'companion', x: 25, y: 21, quests: ['frost_q_vell'], companion: 'vell', icon: '🫧' }
+      ],
+      nodes: [
+        { id: 'n1', kind: 'mining', tier: 3, x: 5, y: 18 }, { id: 'n2', kind: 'mining', tier: 3, x: 14, y: 21 },
+        { id: 'n3', kind: 'herb', tier: 3, x: 9, y: 16 }
+      ],
+      mobs: [
+        { tpl: 'frost_wraith', x: 8, y: 19, n: 4, radius: 6 }, { tpl: 'rime_stalker', x: 13, y: 18, n: 3, radius: 5 },
+        { tpl: 'warden_construct', x: 22, y: 19, n: 3, radius: 5 }, { tpl: 'sigil_keeper', x: 26, y: 17, n: 1, radius: 2, elite: true }
+      ],
+      portal: { x: 24, y: 20, requiresFlag: 'vault_sigil', toZone: 'hollow', toX: 3.5, toY: 11, toFacing: 0 },
+      exits: [{ x: 2, y: 6, r: 1.4, toZone: 'bloomreach', toX: 29, toY: 14, toFacing: Math.PI }]
+    };
+  })();
+
+  (function buildHollow() {
+    const m = mkGrid(26, 22, 1);
+    carve(m, 2, 9, 7, 13);     // R1 entry hall
+    carve(m, 8, 10, 12, 12);   // hub junction
+    carve(m, 11, 2, 20, 7);    // R2 trash hall A
+    carve(m, 11, 14, 20, 19);  // R3 trash hall B
+    carve(m, 12, 8, 12, 14);   // vertical spine linking R2/junction/R3
+    carve(m, 12, 10, 15, 12);  // junction -> boss corridor
+    carve(m, 16, 9, 23, 13);   // R4 boss chamber
+    ZONES.hollow = {
+      id: 'hollow', name: 'The Hollow King’s Vault', levelRange: [20, 27], grid: m, instance: true,
+      palette: { wall1: '#2a1a3a', wall2: '#4a2a66', floor: '#100916', ceil: '#08050c', fog: '#0c0712' },
+      spawn: { x: 3.5, y: 11, facing: 0 },
+      npcs: [],
+      nodes: [],
+      mobs: [
+        { tpl: 'vault_wraith', x: 15, y: 4, n: 3, radius: 4 }, { tpl: 'bone_guard', x: 15, y: 16, n: 3, radius: 4 },
+        { tpl: 'hollow_king', x: 20, y: 11, n: 1, radius: 2, elite: true, boss: true }
+      ],
+      exits: [{ x: 4, y: 11, r: 1.2, toZone: 'frostmarch', toX: 23, toY: 20, toFacing: Math.PI }]
+    };
+  })();
+
+  // --- bestiary ---------------------------------------------------------------
+  const BESTIARY = {
+    ash_imp: { name: 'Ash Imp', icon: '👹', level: [1, 3], hp: 22, dmg: 4, armor: 5, speed: 2.2, aggroRadius: 5, xp: 14, loot: 'trash_low', faction: 'ashenvigil_hostile' },
+    cinder_whelp: { name: 'Cinder Whelp', icon: '🦎', level: [2, 4], hp: 30, dmg: 5, armor: 8, speed: 2.0, aggroRadius: 5, xp: 20, loot: 'trash_low', faction: 'ashenvigil_hostile', dropItem: { id: 'sulfur_shard', chance: 0.5 } },
+    branded_cultist: { name: 'Branded Cultist', icon: '🗡️', level: [3, 6], hp: 46, dmg: 7, armor: 12, speed: 1.9, aggroRadius: 6, xp: 30, loot: 'trash_mid', faction: 'ashenvigil_hostile' },
+    grudge_branded: { name: 'Grudge, the Branded', icon: '🔥', level: [8, 8], hp: 260, dmg: 14, armor: 25, speed: 2.0, aggroRadius: 8, xp: 160, loot: 'elite_scar', faction: 'ashenvigil_hostile', elite: true, ability: { every: 6, name: 'Brand of Ash', radius: 3, dmg: 18 } },
+
+    withered_sapling: { name: 'Withered Sapling', icon: '🌱', level: [6, 8], hp: 60, dmg: 8, armor: 10, speed: 1.8, aggroRadius: 5, xp: 40, loot: 'trash_mid', faction: 'bloomreach_hostile' },
+    withered_treant: { name: 'Withered Treant', icon: '🌳', level: [8, 11], hp: 130, dmg: 12, armor: 30, speed: 1.3, aggroRadius: 5, xp: 65, loot: 'trash_mid', faction: 'bloomreach_hostile' },
+    blight_hound: { name: 'Blight Hound', icon: '🐺', level: [9, 12], hp: 85, dmg: 11, armor: 12, speed: 3.0, aggroRadius: 7, xp: 58, loot: 'trash_mid', faction: 'bloomreach_hostile' },
+    matriarch_withered: { name: 'The Withered Matriarch', icon: '🥀', level: [14, 14], hp: 520, dmg: 20, armor: 35, speed: 1.6, aggroRadius: 9, xp: 340, loot: 'elite_bloom', faction: 'bloomreach_hostile', elite: true, ability: { every: 8, name: 'Wilting Bloom', radius: 4, dmg: 26, dot: true } },
+
+    frost_wraith: { name: 'Frost Wraith', icon: '👻', level: [12, 15], hp: 150, dmg: 16, armor: 20, speed: 2.2, aggroRadius: 7, xp: 95, loot: 'trash_high', faction: 'frostmarch_hostile' },
+    rime_stalker: { name: 'Rime Stalker', icon: '🐾', level: [14, 17], hp: 190, dmg: 20, armor: 22, speed: 2.8, aggroRadius: 8, xp: 120, loot: 'trash_high', faction: 'frostmarch_hostile' },
+    warden_construct: { name: 'Warden Construct', icon: '🗿', level: [16, 19], hp: 320, dmg: 22, armor: 45, speed: 1.2, aggroRadius: 6, xp: 165, loot: 'trash_high', faction: 'frostmarch_hostile' },
+    sigil_keeper: { name: 'The Sigil Keeper', icon: '🔑', level: [20, 20], hp: 640, dmg: 28, armor: 40, speed: 1.8, aggroRadius: 9, xp: 420, loot: 'elite_frost', faction: 'frostmarch_hostile', elite: true, dropItem: { id: 'vault_sigil', chance: 1.0 }, ability: { every: 7, name: 'Rime Lock', radius: 5, dmg: 20, snare: true } },
+
+    vault_wraith: { name: 'Vault Wraith', icon: '👻', level: [20, 22], hp: 300, dmg: 26, armor: 30, speed: 2.4, aggroRadius: 7, xp: 220, loot: 'trash_dungeon', faction: 'hollow_hostile' },
+    bone_guard: { name: 'Bone Guard', icon: '💀', level: [21, 23], hp: 380, dmg: 30, armor: 50, speed: 1.6, aggroRadius: 6, xp: 260, loot: 'trash_dungeon', faction: 'hollow_hostile' },
+    hollow_king: {
+      name: 'The Hollow King', icon: '👑', level: [26, 26], hp: 3200, dmg: 40, armor: 60, speed: 1.6, aggroRadius: 12, xp: 2400, loot: 'boss_hollow', faction: 'hollow_hostile', elite: true, boss: true,
+      ability: { every: 5, name: 'Despair', radius: 4, dmg: 34 },
+      enrageAt: 0.5, enrageAbility: { every: 4, name: 'Hollow Nova', radius: 6, dmg: 44 }
+    }
+  };
+
+  // --- loot tables --------------------------------------------------------
+  const LOOT_TABLES = {
+    trash_low: { gold: [1, 4], itemChance: 0.22, ilvlBonus: -1, qualityFloor: null },
+    trash_mid: { gold: [3, 8], itemChance: 0.28, ilvlBonus: 0, qualityFloor: null },
+    trash_high: { gold: [6, 14], itemChance: 0.32, ilvlBonus: 1, qualityFloor: null },
+    trash_dungeon: { gold: [10, 20], itemChance: 0.4, ilvlBonus: 2, qualityFloor: 'uncommon' },
+    elite_scar: { gold: [15, 25], itemChance: 0.9, ilvlBonus: 2, qualityFloor: 'uncommon', guaranteed: [{ id: 'ashguard_cinderplate', chance: 0.25 }] },
+    elite_bloom: { gold: [30, 45], itemChance: 0.95, ilvlBonus: 3, qualityFloor: 'rare', guaranteed: [{ id: 'bloomreach_wardstaff', chance: 0.2 }] },
+    elite_frost: { gold: [45, 65], itemChance: 1.0, ilvlBonus: 3, qualityFloor: 'rare', guaranteed: [{ id: 'frostmarch_bulwark', chance: 0.15 }] },
+    boss_hollow: { gold: [120, 180], itemChance: 1.0, ilvlBonus: 6, qualityFloor: 'epic', guaranteed: [{ id: 'hollow_kings_crown', chance: 0.35 }] }
+  };
+
+  // --- quests -----------------------------------------------------------------
+  const QUESTS = {
+    scar_q1: { id: 'scar_q1', zone: 'scar', name: 'Blood on the Ash', giver: 'scar_qgiver1', turnin: 'scar_qgiver1', level: 1, kind: 'kill', target: 'ash_imp', count: 8, xp: 120, gold: 6, text: 'Ash Imps have been probing the Vigil’s outer wards. Thin their numbers.' },
+    scar_q2: { id: 'scar_q2', zone: 'scar', name: 'Vigil Supplies', giver: 'scar_qgiver2', turnin: 'scar_qgiver2', level: 2, kind: 'collect', item: 'sulfur_shard', count: 6, xp: 150, gold: 8, rewardChoice: true, text: 'Cinder Whelps hoard sulfur shards. The quartermaster wants six for the forges.' },
+    scar_q3: { id: 'scar_q3', zone: 'scar', name: 'The Cracked Yard', giver: 'scar_commander', turnin: 'scar_commander', level: 7, requires: ['scar_q1', 'scar_q2'], kind: 'kill', target: 'grudge_branded', count: 1, xp: 260, gold: 20, rep: { faction: 'ashenvigil', amount: 250 }, text: 'Grudge has claimed the yard and everything that wanders into it. End him.' },
+    scar_q4: { id: 'scar_q4', zone: 'scar', name: 'Through the Vigil Gate', giver: 'scar_commander', turnin: 'scar_commander', level: 8, requires: ['scar_q3'], kind: 'talk', xp: 200, gold: 15, rep: { faction: 'ashenvigil', amount: 150 }, text: 'The road east is as clear as the Vigil can make it. What lies past Bloomreach is yours to find.' },
+
+    bloom_q1: { id: 'bloom_q1', zone: 'bloomreach', name: 'The Withering', giver: 'bloom_qgiver1', turnin: 'bloom_qgiver1', level: 6, kind: 'kill', target: 'withered_sapling', count: 10, xp: 220, gold: 12, text: 'The blight took the saplings first. Put them out of it.' },
+    bloom_q2: { id: 'bloom_q2', zone: 'bloomreach', name: 'Hound Culling', giver: 'bloom_qgiver2', turnin: 'bloom_qgiver2', level: 9, kind: 'kill', target: 'blight_hound', count: 8, xp: 260, gold: 15, text: 'Blight hounds run in packs now. That is new, and it is not good.' },
+    bloom_q3: { id: 'bloom_q3', zone: 'bloomreach', name: 'Root and Stem', giver: 'bloom_qgiver2', turnin: 'bloom_qgiver2', level: 11, requires: ['bloom_q1'], kind: 'kill', target: 'withered_treant', count: 6, xp: 300, gold: 18, rep: { faction: 'bloomreach', amount: 200 }, text: 'The treants that remember being trees are the ones worth saving. These do not.' },
+    bloom_q4: { id: 'bloom_q4', zone: 'bloomreach', name: 'The Withered Matriarch', giver: 'bloom_finale', turnin: 'bloom_finale', level: 14, requires: ['bloom_q2', 'bloom_q3'], kind: 'kill', target: 'matriarch_withered', count: 1, xp: 420, gold: 35, rep: { faction: 'bloomreach', amount: 400 }, text: 'She was the Circle’s eldest once. What she is now has to be ended, not reasoned with.' },
+    bloom_q_bruggo: { id: 'bloom_q_bruggo', zone: 'bloomreach', name: 'Free the Prisoner', giver: 'bruggo', turnin: 'bruggo', level: 6, kind: 'talk', xp: 100, gold: 5, companion: 'bruggo', text: 'A warrior in a bramble cage, still breathing out of spite. Let him out.' },
+
+    frost_q1: { id: 'frost_q1', zone: 'frostmarch', name: 'Cold Contact', giver: 'frost_qgiver1', turnin: 'frost_qgiver1', level: 12, kind: 'kill', target: 'frost_wraith', count: 8, xp: 320, gold: 20, text: 'Wraiths bleed cold instead of blood. Eight of them, less cold.' },
+    frost_q2: { id: 'frost_q2', zone: 'frostmarch', name: 'Stalked', giver: 'frost_qgiver2', turnin: 'frost_qgiver2', level: 15, kind: 'kill', target: 'rime_stalker', count: 8, xp: 360, gold: 24, text: 'They hunt in the low light. Hunt them back.' },
+    frost_q3: { id: 'frost_q3', zone: 'frostmarch', name: 'Warden’s Work', giver: 'frost_qgiver2', turnin: 'frost_qgiver2', level: 17, requires: ['frost_q2'], kind: 'kill', target: 'warden_construct', count: 6, xp: 400, gold: 28, rep: { faction: 'frostmarch', amount: 250 }, text: 'The constructs guard nothing anymore except the thing that woke them.' },
+    frost_q4: { id: 'frost_q4', zone: 'frostmarch', name: 'The Last Warden', giver: 'frost_sigilgiver', turnin: 'sistervell', level: 16, kind: 'talk', xp: 150, gold: 10, companion: 'vell', text: 'One warden made it back from the crypt. Barely.' },
+    frost_q5: { id: 'frost_q5', zone: 'frostmarch', name: 'The Sealed Vault', giver: 'frost_sigilgiver', turnin: 'frost_sigilgiver', level: 20, requires: ['frost_q3', 'frost_q4'], kind: 'kill', target: 'sigil_keeper', count: 1, xp: 500, gold: 50, rep: { faction: 'frostmarch', amount: 400 }, grantsFlag: 'vault_sigil', text: 'The Sigil Keeper carries the key to whatever the Wardens sealed. Take it from him.' },
+    hollow_q1: { id: 'hollow_q1', zone: 'frostmarch', name: 'Slay the Hollow King', giver: 'frost_sigilgiver', turnin: 'frost_sigilgiver', level: 24, requires: ['frost_q5'], kind: 'kill', target: 'hollow_king', count: 1, xp: 1200, gold: 150, rep: { faction: 'hollowcourt', amount: 500 }, text: 'What the Wardens sealed away is still breathing. It should stop.' }
+  };
+
+  // --- factions -----------------------------------------------------------
+  const FACTION_TIERS = [
+    { name: 'Hated', min: -3000 }, { name: 'Neutral', min: 0 }, { name: 'Friendly', min: 500 },
+    { name: 'Honored', min: 1500 }, { name: 'Revered', min: 3000 }, { name: 'Exalted', min: 6000 }
+  ];
+  const FACTIONS = {
+    ashenvigil: { id: 'ashenvigil', name: 'The Ashen Vigil', zone: 'scar' },
+    bloomreach: { id: 'bloomreach', name: 'Bloomreach Circle', zone: 'bloomreach' },
+    frostmarch: { id: 'frostmarch', name: 'Frostmarch Wardens', zone: 'frostmarch' },
+    hollowcourt: { id: 'hollowcourt', name: 'Court of the Hollow King', zone: 'hollow' }
+  };
+  function repTier(rep) {
+    let t = FACTION_TIERS[0];
+    for (const tier of FACTION_TIERS) if (rep >= tier.min) t = tier;
+    return t;
+  }
+
+  // --- professions --------------------------------------------------------
+  const GATHER_PROFESSIONS = {
+    mining: { id: 'mining', name: 'Mining', icon: '⛏️', mats: { 1: 'copper_ore', 2: 'iron_ore', 3: 'mithril_ore' } },
+    herb: { id: 'herb', name: 'Herbalism', icon: '🌿', mats: { 1: 'silverleaf', 2: 'briarroot', 3: 'frostbloom' } }
+  };
+  const CRAFT_PROFESSIONS = {
+    blacksmithing: {
+      id: 'blacksmithing', name: 'Blacksmithing', icon: '🔨', uses: ['copper_ore', 'iron_ore', 'mithril_ore'],
+      recipes: [
+        { id: 'bs_r1', name: 'Copper Bracers', skillReq: 0, mats: { copper_ore: 4 }, result: { slot: 'wrist', ilvl: 6, quality: 'common' } },
+        { id: 'bs_r2', name: 'Iron Gauntlets', skillReq: 75, mats: { iron_ore: 6 }, result: { slot: 'hands', ilvl: 14, quality: 'uncommon' } },
+        { id: 'bs_r3', name: 'Vigil-Forged Greataxe', skillReq: 150, mats: { iron_ore: 8, mithril_ore: 2 }, result: { slot: 'mainhand', ilvl: 20, quality: 'rare', styleHint: 'str' } },
+        { id: 'bs_r4', name: 'Mithril Legplates', skillReq: 225, mats: { mithril_ore: 10 }, result: { slot: 'legs', ilvl: 26, quality: 'rare' } }
+      ]
+    },
+    alchemy: {
+      id: 'alchemy', name: 'Alchemy', icon: '⚗️', uses: ['silverleaf', 'briarroot', 'frostbloom'],
+      recipes: [
+        { id: 'al_r1', name: 'Minor Healing Draught', skillReq: 0, mats: { silverleaf: 3 }, result: { potion: 'heal', power: 60 } },
+        { id: 'al_r2', name: 'Draught of Swiftness', skillReq: 75, mats: { briarroot: 3 }, result: { potion: 'speed', power: 0.3 } },
+        { id: 'al_r3', name: 'Greater Healing Draught', skillReq: 150, mats: { briarroot: 3, silverleaf: 2 }, result: { potion: 'heal', power: 160 } },
+        { id: 'al_r4', name: 'Frostbloom Elixir', skillReq: 225, mats: { frostbloom: 4 }, result: { potion: 'heal', power: 320 } }
+      ]
+    },
+    enchanting: {
+      id: 'enchanting', name: 'Enchanting', icon: '✨', uses: ['dust'],
+      recipes: [
+        { id: 'en_r1', name: 'Enchant: Minor Stamina', skillReq: 0, mats: { dust: 2 }, result: { enchant: { sta: 4 } } },
+        { id: 'en_r2', name: 'Enchant: Lesser Might', skillReq: 75, mats: { dust: 4 }, result: { enchant: { str: 5, agi: 5 } } },
+        { id: 'en_r3', name: 'Enchant: Greater Intellect', skillReq: 150, mats: { dust: 6 }, result: { enchant: { int: 8 } } },
+        { id: 'en_r4', name: 'Enchant: Vigil’s Wrath', skillReq: 225, mats: { dust: 10 }, result: { enchant: { crit: 8, haste: 4 } } }
+      ]
+    }
+  };
+  const SKILL_TIER_NAME = s => s >= 225 ? 'Artisan' : s >= 150 ? 'Expert' : s >= 75 ? 'Journeyman' : 'Apprentice';
+
+  // --- vendor stock ---------------------------------------------------------
+  const VENDORS = {
+    scar_vendor: { fixed: ['ashguard_cinderplate'], generated: [{ slot: 'chest', ilvl: 8, quality: 'common' }, { slot: 'feet', ilvl: 8, quality: 'common' }, { slot: 'mainhand', ilvl: 8, quality: 'common' }], repFaction: 'ashenvigil', repGated: [{ slot: 'shoulder', ilvl: 14, quality: 'uncommon', tier: 'Friendly' }] },
+    bloom_vendor: { fixed: [], generated: [{ slot: 'legs', ilvl: 12, quality: 'common' }, { slot: 'offhand', ilvl: 12, quality: 'common' }, { slot: 'ring1', ilvl: 12, quality: 'uncommon' }], repFaction: 'bloomreach', repGated: [{ slot: 'chest', ilvl: 18, quality: 'rare', tier: 'Honored' }] },
+    frost_vendor: { fixed: ['frostmarch_bulwark'], generated: [{ slot: 'head', ilvl: 18, quality: 'uncommon' }, { slot: 'waist', ilvl: 18, quality: 'uncommon' }, { slot: 'trinket1', ilvl: 18, quality: 'uncommon' }], repFaction: 'frostmarch', repGated: [{ slot: 'mainhand', ilvl: 24, quality: 'rare', tier: 'Revered' }] }
+  };
+
+  DS.content = {
+    LEVEL_CAP, TALENT_START_LEVEL, SLOTS, SLOT_WEIGHT, QUALITIES, QUALITY_BY_KEY,
+    rollQuality, rollItem, CURATED_ITEMS, CLASSES, talentTiers,
+    ZONES, BESTIARY, LOOT_TABLES, QUESTS, FACTIONS, FACTION_TIERS, repTier,
+    GATHER_PROFESSIONS, CRAFT_PROFESSIONS, SKILL_TIER_NAME, VENDORS
+  };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — the renderer and the touch input, and nothing else.
+ *
+ * The renderer is deliberately the simplest raycaster that still reads as
+ * Doom: vertical-strip DDA walls in one flat colour per wall type, shaded by
+ * side and by distance, no textures. Floor and ceiling are cheap horizontal
+ * bands rather than per-pixel casting. Sprites are a coloured disc and an
+ * emoji glyph, billboarded and depth-tested against the wall the ray behind
+ * them actually hit. That is the whole trick; everything else in the game
+ * is the MMO sitting on top of it.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const FOV = 1.15; // ~66 degrees, classic Doom-ish field of view
+
+  function wallColorFor(cellVal, palette) {
+    return cellVal === 2 ? palette.wall2 : palette.wall1;
+  }
+  function shade(hex, factor) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = C.clamp(Math.round(r * factor), 0, 255);
+    g = C.clamp(Math.round(g * factor), 0, 255);
+    b = C.clamp(Math.round(b * factor), 0, 255);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  /* Casts every column, draws floor/ceiling/walls straight to ctx, and
+   * returns the per-column depth buffer sprites are tested against. */
+  function castWalls(ctx, W, H, zone, player) {
+    const grid = zone.grid, pal = zone.palette;
+    const dirX = Math.cos(player.angle), dirY = Math.sin(player.angle);
+    const planeLen = Math.tan(FOV / 2);
+    const planeX = -dirY * planeLen, planeY = dirX * planeLen;
+    const zbuffer = new Float32Array(W);
+    const half = H / 2;
+
+    // Floor and ceiling: cheap distance-shaded horizontal bands.
+    ctx.fillStyle = pal.ceil; ctx.fillRect(0, 0, W, half);
+    ctx.fillStyle = pal.floor; ctx.fillRect(0, half, W, half);
+    const bandStep = Math.max(2, Math.floor(H / 90));
+    for (let y = half; y < H; y += bandStep) {
+      const rowDist = half / (y - half + 1) * 0.9;
+      const f = C.clamp(1.15 - rowDist * 0.10, 0.18, 1.0);
+      ctx.fillStyle = shade(pal.floor, f);
+      ctx.fillRect(0, y, W, bandStep);
+      const cy = H - y - bandStep;
+      ctx.fillStyle = shade(pal.ceil, f * 0.85);
+      ctx.fillRect(0, Math.max(0, cy), W, bandStep);
+    }
+
+    for (let x = 0; x < W; x++) {
+      const cameraX = (2 * x) / W - 1;
+      const rayDirX = dirX + planeX * cameraX;
+      const rayDirY = dirY + planeY * cameraX;
+      let mapX = Math.floor(player.x), mapY = Math.floor(player.y);
+      const deltaDistX = rayDirX === 0 ? 1e30 : Math.abs(1 / rayDirX);
+      const deltaDistY = rayDirY === 0 ? 1e30 : Math.abs(1 / rayDirY);
+      let stepX, stepY, sideDistX, sideDistY;
+      if (rayDirX < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
+      else { stepX = 1; sideDistX = (mapX + 1 - player.x) * deltaDistX; }
+      if (rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
+      else { stepY = 1; sideDistY = (mapY + 1 - player.y) * deltaDistY; }
+
+      let side = 0, hitVal = 1, steps = 0;
+      while (steps++ < 256) {
+        if (sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
+        else { sideDistY += deltaDistY; mapY += stepY; side = 1; }
+        if (mapX < 0 || mapY < 0 || mapX >= grid.w || mapY >= grid.h) { hitVal = 1; break; }
+        const v = grid.cells[mapY][mapX];
+        if (v !== 0) { hitVal = v; break; }
+      }
+      const perp = side === 0 ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
+      const dist = Math.max(0.05, perp);
+      zbuffer[x] = dist;
+      const lineH = Math.min(H * 4, H / dist);
+      const drawStart = Math.max(0, half - lineH / 2);
+      const drawEnd = Math.min(H, half + lineH / 2);
+      const fog = C.clamp(1 - dist / 16, 0.12, 1);
+      const sideShade = side === 1 ? 0.72 : 1.0;
+      ctx.fillStyle = shade(wallColorFor(hitVal, pal), fog * sideShade);
+      ctx.fillRect(x, drawStart, 1, Math.max(1, drawEnd - drawStart));
+    }
+    return zbuffer;
+  }
+
+  /* Projects a world point into screen space against the same camera used
+   * for the walls this frame, so sprites and nameplates line up. */
+  function project(player, W, H, ex, ey) {
+    const dirX = Math.cos(player.angle), dirY = Math.sin(player.angle);
+    const planeLen = Math.tan(FOV / 2);
+    const planeX = -dirY * planeLen, planeY = dirX * planeLen;
+    const sx = ex - player.x, sy = ey - player.y;
+    const invDet = 1 / (planeX * dirY - dirX * planeY);
+    const tx = invDet * (dirY * sx - dirX * sy);
+    const ty = invDet * (-planeY * sx + planeX * sy);
+    if (ty <= 0.05) return { visible: false, depth: ty };
+    const screenX = (W / 2) * (1 + tx / ty);
+    const scale = H / ty;
+    return { visible: true, depth: ty, screenX, scale };
+  }
+
+  /* Draws one billboard: a team-coloured disc with an emoji glyph on it,
+   * clipped by the wall depth buffer at its own screen column. */
+  function drawSprite(ctx, W, H, zbuffer, proj, opts) {
+    if (!proj.visible) return;
+    const col = C.clamp(Math.floor(proj.screenX), 0, W - 1);
+    if (proj.depth > zbuffer[col] + 0.15) return;
+    const size = C.clamp(proj.scale * (opts.height || 0.9), 4, H * 1.4);
+    const cy = H / 2 + H / 2 - size * (opts.footOffset != null ? opts.footOffset : 0.5);
+    const top = cy - size;
+    if (proj.screenX < -size || proj.screenX > W + size) return;
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = opts.ring || '#c0392b';
+    ctx.beginPath();
+    ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42, size * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = `${Math.max(8, size * 0.62)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(opts.icon || '?', proj.screenX, cy - size * 0.52);
+    ctx.restore();
+    return { screenX: proj.screenX, top, size, cy };
+  }
+
+  function minimap(ctx, canvas, zone, player, entities) {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(6,10,18,0.72)';
+    ctx.fillRect(0, 0, W, H);
+    const grid = zone.grid;
+    const range = 11; // world units shown across the minimap
+    const scale = W / (range * 2);
+    const px = player.x, py = player.y;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(-player.angle + Math.PI / 2);
+    const x0 = Math.max(0, Math.floor(px - range)), x1 = Math.min(grid.w - 1, Math.ceil(px + range));
+    const y0 = Math.max(0, Math.floor(py - range)), y1 = Math.min(grid.h - 1, Math.ceil(py + range));
+    ctx.fillStyle = 'rgba(220,230,247,0.16)';
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (grid.cells[y][x] === 0) ctx.fillRect((x - px) * scale, (y - py) * scale, scale + 1, scale + 1);
+    }
+    (entities || []).forEach(e => {
+      ctx.fillStyle = e.color || '#e0655a';
+      ctx.beginPath();
+      ctx.arc((e.x - px) * scale, (e.y - py) * scale, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+    ctx.fillStyle = '#79c07a';
+    ctx.beginPath();
+    ctx.moveTo(W / 2, H / 2 - 6); ctx.lineTo(W / 2 - 5, H / 2 + 5); ctx.lineTo(W / 2 + 5, H / 2 + 5);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // --- input: left move-stick, right-side drag-to-look, keyboard fallback ---
+  function makeInput(els) {
+    const st = {
+      moveX: 0, moveY: 0, turnDelta: 0, keys: {},
+      touches: {} // pointerId -> {kind:'stick'|'look', ...}
+    };
+    const stick = els.stick, knob = els.knob, stage = els.stage;
+    let stickCenter = null;
+
+    function stickStart(id, x, y) {
+      const r = stick.getBoundingClientRect();
+      stickCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      st.touches[id] = { kind: 'stick' };
+      stickMove(id, x, y);
+    }
+    function stickMove(id, x, y) {
+      if (!stickCenter) return;
+      const maxR = 42;
+      let dx = x - stickCenter.x, dy = y - stickCenter.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const clampD = Math.min(maxR, d);
+      dx = (dx / d) * clampD; dy = (dy / d) * clampD;
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      st.moveX = dx / maxR; st.moveY = dy / maxR;
+    }
+    function stickEnd() {
+      st.moveX = 0; st.moveY = 0;
+      knob.style.transform = 'translate(0,0)';
+    }
+
+    stage.addEventListener('pointerdown', ev => {
+      const stickBox = stick.getBoundingClientRect();
+      const inStick = ev.clientX >= stickBox.left - 24 && ev.clientX <= stickBox.right + 24 &&
+        ev.clientY >= stickBox.top - 24 && ev.clientY <= stickBox.bottom + 24;
+      if (ev.target.closest('button') || ev.target.closest('.panel')) return;
+      if (inStick) { stickStart(ev.pointerId, ev.clientX, ev.clientY); }
+      else { st.touches[ev.pointerId] = { kind: 'look', lastX: ev.clientX, lastY: ev.clientY }; }
+      ev.target.setPointerCapture && ev.target.setPointerCapture(ev.pointerId);
+    });
+    stage.addEventListener('pointermove', ev => {
+      const t = st.touches[ev.pointerId];
+      if (!t) return;
+      if (t.kind === 'stick') stickMove(ev.pointerId, ev.clientX, ev.clientY);
+      else {
+        st.turnDelta += (ev.clientX - t.lastX) * 0.0062;
+        t.lastX = ev.clientX; t.lastY = ev.clientY;
+      }
+    });
+    function endTouch(ev) {
+      const t = st.touches[ev.pointerId];
+      if (t && t.kind === 'stick') stickEnd();
+      delete st.touches[ev.pointerId];
+    }
+    stage.addEventListener('pointerup', endTouch);
+    stage.addEventListener('pointercancel', endTouch);
+
+    window.addEventListener('keydown', e => { st.keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { st.keys[e.key.toLowerCase()] = false; });
+
+    function frameAxes() {
+      let mx = st.moveX, my = st.moveY, turn = st.turnDelta;
+      st.turnDelta = 0;
+      if (st.keys['w']) my = -1; if (st.keys['s']) my = 1;
+      if (st.keys['a']) mx = -1; if (st.keys['d']) mx = 1;
+      if (st.keys['arrowleft'] || st.keys['q']) turn -= 0.045;
+      if (st.keys['arrowright'] || st.keys['e']) turn += 0.045;
+      return { mx, my, turn };
+    }
+    return Object.assign(st, { frameAxes });
+  }
+
+  DS.engine = { FOV, castWalls, project, drawSprite, minimap, makeInput };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — the character: stats, leveling, gear, bags, talents,
+ * professions, reputation, quest log and companions.
+ *
+ * Everything here is pure data manipulation. Nothing draws, nothing moves
+ * anyone in the world — sim.js and world.js call into this to change the
+ * character and read the result back.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+
+  const BAG_SIZE = 24;
+  const RESOURCE_MAX = { rage: 100, energy: 100 };
+
+  function xpForLevel(level) {
+    return Math.round(45 * Math.pow(level, 2.15) + 55 * level);
+  }
+
+  function newCharacter(name, clsId) {
+    const cls = K.CLASSES[clsId];
+    const zone = K.ZONES.scar;
+    return {
+      name: name || 'Adventurer', cls: clsId, level: 1, xp: 0,
+      x: zone.spawn.x, y: zone.spawn.y, angle: zone.spawn.facing || 0, zone: 'scar',
+      talentPoints: 0, talents: {},
+      equip: Object.fromEntries(K.SLOTS.map(s => [s, null])),
+      bags: [], gold: 15,
+      quests: { active: {}, completed: [] }, flags: {},
+      rep: Object.fromEntries(Object.keys(K.FACTIONS).map(f => [f, 0])),
+      professions: { learned: [], skill: {} },
+      companions: {},
+      resource: { current: cls.resource === 'mana' ? 30 : cls.resource === 'rage' ? 0 : 100 },
+      comboPoints: 0,
+      hp: { current: 1, max: 1 }, // filled in by refreshVitals right after creation
+      buffs: [], cooldowns: {},
+      alive: true, log: []
+    };
+  }
+
+  // --- derived stats -----------------------------------------------------
+  function classModifiers(player) {
+    const cls = K.CLASSES[player.cls];
+    const mods = {};
+    let unlocked = [];
+    for (const t of cls.talents) {
+      const rank = player.talents[t.id] || 0;
+      if (rank <= 0) continue;
+      if (t.mod) mods[t.mod.key] = (mods[t.mod.key] || 0) + t.mod.perRank * rank;
+      if (t.unlockAbility) unlocked.push(t.unlockAbility);
+    }
+    return { mods, unlockedAbilities: unlocked };
+  }
+
+  function gearTotals(player) {
+    const tot = { str: 0, agi: 0, int: 0, sta: 0, spirit: 0, armor: 0, crit: 0, haste: 0 };
+    K.SLOTS.forEach(s => {
+      const it = player.equip[s];
+      if (!it) return;
+      Object.entries(it.stats || {}).forEach(([k, v]) => { tot[k] = (tot[k] || 0) + v; });
+    });
+    return tot;
+  }
+
+  /* Recomputed on demand rather than cached — cheap, and it means gear and
+   * talent changes are correct on the very next read with no invalidation
+   * bugs to chase. */
+  function derived(player) {
+    const cls = K.CLASSES[player.cls];
+    const { mods } = classModifiers(player);
+    const gear = gearTotals(player);
+    const base = k => 6 + (cls.growth[k] || 0) * player.level;
+    const stat = k => (base(k) + (gear[k] || 0)) * (1 + (mods['statPct.' + k] || 0));
+    const str = stat('str'), agi = stat('agi'), int_ = stat('int'), sta = stat('sta'), spirit = stat('spirit');
+
+    const attackPower = Math.round((cls.primary === 'str' ? str * 2.2 : cls.primary === 'agi' ? agi * 2.2 : str + agi) + (mods.apFlatPerRank || 0) + (mods.apFlat || 0));
+    const spellPower = Math.round(int_ * 1.6);
+    const armor = Math.round((gear.armor || 0) * (1 + (mods.armorPct || 0)));
+    const maxHealth = Math.round((60 + player.level * 11 + sta * 11) * (1 + (mods.healthPct || 0)));
+    const resKind = cls.resource;
+    let maxResource = 100;
+    if (resKind === 'mana') maxResource = Math.round((25 + player.level * 8 + int_ * 9) * (1 + (mods.manaPct || 0)));
+    else maxResource = RESOURCE_MAX[resKind] || 100;
+
+    const critChance = C.clamp(0.04 + (gear.crit || 0) * 0.0035 + (mods.meleeCrit || 0) + (mods.rangedCrit || 0) + (mods.spellCrit || 0), 0.02, 0.6);
+    const hastePct = C.clamp((gear.haste || 0) * 0.0035, 0, 0.6);
+    const dodge = C.clamp(0.03 + (mods.dodge || 0), 0, 0.5);
+    const parry = C.clamp(mods.parry || 0, 0, 0.4);
+    const block = C.clamp(mods.block || 0, 0, 0.4);
+
+    return {
+      str, agi, int: int_, sta, spirit, attackPower, spellPower, armor,
+      maxHealth, maxResource, resKind, critChance, hastePct, dodge, parry, block, mods
+    };
+  }
+
+  function refreshVitals(player) {
+    const d = derived(player);
+    const hpRatio = player.hp.max > 0 ? player.hp.current / player.hp.max : 1;
+    player.hp.max = d.maxHealth;
+    player.hp.current = player.hp.current <= 0 ? 0 : Math.round(d.maxHealth * hpRatio);
+    if (player.resource.current == null) player.resource.current = d.maxResource;
+    player.resource.max = d.maxResource;
+    return d;
+  }
+
+  // --- leveling ------------------------------------------------------------
+  function grantXP(player, amount) {
+    if (player.level >= K.LEVEL_CAP) return { leveled: false };
+    player.xp += Math.round(amount);
+    let leveled = false, newTalentPts = 0;
+    while (player.level < K.LEVEL_CAP && player.xp >= xpForLevel(player.level)) {
+      player.xp -= xpForLevel(player.level);
+      player.level++;
+      leveled = true;
+      if (player.level >= K.TALENT_START_LEVEL) { player.talentPoints++; newTalentPts++; }
+      const d = refreshVitals(player);
+      player.hp.current = d.maxHealth;
+      player.resource.current = d.maxResource;
+    }
+    if (player.level >= K.LEVEL_CAP) player.xp = 0;
+    return { leveled, newTalentPts };
+  }
+
+  // --- talents -------------------------------------------------------------
+  function talentPointsSpent(player) { return Object.values(player.talents).reduce((s, r) => s + r, 0); }
+  function talentTierUnlocked(player, tier) { return talentPointsSpent(player) >= K.talentTiers()[tier]; }
+  function canSpendTalent(player, talentId) {
+    const cls = K.CLASSES[player.cls];
+    const t = cls.talents.find(x => x.id === talentId);
+    if (!t) return false;
+    if (player.talentPoints <= 0) return false;
+    if (!talentTierUnlocked(player, t.tier)) return false;
+    const cur = player.talents[talentId] || 0;
+    return cur < t.maxRank;
+  }
+  function spendTalent(player, talentId) {
+    if (!canSpendTalent(player, talentId)) return false;
+    player.talents[talentId] = (player.talents[talentId] || 0) + 1;
+    player.talentPoints--;
+    return true;
+  }
+  function resetTalents(player) {
+    const refund = talentPointsSpent(player);
+    player.talents = {};
+    player.talentPoints += refund;
+  }
+  function abilityList(player) {
+    const cls = K.CLASSES[player.cls];
+    const { unlockedAbilities } = classModifiers(player);
+    const known = cls.abilities.filter(a => !a.requiresTalent || (player.talents[a.requiresTalent] || 0) > 0);
+    return known.concat(unlockedAbilities);
+  }
+
+  // --- inventory & gear ------------------------------------------------------
+  function addItem(player, item) {
+    if (player.bags.length >= BAG_SIZE) return false;
+    player.bags.push(item);
+    return true;
+  }
+  function removeItem(player, iid) {
+    const i = player.bags.findIndex(it => it.iid === iid);
+    if (i < 0) return null;
+    return player.bags.splice(i, 1)[0];
+  }
+  function equipFromBag(player, iid) {
+    const item = removeItem(player, iid);
+    if (!item) return false;
+    const slot = item.slot === 'ring1' && player.equip.ring1 && !player.equip.ring2 ? 'ring2'
+      : item.slot === 'trinket1' && player.equip.trinket1 && !player.equip.trinket2 ? 'trinket2' : item.slot;
+    const old = player.equip[slot];
+    player.equip[slot] = item;
+    if (old) player.bags.push(old);
+    return true;
+  }
+  function unequipToBag(player, slot) {
+    const item = player.equip[slot];
+    if (!item) return false;
+    if (player.bags.length >= BAG_SIZE) return false;
+    player.equip[slot] = null;
+    player.bags.push(item);
+    return true;
+  }
+
+  // --- reputation ------------------------------------------------------------
+  function addRep(player, factionId, amount) {
+    player.rep[factionId] = (player.rep[factionId] || 0) + amount;
+  }
+
+  // --- professions -------------------------------------------------------
+  function learnProfession(player, profId) {
+    if (player.professions.learned.includes(profId)) return false;
+    if (player.professions.learned.length >= 2) return false;
+    player.professions.learned.push(profId);
+    player.professions.skill[profId] = 1;
+    return true;
+  }
+  function gatherSkillUp(player, profId, tier) {
+    const cur = player.professions.skill[profId] || 0;
+    const cap = tier * 75 + 75;
+    if (cur >= cap) return 0;
+    const gain = C.rndInt(1, 3);
+    player.professions.skill[profId] = Math.min(300, cur + gain);
+    return gain;
+  }
+
+  // --- quests ----------------------------------------------------------------
+  function questAvailable(player, qid) {
+    const q = K.QUESTS[qid];
+    if (!q) return false;
+    if (player.quests.active[qid] || player.quests.completed.includes(qid)) return false;
+    if (player.level < q.level - 2) return false;
+    if (q.requires && !q.requires.every(r => player.quests.completed.includes(r))) return false;
+    return true;
+  }
+  function acceptQuest(player, qid) {
+    if (!questAvailable(player, qid)) return false;
+    player.quests.active[qid] = { progress: 0 };
+    return true;
+  }
+  function questReadyToTurnIn(player, qid) {
+    const q = K.QUESTS[qid];
+    const a = player.quests.active[qid];
+    if (!q || !a) return false;
+    if (q.kind === 'talk') return true;
+    return a.progress >= (q.count || 1);
+  }
+  function noteKill(player, mobTpl) {
+    Object.entries(player.quests.active).forEach(([qid, a]) => {
+      const q = K.QUESTS[qid];
+      if (q.kind === 'kill' && q.target === mobTpl) a.progress = Math.min(q.count, a.progress + 1);
+    });
+  }
+  function noteCollect(player, itemId, count) {
+    Object.entries(player.quests.active).forEach(([qid, a]) => {
+      const q = K.QUESTS[qid];
+      if (q.kind === 'collect' && q.item === itemId) {
+        const have = player.bags.filter(b => b.tplId === itemId).length;
+        a.progress = Math.min(q.count, have);
+      }
+    });
+  }
+  function turnInQuest(player, qid) {
+    if (!questReadyToTurnIn(player, qid)) return null;
+    const q = K.QUESTS[qid];
+    delete player.quests.active[qid];
+    player.quests.completed.push(qid);
+    if (q.kind === 'collect') {
+      let need = q.count;
+      player.bags = player.bags.filter(b => { if (need > 0 && b.tplId === q.item) { need--; return false; } return true; });
+    }
+    grantXP(player, q.xp);
+    player.gold += q.gold || 0;
+    if (q.rep) addRep(player, q.rep.faction, q.rep.amount);
+    if (q.grantsFlag) player.flags[q.grantsFlag] = true;
+    if (q.companion) player.companions[q.companion] = { recruited: true, alive: true };
+    return q;
+  }
+
+  DS.player = {
+    BAG_SIZE, xpForLevel, newCharacter, derived, refreshVitals, gearTotals, classModifiers,
+    grantXP, talentPointsSpent, talentTierUnlocked, canSpendTalent, spendTalent, resetTalents, abilityList,
+    addItem, removeItem, equipFromBag, unequipToBag, addRep,
+    learnProfession, gatherSkillUp,
+    questAvailable, acceptQuest, questReadyToTurnIn, noteKill, noteCollect, turnInQuest
+  };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — ability resolution, damage/healing math, buffs and cooldowns.
+ *
+ * Player, companions and mobs all funnel through the same handful of
+ * functions here. A companion is just a player-shaped object without gear
+ * (see DS.player.derived — it tolerates an empty equip/talents object), so
+ * "group content" is the same code path as soloing, the way PrimalIsle's
+ * other thirty-four dinosaurs run through the same dino.js as the player.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+  const GCD = 1.0;
+
+  function getCombatStats(actor) {
+    if (actor.kind === 'mob') return actor.combat;
+    return DS.player.derived(actor);
+  }
+
+  function mitigatePhysical(dmg, armor, level) {
+    const mitigation = C.clamp(armor / (armor + 400 + 85 * Math.max(1, level)), 0, 0.75);
+    return dmg * (1 - mitigation);
+  }
+  function rollCrit(chance) { return C.chance(chance); }
+
+  // --- buffs -----------------------------------------------------------------
+  function addBuff(actor, buff) {
+    actor.buffs = actor.buffs || [];
+    const existing = actor.buffs.find(b => b.key === buff.key);
+    if (existing) Object.assign(existing, buff, { elapsed: 0 });
+    else actor.buffs.push(Object.assign({ elapsed: 0, tickTimer: 0 }, buff));
+  }
+  function buffTotals(actor) {
+    const t = { apFlat: 0, armorPct: 0, dmgPct: 0, dmgTakenPct: 0, speedPct: 0, dodgeFlat: 0, shield: 0, immune: false, energyRegenPct: 0, rooted: false, snaredPct: 0 };
+    (actor.buffs || []).forEach(b => {
+      const f = b.fields || {};
+      t.apFlat += f.apFlat || 0; t.armorPct += f.armorPct || 0; t.dmgPct += f.dmgPct || 0;
+      t.dmgTakenPct += f.dmgTakenPct || 0; t.speedPct += f.speedPct || 0; t.dodgeFlat += f.dodgeFlat || 0;
+      t.shield += b.shieldRemaining || 0; if (f.immune) t.immune = true;
+      t.energyRegenPct += f.energyRegenPct || 0; if (b.kind === 'root') t.rooted = true;
+      if (b.kind === 'snare') t.snaredPct = Math.max(t.snaredPct, f.snarePct || 0);
+    });
+    return t;
+  }
+
+  function tickBuffs(actor, dt, log) {
+    if (!actor.buffs || !actor.buffs.length) return;
+    actor.buffs = actor.buffs.filter(b => {
+      b.elapsed += dt;
+      if (b.dot) {
+        b.tickTimer += dt;
+        while (b.tickTimer >= b.dot.interval && b.ticksLeft > 0) {
+          b.tickTimer -= b.dot.interval; b.ticksLeft--;
+          if (b.healPerTick) applyHeal(actor, b.healPerTick);
+          else if (b.perTick) applyDamage(actor, b.perTick, {});
+        }
+      }
+      return b.elapsed < b.dur && actor.alive !== false;
+    });
+  }
+
+  // --- resources & cooldowns -----------------------------------------------
+  function tickCooldowns(actor, dt) {
+    const cds = actor.cooldowns || (actor.cooldowns = {});
+    Object.keys(cds).forEach(k => { cds[k] = Math.max(0, cds[k] - dt); if (cds[k] === 0) delete cds[k]; });
+  }
+  function tickResource(actor, dt, inCombat) {
+    const cs = getCombatStats(actor);
+    if (!actor.resource) return;
+    actor.resource.max = cs.maxResource;
+    const kind = actor.kind === 'mob' ? null : K.CLASSES[actor.cls].resource;
+    if (kind === 'mana') {
+      const regen = (2 + cs.spirit * 0.18) * dt * (inCombat ? 0.4 : 1);
+      actor.resource.current = Math.min(cs.maxResource, actor.resource.current + regen);
+    } else if (kind === 'energy') {
+      const mult = 1 + buffTotals(actor).energyRegenPct;
+      actor.resource.current = Math.min(100, actor.resource.current + 12 * mult * dt);
+    } else if (kind === 'rage') {
+      if (!inCombat) {
+        const decayMod = 1 + ((cs.mods && cs.mods.rageDecayPct) || 0);
+        actor.resource.current = Math.max(0, actor.resource.current - 6 * decayMod * dt);
+      }
+    }
+  }
+
+  // --- damage / healing --------------------------------------------------
+  function applyDamage(target, amount, opts) {
+    opts = opts || {};
+    let dealt = Math.max(0, Math.round(amount));
+    const bt = buffTotals(target);
+    if (bt.immune) return 0;
+    if (bt.shield > 0) {
+      const absorbed = Math.min(bt.shield, dealt);
+      dealt -= absorbed;
+      const shieldBuff = (target.buffs || []).find(b => b.shieldRemaining > 0);
+      if (shieldBuff) shieldBuff.shieldRemaining = Math.max(0, shieldBuff.shieldRemaining - absorbed);
+    }
+    target.hp.current = Math.max(0, target.hp.current - dealt);
+    if (target.hp.current <= 0) target.alive = false;
+    return dealt;
+  }
+  function applyHeal(target, amount) {
+    const healed = Math.min(target.hp.max - target.hp.current, Math.max(0, Math.round(amount)));
+    target.hp.current += healed;
+    return healed;
+  }
+
+  function costFor(ability, cs) {
+    const pct = (cs.mods && (cs.mods[ability.id + '.costPct'] || cs.mods.costPct)) || 0;
+    return Math.max(0, Math.round((ability.cost || 0) * (1 + pct)));
+  }
+  function cdFor(ability, cs) {
+    const pct = (cs.mods && cs.mods[ability.id + '.cdPct']) || 0;
+    return Math.max(0.5, (ability.cd || 0) * (1 + pct) * (1 - cs.hastePct * 0.5));
+  }
+
+  function canUse(caster, target, ability) {
+    if (caster.casting) return { ok: false, reason: 'busy' };
+    if ((caster.cooldowns && caster.cooldowns['_gcd']) > 0) return { ok: false, reason: 'gcd' };
+    if (caster.cooldowns && caster.cooldowns[ability.id] > 0) return { ok: false, reason: 'cooldown' };
+    const cs = getCombatStats(caster);
+    if (ability.finisher && !(caster.comboPoints > 0)) return { ok: false, reason: 'no combo points' };
+    const cost = costFor(ability, cs);
+    if (caster.resource && cost > caster.resource.current) return { ok: false, reason: 'resource' };
+    if (!ability.self && ability.kind !== 'buff' && ability.kind !== 'gap' && ability.range) {
+      if (!target || !target.alive) return { ok: false, reason: 'no target' };
+      if (C.dist(caster.x, caster.y, target.x, target.y) > ability.range + 0.4) return { ok: false, reason: 'range' };
+    }
+    if (ability.execute) {
+      if (!target) return { ok: false, reason: 'no target' };
+      const thresh = ability.execute + ((cs.mods && cs.mods['w_execute.executeThreshold']) || 0);
+      if (target.hp.current / target.hp.max > thresh) return { ok: false, reason: 'target too healthy' };
+    }
+    return { ok: true };
+  }
+
+  function startCast(caster, target, ability, log) {
+    const chk = canUse(caster, target, ability);
+    if (!chk.ok) return chk;
+    const cs = getCombatStats(caster);
+    const cost = costFor(ability, cs);
+    if (caster.resource) caster.resource.current -= cost;
+    caster.cooldowns[ability.id] = cdFor(ability, cs);
+    caster.cooldowns['_gcd'] = GCD;
+    const castTime = (ability.castTime || 0) * (1 - cs.hastePct * 0.5);
+    if (castTime > 0.05) {
+      caster.casting = { ability, target, remaining: castTime, total: castTime };
+    } else {
+      resolveAbility(caster, target, ability, log);
+    }
+    return { ok: true };
+  }
+
+  function tickCasting(caster, dt, log) {
+    if (!caster.casting) return;
+    caster.casting.remaining -= dt;
+    if (caster.casting.remaining <= 0) {
+      const { target, ability } = caster.casting;
+      caster.casting = null;
+      if (target ? target.alive : true) resolveAbility(caster, target, ability, log);
+    }
+  }
+  function interruptCast(caster) { if (caster.casting) { caster.casting = null; return true; } return false; }
+
+  function resolveAbility(caster, target, ability, log) {
+    const cs = getCombatStats(caster);
+    const push = m => log && log.push(m);
+    if (ability.kind === 'gap') {
+      const dist = target ? Math.min(ability.range, C.dist(caster.x, caster.y, target.x, target.y) - 1.2) : ability.range;
+      const nx = caster.x + Math.cos(caster.angle) * (ability.blink ? ability.range : Math.max(0, dist));
+      const ny = caster.y + Math.sin(caster.angle) * (ability.blink ? ability.range : Math.max(0, dist));
+      if (!DS.world.blocked(caster.zone, nx, ny)) { caster.x = nx; caster.y = ny; }
+      if (ability.rageGen && caster.resource) caster.resource.current = Math.min(cs.maxResource, caster.resource.current + ability.rageGen);
+      push(`${caster.name || 'You'} use ${ability.name}.`);
+      return;
+    }
+    if (ability.kind === 'buff') {
+      const dur = (ability.buff.dur || 10) * (1 + ((cs.mods && cs.mods[ability.id + '.durPct']) || 0));
+      const fields = {};
+      if (ability.buff.apFlat) fields.apFlat = ability.buff.apFlat * (1 + ((cs.mods && cs.mods[ability.id + '.apFlatPct']) || 0));
+      if (ability.buff.armorPct) fields.armorPct = ability.buff.armorPct;
+      if (ability.buff.dmgPct) fields.dmgPct = ability.buff.dmgPct;
+      if (ability.buff.dmgTakenPct) fields.dmgTakenPct = ability.buff.dmgTakenPct;
+      if (ability.buff.speedPct) fields.speedPct = ability.buff.speedPct;
+      if (ability.buff.dodgeFlat) fields.dodgeFlat = ability.buff.dodgeFlat;
+      if (ability.buff.immune) fields.immune = true;
+      if (ability.buff.energyRegenPct) fields.energyRegenPct = ability.buff.energyRegenPct;
+      const buff = { key: ability.id, name: ability.name, icon: ability.icon, dur, fields };
+      if (ability.buff.shield) {
+        const amt = Math.round(ability.buff.shield * (ability.buff.scalesWith === 'sp' ? cs.spellPower : 40));
+        buff.shieldRemaining = amt;
+      }
+      addBuff(target && !ability.self ? target : caster, buff);
+      push(`${caster.name || 'You'} cast ${ability.name}.`);
+      return;
+    }
+    if (ability.kind === 'utility') {
+      if (ability.dropAggro) caster.aggroDropped = 2.0;
+      push(`${caster.name || 'You'} use ${ability.name}.`);
+      return;
+    }
+    if (!target || !target.alive) return;
+    if (ability.kind === 'heal') {
+      let amt = ability.power * cs.spellPower + caster.level * 1.5;
+      amt *= 1 + ((cs.mods && cs.mods.healPowerPct) || 0) + ((cs.mods && cs.mods.spellDmgPct) || 0);
+      const crit = rollCrit(cs.critChance);
+      if (crit) amt *= 1.5;
+      const healed = applyHeal(target, amt);
+      if (ability.dot && ability.dot.heal) {
+        addBuff(target, { key: ability.id, name: ability.name, icon: ability.icon, dur: ability.dot.ticks * ability.dot.interval, dot: ability.dot, ticksLeft: ability.dot.ticks, healPerTick: Math.round(ability.power * cs.spellPower * 0.4) });
+      }
+      push(`${ability.name} heals ${target.name || 'target'} for ${healed}${crit ? ' (crit)' : ''}.`);
+      return;
+    }
+    // offensive: melee / ranged / aoe
+    const bt = buffTotals(caster);
+    const scaleStat = ability.scalesWith === 'sp' ? cs.spellPower : (cs.attackPower + bt.apFlat);
+    let base = ability.power * scaleStat + caster.level * 1.3;
+    if (ability.finisher) base *= Math.max(1, caster.comboPoints || 1);
+    base *= 1 + ((cs.mods && cs.mods.spellDmgPct) || 0) + ((cs.mods && cs.mods.meleeDmgPct) || 0) + bt.dmgPct;
+    const crit = rollCrit(cs.critChance);
+    if (crit) base *= 1.5;
+    let dealt = base;
+    if (ability.scalesWith !== 'sp') {
+      const tcs = getCombatStats(target);
+      dealt = mitigatePhysical(dealt, tcs.armor || 0, caster.level);
+    }
+    const tbt = buffTotals(target);
+    dealt *= 1 + tbt.dmgTakenPct;
+    const finalDmg = applyDamage(target, dealt, {});
+    if (ability.lifeStealPct && caster.hp) applyHeal(caster, finalDmg * ability.lifeStealPct);
+    if (ability.generatesCombo && caster.comboPoints != null) caster.comboPoints = Math.min(5, caster.comboPoints + ability.generatesCombo);
+    if (ability.finisher && caster.comboPoints != null) {
+      const keep = (cs.mods && cs.mods.ruthlessnessChance) || 0;
+      caster.comboPoints = C.chance(keep) ? 1 : 0;
+    }
+    if (ability.dot) {
+      const perTick = Math.round((ability.power * scaleStat * 0.35 + caster.level) * (1 + tbt.dmgTakenPct));
+      addBuff(target, { key: ability.id + '_dot', name: ability.name, icon: ability.icon, dur: ability.dot.ticks * ability.dot.interval, dot: ability.dot, ticksLeft: ability.dot.ticks, perTick, physical: ability.scalesWith !== 'sp', sourceId: caster.id });
+    }
+    if (ability.snarePct) addBuff(target, { key: 'snare', name: 'Slowed', icon: '❄️', dur: ability.snareDur || 4, kind: 'snare', fields: { snarePct: ability.snarePct } });
+    if (ability.rootDur) addBuff(target, { key: 'root', name: 'Rooted', icon: '🌿', dur: ability.rootDur, kind: 'root' });
+    if (ability.interrupt) interruptCast(target);
+    if (ability.dropAggro) caster.aggroDropped = 2.0;
+    push(`${caster.name || 'You'} hit ${target.name || 'target'} with ${ability.name} for ${finalDmg}${crit ? ' (crit)' : ''}.`);
+  }
+
+  function autoAttack(caster, target, log) {
+    const cs = getCombatStats(caster);
+    const dmg = mitigatePhysical((cs.attackPower || 6) * 0.55 + caster.level, getCombatStats(target).armor || 0, caster.level);
+    const crit = rollCrit(cs.critChance);
+    const dealt = applyDamage(target, crit ? dmg * 1.5 : dmg, {});
+    log && log.push(`${caster.name || 'You'} swing at ${target.name || 'target'} for ${dealt}${crit ? ' (crit)' : ''}.`);
+    if (caster.kind !== 'mob' && caster.resource && K.CLASSES[caster.cls].resource === 'rage') {
+      caster.resource.current = Math.min(cs.maxResource, caster.resource.current + 4 + dealt * 0.05);
+    }
+    return dealt;
+  }
+
+  DS.combat = {
+    GCD, getCombatStats, mitigatePhysical, rollCrit, addBuff, buffTotals, tickBuffs,
+    tickCooldowns, tickResource, applyDamage, applyHeal, canUse, startCast, tickCasting,
+    interruptCast, resolveAbility, autoAttack
+  };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — mob and companion brains, and loot rolls.
+ *
+ * A mob is a small state machine: idle until something wanders into its
+ * aggro radius, then chase, melee, occasionally use its one special move,
+ * and leash home if the target runs far enough. A companion is the same
+ * movement loop pointed at the player instead of a spawn point, choosing
+ * abilities with a two- or three-line heuristic instead of a script.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+  let nextId = 1;
+
+  function cloneCurated(key, rng) {
+    const base = K.CURATED_ITEMS[key];
+    const r = (rng ? rng() : Math.random());
+    return Object.assign({}, base, { iid: base.iid + '_' + Math.floor(r * 1e9).toString(36), tplId: key });
+  }
+
+  function spawnMob(tplId, x, y, opts) {
+    opts = opts || {};
+    const tpl = K.BESTIARY[tplId];
+    const level = opts.level || C.rndInt(tpl.level[0], tpl.level[1]);
+    const maxHealth = Math.round(tpl.hp);
+    const mob = {
+      id: 'm' + (nextId++), kind: 'mob', tplId, name: tpl.name, icon: tpl.icon,
+      x, y, angle: Math.random() * Math.PI * 2, level, faction: tpl.faction,
+      elite: !!tpl.elite, boss: !!tpl.boss, speed: tpl.speed,
+      aggroRadius: tpl.aggroRadius, leashX: x, leashY: y, leashRadius: (opts.radius || 6) + 10,
+      hp: { current: maxHealth, max: maxHealth },
+      combat: {
+        attackPower: Math.max(6, Math.round(tpl.dmg * 1.8)), spellPower: 0, armor: tpl.armor,
+        maxHealth, maxResource: 0, resKind: null,
+        critChance: tpl.boss ? 0.15 : tpl.elite ? 0.1 : 0.05, hastePct: 0, mods: {}
+      },
+      target: null, atkTimer: C.rnd(0.5, 1.4), abilityTimer: tpl.ability ? C.rnd(2, tpl.ability.every) : Infinity,
+      enraged: false, buffs: [], cooldowns: {}, alive: true
+    };
+    return mob;
+  }
+
+  function nearestHostileTarget(mob, candidates) {
+    let best = null, bestD = mob.aggroRadius;
+    candidates.forEach(c => {
+      if (!c || !c.alive) return;
+      const d = C.dist(mob.x, mob.y, c.x, c.y);
+      if (d < bestD) { bestD = d; best = c; }
+    });
+    return best;
+  }
+
+  function tickMob(mob, candidates, zone, dt, log) {
+    if (!mob.alive) return;
+    DS.combat.tickCooldowns(mob, dt);
+    DS.combat.tickBuffs(mob, dt);
+
+    if (mob.enrageAbilityTpl == null) mob.enrageAbilityTpl = K.BESTIARY[mob.tplId].enrageAbility || null;
+    const tpl = K.BESTIARY[mob.tplId];
+    if (tpl.enrageAt && !mob.enraged && mob.hp.current / mob.hp.max <= tpl.enrageAt) {
+      mob.enraged = true;
+      log && log.push(`${mob.name} flies into a rage!`);
+    }
+
+    if (mob.target && (!mob.target.alive || C.dist(mob.x, mob.y, mob.target.x, mob.target.y) > mob.aggroRadius * 2.2)) mob.target = null;
+    if (!mob.target) mob.target = nearestHostileTarget(mob, candidates);
+    if (C.dist(mob.x, mob.y, mob.leashX, mob.leashY) > mob.leashRadius) {
+      mob.target = null;
+      const dx = mob.leashX - mob.x, dy = mob.leashY - mob.y, d = Math.hypot(dx, dy) || 1;
+      const step = mob.speed * dt * 1.6;
+      const nx = mob.x + (dx / d) * step, ny = mob.y + (dy / d) * step;
+      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; }
+      mob.hp.current = Math.min(mob.hp.max, mob.hp.current + mob.hp.max * 0.15 * dt);
+      return;
+    }
+    if (!mob.target) return;
+
+    const d = C.dist(mob.x, mob.y, mob.target.x, mob.target.y);
+    mob.angle = Math.atan2(mob.target.y - mob.y, mob.target.x - mob.x);
+    const meleeRange = 1.5;
+    if (d > meleeRange) {
+      const step = mob.speed * dt;
+      const nx = mob.x + Math.cos(mob.angle) * step, ny = mob.y + Math.sin(mob.angle) * step;
+      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; }
+      else if (!DS.world.blocked(zone, nx, mob.y)) mob.x = nx;
+      else if (!DS.world.blocked(zone, mob.x, ny)) mob.y = ny;
+    } else {
+      mob.atkTimer -= dt;
+      if (mob.atkTimer <= 0) {
+        mob.atkTimer = 1.3 + Math.random() * 0.6;
+        DS.combat.autoAttack(mob, mob.target, log);
+      }
+    }
+    const ability = mob.enraged && mob.enrageAbilityTpl ? mob.enrageAbilityTpl : tpl.ability;
+    if (ability) {
+      mob.abilityTimer -= dt;
+      if (mob.abilityTimer <= 0 && d <= ability.radius + 3) {
+        mob.abilityTimer = ability.every;
+        [mob.target].concat(candidates.filter(c => c !== mob.target && c && c.alive && C.dist(mob.x, mob.y, c.x, c.y) <= ability.radius))
+          .forEach(t => { if (t && t.alive) DS.combat.applyDamage(t, ability.dmg, {}); });
+        log && log.push(`${mob.name} uses ${ability.name}!`);
+      }
+    }
+  }
+
+  // --- companions -----------------------------------------------------------
+  const COMPANION_DEFS = {
+    bruggo: { id: 'bruggo', name: 'Bruggo Ironhide', icon: '🛡️', cls: 'warrior', role: 'tank' },
+    vell: { id: 'vell', name: 'Sister Vell', icon: '✝️', cls: 'priest', role: 'heal' }
+  };
+
+  function makeCompanionActor(id, player) {
+    const def = COMPANION_DEFS[id];
+    const actor = {
+      kind: 'companion', id: 'c_' + id, defId: id, name: def.name, icon: def.icon, cls: def.cls,
+      level: player.level, x: player.x, y: player.y, angle: player.angle, zone: player.zone,
+      equip: {}, talents: {}, hp: { current: 1, max: 1 }, resource: { current: null },
+      comboPoints: 0, buffs: [], cooldowns: {}, alive: true
+    };
+    DS.player.refreshVitals(actor);
+    actor.hp.current = actor.hp.max;
+    actor.resource.current = actor.resource.max;
+    return actor;
+  }
+
+  function tickCompanion(comp, player, mobs, dt, zone, log) {
+    if (!comp.alive) {
+      comp.reviveTimer = (comp.reviveTimer || 0) - dt;
+      if (comp.reviveTimer <= 0) { comp.alive = true; comp.hp.current = Math.round(comp.hp.max * 0.5); comp.reviveTimer = null; }
+      return;
+    }
+    DS.combat.tickCooldowns(comp, dt);
+    DS.combat.tickBuffs(comp, dt);
+    DS.combat.tickResource(comp, dt, !!comp.inCombat);
+    DS.combat.tickCasting(comp, dt, log);
+
+    const followD = C.dist(comp.x, comp.y, player.x, player.y);
+    const abilities = DS.player.abilityList(comp);
+    const def = COMPANION_DEFS[comp.defId];
+    const liveMobs = mobs.filter(m => m.alive);
+    const nearest = liveMobs.reduce((best, m) => {
+      const d = C.dist(comp.x, comp.y, m.x, m.y);
+      return (d < 14 && (!best || d < best.d)) ? { m, d } : best;
+    }, null);
+    comp.inCombat = !!nearest;
+
+    if (def.role === 'heal') {
+      const woundedAlly = [player, comp].filter(a => a.alive && a.hp.current / a.hp.max < 0.75)
+        .sort((a, b) => (a.hp.current / a.hp.max) - (b.hp.current / b.hp.max))[0];
+      if (woundedAlly && !comp.casting) {
+        const heal = abilities.find(a => a.kind === 'heal' && a.id !== 'pr_renew') || abilities.find(a => a.kind === 'heal');
+        if (heal) { comp.angle = Math.atan2(woundedAlly.y - comp.y, woundedAlly.x - comp.x); DS.combat.startCast(comp, woundedAlly, heal, log); }
+      } else if (nearest && nearest.d <= 20 && !comp.casting) {
+        const dmg = abilities.find(a => a.kind === 'ranged');
+        if (dmg) { comp.angle = Math.atan2(nearest.m.y - comp.y, nearest.m.x - comp.x); DS.combat.startCast(comp, nearest.m, dmg, log); }
+      }
+      moveToward(comp, player, followD > 3.5 ? player : (nearest && nearest.d > 8 ? null : player), zone, dt, 3.5);
+      return;
+    }
+
+    // tank/melee companion: stick close to whatever the player is fighting
+    if (nearest && nearest.d <= 1.6) {
+      comp.angle = Math.atan2(nearest.m.y - comp.y, nearest.m.x - comp.x);
+      comp.atkTimer = (comp.atkTimer || 0) - dt;
+      if (comp.atkTimer <= 0) { comp.atkTimer = 1.4; DS.combat.autoAttack(comp, nearest.m, log); }
+      const shout = abilities.find(a => a.id === 'w_shout');
+      if (shout && DS.combat.canUse(comp, comp, shout).ok && Math.random() < 0.02) DS.combat.startCast(comp, comp, shout, log);
+    } else if (nearest) {
+      moveTowardPoint(comp, nearest.m.x, nearest.m.y, zone, dt, 2.6);
+    } else {
+      moveTowardPoint(comp, player.x, player.y, zone, dt, followD > 2 ? 3.0 : 0);
+    }
+  }
+  function moveTowardPoint(actor, tx, ty, zone, dt, speed) {
+    if (!speed) return;
+    const dx = tx - actor.x, dy = ty - actor.y, d = Math.hypot(dx, dy) || 1;
+    if (d < 0.3) return;
+    actor.angle = Math.atan2(dy, dx);
+    const step = speed * dt;
+    const nx = actor.x + (dx / d) * step, ny = actor.y + (dy / d) * step;
+    if (!DS.world.blocked(zone, nx, ny)) { actor.x = nx; actor.y = ny; }
+  }
+  function moveToward(comp, player, target, zone, dt, speed) {
+    if (!target) return;
+    moveTowardPoint(comp, target.x, target.y, zone, dt, C.dist(comp.x, comp.y, player.x, player.y) > 1.5 ? speed : 0);
+  }
+
+  // --- loot -----------------------------------------------------------------
+  function rollLoot(mob, rng) {
+    rng = rng || Math.random;
+    const tpl = K.BESTIARY[mob.tplId];
+    const table = K.LOOT_TABLES[tpl.loot];
+    const result = { gold: C.rndInt(table.gold[0], table.gold[1]), item: null, questItem: null };
+    if (tpl.dropItem && rng() < tpl.dropItem.chance) result.questItem = cloneCurated(tpl.dropItem.id, rng);
+    let guaranteedHit = null;
+    (table.guaranteed || []).forEach(g => { if (!guaranteedHit && rng() < g.chance) guaranteedHit = g.id; });
+    if (guaranteedHit) { result.item = cloneCurated(guaranteedHit, rng); return result; }
+    if (rng() < table.itemChance) {
+      const slot = C.pick(K.SLOTS);
+      const ilvl = Math.max(1, mob.level + table.ilvlBonus);
+      const quality = K.rollQuality(rng, table.qualityFloor);
+      result.item = K.rollItem(rng, ilvl, slot, quality);
+    }
+    return result;
+  }
+
+  DS.ai = { spawnMob, tickMob, makeCompanionActor, tickCompanion, rollLoot, cloneCurated, COMPANION_DEFS };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — the living zone: collision, mob/node spawns and their
+ * respawn timers, and every kind of interaction (vendor, quest giver,
+ * trainer, gathering node, portal, zone exit).
+ *
+ * Zone content in content.js is the blueprint; a "zone runtime" built here
+ * is the actual instance of it for this session — who's alive, what's been
+ * picked clean, what's on cooldown to come back. It is not saved: like
+ * PrimalIsle's island, it is cheap to rebuild and only the character
+ * persists.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+
+  function blocked(zoneId, x, y) {
+    const zone = K.ZONES[zoneId];
+    const g = zone.grid, r = 0.22;
+    const pts = [[x - r, y - r], [x + r, y - r], [x - r, y + r], [x + r, y + r]];
+    for (const [px, py] of pts) {
+      const cx = Math.floor(px), cy = Math.floor(py);
+      if (cx < 0 || cy < 0 || cx >= g.w || cy >= g.h || g.cells[cy][cx] !== 0) return true;
+    }
+    return false;
+  }
+
+  function scatterPoint(zone, cx, cy, radius, rng) {
+    rng = rng || Math.random;
+    for (let i = 0; i < 24; i++) {
+      const a = rng() * Math.PI * 2, r = rng() * radius;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      if (!blocked(zone.id, x, y)) return { x, y };
+    }
+    return { x: cx, y: cy };
+  }
+
+  function buildZoneRuntime(zoneId) {
+    const zone = K.ZONES[zoneId];
+    const mobs = [];
+    zone.mobs.forEach(def => {
+      for (let i = 0; i < def.n; i++) {
+        const p = scatterPoint(zone, def.x, def.y, def.radius);
+        const m = DS.ai.spawnMob(def.tpl, p.x, p.y, { radius: def.radius });
+        m.spawnDef = def;
+        m.respawnDelay = def.elite ? (m.boss ? 999999 : 90) : 38;
+        mobs.push(m);
+      }
+    });
+    const nodes = zone.nodes.map(n => Object.assign({}, n, { harvested: false, respawnAt: 0 }));
+    const npcs = zone.npcs.map(n => Object.assign({}, n));
+    return { zoneId, mobs, nodes, npcs, floatText: [] };
+  }
+
+  function tickRespawns(rt, dt) {
+    const zone = K.ZONES[rt.zoneId];
+    for (let i = 0; i < rt.mobs.length; i++) {
+      const m = rt.mobs[i];
+      if (m.alive) continue;
+      m.respawning = (m.respawning == null ? m.respawnDelay : m.respawning) - dt;
+      if (m.respawning <= 0 && isFinite(m.respawnDelay)) {
+        const p = scatterPoint(zone, m.spawnDef.x, m.spawnDef.y, m.spawnDef.radius);
+        const fresh = DS.ai.spawnMob(m.tplId, p.x, p.y, { radius: m.spawnDef.radius });
+        fresh.spawnDef = m.spawnDef; fresh.respawnDelay = m.respawnDelay;
+        rt.mobs[i] = fresh;
+      }
+    }
+    rt.nodes.forEach(n => {
+      if (!n.harvested) return;
+      n.respawnAt -= dt;
+      if (n.respawnAt <= 0) n.harvested = false;
+    });
+  }
+
+  // --- interaction discovery ------------------------------------------------
+  const INTERACT_RANGE = 2.4;
+  function nearbyInteractable(player, rt) {
+    const zone = K.ZONES[rt.zoneId];
+    let best = null, bestD = INTERACT_RANGE;
+    rt.npcs.forEach(n => {
+      if (n.kind === 'companion' && player.companions[n.companion] && player.companions[n.companion].recruited) return;
+      const d = C.dist(player.x, player.y, n.x, n.y);
+      if (d < bestD) { bestD = d; best = { kind: 'npc', ref: n }; }
+    });
+    rt.nodes.forEach(n => {
+      if (n.harvested) return;
+      const d = C.dist(player.x, player.y, n.x, n.y);
+      if (d < bestD) { bestD = d; best = { kind: 'node', ref: n }; }
+    });
+    (zone.exits || []).forEach(e => {
+      const d = C.dist(player.x, player.y, e.x, e.y);
+      if (d < e.r) { bestD = 0; best = { kind: 'exit', ref: e }; }
+    });
+    if (zone.portal) {
+      const d = C.dist(player.x, player.y, zone.portal.x, zone.portal.y);
+      if (d < INTERACT_RANGE) { best = best && best.kind === 'exit' ? best : { kind: 'portal', ref: zone.portal }; }
+    }
+    return best;
+  }
+
+  function checkAutoTransition(player, rt) {
+    const zone = K.ZONES[rt.zoneId];
+    for (const e of (zone.exits || [])) {
+      if (C.dist(player.x, player.y, e.x, e.y) < e.r) return { toZone: e.toZone, toX: e.toX, toY: e.toY, toFacing: e.toFacing };
+    }
+    return null;
+  }
+
+  // --- gathering -------------------------------------------------------------
+  function gatherNode(player, node) {
+    const prof = K.GATHER_PROFESSIONS[node.kind];
+    if (!player.professions.learned.includes(prof.id)) return { ok: false, msg: `You haven't learned ${prof.name}.` };
+    if (node.harvested) return { ok: false, msg: 'Already picked clean.' };
+    const mat = prof.mats[node.tier];
+    const count = C.rndInt(1, 3);
+    for (let i = 0; i < count; i++) DS.player.addItem(player, matItem(mat));
+    const gain = DS.player.gatherSkillUp(player, prof.id, node.tier);
+    node.harvested = true; node.respawnAt = 75;
+    return { ok: true, msg: `Gathered ${count}x ${matName(mat)}${gain ? ` (+${gain} ${prof.name})` : ''}.` };
+  }
+  const MAT_NAMES = {
+    copper_ore: 'Copper Ore', iron_ore: 'Iron Ore', mithril_ore: 'Mithril Ore',
+    silverleaf: 'Silverleaf', briarroot: 'Briarroot', frostbloom: 'Frostbloom', dust: 'Arcane Dust'
+  };
+  function matName(id) { return MAT_NAMES[id] || id; }
+  function matItem(id) {
+    return { iid: 'mat_' + id + '_' + Math.floor(Math.random() * 1e9).toString(36), name: matName(id), slot: null, quality: 'common', tplId: id, matId: id, stats: {}, sell: 1 };
+  }
+
+  // --- crafting ----------------------------------------------------------
+  function matCount(player, matId) { return player.bags.filter(b => b.matId === matId).length; }
+  function canCraft(player, profId, recipe) {
+    const skill = player.professions.skill[profId] || 0;
+    if (skill < recipe.skillReq) return false;
+    return Object.entries(recipe.mats).every(([m, n]) => matCount(player, m) >= n);
+  }
+  function craft(player, profId, recipe, rng) {
+    if (!canCraft(player, profId, recipe)) return { ok: false, msg: 'Missing materials or skill.' };
+    Object.entries(recipe.mats).forEach(([m, n]) => {
+      let left = n;
+      player.bags = player.bags.filter(b => { if (left > 0 && b.matId === m) { left--; return false; } return true; });
+    });
+    let result;
+    if (recipe.result.potion) {
+      result = { iid: 'pot_' + Math.floor(Math.random() * 1e9).toString(36), name: recipe.name, slot: null, quality: 'common', potion: recipe.result.potion, power: recipe.result.power, stats: {}, sell: 3 };
+    } else if (recipe.result.enchant) {
+      result = { iid: 'ench_' + Math.floor(Math.random() * 1e9).toString(36), name: recipe.name, slot: null, quality: 'uncommon', enchant: recipe.result.enchant, stats: {}, sell: 5 };
+    } else {
+      result = K.rollItem(rng || Math.random, recipe.result.ilvl, recipe.result.slot, recipe.result.quality, recipe.result.styleHint);
+      result.name = recipe.name;
+    }
+    if (!DS.player.addItem(player, result)) return { ok: false, msg: 'Bags are full.' };
+    const cur = player.professions.skill[profId] || 0;
+    const cap = recipe.skillReq + 75;
+    if (cur < cap) player.professions.skill[profId] = Math.min(300, cur + C.rndInt(1, 3));
+    return { ok: true, msg: `Crafted ${recipe.name}.`, item: result };
+  }
+
+  // --- vendors -------------------------------------------------------------
+  function repTierIndex(player, factionId) {
+    const rep = player.rep[factionId] || 0;
+    const tier = K.repTier(rep);
+    return K.FACTION_TIERS.findIndex(t => t.name === tier.name);
+  }
+  function vendorStock(npc, player) {
+    const v = K.VENDORS[npc.vendor];
+    if (!v.__stock) {
+      const rng = C.rngFrom(1337 + npc.vendor.length * 97);
+      v.__stock = v.fixed.map(id => Object.assign({}, K.CURATED_ITEMS[id]))
+        .concat(v.generated.map(g => K.rollItem(rng, g.ilvl, g.slot, g.quality)));
+    }
+    const gated = (v.repGated || []).filter(g => {
+      const need = K.FACTION_TIERS.findIndex(t => t.name === g.tier);
+      return repTierIndex(player, v.repFaction) >= need;
+    }).map(g => { if (!g.__item) g.__item = K.rollItem(Math.random, g.ilvl, g.slot, g.quality); return g.__item; });
+    return v.__stock.concat(gated);
+  }
+  function buyItem(player, npc, item) {
+    const price = Math.max(1, Math.round((item.sell || 1) * 3.2));
+    if (player.gold < price) return { ok: false, msg: 'Not enough gold.' };
+    if (!DS.player.addItem(player, Object.assign({}, item, { iid: item.iid + '_' + Math.floor(Math.random() * 1e6) }))) return { ok: false, msg: 'Bags are full.' };
+    player.gold -= price;
+    return { ok: true, msg: `Bought ${item.name}.` };
+  }
+  function sellItem(player, iid) {
+    const item = player.bags.find(b => b.iid === iid);
+    if (!item) return { ok: false };
+    DS.player.removeItem(player, iid);
+    const price = Math.max(1, item.sell || 1);
+    player.gold += price;
+    return { ok: true, msg: `Sold ${item.name} for ${price}g.` };
+  }
+
+  // --- quests at an npc -----------------------------------------------------
+  function questsOffered(player, npcId) {
+    return Object.values(K.QUESTS).filter(q => q.giver === npcId && DS.player.questAvailable(player, q.id));
+  }
+  function questsToTurnIn(player, npcId) {
+    return Object.values(K.QUESTS).filter(q => q.turnin === npcId && player.quests.active[q.id] && DS.player.questReadyToTurnIn(player, q.id));
+  }
+  function questsInProgress(player, npcId) {
+    return Object.values(K.QUESTS).filter(q => q.turnin === npcId && player.quests.active[q.id] && !DS.player.questReadyToTurnIn(player, q.id));
+  }
+
+  function enterPortal(player) {
+    const zone = K.ZONES[player.zone];
+    if (!zone.portal) return { ok: false, msg: 'Nothing here.' };
+    if (zone.portal.requiresFlag && !player.flags[zone.portal.requiresFlag]) return { ok: false, msg: 'The vault is sealed. Something out here must be holding the key.' };
+    return { ok: true, toZone: zone.portal.toZone, toX: zone.portal.toX, toY: zone.portal.toY, toFacing: zone.portal.toFacing };
+  }
+
+  function respecCost(player) { return player.level * 5; }
+  function respec(player) {
+    const cost = respecCost(player);
+    if (player.gold < cost) return { ok: false, msg: 'Not enough gold.' };
+    player.gold -= cost;
+    DS.player.resetTalents(player);
+    return { ok: true, msg: 'Talents reset.' };
+  }
+
+  DS.world = {
+    blocked, buildZoneRuntime, tickRespawns, nearbyInteractable, checkAutoTransition,
+    gatherNode, matName, canCraft, craft, matCount,
+    vendorStock, buyItem, sellItem, repTierIndex, enterPortal,
+    questsOffered, questsToTurnIn, questsInProgress, respec, respecCost
+  };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — the game object, new-character flow, and save/load.
+ *
+ * Only the character is persisted — level, gear, bags, quest log, rep,
+ * professions, talents, companions recruited. Zones are rebuilt fresh each
+ * session the way PrimalIsle rebuilds the island from a seed: mobs respawn
+ * where their spawn table says they should, nodes are full again, and nothing
+ * about that needs to survive a reload.
+ */
+(function (DS) {
+  'use strict';
+  const K = DS.content;
+
+  function newGame(name, clsId) {
+    const player = DS.player.newCharacter(name, clsId);
+    DS.player.refreshVitals(player);
+    player.hp.current = player.hp.max;
+    player.resource.current = player.resource.max;
+    return {
+      player, zoneRuntimes: {}, companionsActive: {},
+      combatLog: [], target: null, clock: 0, paused: false
+    };
+  }
+
+  function ensureZoneRuntime(game, zoneId) {
+    if (!game.zoneRuntimes[zoneId]) game.zoneRuntimes[zoneId] = DS.world.buildZoneRuntime(zoneId);
+    return game.zoneRuntimes[zoneId];
+  }
+
+  function syncCompanions(game) {
+    Object.entries(game.player.companions).forEach(([defId, c]) => {
+      if (c.recruited && !game.companionsActive[defId]) {
+        game.companionsActive[defId] = DS.ai.makeCompanionActor(defId, game.player);
+      }
+    });
+    return Object.values(game.companionsActive);
+  }
+
+  function currentZone(game) { return K.ZONES[game.player.zone]; }
+  function currentRuntime(game) { return ensureZoneRuntime(game, game.player.zone); }
+
+  function warp(game, toZone, toX, toY, toFacing) {
+    const p = game.player;
+    p.zone = toZone; p.x = toX; p.y = toY; p.angle = toFacing || 0;
+    ensureZoneRuntime(game, toZone);
+    Object.values(game.companionsActive).forEach(c => { c.x = toX; c.y = toY; c.zone = toZone; });
+  }
+
+  function forSave(game) { return { player: game.player }; }
+
+  function fromSaved(saved) {
+    const game = newGame(saved.player.name, saved.player.cls);
+    game.player = Object.assign(game.player, saved.player);
+    // migration safety: fill in any fields older/partial saves might lack
+    if (!game.player.professions) game.player.professions = { learned: [], skill: {} };
+    if (!game.player.companions) game.player.companions = {};
+    if (!game.player.flags) game.player.flags = {};
+    K.SLOTS.forEach(s => { if (!(s in game.player.equip)) game.player.equip[s] = null; });
+    DS.player.refreshVitals(game.player);
+    ensureZoneRuntime(game, game.player.zone);
+    syncCompanions(game);
+    return game;
+  }
+
+  function load() {
+    const saved = DS.core.load();
+    if (!saved || !saved.player) return null;
+    try { return fromSaved(saved); } catch (e) { console.warn('[doomspire] save incompatible', e); return null; }
+  }
+
+  DS.state = { newGame, ensureZoneRuntime, syncCompanions, currentZone, currentRuntime, warp, forSave, fromSaved, load };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — the tick: turning and movement, targeting, combat, respawns,
+ * and the automatic zone exit at a map edge. Everything else (panels,
+ * rendering) reads what this produces.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+  const CB = DS.combat;
+
+  const MOVE_SPEED = 3.3;
+  const AUTO_ATTACK_RANGE = 1.7;
+  const TARGET_RANGE = 22;
+  const TARGET_CONE = 0.55;
+  const LOG_MAX = 60;
+
+  function log(game, msg) {
+    game.combatLog.push(msg);
+    if (game.combatLog.length > LOG_MAX) game.combatLog.splice(0, game.combatLog.length - LOG_MAX);
+  }
+
+  function pickTarget(player, mobs) {
+    const cur = mobs.find(m => m.id === player.__targetId && m.alive);
+    if (cur && C.dist(player.x, player.y, cur.x, cur.y) <= TARGET_RANGE * 1.3) return cur;
+    let best = null, bestScore = Infinity;
+    mobs.forEach(m => {
+      if (!m.alive) return;
+      const d = C.dist(player.x, player.y, m.x, m.y);
+      if (d > TARGET_RANGE) return;
+      const ang = Math.atan2(m.y - player.y, m.x - player.x);
+      const diff = Math.abs(C.angDelta(player.angle, ang));
+      if (diff > TARGET_CONE && d > 2.2) return;
+      const score = d + diff * 5;
+      if (score < bestScore) { bestScore = score; best = m; }
+    });
+    return best;
+  }
+
+  function moveActor(actor, mx, my, speed, dt, zoneId) {
+    const len = Math.hypot(mx, my);
+    if (len < 1e-4) return;
+    if (len > 1) { mx /= len; my /= len; }
+    const fx = Math.cos(actor.angle), fy = Math.sin(actor.angle);
+    const rx = -Math.sin(actor.angle), ry = Math.cos(actor.angle);
+    const wx = fx * (-my) + rx * mx, wy = fy * (-my) + ry * mx;
+    const step = speed * dt;
+    const nx = actor.x + wx * step, ny = actor.y + wy * step;
+    if (!DS.world.blocked(zoneId, nx, ny)) { actor.x = nx; actor.y = ny; }
+    else if (!DS.world.blocked(zoneId, nx, actor.y)) actor.x = nx;
+    else if (!DS.world.blocked(zoneId, actor.x, ny)) actor.y = ny;
+  }
+
+  function handleMobDeath(game, mob) {
+    if (mob.deathProcessed) return;
+    mob.deathProcessed = true;
+    const player = game.player;
+    const tpl = K.BESTIARY[mob.tplId];
+    const gained = DS.player.grantXP(player, tpl.xp);
+    log(game, `${mob.name} dies. (+${tpl.xp} xp${gained.leveled ? `, level ${player.level}!` : ''})`);
+    const loot = DS.ai.rollLoot(mob);
+    if (loot.gold) { player.gold += loot.gold; }
+    if (loot.item) { if (!DS.player.addItem(player, loot.item)) log(game, `Bags full — ${loot.item.name} was lost.`); else log(game, `Loot: ${loot.item.name}.`); }
+    if (loot.questItem) {
+      if (!DS.player.addItem(player, loot.questItem)) log(game, `Bags full — ${loot.questItem.name} was lost.`);
+      else { log(game, `Picked up ${loot.questItem.name}.`); DS.player.noteCollect(player, loot.questItem.tplId); }
+    }
+    DS.player.noteKill(player, mob.tplId);
+    if (player.__targetId === mob.id) player.__targetId = null;
+  }
+
+  function respawnPlayer(game) {
+    const player = game.player;
+    const zone = K.ZONES[player.zone] || K.ZONES.scar;
+    player.zone = zone.id;
+    player.x = zone.spawn.x; player.y = zone.spawn.y; player.angle = zone.spawn.facing || 0;
+    player.alive = true;
+    DS.player.refreshVitals(player);
+    player.hp.current = player.hp.max;
+    player.gold = Math.max(0, player.gold - Math.round(player.gold * 0.1));
+    DS.state.ensureZoneRuntime(game, player.zone);
+    log(game, 'You return to the world, a little poorer.');
+  }
+
+  function useAbility(game, abilityId) {
+    const player = game.player;
+    if (!player.alive) return { ok: false, reason: 'dead' };
+    const ability = DS.player.abilityList(player).find(a => a.id === abilityId);
+    if (!ability) return { ok: false, reason: 'unknown' };
+    const target = ability.self || ability.kind === 'buff' || ability.kind === 'heal' || ability.kind === 'utility' ? player : game.target;
+    const res = CB.startCast(player, target, ability, game.combatLog);
+    if (game.combatLog.length > LOG_MAX) game.combatLog.splice(0, game.combatLog.length - LOG_MAX);
+    return res;
+  }
+
+  function tick(game, dt, input) {
+    const player = game.player;
+    const rt = DS.state.currentRuntime(game);
+    const companions = DS.state.syncCompanions(game).filter(c => player.companions[c.defId] && player.companions[c.defId].recruited);
+    game.clock += dt;
+
+    if (!player.alive) return;
+
+    const axes = input.frameAxes();
+    player.angle += axes.turn;
+
+    const bt = CB.buffTotals(player);
+    const speedMult = (1 + bt.speedPct) * (1 - bt.snaredPct) * (bt.rooted ? 0 : 1);
+    if (!player.casting) moveActor(player, axes.mx, axes.my, MOVE_SPEED * speedMult, dt, player.zone);
+
+    CB.tickCooldowns(player, dt);
+    CB.tickBuffs(player, dt);
+    CB.tickCasting(player, dt, game.combatLog);
+
+    const liveMobs = rt.mobs.filter(m => m.alive);
+    const target = pickTarget(player, liveMobs);
+    player.__targetId = target ? target.id : null;
+    game.target = target;
+
+    const inCombat = !!target || liveMobs.some(m => m.target === player || companions.includes(m.target));
+    CB.tickResource(player, dt, inCombat);
+
+    player.autoAttackTimer = (player.autoAttackTimer || 0) - dt;
+    if (target && !player.casting && C.dist(player.x, player.y, target.x, target.y) <= AUTO_ATTACK_RANGE) {
+      if (player.autoAttackTimer <= 0) { player.autoAttackTimer = 1.9; CB.autoAttack(player, target, game.combatLog); }
+    }
+
+    companions.forEach(c => DS.ai.tickCompanion(c, player, liveMobs, dt, player.zone, game.combatLog));
+    rt.mobs.forEach(m => {
+      if (m.alive) DS.ai.tickMob(m, [player].concat(companions), player.zone, dt, game.combatLog);
+      else handleMobDeath(game, m);
+    });
+    DS.world.tickRespawns(rt, dt);
+
+    if (game.combatLog.length > LOG_MAX) game.combatLog.splice(0, game.combatLog.length - LOG_MAX);
+
+    if (player.hp.current <= 0 && player.alive) { player.alive = false; log(game, 'You have fallen.'); }
+
+    const exit = DS.world.checkAutoTransition(player, rt);
+    if (exit) {
+      DS.state.warp(game, exit.toZone, exit.toX, exit.toY, exit.toFacing);
+      log(game, `You enter ${K.ZONES[exit.toZone].name}.`);
+    }
+  }
+
+  DS.sim = { tick, useAbility, pickTarget, respawnPlayer, log, MOVE_SPEED, AUTO_ATTACK_RANGE };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — one frame: the raycast scene, sprites with nameplates and
+ * health bars, the crosshair/target reticle, and the minimap. Everything
+ * else (bars, buttons, panels) is DOM and lives in ui.js.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+  const E = DS.engine;
+
+  let scene = null, sceneCtx = null, mini = null, miniCtx = null;
+  let W = 320, H = 240;
+
+  function init(sceneCanvas, miniCanvas) {
+    scene = sceneCanvas; sceneCtx = scene.getContext('2d');
+    mini = miniCanvas; miniCtx = mini.getContext('2d');
+    resize();
+  }
+
+  function resize() {
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    const rect = scene.getBoundingClientRect();
+    W = scene.width = Math.max(160, Math.round(rect.width * dpr));
+    H = scene.height = Math.max(120, Math.round(rect.height * dpr));
+    const mr = mini.getBoundingClientRect();
+    mini.width = Math.round(mr.width * dpr);
+    mini.height = Math.round(mr.height * dpr);
+  }
+
+  const NPC_COLORS = { vendor: '#e8b23a', trainer: '#7fb8e0', proftrainer: '#7fb8e0', quest: '#e0a83f', companion: '#79c07a' };
+
+  function npcMarker(npc, player) {
+    if (npc.kind === 'quest' || npc.kind === 'companion') {
+      const give = DS.world.questsOffered(player, npc.id).length;
+      const turn = DS.world.questsToTurnIn(player, npc.id).length;
+      const prog = DS.world.questsInProgress(player, npc.id).length;
+      if (turn) return { glyph: '❓', color: '#f0d34a' };
+      if (give) return { glyph: '❗', color: '#f0a52e' };
+      if (prog) return { glyph: '…', color: '#8d9ab2' };
+    }
+    return null;
+  }
+
+  function drawBarAbove(ctx, screenX, top, size, ratio, color) {
+    const w = Math.max(14, size * 0.7), h = Math.max(2, size * 0.06);
+    const x = screenX - w / 2, y = top - h - 3;
+    ctx.fillStyle = 'rgba(6,10,18,0.75)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = color; ctx.fillRect(x, y, w * C.clamp(ratio, 0, 1), h);
+  }
+  function drawGlyphAbove(ctx, screenX, top, size, glyph, color) {
+    ctx.font = `${Math.max(10, size * 0.35)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = color;
+    ctx.fillText(glyph, screenX, top - 3);
+  }
+
+  function frame(game, dt) {
+    if (!scene) return;
+    const player = game.player;
+    sceneCtx.clearRect(0, 0, W, H);
+    if (!player.alive) {
+      sceneCtx.fillStyle = '#1a0608';
+      sceneCtx.fillRect(0, 0, W, H);
+      sceneCtx.fillStyle = '#c0392b';
+      sceneCtx.textAlign = 'center'; sceneCtx.font = `${Math.round(H * 0.07)}px sans-serif`;
+      sceneCtx.fillText('YOU HAVE FALLEN', W / 2, H / 2);
+      return;
+    }
+    const zone = K.ZONES[player.zone];
+    const rt = DS.state.currentRuntime(game);
+    const zbuffer = E.castWalls(sceneCtx, W, H, zone, player);
+
+    const companions = Object.values(game.companionsActive).filter(c => player.companions[c.defId] && player.companions[c.defId].recruited && c.zone === player.zone);
+    const sprites = [];
+    rt.mobs.filter(m => m.alive).forEach(m => sprites.push({ x: m.x, y: m.y, icon: m.icon, ring: m.boss ? '#7a1030' : m.elite ? '#a9432c' : '#c0392b', kind: 'mob', ref: m, height: m.boss ? 1.5 : m.elite ? 1.15 : 0.9 }));
+    companions.forEach(c => sprites.push({ x: c.x, y: c.y, icon: c.icon, ring: '#2f6f4a', kind: 'companion', ref: c, height: 0.95 }));
+    rt.npcs.forEach(n => { if (n.kind === 'companion' && player.companions[n.companion] && player.companions[n.companion].recruited) return; sprites.push({ x: n.x, y: n.y, icon: n.icon, ring: NPC_COLORS[n.kind] || '#8d9ab2', kind: 'npc', ref: n, height: 1.0 }); });
+    rt.nodes.forEach(n => { if (n.harvested) return; sprites.push({ x: n.x, y: n.y, icon: n.kind === 'mining' ? '⛏️' : '🌿', ring: '#5f8a4a', kind: 'node', ref: n, height: 0.55, footOffset: 0.15 }); });
+    if (zone.portal) sprites.push({ x: zone.portal.x, y: zone.portal.y, icon: '🌀', ring: '#6a3a9a', kind: 'portal', ref: zone.portal, height: 1.2 });
+
+    const withDepth = sprites.map(s => Object.assign(s, { proj: E.project(player, W, H, s.x, s.y) })).filter(s => s.proj.visible);
+    withDepth.sort((a, b) => b.proj.depth - a.proj.depth);
+    withDepth.forEach(s => {
+      const drawn = E.drawSprite(sceneCtx, W, H, zbuffer, s.proj, { icon: s.icon, ring: s.ring, height: s.height, footOffset: s.footOffset });
+      if (!drawn) return;
+      if (s.kind === 'mob') {
+        const m = s.ref;
+        if (m.hp.current < m.hp.max) drawBarAbove(sceneCtx, drawn.screenX, drawn.top, drawn.size, m.hp.current / m.hp.max, m.boss ? '#c0392b' : '#d8564a');
+        if (game.target === m) {
+          sceneCtx.strokeStyle = '#f0d34a'; sceneCtx.lineWidth = Math.max(1, drawn.size * 0.03);
+          sceneCtx.beginPath(); sceneCtx.ellipse(drawn.screenX, drawn.cy - drawn.size * 0.5, drawn.size * 0.46, drawn.size * 0.54, 0, 0, Math.PI * 2); sceneCtx.stroke();
+        }
+      } else if (s.kind === 'npc') {
+        const marker = npcMarker(s.ref, player);
+        if (marker) drawGlyphAbove(sceneCtx, drawn.screenX, drawn.top, drawn.size, marker.glyph, marker.color);
+      }
+    });
+
+    // crosshair
+    sceneCtx.strokeStyle = game.target ? '#f0d34a' : 'rgba(230,236,247,0.55)';
+    sceneCtx.lineWidth = 1.5;
+    const cx = W / 2, cy = H / 2, r = 6;
+    sceneCtx.beginPath();
+    sceneCtx.moveTo(cx - r, cy); sceneCtx.lineTo(cx - 2, cy);
+    sceneCtx.moveTo(cx + 2, cy); sceneCtx.lineTo(cx + r, cy);
+    sceneCtx.moveTo(cx, cy - r); sceneCtx.lineTo(cx, cy - 2);
+    sceneCtx.moveTo(cx, cy + 2); sceneCtx.lineTo(cx, cy + r);
+    sceneCtx.stroke();
+
+    const mapEntities = rt.mobs.filter(m => m.alive).map(m => ({ x: m.x, y: m.y, color: m.boss ? '#c0392b' : m.elite ? '#e0655a' : '#a9432c' }))
+      .concat(rt.npcs.filter(n => !(n.kind === 'companion' && player.companions[n.companion] && player.companions[n.companion].recruited)).map(n => ({ x: n.x, y: n.y, color: NPC_COLORS[n.kind] || '#8d9ab2' })))
+      .concat(companions.map(c => ({ x: c.x, y: c.y, color: '#79c07a' })));
+    E.minimap(miniCtx, mini, zone, player, mapEntities);
+  }
+
+  DS.render = { init, resize, frame };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — every DOM surface: the HUD, the ability bar, character
+ * creation, and every panel (character, talents, bags, quests, professions,
+ * reputation, party, and whatever NPC you're standing in front of).
+ *
+ * Panels are rebuilt from scratch on open and on action (innerHTML from a
+ * template string) since they're opened rarely; the HUD bars and ability
+ * cooldowns are touched every frame with direct property writes, the same
+ * split PrimalIsle's ui.js makes.
+ */
+(function (DS) {
+  'use strict';
+  const C = DS.core;
+  const K = DS.content;
+
+  const RES_COLOR = { rage: '#c0392b', mana: '#2f6fb0', energy: '#e0b23a' };
+  const RES_NAME = { rage: 'Rage', mana: 'Mana', energy: 'Energy' };
+
+  let els = {};
+  let game = null;
+  let ui = { panel: null, panelCtx: null };
+  let onStartCb = null;
+
+  function q(sel, root) { return (root || document).querySelector(sel); }
+  function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
+  function qcolor(key) { return (K.QUALITY_BY_KEY[key] || K.QUALITY_BY_KEY.common).color; }
+
+  function boot() {
+    els = {
+      scene: q('#scene'), minimap: q('#minimap'), stage: q('#stage'), stick: q('#stick'), knob: q('#knob'),
+      hpFill: q('#hp-fill'), hpText: q('#hp-text'), resFill: q('#res-fill'), resText: q('#res-text'),
+      xpFill: q('#xp-fill'), lvlText: q('#lvl-text'), nameText: q('#name-text'),
+      zoneText: q('#zone-text'), goldText: q('#gold-text'),
+      log: q('#combat-log'), interactBtn: q('#interact-btn'),
+      abilityBar: q('#ability-bar'), menuBtn: q('#menu-btn'), targetBar: q('#target-bar'),
+      targetName: q('#target-name'), targetFill: q('#target-fill'),
+      panelsHost: q('#panels'), tabs: q('#tabs'),
+      charcreate: q('#charcreate'), deathscreen: q('#deathscreen'), comboWrap: q('#combo-points')
+    };
+    DS.engine.input = DS.engine.makeInput({ stage: els.stage, stick: els.stick, knob: els.knob });
+    els.interactBtn.addEventListener('click', onInteract);
+    els.menuBtn.addEventListener('click', () => openPanel(ui.panel ? null : 'character'));
+    els.panelsHost.addEventListener('click', onPanelClick);
+    els.tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) openPanel(b.dataset.tab); });
+    q('#deathscreen .respawn-btn').addEventListener('click', () => { DS.sim.respawnPlayer(game); closeDeath(); });
+    window.addEventListener('resize', () => DS.render.resize());
+    buildCharCreate();
+  }
+
+  // --- character creation ---------------------------------------------------
+  function buildCharCreate() {
+    const list = q('#class-list');
+    list.innerHTML = Object.values(K.CLASSES).map(c => `
+      <button class="class-card" data-cls="${c.id}">
+        <div class="cc-icon">${c.icon}</div>
+        <div class="cc-name">${c.name}</div>
+        <div class="cc-role">${c.role}</div>
+        <div class="cc-blurb">${c.blurb}</div>
+      </button>`).join('');
+    let chosen = null;
+    list.addEventListener('click', e => {
+      const b = e.target.closest('.class-card'); if (!b) return;
+      list.querySelectorAll('.class-card').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel'); chosen = b.dataset.cls;
+      q('#begin-btn').disabled = false;
+    });
+    q('#begin-btn').addEventListener('click', () => {
+      if (!chosen) return;
+      const name = (q('#name-input').value || 'Adventurer').trim().slice(0, 18);
+      const g = DS.state.newGame(name, chosen);
+      els.charcreate.classList.add('hidden');
+      onStartCb && onStartCb(g);
+    });
+  }
+  function showCharCreate(onStart) { onStartCb = onStart; els.charcreate.classList.remove('hidden'); }
+
+  function startGame(g) {
+    game = g;
+    DS.render.init(els.scene, els.minimap);
+    buildAbilityBar();
+    renderStaticHeader();
+  }
+
+  function renderStaticHeader() {
+    els.nameText.textContent = `${game.player.name}`;
+  }
+
+  // --- ability bar -----------------------------------------------------------
+  function buildAbilityBar() {
+    const abilities = DS.player.abilityList(game.player);
+    els.abilityBar.innerHTML = abilities.map((a, i) => `
+      <button class="ability-btn" data-ability="${a.id}" title="${a.name}">
+        <span class="ab-icon">${a.icon}</span>
+        <span class="ab-cd"></span>
+        <span class="ab-key">${i + 1}</span>
+      </button>`).join('');
+    els.abilityBar.querySelectorAll('.ability-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const res = DS.sim.useAbility(game, btn.dataset.ability);
+        if (!res.ok && res.reason !== 'gcd' && res.reason !== 'cooldown') { DS.sim.log(game, `Can't use that (${res.reason}).`); refreshLog(); }
+      });
+    });
+  }
+
+  // --- per-frame HUD ----------------------------------------------------------
+  let lastLogLen = -1;
+  function frame(dt) {
+    if (!game) return;
+    const p = game.player;
+    if (!p.alive) { showDeath(); return; }
+    const d = DS.player.refreshVitals(p);
+    els.hpFill.style.width = C.pct(p.hp.current / p.hp.max);
+    els.hpText.textContent = `${Math.round(p.hp.current)} / ${p.hp.max}`;
+    const resKind = K.CLASSES[p.cls].resource;
+    els.resFill.style.width = C.pct(p.resource.current / p.resource.max);
+    els.resFill.style.background = RES_COLOR[resKind];
+    els.resText.textContent = `${Math.round(p.resource.current)} / ${p.resource.max} ${RES_NAME[resKind]}`;
+    const need = DS.player.xpForLevel(p.level);
+    els.xpFill.style.width = p.level >= K.LEVEL_CAP ? '100%' : C.pct(p.xp / need);
+    els.lvlText.textContent = `Lv ${p.level} ${K.CLASSES[p.cls].icon} ${K.CLASSES[p.cls].name}`;
+    els.zoneText.textContent = K.ZONES[p.zone].name;
+    els.goldText.textContent = `${p.gold}g`;
+
+    els.comboWrap.innerHTML = K.CLASSES[p.cls].comboPoints
+      ? Array.from({ length: 5 }, (_, i) => `<i class="${i < p.comboPoints ? 'on' : ''}"></i>`).join('') : '';
+
+    const abilities = DS.player.abilityList(p);
+    els.abilityBar.querySelectorAll('.ability-btn').forEach(btn => {
+      const a = abilities.find(x => x.id === btn.dataset.ability);
+      const cd = (p.cooldowns[a.id] || 0);
+      const cdEl = btn.querySelector('.ab-cd');
+      cdEl.style.height = cd > 0 ? C.pct(cd / (a.cd || 1)) : '0%';
+      const cost = a.cost || 0;
+      btn.classList.toggle('unaffordable', cost > (p.resource.current || 0) && !a.self);
+    });
+
+    if (game.target && game.target.alive) {
+      els.targetBar.classList.remove('hidden');
+      els.targetName.textContent = `${game.target.name} · Lv ${game.target.level}`;
+      els.targetFill.style.width = C.pct(game.target.hp.current / game.target.hp.max);
+    } else els.targetBar.classList.add('hidden');
+
+    const rt = DS.state.currentRuntime(game);
+    const near = DS.world.nearbyInteractable(p, rt);
+    if (near) {
+      els.interactBtn.classList.remove('hidden');
+      els.interactBtn.textContent = interactLabel(near);
+    } else els.interactBtn.classList.add('hidden');
+
+    if (game.combatLog.length !== lastLogLen) { refreshLog(); lastLogLen = game.combatLog.length; }
+    if (ui.panel) refreshOpenPanel();
+  }
+
+  function interactLabel(near) {
+    if (near.kind === 'node') return `⛏️ Gather ${near.ref.kind === 'mining' ? 'Ore' : 'Herb'}`;
+    if (near.kind === 'portal') return `🌀 Enter the Vault`;
+    if (near.kind === 'exit') return `➜ ${K.ZONES[near.ref.toZone].name}`;
+    const n = near.ref;
+    if (n.vendor) return `💰 Trade with ${n.name}`;
+    if (n.kind === 'trainer') return `🏛️ Speak with ${n.name}`;
+    if (n.kind === 'proftrainer') return `⚙️ Speak with ${n.name}`;
+    return `❗ Speak with ${n.name}`;
+  }
+
+  function refreshLog() {
+    els.log.innerHTML = game.combatLog.slice(-8).map(m => `<div>${m}</div>`).join('');
+    els.log.scrollTop = els.log.scrollHeight;
+  }
+
+  function onInteract() {
+    const rt = DS.state.currentRuntime(game);
+    const near = DS.world.nearbyInteractable(game.player, rt);
+    if (!near) return;
+    if (near.kind === 'node') { const r = DS.world.gatherNode(game.player, near.ref); DS.sim.log(game, r.msg); refreshLog(); return; }
+    if (near.kind === 'portal') {
+      const r = DS.world.enterPortal(game.player);
+      if (!r.ok) { DS.sim.log(game, r.msg); refreshLog(); return; }
+      DS.state.warp(game, r.toZone, r.toX, r.toY, r.toFacing);
+      DS.sim.log(game, `You step through into ${K.ZONES[r.toZone].name}.`);
+      refreshLog(); return;
+    }
+    if (near.kind === 'exit') return; // handled automatically by sim
+    openPanel('npc', { npc: near.ref });
+  }
+
+  // --- panels -----------------------------------------------------------------
+  function openPanel(kind, ctx) {
+    if (!kind) { closePanel(); return; }
+    ui.panel = kind; ui.panelCtx = ctx || null;
+    els.tabs.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === kind));
+    els.panelsHost.classList.remove('hidden');
+    renderPanel();
+  }
+  function closePanel() {
+    ui.panel = null; ui.panelCtx = null;
+    els.panelsHost.classList.add('hidden');
+    els.tabs.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+  }
+  function paused() { return !!ui.panel; }
+  function refreshOpenPanel() { renderPanel(); }
+
+  function renderPanel() {
+    const p = game.player;
+    let html = '';
+    switch (ui.panel) {
+      case 'character': html = renderCharacter(p); break;
+      case 'talents': html = renderTalents(p); break;
+      case 'bags': html = renderBags(p); break;
+      case 'quests': html = renderQuests(p); break;
+      case 'professions': html = renderProfessions(p); break;
+      case 'reputation': html = renderReputation(p); break;
+      case 'party': html = renderParty(p); break;
+      case 'npc': html = renderNpc(p, ui.panelCtx.npc); break;
+      default: html = '';
+    }
+    els.panelsHost.querySelector('.panel-body').innerHTML = html;
+    const title = els.panelsHost.querySelector('.panel-title');
+    title.textContent = ui.panel === 'npc' ? ui.panelCtx.npc.name : C.titleCase(ui.panel);
+  }
+
+  function slotIcon(slot) {
+    return ({ head: '🪖', neck: '📿', shoulder: '🎽', cloak: '🧣', chest: '👕', wrist: '⌚', hands: '🧤', waist: '🎗️', legs: '👖', feet: '🥾', ring1: '💍', ring2: '💍', trinket1: '🔮', trinket2: '🔮', mainhand: '🗡️', offhand: '🛡️' })[slot] || '❔';
+  }
+  function itemLine(it, extraBtns) {
+    const color = qcolor(it.quality);
+    const sub = it.slot ? `${K.SLOT_WEIGHT[it.slot] ? C.titleCase(it.slot.replace(/[12]$/, '')) : ''}${it.ilvl ? ` · ilvl ${it.ilvl}` : ''}`
+      : it.potion ? 'Potion' : it.enchant ? 'Enchant' : it.matId ? 'Material' : 'Item';
+    const stats = Object.entries(it.stats || {}).filter(([, v]) => v).map(([k, v]) => `+${v} ${k}`).join(', ');
+    const dmg = it.dmgLo ? `${it.dmgLo}-${it.dmgHi} dmg, ${it.speed.toFixed(1)} spd` : '';
+    return `<div class="item-row">
+      <div class="item-main">
+        <b style="color:${color}">${it.name}</b>
+        <span class="item-sub">${sub}</span>
+        ${stats || dmg ? `<div class="item-stats">${[dmg, stats].filter(Boolean).join(' · ')}</div>` : ''}
+      </div>
+      <div class="item-btns">${extraBtns}</div>
+    </div>`;
+  }
+
+  function renderCharacter(p) {
+    const d = DS.player.derived(p);
+    const eq = K.SLOTS.map(s => {
+      const it = p.equip[s];
+      return `<button class="slot-cell" data-act="unequip" data-slot="${s}" ${it ? '' : 'disabled'}>
+        <span>${it ? '' : slotIcon(s)}</span>
+        <b style="color:${it ? qcolor(it.quality) : '#5f6b82'}">${it ? it.name : C.titleCase(s.replace(/[12]$/, ''))}</b>
+      </button>`;
+    }).join('');
+    return `
+      <div class="stat-grid">
+        <div>Strength <b>${Math.round(d.str)}</b></div><div>Agility <b>${Math.round(d.agi)}</b></div>
+        <div>Intellect <b>${Math.round(d.int)}</b></div><div>Stamina <b>${Math.round(d.sta)}</b></div>
+        <div>Spirit <b>${Math.round(d.spirit)}</b></div><div>Armor <b>${d.armor}</b></div>
+        <div>Attack Power <b>${d.attackPower}</b></div><div>Spell Power <b>${d.spellPower}</b></div>
+        <div>Crit <b>${C.pct(d.critChance)}</b></div><div>Haste <b>${C.pct(d.hastePct)}</b></div>
+      </div>
+      <h4>Equipped</h4>
+      <div class="slot-grid">${eq}</div>`;
+  }
+
+  function renderTalents(p) {
+    const cls = K.CLASSES[p.cls];
+    const tiers = K.talentTiers();
+    const spent = DS.player.talentPointsSpent(p);
+    const groups = [1, 2, 3, 4, 5].map(tier => {
+      const unlocked = spent >= tiers[tier];
+      const items = cls.talents.filter(t => t.tier === tier).map(t => {
+        const rank = p.talents[t.id] || 0;
+        const can = DS.player.canSpendTalent(p, t.id);
+        return `<button class="talent-cell ${rank > 0 ? 'ranked' : ''} ${can ? 'can' : ''}" data-act="talent" data-id="${t.id}" ${unlocked ? '' : 'disabled'}>
+          <span class="t-icon">${t.icon}</span>
+          <b>${t.name}</b>
+          <span class="t-rank">${rank}/${t.maxRank}</span>
+          <div class="t-desc">${t.desc}</div>
+        </button>`;
+      }).join('');
+      return `<div class="talent-tier ${unlocked ? '' : 'locked'}">
+        <div class="tier-label">${unlocked ? `Tier ${tier}` : `Tier ${tier} — needs ${tiers[tier]} points spent`}</div>
+        <div class="talent-row">${items}</div>
+      </div>`;
+    }).join('');
+    return `<div class="talent-header">
+        <span>${p.talentPoints} point${p.talentPoints === 1 ? '' : 's'} available</span>
+        <button class="mini-btn" data-act="respec">Reset (${DS.world.respecCost(p)}g)</button>
+      </div>${groups}`;
+  }
+
+  function renderBags(p) {
+    const items = p.bags.map(it => itemLine(it,
+      (it.slot ? `<button class="mini-btn" data-act="equip" data-iid="${it.iid}">Equip</button>` : '') +
+      (it.potion ? `<button class="mini-btn" data-act="usepotion" data-iid="${it.iid}">Use</button>` : '') +
+      (it.enchant ? `<button class="mini-btn" data-act="useenchant" data-iid="${it.iid}">Apply</button>` : '') +
+      (it.questItem ? '' : `<button class="mini-btn" data-act="sell" data-iid="${it.iid}">Sell ${it.sell}g</button>`)
+    )).join('') || '<p class="empty">Nothing here.</p>';
+    return `<div class="bag-header">${p.bags.length} / ${DS.player.BAG_SIZE} — ${p.gold}g</div>${items}`;
+  }
+
+  function renderQuests(p) {
+    const active = Object.entries(p.quests.active).map(([qid, a]) => {
+      const q = K.QUESTS[qid];
+      const goal = q.kind === 'kill' ? `${K.BESTIARY[q.target].name} ${a.progress}/${q.count}` : q.kind === 'collect' ? `${q.item.replace(/_/g, ' ')} ${a.progress}/${q.count}` : 'Return and report';
+      return `<div class="quest-row"><b>${q.name}</b><div class="quest-sub">${K.ZONES[q.zone].name} · ${goal}</div><div class="quest-text">${q.text}</div></div>`;
+    }).join('') || '<p class="empty">No active quests.</p>';
+    return `<h4>Active</h4>${active}<h4>Completed (${p.quests.completed.length})</h4>`;
+  }
+
+  function renderProfessions(p) {
+    const learnedGather = p.professions.learned.filter(id => K.GATHER_PROFESSIONS[id]);
+    const learnedCraft = p.professions.learned.filter(id => K.CRAFT_PROFESSIONS[id]);
+    const allIds = Object.keys(K.GATHER_PROFESSIONS).concat(Object.keys(K.CRAFT_PROFESSIONS));
+    const learnRow = p.professions.learned.length >= 2 ? '' : `<div class="learn-row">${allIds.filter(id => !p.professions.learned.includes(id)).map(id => {
+      const def = K.GATHER_PROFESSIONS[id] || K.CRAFT_PROFESSIONS[id];
+      return `<button class="mini-btn" data-act="learnprof" data-id="${id}">${def.icon} Learn ${def.name}</button>`;
+    }).join('')}</div>`;
+    const gatherHtml = learnedGather.map(id => {
+      const skill = p.professions.skill[id] || 0;
+      return `<div class="prof-block"><b>${K.GATHER_PROFESSIONS[id].icon} ${K.GATHER_PROFESSIONS[id].name}</b>
+        <div class="skillbar"><i style="width:${C.pct(skill / 300)}"></i></div>
+        <span>${skill} / 300 — ${K.SKILL_TIER_NAME(skill)}</span></div>`;
+    }).join('');
+    const craftHtml = learnedCraft.map(id => {
+      const prof = K.CRAFT_PROFESSIONS[id];
+      const skill = p.professions.skill[id] || 0;
+      const recipes = prof.recipes.map(r => {
+        const can = DS.world.canCraft(p, id, r);
+        const matsStr = Object.entries(r.mats).map(([m, n]) => `${DS.world.matName(m)} ${DS.world.matCount(p, m)}/${n}`).join(', ');
+        return `<div class="recipe-row"><b>${r.name}</b><span class="item-sub">req ${r.skillReq} skill — ${matsStr}</span>
+          <button class="mini-btn" data-act="craft" data-prof="${id}" data-recipe="${r.id}" ${can ? '' : 'disabled'}>Craft</button></div>`;
+      }).join('');
+      return `<div class="prof-block"><b>${prof.icon} ${prof.name}</b>
+        <div class="skillbar"><i style="width:${C.pct(skill / 300)}"></i></div>
+        <span>${skill} / 300 — ${K.SKILL_TIER_NAME(skill)}</span>${recipes}</div>`;
+    }).join('');
+    return `${learnRow}${gatherHtml}${craftHtml}` || '<p class="empty">No professions learned.</p>';
+  }
+
+  function renderReputation(p) {
+    return Object.values(K.FACTIONS).map(f => {
+      const rep = p.rep[f.id] || 0;
+      const tier = K.repTier(rep);
+      const idx = K.FACTION_TIERS.findIndex(t => t.name === tier.name);
+      const next = K.FACTION_TIERS[idx + 1];
+      const span = next ? next.min - tier.min : 1;
+      const into = rep - tier.min;
+      return `<div class="rep-row"><b>${f.name}</b><span class="item-sub">${tier.name} (${rep})</span>
+        <div class="skillbar"><i style="width:${next ? C.pct(C.clamp(into / span, 0, 1)) : '100%'}"></i></div></div>`;
+    }).join('');
+  }
+
+  function renderParty(p) {
+    return Object.entries(DS.ai.COMPANION_DEFS).map(([id, def]) => {
+      const c = p.companions[id];
+      if (!c || !c.recruited) return `<div class="party-row dim"><b>${def.icon} ${def.name}</b><span class="item-sub">Not yet found — rumored to be somewhere out there.</span></div>`;
+      const actor = game.companionsActive[id];
+      const hpPct = actor ? actor.hp.current / actor.hp.max : 1;
+      return `<div class="party-row"><b>${def.icon} ${def.name}</b><span class="item-sub">Lv ${actor ? actor.level : p.level} ${K.CLASSES[def.cls].name} — ${def.role}</span>
+        <div class="skillbar"><i style="width:${C.pct(hpPct)};background:#79c07a"></i></div></div>`;
+    }).join('');
+  }
+
+  function renderNpc(p, npc) {
+    let html = '';
+    if (npc.kind === 'quest' || npc.kind === 'companion') {
+      const offer = DS.world.questsOffered(p, npc.id);
+      const turn = DS.world.questsToTurnIn(p, npc.id);
+      const prog = DS.world.questsInProgress(p, npc.id);
+      html += turn.map(q => `<div class="quest-row"><b>${q.name}</b><div class="quest-text">Turn in for ${q.xp} xp, ${q.gold}g${q.rep ? `, +rep` : ''}${q.companion ? ', a companion' : ''}.</div>
+        <button class="mini-btn" data-act="turnin" data-q="${q.id}">Turn In</button></div>`).join('');
+      html += offer.map(q => `<div class="quest-row"><b>${q.name}</b><div class="quest-text">${q.text}</div>
+        <button class="mini-btn" data-act="accept" data-q="${q.id}">Accept</button></div>`).join('');
+      html += prog.map(q => `<div class="quest-row dim"><b>${q.name}</b><div class="quest-text">In progress.</div></div>`).join('');
+      if (!offer.length && !turn.length && !prog.length) html += '<p class="empty">Nothing for you right now.</p>';
+    }
+    if (npc.vendor) {
+      const stock = DS.world.vendorStock(npc, p);
+      html += `<h4>For Sale</h4>` + stock.map(it => itemLine(it, `<button class="mini-btn" data-act="buy" data-npc="${npc.id}" data-iid="${it.iid}">Buy ${Math.max(1, Math.round((it.sell || 1) * 3.2))}g</button>`)).join('');
+      html += `<h4>Sell From Bags</h4>` + (p.bags.length ? p.bags.map(it => itemLine(it, it.questItem ? '' : `<button class="mini-btn" data-act="sell" data-iid="${it.iid}">Sell ${it.sell}g</button>`)).join('') : '<p class="empty">Bags are empty.</p>');
+    }
+    if (npc.kind === 'trainer') {
+      html += `<p>${npc.name} can unteach what you've learned, for a price.</p>
+        <button class="mini-btn" data-act="respec">Reset Talents (${DS.world.respecCost(p)}g)</button>`;
+    }
+    if (npc.kind === 'proftrainer') {
+      html += renderProfessions(p);
+    }
+    return html;
+  }
+
+  // --- action dispatch --------------------------------------------------------
+  function onPanelClick(e) {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) { if (e.target.closest('.panel-close')) closePanel(); return; }
+    const p = game.player, d = btn.dataset;
+    let msg = null;
+    switch (d.act) {
+      case 'unequip': if (DS.player.unequipToBag(p, d.slot)) msg = 'Unequipped.'; else msg = 'Bags are full.'; break;
+      case 'equip': DS.player.equipFromBag(p, d.iid); break;
+      case 'sell': msg = DS.world.sellItem(p, d.iid).msg; break;
+      case 'usepotion': { const it = p.bags.find(b => b.iid === d.iid); if (it) { if (it.potion === 'heal') DS.combat.applyHeal(p, it.power); else DS.combat.addBuff(p, { key: 'potion_speed', name: 'Swiftness', icon: '💨', dur: 15, fields: { speedPct: it.power } }); DS.player.removeItem(p, d.iid); msg = `Used ${it.name}.`; } break; }
+      case 'useenchant': { const it = p.bags.find(b => b.iid === d.iid); if (it) { const slot = K.SLOTS.find(s => p.equip[s] && !p.equip[s].__enchanted); if (slot) { Object.entries(it.enchant).forEach(([k, v]) => { p.equip[slot].stats[k] = (p.equip[slot].stats[k] || 0) + v; }); p.equip[slot].__enchanted = true; DS.player.removeItem(p, d.iid); msg = `Applied ${it.name} to ${slot}.`; } else msg = 'Every equipped item is already enchanted.'; } break; }
+      case 'talent': if (DS.player.spendTalent(p, d.id)) { msg = 'Talent learned.'; buildAbilityBar(); } else msg = 'Cannot learn that yet.'; break;
+      case 'respec': msg = DS.world.respec(p).msg; buildAbilityBar(); break;
+      case 'learnprof': msg = DS.player.learnProfession(p, d.id) ? 'Profession learned.' : "Can't learn more professions."; break;
+      case 'craft': msg = DS.world.craft(p, d.prof, K.CRAFT_PROFESSIONS[d.prof].recipes.find(r => r.id === d.recipe)).msg; break;
+      case 'accept': msg = DS.player.acceptQuest(p, d.q) ? 'Quest accepted.' : "Can't accept that."; break;
+      case 'turnin': { const q = DS.player.turnInQuest(p, d.q); msg = q ? `Turned in: ${q.name}.` : "Can't turn that in."; if (q) buildAbilityBar(); break; }
+      case 'buy': { const npc = ui.panelCtx.npc; const item = DS.world.vendorStock(npc, p).find(it => it.iid === d.iid); msg = item ? DS.world.buyItem(p, npc, item).msg : null; break; }
+      default: break;
+    }
+    if (msg) { DS.sim.log(game, msg); refreshLog(); }
+    renderPanel();
+  }
+
+  // --- death ------------------------------------------------------------------
+  function showDeath() { els.deathscreen.classList.remove('hidden'); }
+  function closeDeath() { els.deathscreen.classList.add('hidden'); }
+
+  DS.ui = { boot, showCharCreate, startGame, frame, paused, openPanel, closePanel };
+})(window.DS = window.DS || {});
+
+</script>
+<script>
+/* DoomSpire — bootstrap and the game loop. */
+(function (DS) {
+  'use strict';
+
+  let game = null;
+  let last = 0;
+  let saveAcc = 0;
+  let started = false;
+
+  function persist() {
+    if (!game) return;
+    DS.core.save(DS.state.forSave(game));
+  }
+
+  function begin(g) {
+    game = g;
+    DS.ui.startGame(game);
+    started = true;
+    last = performance.now();
+  }
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (!started) return;
+    const dt = Math.min(0.05, (now - last) / 1000 || 0);
+    last = now;
+    if (!DS.ui.paused()) DS.sim.tick(game, dt, DS.engine.input);
+    DS.render.frame(game, dt);
+    DS.ui.frame(dt);
+    saveAcc += dt;
+    if (saveAcc > 8) { saveAcc = 0; persist(); }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    DS.ui.boot();
+    const saved = DS.state.load();
+    const continueBtn = document.getElementById('continue-btn');
+    if (saved) {
+      continueBtn.classList.remove('hidden');
+      continueBtn.addEventListener('click', () => {
+        document.getElementById('charcreate').classList.add('hidden');
+        begin(saved);
+      });
+    }
+    DS.ui.showCharCreate(begin);
+    requestAnimationFrame(loop);
+  });
+  window.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
+  window.addEventListener('pagehide', persist);
+})(window.DS = window.DS || {});
+
+</script>
