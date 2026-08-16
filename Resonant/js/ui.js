@@ -928,6 +928,7 @@
       row('audio', 'Audio', 'Procedural synthesis. The beat tone is how you tune by ear — strongly recommended.') +
       row('haptics', 'Haptics', 'Detent ticks and impacts through the vibration motor.') +
       row('reduceMotion', 'Reduce motion', 'Disables screen shake and thins particle bursts.') +
+      row('bloom', 'Bloom', 'Light spills between bright things. Costs about half a millisecond.') +
       row('showSci', 'Scientific notes', 'Show the physical definition of each scale.') +
       /* A cycle rather than a toggle, because three states is the right number:
        * everything, only what would be worth interrupting you, and nothing but

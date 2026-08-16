@@ -389,6 +389,44 @@ Leaving restores our block, always. An alternative universe you had forgotten
 you were standing in would silently re-derive every star in the game and read as
 a bug rather than a mechanic.
 
+## Light, and arriving somewhere
+
+Everything in this game emits — nodes ignite as you approach them, filaments
+glow, a star is a disc of light — and all of it was drawn with radial gradients,
+which is how you fake the *look* of light without any of its behaviour. Two
+bright things did not add up. A small very bright thing looked like a large dim
+one. Nothing spilled onto anything.
+
+`bloom.js` is a real post pass: downscale to a quarter (the browser's bilinear
+filter is the first blur, free), threshold with `difference` and `multiply` so
+only genuinely bright things bleed, box-blur by drawing the buffer onto itself,
+composite back with `lighter`. Each scope declares how hard it glows — the foam
+seethes because everything in it is an event; a planet surface barely blooms
+because it is lit rather than luminous.
+
+**The capture happens at the top of the frame, before the clear**, and that is
+the entire performance story. Measured in isolation the steps cost 1.3 ms;
+called at the end of the frame they cost **16 ms**, because sampling a canvas
+with drawing queued on it forces the browser to finish all of it first. Captured
+before the clear — when the canvas holds last frame's finished image and nothing
+is queued — the flush is free. The glow is one frame behind what makes it, which
+at 60 Hz nobody can see.
+
+It still costs about 3 fps in the busiest scope and nothing measurable in the
+others, so there is a settings toggle.
+
+### Arrival
+
+`scene.transition` was a white flash, which says "something changed" and nothing
+else. The ladder *is* the navigation, so a scope change is a movement, and the
+one thing it has to communicate is which way you went.
+
+Descending zooms in: the world starts small and expands into place, and rings
+stream outward past you. Climbing does the reverse. The direction is derived
+from the rungs the two scopes occupy, so it is right for every pair without
+anyone enumerating them — and the suite checks that no ordered pair produces a
+zero, because a zero would draw nothing and leave the change unexplained.
+
 ## Nowhere is empty
 
 `neural.mindAt` builds a small recurrent network from any address and steps it
@@ -666,6 +704,7 @@ All audio is synthesised at runtime — there are no sound files.
 | `scene_shells.js` | Orbital shells: exclusion, Aufbau placement, degeneracy |
 | `physics.js` | the constants, gathered and swappable; ours is the default block |
 | `game.js` `save.js` | state, economy, objectives, persistence |
+| `bloom.js` | the post pass: threshold, blur, and why it captures before the clear |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
 | `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
 | `render.js` `worldrender.js` `hud.js` `ui.js` `input.js` `reactions.js` | presentation |

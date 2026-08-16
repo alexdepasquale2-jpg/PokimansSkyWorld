@@ -61,6 +61,13 @@
     RS.feel.init({ reduceMotion: game.settings.reduceMotion, haptics: game.settings.haptics });
     RS.audio.setEnabled(game.settings.audio);
     RS.ui.setNotifyLevel(game.settings.notify);
+    if (RS.bloom) {
+      RS.bloom.setEnabled(game.settings.bloom !== false);
+      /* Pay the pipeline's first-frame cost now, while nobody is looking. */
+      RS.bloom.warm(fieldCtx, fieldCanvas,
+        fieldCanvas.clientWidth || window.innerWidth,
+        fieldCanvas.clientHeight || window.innerHeight);
+    }
     RS.ui.init(game, bus);
     RS.reactions.wire(game, bus);
     RS.input.attach(hudCanvas, game, bus, {

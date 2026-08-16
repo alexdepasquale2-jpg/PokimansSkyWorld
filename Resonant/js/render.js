@@ -876,6 +876,28 @@
 
   // --- main ----------------------------------------------------------------
 
+  /* ── How much each scope glows ───────────────────────────────────────────
+   *
+   * Bloom is not a uniform filter here; it is part of what a place *is*. The
+   * foam seethes with light because everything in it is an event; a planet
+   * surface barely blooms at all because it is lit rather than luminous; the
+   * ensemble glows hard because it is not a place, it is a set of relations
+   * drawn as light. The threshold moves with it — a scope full of dim things
+   * needs a lower bar or nothing bleeds at all.
+   */
+  const BLOOM = {
+    field:     { amt: 0.85, thr: 0.34 },
+    foam:      { amt: 1.15, thr: 0.30 },
+    shells:    { amt: 0.95, thr: 0.34 },
+    molecular: { amt: 0.75, thr: 0.38 },
+    cellular:  { amt: 0.80, thr: 0.36 },
+    planet:    { amt: 0.42, thr: 0.55 },
+    system:    { amt: 1.05, thr: 0.40 },
+    galaxy:    { amt: 1.00, thr: 0.36 },
+    web:       { amt: 0.90, thr: 0.32 },
+    ensemble:  { amt: 1.10, thr: 0.30 }
+  };
+
   function draw(game, canvas, ctx, dt) {
     resize(canvas);
     const S = RS.feel.state;
@@ -897,6 +919,17 @@
     vis.tierMix.set(D.space.value).step(dt);
 
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+
+    /* Bloom captures *here*, before the clear, while the canvas still holds the
+     * previous frame's finished image and nothing is queued on it. Sampling a
+     * canvas with drawing queued on it forces a pipeline flush — measured at
+     * 16 ms in this scope, against 1.3 ms of actual work. See bloom.js. */
+    if (game.settings.bloom !== false && RS.bloom) {
+      const kb = BLOOM[game.scene ? game.scene.kind : 'field'] || BLOOM.field;
+      const trc = game.scene ? game.scene.transition : 0;
+      RS.bloom.capture(canvas, view.w, view.h, kb.thr * (1 - trc * 0.35));
+    }
+
     ctx.clearRect(0, 0, view.w, view.h);
 
     // deep background
@@ -913,6 +946,31 @@
     ctx.translate(view.cx, view.cy);
     ctx.rotate(S.shakeRot);
     ctx.scale(zoom, zoom);
+    /* ── Arrival, as movement ────────────────────────────────────────────
+     *
+     * The scope change scales the whole world: descending the ladder starts
+     * you zoomed out and settles inward, climbing starts you zoomed in and
+     * pulls back. It is one multiply on a transform that already exists, and
+     * it is the difference between "the picture changed" and "you went
+     * somewhere" — which matters because the ladder *is* the navigation, and a
+     * cut makes twenty-two rungs read as twenty-two destinations rather than
+     * as one continuous axis. */
+    const sc = game.scene;
+    if (sc && sc.transition > 0.001 && sc.transitionDir) {
+      const k = ease.outCubic(1 - sc.transition);
+      /* Descending the ladder is zooming *in*: things grow toward you as you
+       * approach their scale, so the world starts small and expands into place.
+       * Climbing is zooming out: it starts large and contracts. Getting this
+       * backwards — which the first version did — makes descending feel like
+       * retreating, and it is the kind of error that is obvious the moment you
+       * see it and invisible while you are writing it. */
+      const from = sc.transitionDir < 0 ? 0.62 : 1.55;
+      const z = from + (1 - from) * k;
+      ctx.translate(view.cx, view.cy);
+      ctx.scale(z, z);
+      ctx.translate(-view.cx, -view.cy);
+    }
+
     ctx.translate(-view.cx + S.shakeX * px(0.08), -view.cy + S.shakeY * px(0.08));
 
     /* Scene dispatch. The attunement field, the solar system and a planet
@@ -1031,9 +1089,11 @@
         for (let i = 0; i < 3; i++) {
           const off = i * 0.22;
           const k = clamp01(u + off);
+          /* And the rings stream the way the world does: outward past you when
+           * you dive in, inward past you when you pull back. */
           const r = dir < 0
-            ? lerp(maxR, px(0.05), ease.outCubic(k))
-            : lerp(px(0.05), maxR, ease.outCubic(k));
+            ? lerp(px(0.05), maxR, ease.outCubic(k))
+            : lerp(maxR, px(0.05), ease.outCubic(k));
           const a = tr * (1 - Math.abs(k - 0.5) * 1.1) * 0.5;
           if (a <= 0.005) continue;
           ctx.strokeStyle = hsl(vis.hue.value + i * 12, 0.7, 0.66, a);
@@ -1051,6 +1111,20 @@
     drawFloaters(ctx);
 
     ctx.restore();
+
+    /* ── Bloom ───────────────────────────────────────────────────────────
+     *
+     * After the world and before the vignette, so light spills between things
+     * and the vignette still darkens the edge of the result rather than being
+     * bloomed itself. Pushed hard during a transition, which is most of why an
+     * arrival now reads as an event rather than as a cut. */
+    if (game.settings.bloom !== false && RS.bloom) {
+      const b = BLOOM[kind] || BLOOM.field;
+      const tr = game.scene ? game.scene.transition : 0;
+      RS.bloom.composite(ctx, view.w, view.h,
+        b.amt * (1 + tr * 1.4) * (game.settings.reduceMotion ? 0.6 : 1));
+    }
+
     drawPost(ctx);
   }
 

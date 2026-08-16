@@ -501,6 +501,7 @@
       if (key === 'haptics') RS.feel.setHaptics(value);
       if (key === 'reduceMotion') RS.feel.setReduceMotion(value);
       if (key === 'notify') RS.ui.setNotifyLevel(value);
+      if (key === 'bloom' && RS.bloom) RS.bloom.setEnabled(value);
     });
   }
 

@@ -85,7 +85,11 @@
          * warnings, but not routine chatter. Every notification restates
          * something the readout or the objective line also says, so filtering
          * them costs nothing but noise. */
-        notify: 'key'
+        notify: 'key',
+        /* Bloom. On by default because it costs well under a millisecond and
+         * is the largest single visual change in the codebase; off is here for
+         * anything that struggles. */
+        bloom: true
       },
       flags: Object.create(null)
     };
