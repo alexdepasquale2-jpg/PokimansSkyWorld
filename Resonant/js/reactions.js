@@ -201,6 +201,9 @@
           body: sc => sc.web
             ? 'τ is the age of the universe here. Scrub it and watch the structure assemble.'
             : 'Filaments and voids.' },
+        ensemble: { hue: 210, icon: '∵',
+          title: sc => 'level ' + (sc.ensemble ? sc.ensemble.family : 'I') + ' ensemble',
+          body: () => 'Alternative blocks of law. Turn Δ to stand in one — the constants change under you.' },
         foam: { hue: 291, icon: '∴',
           title: () => 'quantum foam',
           body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
@@ -232,6 +235,16 @@
         kind: 'major', icon: '·', hue: 291, ms: 5200, title: 'BODY LOST',
         body: 'A ' + (arch ? arch.name.toLowerCase() : 'body') +
           ' is a persistent arrangement of matter. There is no such thing here.'
+      });
+    });
+
+    bus.on('ensemble:adopt', ({ block, distance }) => {
+      RS.audio.upheaval(1.2 + distance);
+      RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
+      RS.ui.toast({
+        kind: 'major', icon: '∵', hue: 186 + distance * 120, ms: 5000,
+        title: block.name.toUpperCase(),
+        body: block.blurb + ' Everything derives from here under these constants.'
       });
     });
 

@@ -265,7 +265,8 @@ Turning Σ is how you travel, and each range of rungs is somewhere different.
 | stellar · system | **System** | one gravity well and everything bound to it | trade, contact, orbital mechanics |
 | interstellar · cluster | **Star map** | the stars around you | where to go next |
 | local group → hubble | **Cosmic web** | filaments and voids | **tau is the age of the universe** |
-| galactic · beyond | **Attunement field** | tune layers, hold manifestations | the spectrum itself |
+| galactic · interstellar | **Attunement field** | tune layers, hold manifestations | the spectrum itself |
+| inflationary → mathematical | **Ensemble** | alternative blocks of physical law | **the constants change under you** |
 
 Each scope is deliberately a *place* rather than a rule set: the attunement loop
 runs exactly as it does anywhere else, so a player who learned to read a rhythm
@@ -325,6 +326,29 @@ before the reticle catches it. Rarely a pair separates too far to recombine and
 what was borrowed is never repaid — which, at the largest scale, is the reason
 there is anything at all rather than nothing. Finding one is the scope's
 discovery.
+
+### Ensemble
+
+The premise's last claim. So far "local rules" has meant a rung's geometry and a
+band's primitives. Here it means **the laws**.
+
+`physics.js` gathers the numbers `stellar.js` and `planet.js` used to hardcode —
+the solar photospheric temperature, the Salpeter slope, the Jeans escape factor
+of six, the mass–luminosity exponents, the greenhouse coefficients — into one
+named block. Hardcoded they are physics; gathered they are *one block among
+many*. An ensemble node is an alternative block, derived from its address, and
+Δ points at one. Stand in it and the constants swap: every star, world and
+biosphere derived from that moment comes out of the new universe.
+
+The scope's picture is one address derived twice, side by side: the same system,
+under our laws and under those. And the essences are still the same essences —
+Cascade still branches, in fifty alternative universes, which the suite asserts,
+because if it stopped the game would be claiming its own information is a
+property of physics rather than of the fractal store.
+
+Leaving restores our block, always. An alternative universe you had forgotten
+you were standing in would silently re-derive every star in the game and read as
+a bug rather than a mechanic.
 
 ## Six primitives
 
@@ -519,6 +543,8 @@ All audio is synthesised at runtime — there are no sound files.
 | `scene_cellular.js` | Cytoplasm: derived cells, organelles as essences, expression |
 | `scene_web.js` | Cosmic web: logistic structure formation, voids, the event horizon |
 | `scene_foam.js` | Quantum foam: virtual pairs, lifetimes from persistence, ejection |
+| `scene_ensemble.js` | Ensemble: alternative law, adoption, the two-universe specimen |
+| `physics.js` | the constants, gathered and swappable; ours is the default block |
 | `game.js` `save.js` | state, economy, objectives, persistence |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
 | `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
@@ -590,15 +616,12 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **The rest of the ladder.** Fourteen of the twenty-two rungs have a view of
-  their own. What is left is Molecular (`chain`), the orbital shells
-  (`orbital`), and the four ensemble rungs (`abstract`). The ensemble is the
-  interesting one: `physics.js` would lift the constants `stellar.js` and
-  `planet.js` currently hardcode into a named block, and an ensemble node would
-  be an *alternative* block — so you meet the essences you have collected
-  instantiated under different laws. Scenes are a registry (`SCENES` in
-  `scenes.js`) and the suite asserts the ladder is covered without gaps, so
-  adding one is a row and a file.
+- **The last three rungs.** Eighteen of the twenty-two have a view of their
+  own. What is left is Molecular (`chain`) and the two orbital-shell rungs
+  (`orbital`) — both small, both following the pattern the other scopes
+  established. Scenes are a registry (`SCENES` in `scenes.js`) and the suite
+  asserts the ladder is covered without gaps, so adding one is a row and a
+  file.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

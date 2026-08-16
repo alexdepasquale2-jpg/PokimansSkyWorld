@@ -404,6 +404,102 @@
     }
   }
 
+  /* ── The ensemble ────────────────────────────────────────────────────────
+   *
+   * Universes have no spatial form, so there is nothing here to draw *as a
+   * place* — only relations, which is exactly what the `abstract` geometry is
+   * for. Each block is one essence rendered by the same generator that renders
+   * everything else, and the further a block sits from ours the further out and
+   * the more saturated it is drawn. The one Δ is pointed at gets a ring.
+   */
+  function drawEnsemble(ctx, game, t) {
+    const e = game.scene.ensemble;
+    if (!e) return;
+    const sel = game.scene.blockNode;
+
+    /* The compass. Δ is the selector in this scope and nothing else uses it, so
+     * the needle is worth drawing plainly. */
+    const phi = game.dials.phase.value;
+    ctx.strokeStyle = hsl(268, 0.5, 0.6, 0.22);
+    ctx.lineWidth = Math.max(1, px(0.003));
+    ctx.beginPath();
+    ctx.moveTo(view.cx, view.cy);
+    ctx.lineTo(sx(Math.cos(phi) * 0.9), sy(Math.sin(phi) * 0.9));
+    ctx.stroke();
+
+    for (let i = 0; i < e.nodes.length; i++) {
+      const n = e.nodes[i];
+      const on = sel === n;
+      let buf = n.__ss;
+      if (!buf) buf = n.__ss = RS.selfsimilar.build(n.essence, 'abstract', n.idx, buf);
+
+      ctx.save();
+      ctx.translate(sx(n.x), sy(n.y));
+      ctx.rotate(t * 0.06 * (1 + n.distance));
+      /* `abstract` draws dashed relations and dotted nodes, both of which are
+       * faint by construction — so this scope needs a much higher alpha than a
+       * lobed or filamentary one to read at all. */
+      RS.selfsimilar.draw(ctx, buf, 0, 0,
+        RS.selfsimilar.fit(buf, px(0.09 + n.distance * 0.07)),
+        n.hue, 0.5 + n.distance * 0.45, on ? 1.0 : 0.82, t);
+      ctx.restore();
+
+      if (on) {
+        ctx.strokeStyle = hsl(n.hue, 0.9, 0.75, 0.85);
+        ctx.lineWidth = Math.max(2, px(0.006));
+        ctx.beginPath();
+        ctx.arc(sx(n.x), sy(n.y), px(0.15 + Math.sin(t * 2.2) * 0.008), 0, TAU);
+        ctx.stroke();
+      } else {
+        /* Unselected blocks still get a mark, so the compass has visible
+         * detents rather than a needle sweeping through fog. */
+        ctx.fillStyle = hsl(n.hue, 0.6, 0.6, 0.35);
+        ctx.beginPath(); ctx.arc(sx(n.x), sy(n.y), Math.max(1.5, px(0.005)), 0, TAU); ctx.fill();
+      }
+    }
+
+    /* The specimen: one address, two universes. Two stars side by side, sized
+     * and coloured by what each block actually derives. */
+    const sp = game.scene.specimen;
+    if (sp && sp.ours && sp.there) {
+      const y = view.cy + px(0.70);
+      /* Wide enough apart that the two captions cannot collide — they are the
+       * comparison, so overlapping them destroys the only thing this picture
+       * is for. */
+      const pairs = [[sp.ours, view.cx - px(0.42), 'ours'], [sp.there, view.cx + px(0.42), 'there']];
+      for (const [d, x, tag] of pairs) {
+        const r = px(0.018) * Math.pow(clamp(d.lum, 0.001, 1e5), 0.12);
+        /* Star colour from its derived temperature — the difference between the
+         * two discs *is* the difference between the two universes, so it has to
+         * run the right way: 3000 K is red, 5800 K is yellow-white, 10000 K and
+         * up is blue. A linear ramp gets this backwards at one end or the
+         * other, because the yellow-to-blue half of the sequence covers three
+         * times the temperature range that the red-to-yellow half does. */
+        const hue = d.temp < 5000
+          ? lerp(16, 44, clamp01((d.temp - 2500) / 2500))
+          : lerp(44, 215, clamp01((d.temp - 5000) / 6000));
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+        g.addColorStop(0, hsl(hue, 0.75, 0.72, 0.9));
+        g.addColorStop(1, hsl(hue, 0.75, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
+        ctx.fillStyle = hsl(hue, 0.5, 0.85, 0.95);
+        ctx.beginPath(); ctx.arc(x, y, Math.max(2, r), 0, TAU); ctx.fill();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = hsl(0, 0, 0.62, 0.75);
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillText(tag, x, y + px(0.085));
+        ctx.fillStyle = hsl(hue, 0.5, 0.78, 0.9);
+        ctx.font = '11px ui-monospace, Menlo, monospace';
+        ctx.fillText(Math.round(d.temp) + ' K', x, y + px(0.135));
+        ctx.fillStyle = hsl(d.living ? 140 : 0, 0.5, 0.66, 0.8);
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillText(d.living + '/' + d.worlds + ' alive', x, y + px(0.175));
+      }
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -712,6 +808,7 @@
       const inCell = kind === 'cellular';
       const inWeb = kind === 'web';
       const inFoam = kind === 'foam';
+      const inEnsemble = kind === 'ensemble';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -722,6 +819,7 @@
       if (inCell) drawCell(ctx, game, t);
       else if (inWeb) drawWeb(ctx, game, t);
       else if (inFoam) drawFoam(ctx, game, t);
+      else if (inEnsemble) drawEnsemble(ctx, game, t);
 
       /* The rim. A membrane in a cell, the horizon in the web, and absent in
        * the foam — there is no boundary at a scale where nothing persists long

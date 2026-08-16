@@ -18,6 +18,12 @@
   const SAVE_VERSION = 1;
 
   function newGame(seed) {
+    /* A new game starts in our own universe. The physics block is module-level
+     * rather than per-game — it has to be, because every derivation reads it
+     * without being handed a game — so beginning a session while an ensemble
+     * block from a previous one is still adopted would silently derive the
+     * whole galaxy under borrowed laws. */
+    RS.physics.use(RS.physics.OURS);
     const game = {
       version: SAVE_VERSION,
       seed: (seed >>> 0) || 0x5EED1,
@@ -209,6 +215,17 @@
       }
       return { text: 'Nothing is assembling at ' + w.tGyr.toFixed(1) +
         ' Gyr. Scrub τ to find a collapse in progress.', kind: 'scrub' };
+    }
+    if (s.kind === 'ensemble') {
+      if (!s.blockNode) {
+        return { text: 'Turn Δ to point at a block of laws. Nothing here has a place — only rules.',
+          kind: 'select' };
+      }
+      const d = Math.round(s.blockNode.distance * 100);
+      return { text: s.blockNode.block.name + ' is ' + d +
+        '% unlike ours. The essences are the same essences. ×' +
+        RS.ensemble.bonusFor(game).toFixed(2) + ' to recognise one under these laws.',
+        kind: 'express' };
     }
     if (s.kind === 'foam') {
       const f = s.foam;

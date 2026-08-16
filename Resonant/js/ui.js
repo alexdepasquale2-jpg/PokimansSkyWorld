@@ -176,6 +176,13 @@
         (r.disconnected ? ' · ' + r.disconnected + ' beyond the horizon' : '') +
         (r.assembling > 0.25 ? ' · ASSEMBLING ×' + r.bonus.toFixed(2) : ''));
       el['layer-name'].style.color = hsl(276, 0.7, 0.72);
+    } else if (sc.kind === 'ensemble') {
+      const r = RS.ensemble.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.rows
+        ? r.sub + ' · ' + Math.round(r.distance * 100) + '% unlike ours · ×' + r.bonus.toFixed(2)
+        : r.sub);
+      el['layer-name'].style.color = hsl(r.rows ? 186 + r.distance * 120 : 210, 0.7, 0.72);
     } else if (sc.kind === 'foam') {
       const r = RS.foam.readout(game);
       setText('layer-name', 'QUANTUM FOAM');
@@ -377,6 +384,38 @@
         (r.disconnected
           ? '<div class="ro-sub" style="color:' + hsl(200, 0.6, 0.68) + '">' + r.disconnected +
             ' structures past the horizon &mdash; no signal has ever crossed</div>' : '');
+      return;
+    }
+    if (s.kind === 'ensemble') {
+      const r = RS.ensemble.readout(game);
+      if (!r.rows) {
+        node.innerHTML =
+          '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.6, 0.72) + '">&#8757;</span>' +
+          '<span class="ro-title">' + r.title + '</span></div>' +
+          '<div class="ro-sub">' + r.sub + '</div>';
+        return;
+      }
+      /* Every axis, against ours. This is the scope's whole content, and it has
+       * to be a comparison rather than a list of numbers — "×1.7 of ours" says
+       * something; "9812 K" says nothing without the other column. */
+      const rows = r.rows.map(x =>
+        '<div class="ro-sub" style="display:flex;gap:6px">' +
+        '<b style="min-width:112px;font-weight:400;opacity:.7">' + x.name + '</b>' +
+        '<span style="color:' + hsl(x.mult > 1 ? 36 : 190, 0.7, 0.7) + '">&times;' +
+        x.mult.toFixed(2) + '</span>' +
+        '<span style="opacity:.65">' + x.says + '</span></div>').join('');
+      const sp = r.specimen;
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(186 + r.distance * 120, 0.8, 0.72) + '">&#8757;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">Level ' + r.level + ' &middot; ' + r.sub + '</div>' +
+        rows +
+        (sp && sp.ours && sp.there
+          ? '<div class="ro-sub" style="margin-top:5px;opacity:.8">' + sp.ours.name +
+            ', derived twice: ' + Math.round(sp.ours.temp) + ' K / ' + sp.ours.living +
+            ' alive here &mdash; ' + Math.round(sp.there.temp) + ' K / ' + sp.there.living +
+            ' alive there</div>' : '');
       return;
     }
     if (s.kind === 'foam') {

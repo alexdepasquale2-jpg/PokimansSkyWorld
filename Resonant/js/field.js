@@ -498,6 +498,7 @@
     const k = game.scene && game.scene.kind;
     if (k === 'web' && RS.web) return RS.web.bonusFor(game);
     if (k === 'foam' && RS.foam) return RS.foam.bonusFor(game);
+    if (k === 'ensemble' && RS.ensemble) return RS.ensemble.bonusFor(game);
     return 1;
   }
 

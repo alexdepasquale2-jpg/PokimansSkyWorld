@@ -3062,6 +3062,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const k = game.scene && game.scene.kind;
     if (k === 'web' && RS.web) return RS.web.bonusFor(game);
     if (k === 'foam' && RS.foam) return RS.foam.bonusFor(game);
+    if (k === 'ensemble' && RS.ensemble) return RS.ensemble.bonusFor(game);
     return 1;
   }
 
@@ -3323,6 +3324,228 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
     holdTimeOf, spawnNode, applyOffline, updateDerived,
     applyPrimitives, passiveShareOf, holdsAntecedent, scopeBonus, DIAL_LOAD, ORDER_WINDOW
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the constants, in one place, and swappable.
+ *
+ * ── Why this file exists ──────────────────────────────────────────────────
+ *
+ * `stellar.js` and `planet.js` are full of numbers that are not arbitrary: the
+ * Sun's photospheric temperature, the Salpeter slope, the Jeans escape factor
+ * of six, the exponents of the mass–luminosity relation. They are our
+ * universe's numbers. Hardcoded, they are physics; named and gathered, they
+ * become **one block among many**.
+ *
+ * That distinction is the whole of the Ensemble scope, and it is the last thing
+ * the game's premise has left to say. The claim has been that one body of
+ * information is rendered differently by local rules — and so far "local rules"
+ * has meant a tier's geometry and a band's primitives. Here it means the laws.
+ * Step into an ensemble node and the same essences you have spent the game
+ * collecting instantiate under a different block: stars that cannot fuse,
+ * atmospheres nothing can hold, a habitable zone that does not exist.
+ *
+ * ── The contract ──────────────────────────────────────────────────────────
+ *
+ * `RS.physics.current` is the block every derivation reads. It is OURS by
+ * default and is only ever swapped by the Ensemble scope, which restores it on
+ * leaving. Every consumer reads through the accessors rather than closing over
+ * the numbers, so a swap takes effect immediately and everywhere — that is the
+ * point, and it is also the thing that would break silently if any module kept
+ * a copy.
+ *
+ * Blocks are derived, not authored: an ensemble node's block is a pure function
+ * of its address, so the same alternative universe is the same one every time
+ * you return to it, and there are as many of them as there are addresses.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN } = RS.core;
+
+  /* ── Our universe ─────────────────────────────────────────────────────────
+   *
+   * Every number here is measured, and the comment says what by. A block is
+   * legible precisely because the default is real: a player who has read this
+   * screen knows what an alternative is an alternative *to*.
+   */
+  const OURS = {
+    id: 'ours', name: 'This Universe', level: 'I',
+    blurb: 'The block we were issued with. Everything else is a variation on it.',
+
+    /* Stellar */
+    tSun: 5772,            // K, solar photosphere
+    imfAlpha: 2.35,        // Salpeter slope of the initial mass function
+    mMin: 0.08,            // solar masses — below this, no hydrogen fusion
+    mMax: 40,              // solar masses — above this, radiation pressure wins
+    /* Mass–luminosity: L ∝ M^k, with k breaking at the points where the
+     * dominant energy transport changes. */
+    mlLow: 2.3, mlMid: 4.0, mlHigh: 3.5,
+
+    /* Planetary */
+    /* Equilibrium temperature of a zero-albedo body at 1 AU from the Sun. The
+     * constant that makes everything downstream dimensionless. */
+    tEq1AU: 278.5,
+    /* Jeans escape: a gas is retained when escape velocity exceeds this many
+     * thermal velocities. Six is the standard rule of thumb and it is why Earth
+     * keeps nitrogen and loses hydrogen. */
+    jeans: 6,
+    greenhouseK: 0.42,     // forcing coefficient
+    greenhouseP: 0.42,     // and its exponent — saturating, but able to run away
+
+    /* Life. The rate constant of the abiogenesis logistic, solved numerically
+     * so that roughly one system in six carries life. */
+    abiogenesis: 3.2,
+
+    /* How habitable a world has to be before anything takes hold, and how
+     * forgiving the temperature window is. */
+    habSigma: 58,
+    waterWeight: 5
+  };
+
+  /* ── What can vary, and by how much ───────────────────────────────────────
+   *
+   * Each axis names a real physical knob and a range in which a universe is
+   * still *describable* — a block where nothing fuses at all has no stars to
+   * derive and is not interesting to stand in, it is just an empty screen. The
+   * ranges are wide enough that a block feels genuinely other and narrow enough
+   * that the same code can render it.
+   */
+  const AXES = [
+    { key: 'tSun', name: 'Fusion temperature', lo: 0.55, hi: 1.8,
+      says: v => v < 0.9 ? 'stars burn cool and red' : v > 1.2 ? 'stars burn hot and blue' : 'stars burn much as ours do' },
+    { key: 'imfAlpha', name: 'Mass spectrum', lo: 0.62, hi: 1.5,
+      says: v => v < 0.85 ? 'giants are common' : v > 1.2 ? 'almost everything is a dwarf' : 'a familiar spread of masses' },
+    { key: 'jeans', name: 'Atmospheric retention', lo: 0.45, hi: 1.9,
+      says: v => v < 0.8 ? 'worlds hold onto almost anything' : v > 1.3 ? 'atmospheres bleed away' : 'atmospheres behave' },
+    { key: 'greenhouseK', name: 'Greenhouse forcing', lo: 0.2, hi: 2.6,
+      says: v => v < 0.6 ? 'atmospheres barely warm a world' : v > 1.6 ? 'runaway is the normal outcome' : 'greenhouse forcing is mild' },
+    { key: 'abiogenesis', name: 'Abiogenesis rate', lo: 0.12, hi: 2.4,
+      says: v => v < 0.5 ? 'life almost never starts' : v > 1.6 ? 'life starts everywhere it can' : 'life starts sometimes' },
+    { key: 'habSigma', name: 'Thermal tolerance', lo: 0.4, hi: 2.0,
+      says: v => v < 0.7 ? 'life needs a narrow window' : v > 1.4 ? 'life tolerates almost any temperature' : 'a familiar tolerance' }
+  ];
+
+  /* Blocks are multiplicative variations rather than absolute values, so an
+   * axis is always readable as "×1.4 of ours" and a player can compare two
+   * ensemble nodes without memorising six numbers. */
+  function blockAt(worldSeed, index, out) {
+    const b = out || {};
+    for (const k in OURS) b[k] = OURS[k];
+    const h = hashN(worldSeed >>> 0, index | 0, 0xE5B1);
+
+    const mult = b.__mult || (b.__mult = {});
+    for (let i = 0; i < AXES.length; i++) {
+      const ax = AXES[i];
+      /* Squared toward the middle, so most blocks differ noticeably on one or
+       * two axes rather than mildly on all six. A universe that is 15% off in
+       * every direction is just noise; one that is unrecognisable in exactly
+       * one respect is a place. */
+      const u = hashF(h, i + 1);
+      const skew = u < 0.5 ? 0.5 - Math.pow(1 - u * 2, 1.7) * 0.5
+        : 0.5 + Math.pow(u * 2 - 1, 1.7) * 0.5;
+      const m = lerp(ax.lo, ax.hi, skew);
+      mult[ax.key] = m;
+      b[ax.key] = OURS[ax.key] * m;
+    }
+    /* Mass limits follow the fusion temperature: a block where fusion is
+     * harder needs more mass to start it, which is the honest consequence and
+     * it changes what stars exist rather than just how they look. */
+    b.mMin = OURS.mMin * mult.tSun;
+    b.mMax = OURS.mMax * lerp(1.4, 0.7, clamp01((mult.tSun - 0.55) / 1.25));
+
+    b.id = 'block:' + index;
+    b.index = index;
+    b.name = nameFor(worldSeed, index);
+    b.level = LEVELS[hashN(h, 3) % LEVELS.length];
+    b.blurb = describe(b);
+    return b;
+  }
+
+  /* Tegmark's ladder: which *kind* of other universe this is. Flavour on the
+   * surface, but it is the vocabulary the scale ladder's top four rungs are
+   * already labelled with, so the two agree. */
+  const LEVELS = ['I', 'II', 'III', 'IV'];
+
+  const PREFIX = ['Aleph', 'Bet', 'Gimel', 'Dalet', 'He', 'Vav', 'Zayin', 'Chet',
+    'Tet', 'Yod', 'Kaf', 'Lamed', 'Mem', 'Nun', 'Samekh', 'Ayin'];
+  const SUFFIX = ['Branch', 'Sheet', 'Bulk', 'Fold', 'Leaf', 'Shell', 'Domain', 'Basin'];
+
+  function nameFor(worldSeed, index) {
+    const h = hashN(worldSeed >>> 0, index | 0, 0x9A11);
+    return PREFIX[h % PREFIX.length] + ' ' +
+      SUFFIX[hashN(h, 7) % SUFFIX.length] + ' ' + (1 + (index % 997));
+  }
+
+  /* The one-line character of a block: whichever axis departs furthest from
+   * ours is what the place is *about*. */
+  function describe(b) {
+    let worst = AXES[0], far = 0;
+    for (const ax of AXES) {
+      const m = b.__mult[ax.key];
+      const d = Math.abs(Math.log(m));
+      if (d > far) { far = d; worst = ax; }
+    }
+    const s = worst.says(b.__mult[worst.key]);
+    return s.charAt(0).toUpperCase() + s.slice(1) + '.';
+  }
+
+  /* How far this block is from ours overall, 0..1. Drives how alien the scope
+   * looks, and how much a recognition made under it is worth. */
+  function distanceFrom(b) {
+    if (!b || !b.__mult) return 0;
+    let sum = 0;
+    for (const ax of AXES) sum += Math.abs(Math.log(b.__mult[ax.key]));
+    return clamp01(sum / (AXES.length * 0.85));
+  }
+
+  /* Per-axis comparison rows, for the readout. */
+  function compare(b, out) {
+    const rows = out || [];
+    rows.length = 0;
+    if (!b || !b.__mult) return rows;
+    for (const ax of AXES) {
+      const m = b.__mult[ax.key];
+      rows.push({ key: ax.key, name: ax.name, mult: m, says: ax.says(m), ours: OURS[ax.key], here: b[ax.key] });
+    }
+    return rows;
+  }
+
+  /* ── The live block ───────────────────────────────────────────────────────
+   *
+   * `current` is what every derivation reads. Swapping it changes the universe
+   * for everything derived after the swap — which is exactly what stepping into
+   * an ensemble node should do, and exactly why nothing may cache these values.
+   */
+  let current = OURS;
+
+  function use(block) {
+    const prev = current;
+    current = block || OURS;
+    return prev;
+  }
+  function get() { return current; }
+  function isOurs() { return current === OURS; }
+
+  RS.physics = {
+    OURS, AXES, LEVELS, blockAt, nameFor, describe, distanceFrom, compare,
+    use, get, isOurs,
+    /* Accessors. Consumers call these rather than reading `current` directly,
+     * so the indirection is one place and a mis-named key fails loudly here
+     * rather than silently producing NaN three modules away. */
+    tSun: () => current.tSun,
+    imfAlpha: () => current.imfAlpha,
+    mMin: () => current.mMin,
+    mMax: () => current.mMax,
+    ml: () => current,
+    tEq1AU: () => current.tEq1AU,
+    jeans: () => current.jeans,
+    greenhouseK: () => current.greenhouseK,
+    greenhouseP: () => current.greenhouseP,
+    abiogenesis: () => current.abiogenesis,
+    habSigma: () => current.habSigma,
+    waterWeight: () => current.waterWeight
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -3590,7 +3813,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   'use strict';
   const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
 
-  const T_SUN = 5772;          // K
+  /* The block's numbers, read live rather than closed over — stepping into an
+   * ensemble node swaps the physics under everything, and a cached constant
+   * would quietly keep deriving the old universe. Geometry stays fixed: a solar
+   * radius is a unit of length, not a law. */
+  const P = RS.physics;
   const AU_PER_SOLAR_RADIUS = 0.00465047;
   const EARTH_MASSES_PER_SOLAR = 332946;
 
@@ -3599,22 +3826,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * makes the galaxy overwhelmingly M dwarfs with a scattering of giants —
    * which is both true and much better design than a uniform spread, because
    * it makes a big star an event. */
-  const IMF_ALPHA = 2.35;
-  const M_MIN = 0.08, M_MAX = 40;
-  const P_MIN = Math.pow(M_MIN, 1 - IMF_ALPHA);
-  const P_MAX = Math.pow(M_MAX, 1 - IMF_ALPHA);
-
   function sampleMass(u) {
-    return Math.pow(P_MIN + u * (P_MAX - P_MIN), 1 / (1 - IMF_ALPHA));
+    const a = P.imfAlpha(), lo = P.mMin(), hi = P.mMax();
+    const pLo = Math.pow(lo, 1 - a);
+    const pHi = Math.pow(hi, 1 - a);
+    return Math.pow(pLo + u * (pHi - pLo), 1 / (1 - a));
   }
 
   /* ── Mass–luminosity relation ─────────────────────────────────────────────
    * Piecewise, as observed. The breaks are real: below ~0.43 M☉ the star is
    * fully convective, above ~2 M☉ radiation pressure starts to dominate. */
   function luminosityOf(m) {
-    if (m < 0.43) return 0.23 * Math.pow(m, 2.3);
-    if (m < 2) return Math.pow(m, 4);
-    if (m < 55) return 1.4 * Math.pow(m, 3.5);
+    const b = P.get();
+    if (m < 0.43) return 0.23 * Math.pow(m, b.mlLow);
+    if (m < 2) return Math.pow(m, b.mlMid);
+    if (m < 55) return 1.4 * Math.pow(m, b.mlHigh);
     return 32000 * m;
   }
 
@@ -3626,7 +3852,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* Effective temperature by inverting Stefan–Boltzmann: L = 4πR²σT⁴. In solar
    * units that collapses to T = T☉·(L/R²)^¼. */
   function temperatureOf(L, R) {
-    return T_SUN * Math.pow(L / (R * R), 0.25);
+    return P.tSun() * Math.pow(L / (R * R), 0.25);
   }
 
   /* Main-sequence lifetime in Gyr. Fuel scales with mass, burn rate with
@@ -3878,7 +4104,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.stellar = {
-    T_SUN, AU_PER_SOLAR_RADIUS, EARTH_MASSES_PER_SOLAR, CLASSES,
+     AU_PER_SOLAR_RADIUS, EARTH_MASSES_PER_SOLAR, CLASSES,
     sampleMass, luminosityOf, radiusOf, temperatureOf, lifetimeOf, classify,
     habitableZone, frostLine, metallicityAt, makeStar, companionCount,
     systemAt, nameSystem, bodyName, fluxAt, skyStars
@@ -3978,7 +4204,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
      * got past pond scum, which is the sort of thing only a galaxy-scale
      * census catches. simtest now runs that census. */
     const stability = 0.35 + 0.4 * p.magnetosphere + 0.25 * p.tectonics;
-    const r = 3.2 * p.habitability * stability * (0.6 + hashF(h, 102) * 0.9);
+    const r = RS.physics.abiogenesis() * p.habitability * stability * (0.6 + hashF(h, 102) * 0.9);
 
     const complexity = clamp01(logistic(t, 1.0, 0.012, r));
     const stage = stageOf(complexity);
@@ -4391,14 +4617,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   function thermalVelocity(T, mu) { return 0.1574 * Math.sqrt(T / mu); }
 
-  function retains(vEsc, T, mu) { return vEsc > 6 * thermalVelocity(T, mu); }
+  function retains(vEsc, T, mu) { return vEsc > RS.physics.jeans() * thermalVelocity(T, mu); }
 
   /* ── Temperature ──────────────────────────────────────────────────────────
    * Equilibrium temperature from flux and albedo, then a greenhouse term.
    * 278.5 K is the equilibrium temperature of a zero-albedo body at 1 AU from
    * the Sun, which is the constant that makes the rest dimensionless. */
   function equilibriumTemp(flux, albedo) {
-    return 278.5 * Math.pow(Math.max(1e-9, flux) * (1 - albedo), 0.25);
+    return RS.physics.tEq1AU() * Math.pow(Math.max(1e-9, flux) * (1 - albedo), 0.25);
   }
 
   /* Greenhouse forcing. Saturating rather than linear, because doubling an
@@ -4407,7 +4633,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * being special-cased. */
   function greenhouseFactor(pressure, opacity) {
     const tau = pressure * opacity;
-    return 1 + 0.42 * Math.pow(tau, 0.42);
+    return 1 + RS.physics.greenhouseK() * Math.pow(tau, RS.physics.greenhouseP());
   }
 
   // ── the planet ───────────────────────────────────────────────────────────
@@ -4606,10 +4832,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * the galaxy; loosening them makes contact routine. */
   function habitabilityOf(p) {
     if (!p.type.landable) return 0;
-    const temp = Math.exp(-Math.pow((p.surfaceTemp - 288) / 58, 2));
+    const temp = Math.exp(-Math.pow((p.surfaceTemp - 288) / RS.physics.habSigma(), 2));
     const grav = Math.exp(-Math.pow((p.gravity - 1) / 0.85, 2));
     const press = p.pressure < 0.02 ? 0 : Math.exp(-Math.pow(Math.log(p.pressure / 1.0) / 1.5, 2));
-    const water = clamp01(p.hydrosphere * 5);
+    const water = clamp01(p.hydrosphere * RS.physics.waterWeight());
     const shield = 0.3 + 0.7 * p.magnetosphere;
     return clamp01(temp * grav * press * water * shield);
   }
@@ -7127,7 +7353,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       { name: 'Quantum foam', range: 'planck · quantum', what: 'Nothing persists, including your body. Find the pair that never cancelled.',
         active: sc.kind === 'foam', hue: 291 },
       { name: 'Cosmic web', range: 'local group → hubble volume', what: 'τ is the age of the universe. Catch a filament while it assembles.',
-        active: sc.kind === 'web', hue: 276 }
+        active: sc.kind === 'web', hue: 276 },
+      { name: 'Ensemble', range: 'inflationary → mathematical', what: 'Alternative laws. Δ picks one; the constants change under you.',
+        active: sc.kind === 'ensemble', hue: 210 }
     ];
     for (const r of rungs) {
       h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +
@@ -7973,6 +8201,252 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — the Ensemble scope. The last thing the premise has to say.
+ *
+ * ── The argument, finished ────────────────────────────────────────────────
+ *
+ * The claim all game has been that one body of information is rendered
+ * differently by local rules. So far "local rules" has meant a rung's geometry
+ * and a band's primitives — the *same* essence drawn as a spiral arm here and a
+ * coiled flagellum there, behaving the same way in both because it is the same
+ * four numbers underneath.
+ *
+ * Here, local rules means **the laws**. An ensemble node is an alternative
+ * block of constants (physics.js), and standing in one swaps them: stars fuse
+ * at a different temperature, atmospheres bleed away or cannot, life starts
+ * everywhere or almost nowhere. And the essences are *still the same
+ * essences*. Cascade still branches. That is either a trivial observation or
+ * the entire thesis, depending on how seriously the premise was meant, and the
+ * game means it seriously.
+ *
+ * ── What you actually do ──────────────────────────────────────────────────
+ *
+ * Nodes are blocks. Each is drawn as a figure by the same self-similar
+ * generator that draws everything else, in `abstract` geometry, because a
+ * universe has no spatial form to render — only relations.
+ *
+ * Standing in one, the game **derives a specimen system under those laws** and
+ * shows it beside the same address derived under ours. Two stars, one address,
+ * different constants. It is the most direct statement the game can make, and
+ * it is a picture rather than a paragraph.
+ *
+ * ── The safety rule ───────────────────────────────────────────────────────
+ *
+ * Leaving the scope restores our block, always. An alternative universe you
+ * forgot you were standing in would silently re-derive every world in the game
+ * and look like a bug rather than a mechanic. The scope owns the swap, and
+ * `scenes.changeScene` restores on exit.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  const NODE_COUNT = 9;
+
+  /* Which slice of the ensemble a rung looks at. The top four rungs are already
+   * labelled with Tegmark's levels, so the scope uses them as its index: a
+   * different rung is a different family of alternatives, not a zoom. */
+  function familyOf(tierId) {
+    const t = RS.cosmos.BY_ID[tierId];
+    return t && t.level ? t.level : 'I';
+  }
+
+  function ensembleAt(game, tierId, out) {
+    const o = out || {};
+    const family = familyOf(tierId);
+    const base = hashN(game.seed ^ 0xE115, family.length * 31, 0x77);
+    const nodes = o.nodes || (o.nodes = []);
+    nodes.length = 0;
+
+    for (let i = 0; i < NODE_COUNT; i++) {
+      const idx = (base + i * 7919) >>> 0;
+      const block = RS.physics.blockAt(game.seed, idx, nodes[i] && nodes[i].block);
+      const h = hashN(base, i, 5);
+      const ang = (i / NODE_COUNT) * TAU + hashF(h, 1) * 0.35;
+      const rad = 0.34 + hashF(h, 2) * 0.46;
+      nodes.push({
+        i, idx, block,
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
+        /* Distance from our block drives everything visible about a node: how
+         * far out it sits, how strange it looks, and what it pays. */
+        distance: RS.physics.distanceFrom(block),
+        /* An essence per node, so the abstract geometry has something to draw
+         * and so a player can hunt a *particular* essence across universes —
+         * which is the RECOGNITION pathway's endgame. */
+        essence: RS.fractal.essenceAt(game.seed, idx, i),
+        hue: 186 + RS.physics.distanceFrom(block) * 120
+      });
+    }
+    o.family = family;
+    o.tierId = tierId;
+    return o;
+  }
+
+  /* ── Standing in a block ──────────────────────────────────────────────────
+   *
+   * Adopting one swaps the live constants. Everything derived afterwards —
+   * stars, worlds, biospheres — comes out of the new block, which is the whole
+   * mechanic, and is also why the galaxy cache has to be dropped: a cached star
+   * is a star from the universe you just left.
+   */
+  function adopt(game, bus, node) {
+    const s = game.scene;
+    if (!node) return null;
+    s.blockNode = node;
+    RS.physics.use(node.block);
+    invalidate(game);
+    bus.emit('ensemble:adopt', { block: node.block, distance: node.distance });
+    return node.block;
+  }
+
+  function release(game, bus) {
+    const s = game.scene;
+    if (RS.physics.isOurs() && !s.blockNode) return;
+    s.blockNode = null;
+    RS.physics.use(RS.physics.OURS);
+    invalidate(game);
+    if (bus) bus.emit('ensemble:release', {});
+  }
+
+  /* Anything derived-and-kept has to go when the laws change. There is very
+   * little of it, because the game stores almost nothing — which is exactly the
+   * property that makes a mechanic like this cheap instead of impossible. */
+  function invalidate(game) {
+    if (game.galaxy) game.galaxy.cacheKey = '';
+    const s = game.scene;
+    s.specimen = null;
+    /* The current system and planet were derived under the old block. Drop
+     * them; they will be re-derived on demand under the new one. */
+    if (s.system) s.system = null;
+    if (s.planet) s.planet = null;
+  }
+
+  /* ── The specimen ─────────────────────────────────────────────────────────
+   *
+   * One address, derived twice: once under our block and once under the
+   * adopted one. This is the scope's picture, and it is worth more than any
+   * amount of prose about what a different mass–luminosity exponent means.
+   */
+  function specimenFor(game, block) {
+    const prev = RS.physics.use(RS.physics.OURS);
+    const ours = sampleSystem(game);
+    RS.physics.use(block);
+    const there = sampleSystem(game);
+    RS.physics.use(prev);
+    return { ours, there };
+  }
+
+  function sampleSystem(game) {
+    const sys = RS.stellar.systemAt(game.seed, 0, 0, 0);
+    if (!sys) return null;
+    const st = sys.primary;
+    let worlds = 0, living = 0;
+    for (let i = 0; i < sys.bodies.length; i++) {
+      if (sys.bodies[i].kind !== 'planet') continue;
+      worlds++;
+      const p = RS.planet.planetAt(sys, i);
+      if (p && p.biosphere) living++;
+    }
+    return {
+      name: sys.name,
+      mass: st.mass,
+      temp: st.temperature,
+      lum: st.luminosity,
+      cls: st.cls.name,
+      hzInner: sys.hz.inner, hzOuter: sys.hz.outer,
+      worlds, living
+    };
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    const tier = RS.cosmos.TIERS[clamp(Math.round(game.dials.space.value), 0, RS.cosmos.TIERS.length - 1)];
+    s.ensemble = ensembleAt(game, tier.id, s.ensemble);
+    s.blockNode = null;
+    RS.physics.use(RS.physics.OURS);
+    bus.emit('ensemble:enter', { ensemble: s.ensemble });
+    return s.ensemble;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    s.ensembleT = (s.ensembleT || 0) + dt;
+    const tier = RS.cosmos.TIERS[clamp(Math.round(game.dials.space.value), 0, RS.cosmos.TIERS.length - 1)];
+    if (!s.ensemble || s.ensemble.tierId !== tier.id) {
+      /* Moving between the four ensemble rungs is moving between *families* of
+       * alternative, so the block you were standing in does not come with you. */
+      release(game, bus);
+      s.ensemble = ensembleAt(game, tier.id, s.ensemble);
+    }
+
+    /* Δ selects. The phase dial is the only one not already spoken for here —
+     * there is no space to move through and no time to scrub — so it becomes
+     * the thing that picks which universe you are pointed at, which is a
+     * genuinely good use of a dial that is otherwise idle in this scope. */
+    const want = pick(game);
+    if (want && want !== s.blockNode) adopt(game, bus, want);
+
+    if (s.blockNode && !s.specimen) s.specimen = specimenFor(game, s.blockNode.block);
+  }
+
+  /* Which node Δ is pointed at. Nodes sit at their own angles, so this is a
+   * literal compass. */
+  function pick(game) {
+    const s = game.scene;
+    if (!s.ensemble || !s.ensemble.nodes.length) return null;
+    const phi = game.dials.phase.value;
+    let best = null, bd = Infinity;
+    for (const n of s.ensemble.nodes) {
+      const a = Math.atan2(n.y, n.x);
+      const d = Math.abs(RS.core.angDelta(phi, a));
+      if (d < bd) { bd = d; best = n; }
+    }
+    /* Only within a reasonable arc — pointing between two universes should
+     * select neither, so the dial has a dead zone and the choice is
+     * deliberate. */
+    return bd < 0.32 ? best : null;
+  }
+
+  /* Recognising an essence under laws unlike ours is the premise's strongest
+   * claim, so it is the scope's payout. Scales with how far the block is from
+   * ours, because a universe that differs by 3% proves nothing. */
+  function bonusFor(game) {
+    const s = game.scene;
+    if (s.kind !== 'ensemble' || !s.blockNode) return 1;
+    return 1 + s.blockNode.distance * 3.0;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const e = s.ensemble;
+    if (!e) return { title: 'Ensemble', sub: 'resolving…' };
+    if (!s.blockNode) {
+      return {
+        title: 'Level ' + e.family + ' Ensemble',
+        sub: 'Turn Δ to point at a block. Nothing here has a place — only laws.',
+        count: e.nodes.length
+      };
+    }
+    const b = s.blockNode.block;
+    return {
+      title: b.name,
+      sub: b.blurb,
+      level: b.level,
+      distance: s.blockNode.distance,
+      rows: RS.physics.compare(b, []),
+      specimen: s.specimen,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.ensemble = {
+    NODE_COUNT, familyOf, ensembleAt, adopt, release, invalidate,
+    specimenFor, sampleSystem, enter, tick, pick, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the scene stack: field → system → planet surface.
  *
  * ── The modal split, and why it is the best idea in this file ──────────────
@@ -8027,6 +8501,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const TIER_QUANTUM = RS.cosmos.BY_ID.quantum.index;        // 1
   const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
   const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
+  const TIER_ENSEMBLE = RS.cosmos.BY_ID.inflationary.index;  // 18
 
   const SCENES = [
     {
@@ -8040,6 +8515,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'web', name: 'Cosmic Web', first: TIER_GROUP, last: TIER_HUBBLE,
       blurb: 'Filaments and voids, assembling over thirteen billion years.'
+    },
+    {
+      id: 'ensemble', name: 'Ensemble', first: TIER_ENSEMBLE, last: RS.cosmos.TIERS.length - 1,
+      blurb: 'Alternative blocks of physical law. Stand in one and the constants change.'
     },
     {
       id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
@@ -8100,6 +8579,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Ensemble. `blockNode` is the alternative physics currently adopted;
+       * `specimen` is one address derived under both blocks side by side. */
+      ensemble: null,
+      ensembleT: 0,
+      blockNode: null,
+      specimen: null,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -8220,6 +8705,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
     else if (s.kind === 'web') RS.web.tick(game, bus, dt);
     else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
+    else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -8233,6 +8719,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+
+    /* Leaving the Ensemble always restores our own block. An alternative
+     * universe you had forgotten you were standing in would silently re-derive
+     * every star in the game and read as a bug rather than as a mechanic — so
+     * the swap is scoped to the one place that owns it, unconditionally, on
+     * the way out. */
+    if (s.lastKind === 'ensemble' && kind !== 'ensemble' && RS.ensemble) {
+      RS.ensemble.release(game, bus);
+    }
 
     if (kind === 'galaxy') {
       /* The map centres on wherever the player currently is, so zooming out
@@ -8280,6 +8775,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     } else if (kind === 'foam') {
       s.agents.length = 0;
       RS.foam.enter(game, bus);
+    } else if (kind === 'ensemble') {
+      s.agents.length = 0;
+      RS.ensemble.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -8689,7 +9187,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
@@ -8719,6 +9217,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const SAVE_VERSION = 1;
 
   function newGame(seed) {
+    /* A new game starts in our own universe. The physics block is module-level
+     * rather than per-game — it has to be, because every derivation reads it
+     * without being handed a game — so beginning a session while an ensemble
+     * block from a previous one is still adopted would silently derive the
+     * whole galaxy under borrowed laws. */
+    RS.physics.use(RS.physics.OURS);
     const game = {
       version: SAVE_VERSION,
       seed: (seed >>> 0) || 0x5EED1,
@@ -8910,6 +9414,17 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       }
       return { text: 'Nothing is assembling at ' + w.tGyr.toFixed(1) +
         ' Gyr. Scrub τ to find a collapse in progress.', kind: 'scrub' };
+    }
+    if (s.kind === 'ensemble') {
+      if (!s.blockNode) {
+        return { text: 'Turn Δ to point at a block of laws. Nothing here has a place — only rules.',
+          kind: 'select' };
+      }
+      const d = Math.round(s.blockNode.distance * 100);
+      return { text: s.blockNode.block.name + ' is ' + d +
+        '% unlike ours. The essences are the same essences. ×' +
+        RS.ensemble.bonusFor(game).toFixed(2) + ' to recognise one under these laws.',
+        kind: 'express' };
     }
     if (s.kind === 'foam') {
       const f = s.foam;
@@ -10444,6 +10959,102 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
   }
 
+  /* ── The ensemble ────────────────────────────────────────────────────────
+   *
+   * Universes have no spatial form, so there is nothing here to draw *as a
+   * place* — only relations, which is exactly what the `abstract` geometry is
+   * for. Each block is one essence rendered by the same generator that renders
+   * everything else, and the further a block sits from ours the further out and
+   * the more saturated it is drawn. The one Δ is pointed at gets a ring.
+   */
+  function drawEnsemble(ctx, game, t) {
+    const e = game.scene.ensemble;
+    if (!e) return;
+    const sel = game.scene.blockNode;
+
+    /* The compass. Δ is the selector in this scope and nothing else uses it, so
+     * the needle is worth drawing plainly. */
+    const phi = game.dials.phase.value;
+    ctx.strokeStyle = hsl(268, 0.5, 0.6, 0.22);
+    ctx.lineWidth = Math.max(1, px(0.003));
+    ctx.beginPath();
+    ctx.moveTo(view.cx, view.cy);
+    ctx.lineTo(sx(Math.cos(phi) * 0.9), sy(Math.sin(phi) * 0.9));
+    ctx.stroke();
+
+    for (let i = 0; i < e.nodes.length; i++) {
+      const n = e.nodes[i];
+      const on = sel === n;
+      let buf = n.__ss;
+      if (!buf) buf = n.__ss = RS.selfsimilar.build(n.essence, 'abstract', n.idx, buf);
+
+      ctx.save();
+      ctx.translate(sx(n.x), sy(n.y));
+      ctx.rotate(t * 0.06 * (1 + n.distance));
+      /* `abstract` draws dashed relations and dotted nodes, both of which are
+       * faint by construction — so this scope needs a much higher alpha than a
+       * lobed or filamentary one to read at all. */
+      RS.selfsimilar.draw(ctx, buf, 0, 0,
+        RS.selfsimilar.fit(buf, px(0.09 + n.distance * 0.07)),
+        n.hue, 0.5 + n.distance * 0.45, on ? 1.0 : 0.82, t);
+      ctx.restore();
+
+      if (on) {
+        ctx.strokeStyle = hsl(n.hue, 0.9, 0.75, 0.85);
+        ctx.lineWidth = Math.max(2, px(0.006));
+        ctx.beginPath();
+        ctx.arc(sx(n.x), sy(n.y), px(0.15 + Math.sin(t * 2.2) * 0.008), 0, TAU);
+        ctx.stroke();
+      } else {
+        /* Unselected blocks still get a mark, so the compass has visible
+         * detents rather than a needle sweeping through fog. */
+        ctx.fillStyle = hsl(n.hue, 0.6, 0.6, 0.35);
+        ctx.beginPath(); ctx.arc(sx(n.x), sy(n.y), Math.max(1.5, px(0.005)), 0, TAU); ctx.fill();
+      }
+    }
+
+    /* The specimen: one address, two universes. Two stars side by side, sized
+     * and coloured by what each block actually derives. */
+    const sp = game.scene.specimen;
+    if (sp && sp.ours && sp.there) {
+      const y = view.cy + px(0.70);
+      /* Wide enough apart that the two captions cannot collide — they are the
+       * comparison, so overlapping them destroys the only thing this picture
+       * is for. */
+      const pairs = [[sp.ours, view.cx - px(0.42), 'ours'], [sp.there, view.cx + px(0.42), 'there']];
+      for (const [d, x, tag] of pairs) {
+        const r = px(0.018) * Math.pow(clamp(d.lum, 0.001, 1e5), 0.12);
+        /* Star colour from its derived temperature — the difference between the
+         * two discs *is* the difference between the two universes, so it has to
+         * run the right way: 3000 K is red, 5800 K is yellow-white, 10000 K and
+         * up is blue. A linear ramp gets this backwards at one end or the
+         * other, because the yellow-to-blue half of the sequence covers three
+         * times the temperature range that the red-to-yellow half does. */
+        const hue = d.temp < 5000
+          ? lerp(16, 44, clamp01((d.temp - 2500) / 2500))
+          : lerp(44, 215, clamp01((d.temp - 5000) / 6000));
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+        g.addColorStop(0, hsl(hue, 0.75, 0.72, 0.9));
+        g.addColorStop(1, hsl(hue, 0.75, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
+        ctx.fillStyle = hsl(hue, 0.5, 0.85, 0.95);
+        ctx.beginPath(); ctx.arc(x, y, Math.max(2, r), 0, TAU); ctx.fill();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = hsl(0, 0, 0.62, 0.75);
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillText(tag, x, y + px(0.085));
+        ctx.fillStyle = hsl(hue, 0.5, 0.78, 0.9);
+        ctx.font = '11px ui-monospace, Menlo, monospace';
+        ctx.fillText(Math.round(d.temp) + ' K', x, y + px(0.135));
+        ctx.fillStyle = hsl(d.living ? 140 : 0, 0.5, 0.66, 0.8);
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillText(d.living + '/' + d.worlds + ' alive', x, y + px(0.175));
+      }
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -10752,6 +11363,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       const inCell = kind === 'cellular';
       const inWeb = kind === 'web';
       const inFoam = kind === 'foam';
+      const inEnsemble = kind === 'ensemble';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -10762,6 +11374,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (inCell) drawCell(ctx, game, t);
       else if (inWeb) drawWeb(ctx, game, t);
       else if (inFoam) drawFoam(ctx, game, t);
+      else if (inEnsemble) drawEnsemble(ctx, game, t);
 
       /* The rim. A membrane in a cell, the horizon in the web, and absent in
        * the foam — there is no boundary at a scale where nothing persists long
@@ -12359,6 +12972,13 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         (r.disconnected ? ' · ' + r.disconnected + ' beyond the horizon' : '') +
         (r.assembling > 0.25 ? ' · ASSEMBLING ×' + r.bonus.toFixed(2) : ''));
       el['layer-name'].style.color = hsl(276, 0.7, 0.72);
+    } else if (sc.kind === 'ensemble') {
+      const r = RS.ensemble.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.rows
+        ? r.sub + ' · ' + Math.round(r.distance * 100) + '% unlike ours · ×' + r.bonus.toFixed(2)
+        : r.sub);
+      el['layer-name'].style.color = hsl(r.rows ? 186 + r.distance * 120 : 210, 0.7, 0.72);
     } else if (sc.kind === 'foam') {
       const r = RS.foam.readout(game);
       setText('layer-name', 'QUANTUM FOAM');
@@ -12560,6 +13180,38 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         (r.disconnected
           ? '<div class="ro-sub" style="color:' + hsl(200, 0.6, 0.68) + '">' + r.disconnected +
             ' structures past the horizon &mdash; no signal has ever crossed</div>' : '');
+      return;
+    }
+    if (s.kind === 'ensemble') {
+      const r = RS.ensemble.readout(game);
+      if (!r.rows) {
+        node.innerHTML =
+          '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.6, 0.72) + '">&#8757;</span>' +
+          '<span class="ro-title">' + r.title + '</span></div>' +
+          '<div class="ro-sub">' + r.sub + '</div>';
+        return;
+      }
+      /* Every axis, against ours. This is the scope's whole content, and it has
+       * to be a comparison rather than a list of numbers — "×1.7 of ours" says
+       * something; "9812 K" says nothing without the other column. */
+      const rows = r.rows.map(x =>
+        '<div class="ro-sub" style="display:flex;gap:6px">' +
+        '<b style="min-width:112px;font-weight:400;opacity:.7">' + x.name + '</b>' +
+        '<span style="color:' + hsl(x.mult > 1 ? 36 : 190, 0.7, 0.7) + '">&times;' +
+        x.mult.toFixed(2) + '</span>' +
+        '<span style="opacity:.65">' + x.says + '</span></div>').join('');
+      const sp = r.specimen;
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(186 + r.distance * 120, 0.8, 0.72) + '">&#8757;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">Level ' + r.level + ' &middot; ' + r.sub + '</div>' +
+        rows +
+        (sp && sp.ours && sp.there
+          ? '<div class="ro-sub" style="margin-top:5px;opacity:.8">' + sp.ours.name +
+            ', derived twice: ' + Math.round(sp.ours.temp) + ' K / ' + sp.ours.living +
+            ' alive here &mdash; ' + Math.round(sp.there.temp) + ' K / ' + sp.there.living +
+            ' alive there</div>' : '');
       return;
     }
     if (s.kind === 'foam') {
@@ -13347,6 +13999,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           body: sc => sc.web
             ? 'τ is the age of the universe here. Scrub it and watch the structure assemble.'
             : 'Filaments and voids.' },
+        ensemble: { hue: 210, icon: '∵',
+          title: sc => 'level ' + (sc.ensemble ? sc.ensemble.family : 'I') + ' ensemble',
+          body: () => 'Alternative blocks of law. Turn Δ to stand in one — the constants change under you.' },
         foam: { hue: 291, icon: '∴',
           title: () => 'quantum foam',
           body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
@@ -13378,6 +14033,16 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         kind: 'major', icon: '·', hue: 291, ms: 5200, title: 'BODY LOST',
         body: 'A ' + (arch ? arch.name.toLowerCase() : 'body') +
           ' is a persistent arrangement of matter. There is no such thing here.'
+      });
+    });
+
+    bus.on('ensemble:adopt', ({ block, distance }) => {
+      RS.audio.upheaval(1.2 + distance);
+      RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
+      RS.ui.toast({
+        kind: 'major', icon: '∵', hue: 186 + distance * 120, ms: 5000,
+        title: block.name.toUpperCase(),
+        body: block.blurb + ' Everything derives from here under these constants.'
       });
     });
 

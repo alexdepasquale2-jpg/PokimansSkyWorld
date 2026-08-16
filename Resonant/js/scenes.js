@@ -52,6 +52,7 @@
   const TIER_QUANTUM = RS.cosmos.BY_ID.quantum.index;        // 1
   const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
   const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
+  const TIER_ENSEMBLE = RS.cosmos.BY_ID.inflationary.index;  // 18
 
   const SCENES = [
     {
@@ -65,6 +66,10 @@
     {
       id: 'web', name: 'Cosmic Web', first: TIER_GROUP, last: TIER_HUBBLE,
       blurb: 'Filaments and voids, assembling over thirteen billion years.'
+    },
+    {
+      id: 'ensemble', name: 'Ensemble', first: TIER_ENSEMBLE, last: RS.cosmos.TIERS.length - 1,
+      blurb: 'Alternative blocks of physical law. Stand in one and the constants change.'
     },
     {
       id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
@@ -125,6 +130,12 @@
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Ensemble. `blockNode` is the alternative physics currently adopted;
+       * `specimen` is one address derived under both blocks side by side. */
+      ensemble: null,
+      ensembleT: 0,
+      blockNode: null,
+      specimen: null,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -245,6 +256,7 @@
     else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
     else if (s.kind === 'web') RS.web.tick(game, bus, dt);
     else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
+    else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -258,6 +270,15 @@
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+
+    /* Leaving the Ensemble always restores our own block. An alternative
+     * universe you had forgotten you were standing in would silently re-derive
+     * every star in the game and read as a bug rather than as a mechanic — so
+     * the swap is scoped to the one place that owns it, unconditionally, on
+     * the way out. */
+    if (s.lastKind === 'ensemble' && kind !== 'ensemble' && RS.ensemble) {
+      RS.ensemble.release(game, bus);
+    }
 
     if (kind === 'galaxy') {
       /* The map centres on wherever the player currently is, so zooming out
@@ -305,6 +326,9 @@
     } else if (kind === 'foam') {
       s.agents.length = 0;
       RS.foam.enter(game, bus);
+    } else if (kind === 'ensemble') {
+      s.agents.length = 0;
+      RS.ensemble.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -714,7 +738,7 @@
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,

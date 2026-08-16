@@ -137,7 +137,9 @@
       { name: 'Quantum foam', range: 'planck · quantum', what: 'Nothing persists, including your body. Find the pair that never cancelled.',
         active: sc.kind === 'foam', hue: 291 },
       { name: 'Cosmic web', range: 'local group → hubble volume', what: 'τ is the age of the universe. Catch a filament while it assembles.',
-        active: sc.kind === 'web', hue: 276 }
+        active: sc.kind === 'web', hue: 276 },
+      { name: 'Ensemble', range: 'inflationary → mathematical', what: 'Alternative laws. Δ picks one; the constants change under you.',
+        active: sc.kind === 'ensemble', hue: 210 }
     ];
     for (const r of rungs) {
       h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +
