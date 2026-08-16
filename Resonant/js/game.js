@@ -73,13 +73,24 @@
       fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
       senseBonus: 0,
 
-      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
+      stats: { blocksAdopted: 0, farthestBlock: 0, crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
 
       /* Transient, rebuilt every frame — never saved. */
       focusNode: null,
       __spec: null,
 
-      settings: { audio: true, haptics: true, reduceMotion: false, showSci: true },
+      settings: {
+        audio: true, haptics: true, reduceMotion: false, showSci: true,
+        /* 'all' | 'key' | 'off'. Default 'key': arrivals, discoveries and
+         * warnings, but not routine chatter. Every notification restates
+         * something the readout or the objective line also says, so filtering
+         * them costs nothing but noise. */
+        notify: 'key',
+        /* Bloom. On by default because it costs well under a millisecond and
+         * is the largest single visual change in the codebase; off is here for
+         * anything that struggles. */
+        bloom: true
+      },
       flags: Object.create(null)
     };
     RS.dials.refreshReach(game.dials);
@@ -227,6 +238,32 @@
         RS.ensemble.bonusFor(game).toFixed(2) + ' to recognise one under these laws.',
         kind: 'express' };
     }
+    if (s.kind === 'molecular') {
+      const m = s.molecule;
+      if (!m) return { text: 'Resolving…', kind: 'wait' };
+      if (m.bias < 0.1) {
+        return { text: 'Both hands in equal numbers here — nothing is choosing. Find a living world and come back.',
+          kind: 'select' };
+      }
+      if (m.anomalous) {
+        return { text: m.anomalous + ' molecule' + (m.anomalous > 1 ? 's' : '') +
+          ' of the wrong hand — the warm ones. ×' + RS.molecular.bonusFor(game).toFixed(2) + '.',
+          kind: 'express' };
+      }
+      return { text: 'Every chiral site here is the hand life chose. Sweep Σ for a sample that is not.',
+        kind: 'select' };
+    }
+    if (s.kind === 'shells') {
+      const sh = s.shells;
+      if (!sh) return { text: 'Resolving…', kind: 'wait' };
+      if (sh.degenerate) {
+        return { text: sh.degenerate + ' occupants share an energy without sharing a state. ' +
+          'That coincidence is where chemistry comes from — and it pays ×' +
+          RS.shells.bonusFor(game).toFixed(2) + '.', kind: 'express' };
+      }
+      return { text: sh.displaced + ' occupants were pushed outward because their state was taken. ' +
+        'Excited, and about to fall back.', kind: 'express' };
+    }
     if (s.kind === 'foam') {
       const f = s.foam;
       if (!f) return { text: 'Resolving…', kind: 'wait' };
@@ -266,10 +303,33 @@
       if (!game.inhabiting) {
         return { text: 'Take a body to touch this world. Unembodied, you can only watch it.', kind: 'embark' };
       }
-      const env = RS.vessel.environmentFor(game);
-      const blocked = RS.vessel.canOperate(RS.vessel.archOf(game.body), env);
-      if (blocked) return { text: 'This body cannot work here: ' + blocked + '.', kind: 'blocked' };
-      return { text: 'τ throttle · Σ vertical · Δ heading · φ senses.', kind: 'pilot' };
+      const st = RS.vessel.statusOf(game);
+      if (st && st.blocked) {
+        return { text: 'This body cannot work here: ' + st.blocked +
+          (st.alternative ? '. Take the ' + st.alternative.name + ' instead.' : '. Nothing you have works here.'),
+          kind: 'blocked' };
+      }
+      /* The dial map lives on the pilot bar now and is permanently visible, so
+       * repeating it here would spend the one line that could say something
+       * about *this* world on something the player can already read. */
+      if (st && st.strain > 0.6) {
+        return { text: 'Strain at ' + Math.round(st.strain * 100) +
+          '%. Leave the body before it fails, or the hold goes with it.', kind: 'blocked' };
+      }
+      if (st && st.endurance !== Infinity && st.endurance < 45) {
+        return { text: Math.round(st.endurance) + 's of charge at this pace. Ease off τ or turn back.',
+          kind: 'blocked' };
+      }
+      const p = s.planet;
+      if (p && p.biosphere && p.biosphere.complexity > 0.34) {
+        return { text: 'Life here. Ride a mind with the symbiont, or turn Σ inward to enter a cell.',
+          kind: 'explore' };
+      }
+      if (p && p.resources && p.resources.length) {
+        return { text: 'Seams below. Extract with the harvester, or build from the world panel.',
+          kind: 'explore' };
+      }
+      return { text: 'Walk it. Δ steers, and φ changes what you can sense.', kind: 'pilot' };
     }
     return nextObjective(game);
   }

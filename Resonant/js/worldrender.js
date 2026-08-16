@@ -448,15 +448,35 @@
     const aHue = atmosphereHue(p);
     const starHue = p.system.primary.cls.hue;
     const thick = clamp01(p.pressure / 2.2);
+
+    /* ── Day and night ───────────────────────────────────────────────────
+     *
+     * `daylight` is the star's elevation softened through a terminator whose
+     * width is the atmosphere's own — so a dense world has a long twilight and
+     * an airless one snaps from noon to night, which is why the Moon has no
+     * dusk. On a tidally locked world it does not change with time at all: it
+     * changes with *longitude*, and half the world never sees the star.
+     *
+     * Everything below reads this one number, which is why the whole day/night
+     * cycle costs a sine and two cosines rather than a lighting model. */
+    const lt = s.clock;
+    const day = lt && lt.ok ? lt.sun.daylight : 1;
+    /* Twilight reddens near the terminator: long path length through the
+     * atmosphere scatters the short wavelengths out, and only a world with air
+     * can do it. */
+    const redshift = clamp01(1 - Math.abs(day - 0.5) * 2) * thick * 34;
+
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    sky.addColorStop(0, hsl(aHue, 0.5 * thick, 0.04 + thick * 0.28, 1));
-    sky.addColorStop(1, hsl(lerp(aHue, starHue, 0.45), 0.55 * thick, 0.06 + thick * 0.5, 1));
+    sky.addColorStop(0, hsl(aHue, 0.5 * thick, (0.04 + thick * 0.28) * (0.10 + day * 0.90), 1));
+    sky.addColorStop(1, hsl(lerp(aHue, starHue, 0.45) - redshift,
+      0.55 * thick * (0.5 + day * 0.5), (0.06 + thick * 0.5) * (0.08 + day * 0.92), 1));
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, horizon);
 
     /* Stars, visible only where the air is thin enough not to scatter them
-     * out. This is the same physics that makes Earth's daytime sky opaque. */
-    const starVis = clamp01(1 - thick * 1.5);
+     * out — and at night, on any world with air at all, for exactly the same
+     * reason. This is the same physics that makes Earth's daytime sky opaque. */
+    const starVis = clamp01(clamp01(1 - thick * 1.5) + clamp01(1 - day) * thick);
     if (starVis > 0.02) {
       ctx.fillStyle = 'rgba(255,255,255,' + (starVis * 0.75).toFixed(2) + ')';
       for (let i = 0; i < 90; i++) {

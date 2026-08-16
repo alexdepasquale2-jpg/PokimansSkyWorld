@@ -199,30 +199,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 /* ── toasts ───────────────────────────────────────────────────────────── */
 
 #toasts {
-  /* Below the topbar, the scene tag and the context strip, so transient
-     messages never bury the two lines that say where you are and what mode
-     the dials are in. */
-  position: fixed; top: calc(var(--safe-t) + 150px); left: 50%;
-  transform: translateX(-50%);
-  display: flex; flex-direction: column; gap: 6px;
-  width: min(92vw, 400px); z-index: 5;
+  /* Top-right, out of the world entirely. They used to be centred and three
+     deep, which put a wall of cards directly over the thing they were about —
+     and a notification that hides what it is describing is worse than none.
+     Nothing here is load-bearing: every message restates something the
+     readout, the objective line or the guide also says. */
+  position: fixed; top: calc(var(--safe-t) + 46px); right: 10px;
+  display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
+  width: min(74vw, 264px); z-index: 5;
   pointer-events: none;
 }
 .toast {
   --h: 200;
-  display: flex; gap: 9px; align-items: flex-start;
-  background: rgba(7, 11, 19, 0.95);
-  border: 1px solid hsla(var(--h), 60%, 60%, .3);
-  border-left: 2px solid hsl(var(--h), 80%, 62%);
-  border-radius: 10px; padding: 8px 11px;
-  backdrop-filter: blur(11px); -webkit-backdrop-filter: blur(11px);
-  animation: toast-in .34s cubic-bezier(.2, 1.3, .35, 1);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  display: flex; gap: 7px; align-items: flex-start;
+  /* Translucent rather than near-opaque: the world should stay legible
+     *through* a notification, which is most of why these stopped feeling like
+     an interruption. */
+  background: rgba(7, 11, 19, 0.72);
+  border: 1px solid hsla(var(--h), 60%, 60%, .22);
+  border-left: 2px solid hsla(var(--h), 80%, 62%, .8);
+  border-radius: 8px; padding: 6px 9px;
+  max-width: 100%;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  animation: toast-in .28s cubic-bezier(.2, 1.3, .35, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .38);
 }
 .toast.out { animation: toast-out .4s ease forwards; }
-.toast i { font-style: normal; font-size: 15px; color: hsl(var(--h), 85%, 70%); line-height: 1.1; }
-.toast b { display: block; font-size: 10.5px; letter-spacing: .06em; }
-.toast em { display: block; font-style: normal; font-size: 9.5px; color: var(--dim); margin-top: 2px; line-height: 1.42; }
+.toast i { font-style: normal; font-size: 13px; color: hsl(var(--h), 85%, 70%); line-height: 1.1; }
+.toast b { display: block; font-size: 10px; letter-spacing: .05em; }
+.toast em { display: block; font-style: normal; font-size: 9px; color: var(--dim); margin-top: 2px; line-height: 1.38; }
 .toast.major { border-left-width: 3px; }
 .toast.major b { font-size: 11.5px; }
 .toast.gnosis { border-left-color: #f0abfc; }
@@ -230,12 +235,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .toast.seat { padding: 5px 10px; opacity: .9; }
 .toast.seat b { font-size: 9.5px; }
 
+/* Slide in from the edge they live on rather than dropping from above — a
+   card that moves toward the middle of the screen reads as demanding
+   attention, and one that slides in from the margin does not. */
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(-10px) scale(.96); }
+  from { opacity: 0; transform: translateX(14px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to { opacity: 0; transform: translateX(10px); }
 }
 
 /* ── drawer ───────────────────────────────────────────────────────────── */
@@ -342,6 +350,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .set-row .k { font-size: 10px; font-weight: 700; }
 .set-row .d { font-size: 8.5px; color: var(--dimmer); line-height: 1.35; }
+.set-row .cyc {
+  font-size: 9px; letter-spacing: .1em; padding: 3px 7px; border-radius: 5px;
+  border: 1px solid var(--line); color: var(--ink); opacity: .85; align-self: center;
+}
 .set-row .sw {
   width: 28px; height: 16px; border-radius: 8px;
   background: rgba(140, 175, 220, .2); position: relative;
@@ -425,7 +437,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 
 #body-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  pointer-events: auto;
   margin-top: auto; margin-bottom: 6px;
   align-self: flex-start;
   background: var(--panel);
@@ -446,7 +459,42 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .bb-meter b { position: absolute; inset: 0 auto 0 0; display: block; transition: width .2s linear; }
 .bb-tag { font-size: 9px; color: var(--dim); }
-.bb-warn { font-size: 9px; color: var(--warn); }
+.bb-warn {
+  font-size: 9px; color: var(--warn); flex-basis: 100%;
+  display: flex; align-items: center; gap: 5px;
+}
+.bb-fix {
+  font: inherit; font-size: 9px; letter-spacing: .04em;
+  background: hsla(40, 80%, 60%, .16); color: hsl(40, 85%, 72%);
+  border: 1px solid hsla(40, 80%, 60%, .4); border-radius: 5px;
+  padding: 2px 6px; cursor: pointer; pointer-events: auto;
+}
+.bb-fix:hover { background: hsla(40, 80%, 60%, .28); }
+
+.bb-head {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; pointer-events: auto;
+}
+.bb-head:hover .bb-name { color: #fff; }
+
+/* The dial map, live. Every body reinterprets the same four controls, and
+   until this existed the only place that mapping appeared was a drawer you had
+   to close in order to fly. */
+.bb-dials { display: flex; gap: 7px; flex-wrap: wrap; }
+.bb-dial {
+  --h: 200;
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-size: 8.5px; color: var(--dim); white-space: nowrap;
+}
+.bb-dial b {
+  font-size: 10px; font-weight: 400; color: hsl(var(--h), 70%, 70%);
+}
+@media (max-width: 560px) {
+  /* On a phone the bar is competing with the world for a narrow column, so the
+     dial map drops to the two controls that differ most between bodies. */
+  .bb-dial:nth-child(n+3) { display: none; }
+}
 
 /* The readout is the anchor for the bottom-left column; once the body bar
  * takes the auto margin, the readout must not also claim it. */
@@ -511,6 +559,103 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .say p:last-child { margin-bottom: 0; }
 
+
+/* ── the essence sheet ─────────────────────────────────────────────────────
+ *
+ * The player's map of the generative core. Four axes per essence, drawn as
+ * bars so the *shape* of an essence is recognisable at a glance — and blanks
+ * where an axis has not been read yet, because what you do not know is itself
+ * information worth seeing.
+ */
+.ess-sheet { display: flex; flex-direction: column; gap: 3px; }
+.ess-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto auto;
+  grid-template-areas: "g n ax ct" ". f f f";
+  align-items: center; gap: 4px 8px;
+  padding: 6px 8px; border-radius: 7px;
+  background: rgba(140, 175, 220, .045);
+  border: 1px solid transparent;
+}
+.ess-row.unknown { opacity: .38; }
+.ess-row .eg { grid-area: g; font-size: 13px; text-align: center; }
+.ess-row .en { grid-area: n; font-size: 10.5px; min-width: 0; }
+.ess-row .en em {
+  display: block; font-style: normal; font-size: 8.5px;
+  color: var(--dim); line-height: 1.35; margin-top: 1px;
+}
+.ess-row .eax { grid-area: ax; display: flex; gap: 3px; }
+.ess-row .ect {
+  grid-area: ct; font-size: 9px; color: var(--dim); text-align: right; min-width: 44px;
+}
+.ess-row .ect em { display: block; font-style: normal; font-size: 8px; opacity: .7; }
+.ess-row .ef {
+  grid-area: f; font-size: 8px; color: var(--dim); opacity: .6;
+  padding-left: 26px; line-height: 1.4;
+}
+
+/* One axis. The letter is always there so the row reads the same whether the
+   value is known or not — only the bar appears. */
+.ess-row .ax {
+  --h: 200;
+  position: relative; width: 34px; height: 13px;
+  border-radius: 3px; overflow: hidden;
+  background: rgba(140, 175, 220, .12);
+  display: flex; align-items: center; justify-content: center;
+}
+.ess-row .ax.blank {
+  background: repeating-linear-gradient(45deg,
+    rgba(140, 175, 220, .05) 0 3px, rgba(140, 175, 220, .11) 3px 6px);
+}
+.ess-row .ax b {
+  position: relative; z-index: 1;
+  font-size: 8px; font-weight: 700; letter-spacing: .04em;
+  color: hsl(var(--h), 60%, 78%);
+}
+.ess-row .ax.blank b { color: rgba(160, 185, 215, .4); }
+.ess-row .ax i {
+  position: absolute; inset: 0 auto 0 0; display: block;
+  background: hsla(var(--h), 70%, 58%, .5);
+}
+
+@media (max-width: 460px) {
+  /* On a phone the sheet drops the form names and tightens the bars; the axes
+     are the part that has to survive. */
+  .ess-row .ef { display: none; }
+  .ess-row .ax { width: 26px; }
+}
+
+
+/* ── the drawer's tab row ──────────────────────────────────────────────────
+ *
+ * Seven topbar buttons became one. On a phone they were already competing with
+ * the insight readout for the same strip, and every new panel added another —
+ * so the panels moved inside the drawer they all open into, which is where a
+ * player is already looking when they want a different one.
+ */
+#drawer-tabs {
+  display: flex; gap: 2px; padding: 0 10px 8px;
+  overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+#drawer-tabs::-webkit-scrollbar { display: none; }
+#drawer-tabs button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: 0; border-radius: 7px;
+  padding: 6px 9px; cursor: pointer;
+  font: inherit; font-size: 8.5px; letter-spacing: .05em;
+  color: var(--dim); white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+#drawer-tabs button span { font-size: 13px; line-height: 1; }
+#drawer-tabs button:hover { color: var(--ink); background: rgba(140, 175, 220, .07); }
+#drawer-tabs button.on {
+  color: var(--ink);
+  border-bottom-color: hsl(190, 70%, 60%);
+  background: rgba(140, 175, 220, .09);
+}
+
 </style>
 </head>
 <body>
@@ -538,14 +683,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       <span id="progress-pct">0%</span>
     </div>
     <div id="tools">
+      <!-- Contact stays separate on purpose: it is the one panel that is
+           event-driven rather than something you go and look at, and burying an
+           incoming channel two taps deep would make it missable. Everything
+           else is one drawer with tabs. -->
       <button id="btn-contact" class="tool" title="Contact" data-on="0">◉</button>
-      <button id="btn-world" class="tool" title="World">🜨</button>
-      <button id="btn-vessels" class="tool" title="Bodies &amp; research">⋀</button>
-      <button id="btn-upgrades" class="tool" title="Dials">⚙</button>
-      <button id="btn-codex" class="tool" title="Codex">☰</button>
-      <button id="btn-paths" class="tool" title="Pathways">◈</button>
-      <button id="btn-guide" class="tool" title="How this works">?</button>
-      <button id="btn-settings" class="tool" title="Settings">⋯</button>
+      <button id="btn-menu" class="tool" title="Panels">☰</button>
     </div>
   </header>
 
@@ -579,6 +722,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       <h2 id="drawer-title">DIALS</h2>
       <button id="btn-drawer-close" aria-label="Close">✕</button>
     </header>
+    <!-- One row of tabs instead of seven topbar buttons. The tabs are only
+         drawn for panels that are worth opening right now — the World tab is
+         meaningless in the attunement field — so the row shrinks and grows with
+         where you are. -->
+    <nav id="drawer-tabs"></nav>
     <div id="drawer-body"></div>
   </aside>
 
@@ -1724,9 +1872,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    *
    * ── The four axes: the entire authored seed of the game ──────────────────
    *
-   * Fourteen essences × four numbers = 56 values, and every mechanic in the
-   * game is generated from them (see emergence.js). 12 bands × 14 essences ×
-   * 8 geometries = 1344 distinct situations, all traceable back to this table
+   * Sixteen essences × four numbers = 64 values, and every mechanic in the
+   * game is generated from them (see emergence.js). 12 bands × 16 essences ×
+   * 8 geometries = 1536 distinct situations, all traceable back to this table
    * — which is what makes them *recognisable* rather than merely various.
    *
    *   complexity   how much structure it carries      → nesting depth, ordering depth
@@ -1815,6 +1963,37 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       trait: 'One event that spends itself buying a thousand others.',
       forms: { foam: 'Decay Chain', orbital: 'Auger Cascade', chain: 'Reaction Cascade',
         cell: 'Signal Cascade', body: 'Avalanche', disc: 'Starburst', web: 'Merger Chain', abstract: 'Entailment' } },
+    /* ── The two that were added last ─────────────────────────────────────
+     *
+     * Added to exercise the property the whole architecture exists to have:
+     * an essence is 4 numbers, 8 form names and a trait, and adding one adds it
+     * to twelve layers, twenty-two rungs, six primitives and every scope at
+     * once. No band table, no scene, no renderer and no primitive was touched
+     * to put these in the game — which is either a trivial observation about
+     * data-driven design or the entire point, depending on whether you believe
+     * the first fourteen were generated the same way. They were.
+     *
+     * They also fill two genuine holes in the axis space. Nothing branched
+     * *and* was symmetric — every branching essence was lopsided, so a player
+     * could have concluded that branching implies asymmetry, which is false and
+     * a snowflake disproves it. And nothing was intricate, unbranched and
+     * volatile all at once, which is what turbulence is. */
+    { id: 'dendrite', name: 'Dendrite', glyph: '❋', hueShift: 58, complexity: 0.60,
+      /* Reaches out many ways, and every way is the same way. High branching
+       * with high symmetry — a snowflake, a radiolarian, a nerve arbor. */
+      branching: 0.80, symmetry: 0.92, persistence: 0.45,
+      trait: 'Reaches out in every direction at once, and every direction is the same one.',
+      forms: { foam: 'Vertex Sheaf', orbital: 'Hybrid Orbital', chain: 'Dendrimer',
+        cell: 'Arbor', body: 'Frost Fern', disc: 'Tidal Tail', web: 'Filament Node',
+        abstract: 'Free Group' } },
+    { id: 'turbulence', name: 'Turbulence', glyph: '≀', hueShift: -52, complexity: 0.85,
+      /* Intricate, unbranched, lopsided and gone in a moment. The one thing
+       * with no structure you can hold on to and far too much to describe. */
+      branching: 0.25, symmetry: 0.10, persistence: 0.18,
+      trait: 'Too much structure to describe and none of it lasts long enough to try.',
+      forms: { foam: 'Vacuum Churn', orbital: 'Correlation Hole', chain: 'Molten Tangle',
+        cell: 'Cytoplasmic Churn', body: 'Storm', disc: 'Shear Front', web: 'Infall Shock',
+        abstract: 'Mixing Map' } },
     { id: 'memory', name: 'Memory', glyph: '⌸', hueShift: -46, complexity: 0.65,
       branching: 0.20, symmetry: 0.60, persistence: 1.00,
       trait: 'The present shaped by something that has already stopped existing.',
@@ -2070,7 +2249,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
  * (cosmos.js). A band declares which primitives are live (spectrum.js). A tier
  * declares how fast and how they are drawn.
  *
- *     56 authored numbers  ×  6 functions  =  1344 distinct situations
+ *     64 authored numbers  ×  6 functions  =  1536 distinct situations
  *
  * ── Why this and not twelve hand-written modes ────────────────────────────
  *
@@ -2089,7 +2268,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
  * ── Contract ──────────────────────────────────────────────────────────────
  *
  * Every function here is pure, allocation-free (writes into a caller-owned
- * `out`), finite for all 14 essences × 22 tiers, and reads *all four* axes so
+ * `out`), finite for all 16 essences × 22 tiers, and reads *all four* axes so
  * no essence is inert in any primitive. They are called per node per frame, so
  * they must stay cheap — no trigonometry beyond one sin/cos, no allocation.
  */
@@ -2315,7 +2494,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const LABELS = {
     gate: { name: 'Gate', glyph: '▮', blurb: 'Available only in windows. Learn the rhythm.' },
     nest: { name: 'Nest', glyph: '◇', blurb: 'Contains smaller copies. Descend for the payout.' },
-    flow: { name: 'Flow', glyph: '≈', blurb: 'Has a direction. Follow the gradient.' },
+    /* Displayed as "Gradient", not "Flow". There is an *essence* called Flow,
+     * and a codex listing the same word twice for two different things — one of
+     * fourteen essences, and one of six primitives — is a legibility problem
+     * rather than a coincidence. The id stays `flow` because that is what the
+     * band tables and every call site say. */
+    flow: { name: 'Gradient', glyph: '≈', blurb: 'Has a direction. Follow it.' },
     order: { name: 'Order', glyph: '→', blurb: 'Needs its antecedents first. Read the graph.' },
     twin: { name: 'Twin', glyph: '◐', blurb: 'Exists twice. One is real — find the tell.' },
     invert: { name: 'Invert', glyph: '○', blurb: 'Reads backwards. Unlearn what you know.' }
@@ -3063,6 +3247,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (k === 'web' && RS.web) return RS.web.bonusFor(game);
     if (k === 'foam' && RS.foam) return RS.foam.bonusFor(game);
     if (k === 'ensemble' && RS.ensemble) return RS.ensemble.bonusFor(game);
+    if (k === 'molecular' && RS.molecular) return RS.molecular.bonusFor(game);
+    if (k === 'shells' && RS.shells) return RS.shells.bonusFor(game);
     return 1;
   }
 
@@ -5632,6 +5818,61 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }));
   }
 
+  /* The body that would actually work where you are standing, preferring the
+   * most capable one you have unlocked. "This body cannot work here" is only
+   * half a message; the other half is which one can, and the player should not
+   * have to open a drawer and read six predicates to find out. */
+  function bestHere(game, exclude) {
+    const env = environmentFor(game);
+    let best = null;
+    for (const a of ARCHETYPES) {
+      if (!game.vessels.unlocked[a.id]) continue;
+      if (exclude && a.id === exclude) continue;
+      if (canOperate(a, env)) continue;
+      /* `tier` is the archetype's own sense of how much body it is, so the
+       * most capable working body wins rather than whichever is listed first. */
+      if (!best || a.tier > best.tier) best = a;
+    }
+    return best;
+  }
+
+  /* Everything a pilot needs to see at a glance, in one call, so the HUD does
+   * not have to know the shape of a body. */
+  function statusOf(game) {
+    if (!game.inhabiting || !game.body) return null;
+    const b = game.body;
+    const a = archOf(b);
+    const env = environmentFor(game);
+    const blocked = canOperate(a, env);
+    return {
+      arch: a, body: b, env, blocked,
+      charge: b.charge, capacity: a.capacity,
+      chargeFrac: clamp01(b.charge / Math.max(1, a.capacity)),
+      /* Strain is simulated and was never shown, so the one number that says
+       * "change body soon" was invisible. */
+      strain: clamp01(b.strain || 0),
+      speed: Math.hypot(b.vx || 0, b.vy || 0),
+      elevation: b.elevation || 0,
+      holdMass: b.holdMass || 0,
+      possession: b.mindState ? b.mindState.possession : null,
+      /* Seconds of charge left at the current draw, which is the number that
+       * actually tells you whether to turn back. Infinite while regenerating. */
+      endurance: enduranceOf(a, b, env),
+      alternative: blocked ? bestHere(game, a.id) : null
+    };
+  }
+
+  /* Net charge budget: draw scales with exertion and with how hostile the
+   * medium is; regen is the archetype's own recovery. Positive net means the
+   * body is charging and endurance is unbounded. */
+  function enduranceOf(arch, body, env) {
+    const exertion = 0.35 + Math.hypot(body.vx || 0, body.vy || 0) * 1.6;
+    const hostile = 1 + clamp01(Math.abs(env.temperature - 288) / 220);
+    const net = arch.regen - arch.draw * exertion * hostile;
+    if (net >= 0) return Infinity;
+    return body.charge / -net;
+  }
+
   // ── the inhabited body ───────────────────────────────────────────────────
 
   function newBody(archId) {
@@ -5890,11 +6131,421 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.vessel = {
     MEDIUM, ARCHETYPES, BY_ID,
-    environmentFor, canOperate, availability,
+    environmentFor, canOperate, availability, bestHere, statusOf, enduranceOf,
     newBody, archOf, controlsFrom, integrate,
     ride, unride, stepMind, senseRadius, canSenseBand,
     addCargo, removeCargo, effectiveMass
   };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — nowhere is empty.
+ *
+ * ── The problem this fixes ────────────────────────────────────────────────
+ *
+ * `neural.mindAt` builds a small recurrent network from any address hash and
+ * steps it for about 200 multiply-adds. It has been in the codebase since the
+ * solar layer landed, and exactly two things called it: creatures on a planet
+ * surface, and the mind you ride. Every other scope on the twenty-two-rung
+ * ladder was furniture — a cell with no traffic in it, a filament with nothing
+ * moving along it, an atom whose shells were a diagram.
+ *
+ * A scope with nothing living in it reads as a screensaver no matter how
+ * correct its physics is. This file gives every scope its own inhabitants, from
+ * the same generator, at the same cost.
+ *
+ * ── The rule that makes them feel alive ───────────────────────────────────
+ *
+ * **They act before you arrive and continue after you leave.** Nothing here is
+ * spawned on entry or despawned on exit, because an inhabitant that begins
+ * existing when you look at it is a decoration. Instead each one's *path* is a
+ * pure function of (address, scene time), so the swarm you find in a cell has
+ * demonstrably been circulating for as long as that cell has existed and will
+ * still be doing it when you come back — and it costs nothing while you are
+ * elsewhere, because it is not being simulated. It is being *derived*.
+ *
+ * The mind is real, though: each inhabitant carries a genuine recurrent network
+ * whose output steers it, so what it does is emergent rather than scripted, and
+ * two inhabitants of the same kind at different addresses behave differently
+ * because their weights differ.
+ *
+ * ── Cost ──────────────────────────────────────────────────────────────────
+ *
+ * At most `MAX_LIVE` inhabitants are stepped per frame — the ones on screen —
+ * and the rest are derived positionally when needed. Minds are cached by
+ * address inside `neural.js`, so revisiting a place is free.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  /* Only this many carry a stepped mind at once. Beyond that they drift on
+   * their derived paths, which is indistinguishable at the sizes they are
+   * drawn at and costs nothing. */
+  const MAX_LIVE = 10;
+
+  /* ── What lives where ─────────────────────────────────────────────────────
+   *
+   * One entry per scope. `n` is how many, `size` how big they draw, `speed`
+   * how fast they work through their cycle, and `blurb` what the readout calls
+   * them — because "there are things moving" is worth much less than "those are
+   * transcription complexes, and they are doing something".
+   */
+  const KINDS = {
+    foam: {
+      id: 'fluctuation', name: 'Fluctuations', n: 0,
+      /* The foam's pairs *are* its inhabitants and they are already derived in
+       * scene_foam. Adding more would be noise on top of noise. */
+      blurb: 'Nothing here persists long enough to be anything.'
+    },
+    shells: {
+      id: 'transition', name: 'Transitions', n: 5, size: 0.008, speed: 1.4, hue: 46,
+      blurb: 'Occupants dropping between states, emitting as they fall.'
+    },
+    molecular: {
+      id: 'enzyme', name: 'Catalysts', n: 6, size: 0.014, speed: 0.9, hue: 150,
+      blurb: 'Enzymes working the chain — each one holds a substrate and lets go.'
+    },
+    cellular: {
+      id: 'vesicle', name: 'Traffic', n: 9, size: 0.018, speed: 0.7, hue: 168,
+      blurb: 'Vesicles and motor proteins, moving cargo along the cytoskeleton.'
+    },
+    planet: {
+      /* The surface already has `scenes.agents`, which are stepped properly and
+       * can be ridden. Nothing to add. */
+      id: 'fauna', name: 'Fauna', n: 0, blurb: 'Whatever lives here.'
+    },
+    system: {
+      id: 'ship', name: 'Traffic', n: 5, size: 0.010, speed: 0.35, hue: 45,
+      blurb: 'Ships in transit. They were going somewhere before you arrived.'
+    },
+    galaxy: {
+      id: 'probe', name: 'Probes', n: 4, size: 0.008, speed: 0.2, hue: 190,
+      blurb: 'Somebody else’s probes, crossing between stars.'
+    },
+    web: {
+      id: 'galaxy', name: 'Galaxies', n: 12, size: 0.006, speed: 0.12, hue: 276,
+      blurb: 'Galaxies falling down the filaments toward the nodes.'
+    },
+    field: {
+      id: 'drifter', name: 'Drifters', n: 6, size: 0.010, speed: 0.5, hue: 210,
+      blurb: 'Something is moving out there that you are not tuned to.'
+    },
+    ensemble: {
+      id: 'observer', name: 'Observers', n: 3, size: 0.012, speed: 0.25, hue: 210,
+      blurb: 'Whatever is doing the observing in a universe that is not ours.'
+    }
+  };
+
+  function kindFor(sceneKind) { return KINDS[sceneKind] || null; }
+
+  /* ── Derivation ───────────────────────────────────────────────────────────
+   *
+   * Position is a pure function of (address, t). No state, no spawn, no
+   * despawn — which is exactly what makes "it was already doing this" true
+   * rather than a claim.
+   */
+  function inhabitantsFor(game, sceneKind, t, dt, out) {
+    const k = kindFor(sceneKind);
+    const o = out || {};
+    const list = o.list || (o.list = []);
+    list.length = 0;
+    o.kind = k;
+    if (!k || !k.n) return o;
+
+    /* Addressed off the scene, so the same place has the same inhabitants and
+     * a different place has different ones. */
+    const seed = hashN(game.seed ^ 0x1A7B, sceneKind.length * 613, addressOf(game));
+
+    for (let i = 0; i < k.n; i++) {
+      const h = hashN(seed, i, 0x33);
+      /* Each follows a slow closed path, so it circulates rather than
+       * wandering off — a thing that leaves is a thing that was never really
+       * living there. */
+      const r0 = 0.22 + hashF(h, 1) * 0.62;
+      const r1 = r0 * (0.55 + hashF(h, 2) * 0.5);
+      const rate = k.speed * (0.6 + hashF(h, 3) * 0.9);
+      const phase = hashF(h, 4) * TAU;
+      const a = t * rate + phase;
+      /* An ellipse with a slow precession — two frequencies, so the path never
+       * quite repeats and the motion does not read as a carousel. */
+      const prec = t * rate * 0.13;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const cp = Math.cos(prec), sp = Math.sin(prec);
+      const x0 = ca * r0, y0 = sa * r1;
+
+      /* The mind. Real, cached by address, and its output modulates the path —
+       * so an inhabitant hesitates, doubles back and lingers in ways nothing
+       * scripted it to. */
+      let wob = 0, bright = 1;
+      if (i < MAX_LIVE) {
+        const mind = RS.neural.mindAt(h);
+        const st = stateFor(h);
+        stepMind(mind, st, t, i, dt);
+        wob = st.out[0] * 0.06;
+        bright = 0.55 + clamp01(st.out[1] * 0.5 + 0.5) * 0.75;
+      }
+
+      /* The *path* is pure in (address, t); the mind adds a small live
+       * perturbation on top of it. Both are exposed, because the distinction is
+       * real: `bx`/`by` is where this thing would be with nobody home, and
+       * `x`/`y` is where it actually is. Anything that needs determinism reads
+       * the base; the renderer reads the real one. */
+      const bx = x0 * cp - y0 * sp;
+      const by = x0 * sp + y0 * cp;
+      list.push({
+        i,
+        bx, by,
+        x: bx + wob,
+        y: by + wob * 0.6,
+        size: k.size * (0.7 + hashF(h, 5) * 0.7),
+        hue: k.hue + (hashF(h, 6) * 40 - 20),
+        bright,
+        /* Heading, so something with a front can be drawn pointing along it. */
+        heading: Math.atan2(
+          Math.cos(a + 0.05) * r1 - sa * r1,
+          -Math.sin(a + 0.05) * r0 + ca * r0) + prec
+      });
+    }
+    return o;
+  }
+
+  /* Which place we are in, as one number, so two different systems have
+   * different traffic and returning to one finds the same traffic. */
+  function addressOf(game) {
+    const s = game.scene;
+    if (s.systemAddr) return hashN(s.systemAddr.sx | 0, s.systemAddr.sy | 0, s.systemAddr.index | 0);
+    if (s.cell) return hashN(s.cellIndex | 0, 0x7, 0x7);
+    return hashN(Math.round(game.dials.space.value * 4), game.galaxy ? game.galaxy.sx : 0,
+      game.galaxy ? game.galaxy.sy : 0);
+  }
+
+  /* One persistent hidden state per live inhabitant, keyed by address. Held
+   * here rather than in the list because the list is rebuilt every frame and a
+   * recurrent network with no memory between frames is not recurrent. */
+  const states = new Map();
+
+  function stateFor(h) {
+    let st = states.get(h);
+    if (!st) {
+      st = RS.neural.newState();
+      st.inp = new Float32Array(RS.neural.N_IN);
+      states.set(h, st);
+      /* Bounded: a long session that visits many places must not accumulate
+       * state for all of them. The oldest go first, and they re-derive
+       * identically when revisited. */
+      if (states.size > 240) {
+        const first = states.keys().next().value;
+        states.delete(first);
+      }
+    }
+    return st;
+  }
+
+  function stepMind(mind, st, t, i, dt) {
+    /* Senses: where it is in its own cycle, plus a slow shared drive so a
+     * population responds to the same conditions and therefore looks like a
+     * population rather than like independent dots. */
+    const n = st.inp.length;
+    if (n > 0) st.inp[0] = Math.sin(t * 0.7 + i);
+    if (n > 1) st.inp[1] = Math.cos(t * 0.31 + i * 1.7);
+    if (n > 2) st.inp[2] = Math.sin(t * 0.12);
+    if (n > 3) st.inp[3] = st.out[0];
+    if (n > 4) st.inp[4] = st.out[1];
+    if (n > 5) st.inp[5] = 1;
+    RS.neural.step(mind, st, st.inp, Math.min(0.05, dt || 1 / 60));
+  }
+
+  function readout(sceneKind) {
+    const k = kindFor(sceneKind);
+    return k && k.n ? { name: k.name, count: k.n, blurb: k.blurb } : null;
+  }
+
+  RS.inhabitants = { KINDS, MAX_LIVE, kindFor, inhabitantsFor, addressOf, readout, states };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — time you can feel standing in it.
+ *
+ * ── What was already true, and invisible ──────────────────────────────────
+ *
+ * `planet.js` has derived `dayHours`, `axialTilt`, `tidallyLocked` and a full
+ * list of `moons` with real orbital periods since the solar layer landed. Every
+ * one of those numbers was correct, none of them was rendered, and the surface
+ * looked the same at every hour of every day of every year on every world.
+ *
+ * A tidally locked world is the clearest case. Half of it never sees the star
+ * and half of it never stops seeing it — that is the single most important fact
+ * about the most common kind of habitable world in the real galaxy, the game
+ * knew it, and standing on one looked exactly like standing on Earth.
+ *
+ * ── What this file does ───────────────────────────────────────────────────
+ *
+ * Turns those numbers into a sun angle, a season, and a tide, all closed-form
+ * in (planet, longitude, latitude, epoch). Nothing is integrated and nothing is
+ * stored, so scrubbing τ across a thousand years costs exactly what standing
+ * still costs.
+ *
+ * The interesting consequence is that τ acquires a second meaning on a surface
+ * without gaining a second control: unembodied it already scrubs history, and
+ * now that scrub visibly runs the day. Watching a tidally locked world's
+ * terminator *not move* while a fast rotator strobes through fifty days is the
+ * kind of thing that teaches a fact permanently.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, TAU } = RS.core;
+
+  const HOURS_PER_YEAR = 8766;   // 365.25 × 24
+
+  /* ── Where the star is ────────────────────────────────────────────────────
+   *
+   * Returns the star's elevation above the horizon at this place and time, as a
+   * signed cosine: +1 overhead, 0 at the horizon, −1 antipodal. Everything the
+   * renderer needs follows from that one number.
+   */
+  function sunAt(p, lonDeg, latDeg, epochYears, out) {
+    const o = out || {};
+    const lat = latDeg * Math.PI / 180;
+
+    /* Season. The declination of the star swings between ±tilt over a year,
+     * which is what a season *is* — and a world with no tilt has no seasons,
+     * which is why a tidally locked one is the same forever. */
+    const yearPhase = (epochYears % 1 + 1) % 1;
+    const decl = p.axialTilt * Math.sin(yearPhase * TAU);
+
+    let hourAngle, dayFrac;
+    if (p.tidallyLocked) {
+      /* No rotation relative to the star. The hour angle is simply the
+       * longitude: the substellar point is fixed at 0°, the antistellar point
+       * at 180°, and the terminator is a permanent line of dusk that a
+       * civilisation would build along. Time of day does not exist here. */
+      hourAngle = lonDeg * Math.PI / 180;
+      dayFrac = 0;
+    } else {
+      /* Real rotation. `dayHours` is derived from the world's own spin, so a
+       * fast rotator genuinely strobes and a slow one crawls. */
+      const hours = Math.max(0.05, p.dayHours);
+      const elapsed = epochYears * HOURS_PER_YEAR;
+      dayFrac = ((elapsed / hours) % 1 + 1) % 1;
+      hourAngle = (dayFrac * TAU) + lonDeg * Math.PI / 180;
+    }
+
+    /* Standard solar elevation. This is the actual formula, not an
+     * approximation of it — it costs one sin and two cos. */
+    const elev = Math.sin(lat) * Math.sin(decl) +
+      Math.cos(lat) * Math.cos(decl) * Math.cos(hourAngle);
+
+    o.elevation = clamp(elev, -1, 1);
+    o.declination = decl;
+    o.hourAngle = hourAngle;
+    o.dayFrac = dayFrac;
+    o.yearPhase = yearPhase;
+    o.locked = !!p.tidallyLocked;
+    /* Daylight, softened through the terminator: a thick atmosphere scatters
+     * light around the limb, so a dense world has a long twilight and an airless
+     * one snaps from noon to night. Real, and it is why the Moon has no dusk. */
+    const soft = 0.04 + clamp01(p.pressure * 0.5) * 0.30;
+    o.daylight = clamp01((o.elevation + soft) / (soft * 2));
+    /* Where in the day, named. A tidally locked world gets a *place* name
+     * instead, because it does not have times of day. */
+    o.phase = o.locked
+      ? (o.elevation > 0.55 ? 'substellar' : o.elevation > 0.05 ? 'day side'
+        : o.elevation > -0.15 ? 'terminator' : 'night side')
+      : (o.daylight > 0.92 ? 'midday' : o.daylight > 0.55 ? 'afternoon'
+        : o.daylight > 0.12 ? 'twilight' : o.daylight > 0.02 ? 'dusk' : 'night');
+    return o;
+  }
+
+  /* Season as a name, from the declination against this hemisphere. A world
+   * with a tilt under about 5° does not really have them, and says so. */
+  function seasonOf(p, latDeg, sun) {
+    if (p.tidallyLocked || p.axialTilt < 0.09) return 'no seasons';
+    const north = latDeg >= 0;
+    const d = north ? sun.declination : -sun.declination;
+    const peak = p.axialTilt;
+    if (d > peak * 0.55) return 'high summer';
+    if (d > peak * 0.15) return 'summer';
+    if (d < -peak * 0.55) return 'deep winter';
+    if (d < -peak * 0.15) return 'winter';
+    return sun.yearPhase < 0.5 ? 'spring' : 'autumn';
+  }
+
+  /* ── Tides ────────────────────────────────────────────────────────────────
+   *
+   * The sum over moons of (mass / distance³), which is the actual tidal scaling
+   * — and it is cubic rather than square, which is why a close small moon beats
+   * a distant large one and why a world with four moons has a genuinely messy
+   * tide rather than a bigger one.
+   */
+  function tideAt(p, epochYears, out) {
+    const o = out || {};
+    const moons = p.moons && p.moons.list;
+    if (!moons || !moons.length) { o.height = 0; o.count = 0; o.spring = false; return o; }
+
+    let sum = 0, maxOne = 0;
+    /* Vector sum of the bulge directions, so two moons on opposite sides
+     * partially cancel — the difference between a spring and a neap tide, which
+     * is a real thing a player standing on a beach could notice. */
+    let vx = 0, vy = 0;
+    for (let i = 0; i < moons.length; i++) {
+      const m = moons[i];
+      const per = Math.max(0.02, m.period || 1);
+      const ang = (epochYears * 365.25 / per) * TAU;
+      const pull = (m.massE || 0.01) / Math.pow(Math.max(0.001, m.a || 0.002), 3) * 1e-9;
+      sum += pull;
+      if (pull > maxOne) maxOne = pull;
+      vx += Math.cos(ang * 2) * pull;
+      vy += Math.sin(ang * 2) * pull;
+    }
+    const coherent = Math.hypot(vx, vy);
+    o.count = moons.length;
+    o.height = clamp01(sum * 0.5);
+    /* Aligned: the bulges reinforce. This is a spring tide, and on a world with
+     * several moons it is rare and worth being somewhere else for. */
+    o.alignment = sum > 0 ? clamp01(coherent / sum) : 0;
+    o.spring = o.alignment > 0.82 && moons.length > 1;
+    o.phase = Math.atan2(vy, vx);
+    return o;
+  }
+
+  /* Everything at once, for the readout and the renderer. One call per frame. */
+  function stateFor(game, out) {
+    const s = game.scene;
+    const p = s.planet;
+    const o = out || {};
+    if (!p) { o.ok = false; return o; }
+    o.ok = true;
+    o.sun = sunAt(p, s.lon || 0, s.lat || 0, s.t || 0, o.sun);
+    o.season = seasonOf(p, s.lat || 0, o.sun);
+    o.tide = tideAt(p, s.t || 0, o.tide);
+    o.dayHours = p.dayHours;
+    o.locked = !!p.tidallyLocked;
+    return o;
+  }
+
+  /* A one-line description, which is what the readout wants. */
+  function describe(st) {
+    if (!st || !st.ok) return '';
+    const bits = [st.sun.phase];
+    if (!st.locked) {
+      bits.push(st.dayHours < 48
+        ? st.dayHours.toFixed(1) + ' h day'
+        : (st.dayHours / 24).toFixed(0) + ' d day');
+    } else {
+      bits.push('tidally locked');
+    }
+    if (st.season !== 'no seasons') bits.push(st.season);
+    if (st.tide.count) {
+      bits.push(st.tide.count + ' moon' + (st.tide.count > 1 ? 's' : '') +
+        (st.tide.spring ? ' · spring tide' : ''));
+    }
+    return bits.join(' · ');
+  }
+
+  RS.localtime = { HOURS_PER_YEAR, sunAt, seasonOf, tideAt, stateFor, describe };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -7233,15 +7884,28 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
  *
  * ── The three pathways ────────────────────────────────────────────────────
  *
- * The progression panel exists because this game has three genuinely different
+ * The progression panel exists because this game has six genuinely different
  * routes forward and no obvious way to tell that from the inside:
  *
- *   TUNE     spectrum bands → gnosis → yield everywhere. Pure skill; needs
- *            nothing but dials. Always available, never mandatory.
- *   REACH    research → vessels → worlds → structures. The material route.
- *   CONTACT  find a culture → standing → charts and teaching. The shortcut
- *            route: a civilisation can hand you research and reveal stars
- *            your own field cannot reach.
+ *   TUNE        spectrum bands → gnosis → yield everywhere. Pure skill; needs
+ *               nothing but dials. Always available, never mandatory.
+ *   REACH       research → vessels → worlds → structures. The material route.
+ *   CONTACT     find a culture → standing → charts and teaching. The shortcut
+ *               route: a civilisation can hand you research and reveal stars
+ *               your own field cannot reach.
+ *   INWARD      Σ range downward → microscopy → the four small scopes. The only
+ *               route that reaches the one place you change a world from
+ *               inside it.
+ *   BEYOND      Σ range upward → the cosmic web → the ensemble. Ends in the
+ *               game's final statement about its own premise: the same
+ *               essences, under different laws.
+ *   RECOGNITION hunt one essence across contexts until you can predict it.
+ *               Only a real strategy since gnosis became foresight — before
+ *               that, understanding was a yield multiplier and nothing else.
+ *
+ * The first three are about the spectrum, the material world and other people.
+ * The last three are about the ladder and about knowledge, and a player can
+ * finish the game having barely touched any given three of the six.
  *
  * They feed each other — insight from any of them buys any of them — but a
  * player can lead with whichever suits them, and the panel says so explicitly
@@ -7350,6 +8014,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         active: sc.kind === 'planet', hue: 130 },
       { name: 'Cytoplasm', range: 'cellular', what: 'Inside one cell of a living world. Work here and its biosphere changes.',
         active: sc.kind === 'cellular', hue: 150 },
+      { name: 'Orbital shells', range: 'nucleonic · atomic', what: 'Finite places, and no two may be the same. Catch a degeneracy.',
+        active: sc.kind === 'shells', hue: 210 },
+      { name: 'Molecular', range: 'molecular', what: 'Handedness. A living world settled which hand it uses — find one of the other.',
+        active: sc.kind === 'molecular', hue: 196 },
       { name: 'Quantum foam', range: 'planck · quantum', what: 'Nothing persists, including your body. Find the pair that never cancelled.',
         active: sc.kind === 'foam', hue: 291 },
       { name: 'Cosmic web', range: 'local group → hubble volume', what: 'τ is the age of the universe. Catch a filament while it assembles.',
@@ -7401,9 +8069,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const met = RS.contact.totalMet(game);
     const allies = RS.contact.allies(game);
 
-    let h = '<section><h3>Three ways forward</h3>' +
+    /* Scope coverage: how much of the ladder this player has actually stood on,
+     * which is what the two new routes are about. */
+    const scopesSeen = {};
+    for (const id in game.known.tiers) {
+      const t = RS.cosmos.BY_ID[id];
+      if (t) scopesSeen[RS.scenes.sceneForTier(t.index)] = true;
+    }
+    const scopeCount = Object.keys(scopesSeen).length;
+    const inwardScopes = ['foam', 'shells', 'molecular', 'cellular'].filter(k => scopesSeen[k]).length;
+    const beyondScopes = ['web', 'ensemble'].filter(k => scopesSeen[k]).length;
+    const expressed = expressionTotal(game);
+    const fore = foresight(game);
+
+    let h = '<section><h3>Six ways forward</h3>' +
       '<p class="blurb">They feed each other — insight from any route buys any other — ' +
-      'but you can lead with whichever suits you. None of them is the main one.</p></section>';
+      'but you can lead with whichever suits you. None of them is the main one, and ' +
+      'the game can be finished having barely touched three of them.</p></section>';
 
     const paths = [
       {
@@ -7443,6 +8125,51 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           ['Reality field', game.fields.reality.toFixed(2)]
         ],
         next: nextContact(game)
+      },
+      {
+        /* INWARD. The ladder runs both ways and the small end was, until the
+         * scopes existed, somewhere you could only look rather than work. */
+        name: 'INWARD', hue: 150,
+        premise: 'Down the ladder rather than out. Four scopes below the surface, each with ' +
+          'something findable nowhere else — and the only place you change a world from inside it.',
+        rows: [
+          ['Small scopes entered', inwardScopes + ' / 4'],
+          ['Microscopy', RS.influence.isResearched(game, 'microscopy') ? 'researched' : 'not yet'],
+          ['Bodies for small places', (game.vessels.unlocked.ciliate ? 1 : 0) + ' / 1'],
+          ['Worlds expressed', expressed.worlds],
+          ['Deepest expression', (expressed.best * 100).toFixed(0) + '%'],
+          ['Σ inward reach', RS.cosmos.TIERS[Math.round(game.dials.space.min)].short]
+        ],
+        next: nextInward(game, scopesSeen, expressed)
+      },
+      {
+        /* BEYOND. The other end of the same ladder, and the one that ends in
+         * the game's final statement about its own premise. */
+        name: 'BEYOND', hue: 276,
+        premise: 'Up the ladder past the galaxy. Structure that assembles over thirteen billion ' +
+          'years, and then the laws themselves as a place you can stand in.',
+        rows: [
+          ['Vast scopes entered', beyondScopes + ' / 2'],
+          ['Σ outward reach', RS.cosmos.TIERS[Math.round(game.dials.space.max)].short],
+          ['Blocks adopted', game.stats.blocksAdopted || 0],
+          ['Furthest from ours', ((game.stats.farthestBlock || 0) * 100).toFixed(0) + '%']
+        ],
+        next: nextBeyond(game, scopesSeen)
+      },
+      {
+        /* RECOGNITION. Only a real strategy since gnosis became foresight —
+         * before that, hunting a particular essence bought a yield multiplier
+         * and nothing else. */
+        name: 'RECOGNITION', hue: 320,
+        premise: 'Hunt one essence across contexts until you can predict it. Understanding ' +
+          'is not a multiplier any more — it draws the behaviour before you measure it.',
+        rows: [
+          ['Essences met', fore.met + ' / ' + RS.fractal.ESSENCES.length],
+          ['Axes revealed', fore.axes + ' / ' + (RS.fractal.ESSENCES.length * 4)],
+          ['Fully read', fore.complete],
+          ['Closest to a reveal', fore.nearest ? fore.nearest.name + ' (' + fore.gap + ' more)' : '—']
+        ],
+        next: nextRecognition(game, fore)
       }
     ];
 
@@ -7488,6 +8215,127 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
     if (!RS.influence.structureCount(game)) return 'Site your first structure on a world you care about.';
     return 'Raise the consciousness field with beacons to reach further stars.';
+  }
+
+  /* ── The three new routes ─────────────────────────────────────────────────
+   *
+   * Each answers the same question the first three do — "what is the single
+   * most useful thing I could do next, given where I actually am" — against a
+   * different axis of the game. They are computed from live state rather than
+   * scripted, so a route that is already finished says so instead of repeating
+   * its first step forever.
+   */
+
+  /* How much of the game's worlds this player has reshaped from inside. */
+  function expressionTotal(game) {
+    let worlds = 0, best = 0;
+    for (const k in game.deltas) {
+      for (const d of game.deltas[k]) {
+        if (d.id !== RS.influence.EXPRESSION_ID) continue;
+        worlds++;
+        const v = 1 - Math.exp(-d.work / RS.influence.EXPRESSION_SCALE);
+        if (v > best) best = v;
+      }
+    }
+    return { worlds, best };
+  }
+
+  /* The state of the gnosis ledger as *foresight* rather than as a score:
+   * how many axes are actually revealed, and which essence is closest to
+   * giving up its next one. */
+  function foresight(game) {
+    let met = 0, axes = 0, complete = 0;
+    let nearest = null, gap = Infinity;
+    for (const e of RS.fractal.ESSENCES) {
+      const n = RS.fractal.gnosisOf(game, e.id);
+      if (n > 0) met++;
+      const revealed = RS.fractal.revealCount(n);
+      axes += revealed;
+      if (revealed >= 4) { complete++; continue; }
+      /* Distance to the next reveal threshold. Ties break toward the essence
+       * you have already met most often: "two more contexts of Cascade, which
+       * you have already seen four times" is a hunt worth continuing, whereas
+       * "two more contexts of something you have never met" is just a
+       * restatement of the reveal rule. */
+      const need = RS.fractal.REVEAL_AT[revealed];
+      const d = need - n;
+      if (d > 0 && (d < gap || (d === gap && nearest &&
+          n > RS.fractal.gnosisOf(game, nearest.id)))) {
+        gap = d; nearest = e;
+      }
+    }
+    return { met, axes, complete, nearest, gap: gap === Infinity ? 0 : gap };
+  }
+
+  function nextInward(game, seen, expressed) {
+    const D = game.dials;
+    /* Reach first: the small rungs are literally unreachable until Σ range is
+     * bought, so telling a player to visit them would be nonsense. */
+    for (const id of ['cellular', 'molecular', 'shells', 'foam']) {
+      const rung = RS.scenes.tierForScene(id);
+      if (rung < Math.round(D.space.min)) {
+        return 'Buy Σ RANGE to reach the ' + RS.cosmos.TIERS[rung].name + ' rung — ' +
+          'four scopes sit below where your dial currently stops.';
+      }
+      if (!seen[id]) {
+        return 'Turn Σ to ' + RS.cosmos.TIERS[rung].name + '. ' +
+          RS.scenes.SCENE_BY_ID[id].blurb;
+      }
+    }
+    if (!RS.influence.isResearched(game, 'microscopy')) {
+      return 'Research MICROSCOPY — the ciliate is the only body that works where inertia does not.';
+    }
+    if (!expressed.worlds) {
+      return 'Crystallise inside a cell. It is the only place you change a world from inside it, ' +
+        'and the change shows from orbit afterwards.';
+    }
+    if (expressed.best < 0.5) {
+      return 'Keep working cells on the same world — expression saturates, so the early ' +
+        'crystals move a biosphere furthest.';
+    }
+    return 'The small end is yours. Hunt a wrong-handed molecule on a homochiral world, ' +
+      'or a degeneracy in the shells.';
+  }
+
+  function nextBeyond(game, seen) {
+    const D = game.dials;
+    for (const id of ['web', 'ensemble']) {
+      const rung = RS.scenes.tierForScene(id);
+      if (rung > Math.round(D.space.max)) {
+        return 'Buy Σ RANGE to reach the ' + RS.cosmos.TIERS[rung].name + ' rung.';
+      }
+      if (!seen[id]) {
+        return 'Turn Σ out to ' + RS.cosmos.TIERS[rung].name + '. ' +
+          RS.scenes.SCENE_BY_ID[id].blurb;
+      }
+    }
+    if (!game.stats.blocksAdopted) {
+      return 'In the Ensemble, turn Δ onto a block and stand in it. The constants change under you ' +
+        'and every world re-derives.';
+    }
+    if ((game.stats.farthestBlock || 0) < 0.5) {
+      return 'Find a block further from ours — the payout scales with how unlike ours it is, ' +
+        'and a universe 3% off proves nothing.';
+    }
+    return 'Recognise an essence under laws unlike ours. That is the strongest claim the game makes.';
+  }
+
+  function nextRecognition(game, fore) {
+    if (!fore.met) {
+      return 'Crystallise anything. Every manifestation is an essence, and meeting one in a new ' +
+        'context is what reveals its axes.';
+    }
+    if (fore.nearest) {
+      const known = RS.fractal.predicted(game, fore.nearest.id, {});
+      const which = RS.fractal.AXES.find(a => known[a] === undefined);
+      return 'Find ' + fore.nearest.name + ' in ' + fore.gap + ' more context' +
+        (fore.gap > 1 ? 's' : '') + ' — a different layer or a different rung — and its ' +
+        (which || 'next axis') + ' is revealed. The HUD will draw it before you measure it.';
+    }
+    if (fore.complete < RS.fractal.ESSENCES.length) {
+      return fore.complete + ' essences fully read. Keep meeting the rest in new places.';
+    }
+    return 'Every essence is fully read. You can predict any layer at any scale before you tune it.';
   }
 
   function nextContact(game) {
@@ -8447,6 +9295,383 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — the Molecular scope. Rung 4, and the one place handedness matters.
+ *
+ * ── The only-here rule: chirality ─────────────────────────────────────────
+ *
+ * A molecule with four different groups on a carbon comes in two forms that are
+ * mirror images and cannot be superimposed — left-handed and right-handed. They
+ * have identical energies, identical spectra, identical everything a physicist
+ * measures. And life uses one of them almost exclusively: every amino acid in
+ * every organism on Earth is left-handed, every sugar right-handed, and nobody
+ * knows why it went that way rather than the other.
+ *
+ * That is the scope. On a sterile world the two handednesses are found in equal
+ * numbers, because nothing is selecting. On a living world the chemistry is
+ * **homochiral** — one hand dominates, and the fraction that has been driven
+ * out is a direct measurement of how thoroughly life has taken the place over.
+ * You can read a biosphere's depth off a bag of molecules without ever seeing
+ * an organism, which is a real technique and a genuinely different way to look
+ * at a world.
+ *
+ * And the discovery is the exception: on a homochiral world, the rare molecule
+ * of the *wrong* hand. It is either contamination, or abiotic, or something
+ * living that does not share an ancestor with everything else there.
+ *
+ * ── Where handedness comes from ───────────────────────────────────────────
+ *
+ * `symmetry`, straight through. An essence with symmetry 1.0 is achiral — its
+ * mirror image *is* itself, so the question does not arise, which is exactly
+ * what perfect symmetry means. Below that, the lower the symmetry the more
+ * strongly a molecule commits to one hand. The player has been reading that
+ * axis since the first layer; here it decides something no other scope uses it
+ * for.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  const SITE_COUNT = 14;
+
+  /* Below this, an essence is symmetric enough that its mirror image is itself
+   * and handedness is not defined. */
+  const ACHIRAL_ABOVE = 0.92;
+
+  function isChiral(ess) {
+    return RS.emergence.axes(ess).s < ACHIRAL_ABOVE;
+  }
+
+  /* How strongly life here has driven out one hand. Zero on a sterile world —
+   * an equal mixture, which is what chemistry produces when nothing is
+   * choosing — and rising toward total as a biosphere deepens. */
+  function homochiralityOf(planet) {
+    const bio = planet && planet.biosphere;
+    if (!bio) return 0;
+    /* Saturating: the first stirrings of life already bias the mixture
+     * noticeably, and a mature biosphere is very nearly pure. */
+    return clamp01(1 - Math.exp(-bio.complexity * 3.4));
+  }
+
+  /* Which hand this particular molecule is. On a sterile world it is a coin
+   * flip; on a living one the coin is weighted by how homochiral the place is,
+   * and the rare exception is the find. */
+  function handOf(seed, i, bias) {
+    const u = hashF(hashN(seed >>> 0, i, 0x0CA1), 3);
+    /* `bias` 0 → half and half. `bias` 1 → the minority hand essentially never
+     * appears. The threshold is the fraction of the minority hand. */
+    const minority = (1 - bias) * 0.5;
+    return u < minority ? -1 : 1;
+  }
+
+  function moleculeAt(game, planet, patch, index, out) {
+    const o = out || {};
+    const bias = homochiralityOf(planet);
+    const seed = hashN(game.seed ^ 0x3013, Math.round(patch * 1e4), index);
+    const sites = o.sites || (o.sites = []);
+    sites.length = 0;
+
+    let chiral = 0, minority = 0;
+    for (let i = 0; i < SITE_COUNT; i++) {
+      const h = hashN(seed, i, 11);
+      const ess = RS.fractal.essenceAt(game.seed, index * 613 + i, Math.round(patch * 1e3));
+      const chi = isChiral(ess);
+      const hand = chi ? handOf(seed, i, bias) : 0;
+      if (chi) { chiral++; if (hand < 0) minority++; }
+
+      /* Sites sit on a chain that coils — the `chain` geometry's own shape, and
+       * the reason the rung looks like nothing else on the ladder. */
+      const u = i / SITE_COUNT;
+      const turns = 2.4;
+      const ang = u * TAU * turns + hashF(h, 1) * 0.18;
+      const rad = 0.18 + u * 0.62;
+
+      sites.push({
+        i, essence: ess,
+        form: (ess.forms && ess.forms.chain) || ess.name,
+        chiral: chi, hand,
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad * 0.82,
+        size: 0.030 + hashF(h, 2) * 0.030,
+        /* Bond order to the next site — how tightly it is held, which is the
+         * essence's persistence doing what it says everywhere else. */
+        bond: 1 + Math.round(RS.emergence.axes(ess).p * 2),
+        hue: chi ? (hand < 0 ? 24 : 196) : 140
+      });
+    }
+
+    o.sites = sites;
+    o.bias = bias;
+    o.chiral = chiral;
+    /* The find: molecules of the hand life here does *not* use. On a sterile
+     * world this is meaningless (both hands are equally common); on a deeply
+     * homochiral one it is the anomaly the whole scope exists to notice. */
+    o.minority = minority;
+    o.anomalous = bias > 0.5 ? minority : 0;
+    o.host = planet ? planet.name : null;
+    o.patch = patch;
+    o.index = index;
+    return o;
+  }
+
+  function reasonAbsent(planet) {
+    if (!planet) return 'no world selected';
+    /* Molecules exist everywhere; there is nothing to refuse. The scope is
+     * simply much less interesting on a world with no chemistry worth the
+     * name, and it says so rather than pretending. */
+    return null;
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    s.molIndex = s.molIndex || 0;
+    s.molecule = moleculeAt(game, s.planet, RS.cellular.patchOf(s), s.molIndex, s.molecule);
+    bus.emit('molecule:enter', { molecule: s.molecule });
+    return s.molecule;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    s.molT = (s.molT || 0) + dt * 0.7;
+    if (!s.molecule) enter(game, bus);
+  }
+
+  /* Finding the wrong-handed molecule on a world that settled the question
+   * long ago is the scope's discovery, and it scales with how settled the
+   * question is — an anomaly in a 50/50 mixture is not an anomaly. */
+  function bonusFor(game) {
+    const s = game.scene;
+    const m = s.molecule;
+    if (s.kind !== 'molecular' || !m) return 1;
+    return 1 + clamp01(m.anomalous / 3) * m.bias * 2.2;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const m = s.molecule;
+    if (!m) return { title: 'Molecular', sub: 'resolving…' };
+    const pct = Math.round(m.bias * 100);
+    return {
+      title: m.bias > 0.5 ? 'Homochiral Chemistry' : 'Racemic Chemistry',
+      sub: m.bias < 0.05
+        ? 'Both hands in equal numbers. Nothing here is choosing.'
+        : pct + '% of one hand — life here settled the question and never revisited it.',
+      bias: m.bias,
+      chiral: m.chiral,
+      anomalous: m.anomalous,
+      host: m.host,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.molecular = {
+    SITE_COUNT, ACHIRAL_ABOVE, isChiral, homochiralityOf, handOf,
+    moleculeAt, reasonAbsent, enter, tick, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the Orbital Shell scope. Rungs 2–3, and the only place where two
+ * things are forbidden from being the same.
+ *
+ * ── The only-here rule: exclusion ─────────────────────────────────────────
+ *
+ * Every other scope in the game lets manifestations overlap freely. Here they
+ * cannot: no two occupants may share a full set of quantum numbers (n, l, m,
+ * s). That is not a rule anybody chose — it is what "fermion" means — and it is
+ * the reason matter takes up space, the reason there is a periodic table, and
+ * the reason a star can stop collapsing.
+ *
+ * Mechanically it makes this the one scope with a **finite, contested** set of
+ * places to be. A shell has 2(2l+1) slots and no more. Occupied slots are gone.
+ * Which slot a manifestation lands in is derived from its essence, so two
+ * essences that want the same state genuinely fight over it, and the one that
+ * loses is displaced outward to a higher shell — which costs energy, and shows.
+ *
+ * ── What you can find only here: degeneracy ───────────────────────────────
+ *
+ * Two configurations with different quantum numbers but the *same* energy. In
+ * our universe they are the reason chemistry exists — degenerate orbitals are
+ * where bonds come from — and they are unstable to any perturbation, so
+ * catching one is catching a coincidence. The scope pays for it, and how many
+ * there are depends on the physics block, which means the Ensemble and this
+ * scope talk to each other without either being told about the other.
+ *
+ * ── TWIN is native here ───────────────────────────────────────────────────
+ *
+ * Spin-up and spin-down share every other quantum number and differ only in the
+ * one that cannot be observed without choosing it. The Probabilistic layer's
+ * primitive is not a metaphor at this rung; it is the literal situation.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  /* How many shells to render. Beyond n = 5 the radii are too close together
+   * to read and nothing interesting is happening out there anyway. */
+  const N_MAX = 5;
+
+  /* Slots in subshell l: 2(2l+1) — two spins × (2l+1) orientations. */
+  function slotsIn(l) { return 2 * (2 * l + 1); }
+
+  /* Energy of a state, in arbitrary but ordered units. The Madelung rule —
+   * order by (n + l), then by n — is why 4s fills before 3d and therefore why
+   * the periodic table has the shape it has. Degeneracies are exactly the
+   * states that tie. */
+  function energyOf(n, l) { return (n + l) + n / 100; }
+
+  /* Which state an essence wants. Derived, so an essence always goes for the
+   * same place and a player learns where to expect it — and so two essences
+   * that both want it genuinely collide. */
+  function desiredState(ess) {
+    const a = RS.emergence.axes(ess);
+    /* Complexity picks the principal number: an intricate essence sits further
+     * out, which is both the obvious reading and the useful one. */
+    const n = 1 + Math.floor(a.c * (N_MAX - 1) + 0.5);
+    /* Branching picks the subshell: s is spherical (no branching), p, d and f
+     * have progressively more lobes. Exactly what `branching` means. */
+    const l = Math.min(n - 1, Math.round(a.b * 3));
+    /* Symmetry picks the orientation within the subshell. */
+    const m = Math.round((a.s * 2 - 1) * l);
+    /* Persistence picks the spin, so a Memory and a Seed in the same orbital
+     * are the two halves of a pair rather than a collision. */
+    const s = a.p >= 0.5 ? 1 : -1;
+    return { n, l, m, s };
+  }
+
+  function stateKey(q) { return q.n + ':' + q.l + ':' + q.m + ':' + q.s; }
+
+  /* ── The configuration ────────────────────────────────────────────────────
+   *
+   * Fill the shells with essences, honouring exclusion. An essence whose state
+   * is taken is pushed outward until it finds one free — the Aufbau principle
+   * running as a placement algorithm rather than as a diagram.
+   */
+  function shellsAt(game, scale, out) {
+    const o = out || {};
+    const occupants = o.occupants || (o.occupants = []);
+    occupants.length = 0;
+    const taken = o.__taken || (o.__taken = new Map());
+    taken.clear();
+
+    const E = RS.fractal.ESSENCES;
+    let displaced = 0;
+
+    for (let i = 0; i < E.length; i++) {
+      const ess = E[i];
+      const want = desiredState(ess);
+      let q = want, bumped = 0;
+      /* Walk outward until a free state turns up. It always does: there are
+       * far more states within N_MAX than there are essences. */
+      while (taken.has(stateKey(q)) && bumped < 40) {
+        bumped++;
+        let n = q.n, l = q.l, m = q.m, s = q.s;
+        if (s > 0) s = -1;                    // try the other spin first
+        else { s = 1; m++; }                  // then the next orientation
+        if (m > l) { m = -l; l++; }           // then the next subshell
+        if (l > n - 1) { l = 0; m = 0; n++; } // then the next shell
+        if (n > N_MAX) { n = 1; l = 0; m = 0; }
+        q = { n, l, m, s };
+      }
+      taken.set(stateKey(q), ess.id);
+      if (bumped) displaced++;
+
+      const shell = q.n;
+      const rad = 0.16 + (shell - 1) / N_MAX * 0.74;
+      /* Position within the shell from the orientation, so m is visible as an
+       * angle rather than being a number in a tooltip. */
+      const ang = (q.m + q.l + 0.5) / (2 * q.l + 1) * TAU + q.l * 0.6;
+
+      occupants.push({
+        essence: ess,
+        form: (ess.forms && ess.forms.orbital) || ess.name,
+        q, want, bumped,
+        /* Energy cost of being displaced. Real: a displaced electron is in an
+         * excited state and wants to fall back. */
+        excited: bumped > 0,
+        energy: energyOf(q.n, q.l),
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad * 0.9,
+        rad, ang,
+        /* Spin-up and spin-down are the literal TWIN of this rung. */
+        spin: q.s,
+        hue: 196 + q.l * 26 + (q.s > 0 ? 0 : 18)
+      });
+    }
+
+    /* Degeneracies: distinct states that happen to share an energy. In our
+     * block the Madelung ordering produces plenty; in a block where the
+     * mass–luminosity exponents have moved, fewer or more — so the Ensemble
+     * changes what this rung contains without either scope knowing about the
+     * other. */
+    const byEnergy = new Map();
+    for (const oc of occupants) {
+      const k = oc.energy.toFixed(3);
+      byEnergy.set(k, (byEnergy.get(k) || 0) + 1);
+    }
+    let degenerate = 0;
+    for (const [, n] of byEnergy) if (n > 1) degenerate += n;
+
+    o.occupants = occupants;
+    o.displaced = displaced;
+    o.degenerate = degenerate;
+    o.shells = N_MAX;
+    o.capacity = capacityWithin(N_MAX);
+    o.scale = scale;
+    return o;
+  }
+
+  function capacityWithin(nMax) {
+    let n = 0;
+    for (let i = 1; i <= nMax; i++) for (let l = 0; l < i; l++) n += slotsIn(l);
+    return n;
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    s.shells = shellsAt(game, game.dials.space.value, s.shells);
+    bus.emit('shells:enter', { shells: s.shells });
+    return s.shells;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    s.shellT = (s.shellT || 0) + dt;
+    if (!s.shells) enter(game, bus);
+  }
+
+  /* Degeneracy is a coincidence and coincidences are worth catching. Displaced
+   * occupants pay too — an excited state is a thing that is about to stop
+   * being, and working one before it falls back is the timing element this rung
+   * has instead of a gate. */
+  function bonusFor(game) {
+    const s = game.scene;
+    const sh = s.shells;
+    if (s.kind !== 'shells' || !sh) return 1;
+    return 1 + clamp01(sh.degenerate / 8) * 1.4 + clamp01(sh.displaced / 6) * 0.8;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const sh = s.shells;
+    if (!sh) return { title: 'Orbital Shells', sub: 'resolving…' };
+    return {
+      title: 'Orbital Shells',
+      sub: 'No two occupants may share a state. That is why matter takes up space.',
+      occupied: sh.occupants.length,
+      capacity: sh.capacity,
+      displaced: sh.displaced,
+      degenerate: sh.degenerate,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.shells = {
+    N_MAX, slotsIn, energyOf, desiredState, stateKey, shellsAt,
+    capacityWithin, enter, tick, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the scene stack: field → system → planet surface.
  *
  * ── The modal split, and why it is the best idea in this file ──────────────
@@ -8502,11 +9727,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
   const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
   const TIER_ENSEMBLE = RS.cosmos.BY_ID.inflationary.index;  // 18
+  const TIER_ATOMIC = RS.cosmos.BY_ID.atomic.index;          // 3
+  const TIER_MOLECULAR = RS.cosmos.BY_ID.molecular.index;    // 4
 
   const SCENES = [
     {
       id: 'foam', name: 'Quantum Foam', first: 0, last: TIER_QUANTUM,
       blurb: 'Below the scale at which anything persists. No body works here.'
+    },
+    {
+      id: 'shells', name: 'Orbital Shells', first: TIER_QUANTUM + 1, last: TIER_ATOMIC,
+      blurb: 'Where no two occupants may share a state. That is why matter takes up space.'
+    },
+    {
+      id: 'molecular', name: 'Molecular', first: TIER_MOLECULAR, last: TIER_MOLECULAR,
+      blurb: 'Chains and handedness. A living world settles which hand it uses and never revisits it.'
     },
     {
       id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
@@ -8579,6 +9814,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Local time at the current lon/lat — day, season, tide. */
+      clock: null,
+      transitionDir: 0,
+      /* Inhabitants — derived per frame, never persisted. */
+      inhabitants: null,
+      localT: 0,
+      /* Molecular and orbital shells. */
+      molecule: null, molIndex: 0, molT: 0,
+      shells: null, shellT: 0,
       /* Ensemble. `blockNode` is the alternative physics currently adopted;
        * `specimen` is one address derived under both blocks side by side. */
       ensemble: null,
@@ -8699,6 +9943,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
     s.tGyr = s.t * 1e-9;
 
+    /* Local time. Closed-form in (planet, lon, lat, epoch), so scrubbing τ
+     * across a thousand years costs exactly what standing still costs — and it
+     * gives τ a second meaning on a surface without a second control. */
+    if (s.planet) s.clock = RS.localtime.stateFor(game, s.clock);
+
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
@@ -8706,6 +9955,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     else if (s.kind === 'web') RS.web.tick(game, bus, dt);
     else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
     else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
+    else if (s.kind === 'molecular') RS.molecular.tick(game, bus, dt);
+    else if (s.kind === 'shells') RS.shells.tick(game, bus, dt);
+
+    /* Inhabitants, in every scope. Derived rather than spawned, so they were
+     * already doing this before you arrived and will be doing it when you come
+     * back — and cost nothing at all while you are elsewhere. */
+    s.inhabitants = RS.inhabitants.inhabitantsFor(game, s.kind, s.t * 1e-4 + s.localT, dt, s.inhabitants);
+    s.localT = (s.localT || 0) + dt;
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -8719,6 +9976,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+    /* Which way you went. The ladder is the navigation, so a scope change is a
+     * *movement* — inward toward the small or outward toward the vast — and a
+     * cut that does not say which makes the whole thing feel like a menu.
+     * Derived from the rungs the two scopes occupy, so it is right for every
+     * pair without anybody enumerating them. */
+    s.transitionDir = Math.sign(tierForScene(kind) - tierForScene(s.lastKind)) || 0;
 
     /* Leaving the Ensemble always restores our own block. An alternative
      * universe you had forgotten you were standing in would silently re-derive
@@ -8778,6 +10041,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     } else if (kind === 'ensemble') {
       s.agents.length = 0;
       RS.ensemble.enter(game, bus);
+    } else if (kind === 'molecular') {
+      /* Molecules belong to a world, so the same rule as the cell: arriving
+       * without one chosen picks the one the surface scene would have. */
+      if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
+      if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
+      s.agents.length = 0;
+      s.molecule = null;
+      RS.molecular.enter(game, bus);
+    } else if (kind === 'shells') {
+      /* Shells belong to nothing in particular — an atom is an atom anywhere,
+       * which is itself the point of the rung. */
+      s.agents.length = 0;
+      RS.shells.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -9187,7 +10463,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE, TIER_ATOMIC, TIER_MOLECULAR,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
@@ -9272,13 +10548,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
       senseBonus: 0,
 
-      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
+      stats: { blocksAdopted: 0, farthestBlock: 0, crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
 
       /* Transient, rebuilt every frame — never saved. */
       focusNode: null,
       __spec: null,
 
-      settings: { audio: true, haptics: true, reduceMotion: false, showSci: true },
+      settings: {
+        audio: true, haptics: true, reduceMotion: false, showSci: true,
+        /* 'all' | 'key' | 'off'. Default 'key': arrivals, discoveries and
+         * warnings, but not routine chatter. Every notification restates
+         * something the readout or the objective line also says, so filtering
+         * them costs nothing but noise. */
+        notify: 'key',
+        /* Bloom. On by default because it costs well under a millisecond and
+         * is the largest single visual change in the codebase; off is here for
+         * anything that struggles. */
+        bloom: true
+      },
       flags: Object.create(null)
     };
     RS.dials.refreshReach(game.dials);
@@ -9426,6 +10713,32 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         RS.ensemble.bonusFor(game).toFixed(2) + ' to recognise one under these laws.',
         kind: 'express' };
     }
+    if (s.kind === 'molecular') {
+      const m = s.molecule;
+      if (!m) return { text: 'Resolving…', kind: 'wait' };
+      if (m.bias < 0.1) {
+        return { text: 'Both hands in equal numbers here — nothing is choosing. Find a living world and come back.',
+          kind: 'select' };
+      }
+      if (m.anomalous) {
+        return { text: m.anomalous + ' molecule' + (m.anomalous > 1 ? 's' : '') +
+          ' of the wrong hand — the warm ones. ×' + RS.molecular.bonusFor(game).toFixed(2) + '.',
+          kind: 'express' };
+      }
+      return { text: 'Every chiral site here is the hand life chose. Sweep Σ for a sample that is not.',
+        kind: 'select' };
+    }
+    if (s.kind === 'shells') {
+      const sh = s.shells;
+      if (!sh) return { text: 'Resolving…', kind: 'wait' };
+      if (sh.degenerate) {
+        return { text: sh.degenerate + ' occupants share an energy without sharing a state. ' +
+          'That coincidence is where chemistry comes from — and it pays ×' +
+          RS.shells.bonusFor(game).toFixed(2) + '.', kind: 'express' };
+      }
+      return { text: sh.displaced + ' occupants were pushed outward because their state was taken. ' +
+        'Excited, and about to fall back.', kind: 'express' };
+    }
     if (s.kind === 'foam') {
       const f = s.foam;
       if (!f) return { text: 'Resolving…', kind: 'wait' };
@@ -9465,10 +10778,33 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (!game.inhabiting) {
         return { text: 'Take a body to touch this world. Unembodied, you can only watch it.', kind: 'embark' };
       }
-      const env = RS.vessel.environmentFor(game);
-      const blocked = RS.vessel.canOperate(RS.vessel.archOf(game.body), env);
-      if (blocked) return { text: 'This body cannot work here: ' + blocked + '.', kind: 'blocked' };
-      return { text: 'τ throttle · Σ vertical · Δ heading · φ senses.', kind: 'pilot' };
+      const st = RS.vessel.statusOf(game);
+      if (st && st.blocked) {
+        return { text: 'This body cannot work here: ' + st.blocked +
+          (st.alternative ? '. Take the ' + st.alternative.name + ' instead.' : '. Nothing you have works here.'),
+          kind: 'blocked' };
+      }
+      /* The dial map lives on the pilot bar now and is permanently visible, so
+       * repeating it here would spend the one line that could say something
+       * about *this* world on something the player can already read. */
+      if (st && st.strain > 0.6) {
+        return { text: 'Strain at ' + Math.round(st.strain * 100) +
+          '%. Leave the body before it fails, or the hold goes with it.', kind: 'blocked' };
+      }
+      if (st && st.endurance !== Infinity && st.endurance < 45) {
+        return { text: Math.round(st.endurance) + 's of charge at this pace. Ease off τ or turn back.',
+          kind: 'blocked' };
+      }
+      const p = s.planet;
+      if (p && p.biosphere && p.biosphere.complexity > 0.34) {
+        return { text: 'Life here. Ride a mind with the symbiont, or turn Σ inward to enter a cell.',
+          kind: 'explore' };
+      }
+      if (p && p.resources && p.resources.length) {
+        return { text: 'Seams below. Extract with the harvester, or build from the world panel.',
+          kind: 'explore' };
+      }
+      return { text: 'Walk it. Δ steers, and φ changes what you can sense.', kind: 'pilot' };
     }
     return nextObjective(game);
   }
@@ -9588,6 +10924,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     noiseBuf = makeNoise(0.5);
     buildDrone();
+    buildBed();
     buildRamp();
     started = true;
     return true;
@@ -9670,6 +11007,74 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     droneGain.gain.setTargetAtTime(vol, now, 0.09);
     droneFilter.frequency.setTargetAtTime(
       ghost ? 420 : lerp(600, 4200, res), now, 0.12);
+  }
+
+  // --- ambient beds --------------------------------------------------------
+
+  /* ── One bed per scope ────────────────────────────────────────────────────
+   *
+   * Not new machinery: one noise source and one filter, shaped differently per
+   * scope. A place that sounds the same everywhere reads as a menu, and this is
+   * the cheapest possible fix — the whole thing is two nodes and a table.
+   *
+   * The most important entry is the vacuum. Sound genuinely does not propagate
+   * where there is no medium, so the system and galaxy scopes get *silence*,
+   * and the contrast when you descend into an atmosphere and the wind arrives
+   * is worth more than any amount of texture would have been.
+   */
+  const BEDS = {
+    /* freq: the filter's centre. q: how resonant — high q is a pitch, low q is
+     * a wash. gain: how loud, and zero means genuinely silent. */
+    field:     { freq: 220,  q: 0.6, gain: 0.020, type: 'lowpass'  },
+    foam:      { freq: 5200, q: 0.4, gain: 0.055, type: 'highpass' },
+    shells:    { freq: 1400, q: 7.0, gain: 0.030, type: 'bandpass' },
+    molecular: { freq: 700,  q: 3.0, gain: 0.026, type: 'bandpass' },
+    cellular:  { freq: 300,  q: 1.6, gain: 0.040, type: 'lowpass'  },
+    planet:    { freq: 500,  q: 0.7, gain: 0.045, type: 'lowpass'  },
+    system:    { freq: 200,  q: 0.5, gain: 0.000, type: 'lowpass'  },
+    galaxy:    { freq: 200,  q: 0.5, gain: 0.000, type: 'lowpass'  },
+    web:       { freq: 70,   q: 0.8, gain: 0.050, type: 'lowpass'  },
+    ensemble:  { freq: 950,  q: 12.0, gain: 0.022, type: 'bandpass' }
+  };
+
+  let bedSrc = null, bedFilter = null, bedGain = null;
+
+  function buildBed() {
+    bedGain = ctx.createGain(); bedGain.gain.value = 0;
+    bedFilter = ctx.createBiquadFilter();
+    bedFilter.type = 'lowpass';
+    bedFilter.frequency.value = 400;
+    bedFilter.Q.value = 1;
+    bedSrc = ctx.createBufferSource();
+    bedSrc.buffer = makeNoise(4);
+    bedSrc.loop = true;
+    bedSrc.connect(bedFilter);
+    bedFilter.connect(bedGain);
+    bedGain.connect(master);
+    bedGain.connect(verbGain);
+    bedSrc.start();
+  }
+
+  /* `pressure` scales the planet surface bed, because wind is a thing air does
+   * and a body on an airless world should hear nothing but its own machinery.
+   * That is the one place in the game where the physics and the sound design
+   * are the same decision. */
+  function updateBed(sceneKind, pressure) {
+    if (!started || !enabled || !bedGain) return;
+    const b = BEDS[sceneKind] || BEDS.field;
+    const now = ctx.currentTime;
+    let gain = b.gain;
+    if (sceneKind === 'planet') {
+      /* Saturating in pressure: Mars at 0.006 bar is essentially silent, Earth
+       * at 1 is a light wind, and Venus at 92 is not 92 times louder. */
+      gain *= clamp01(1 - Math.exp(-(pressure || 0) * 2.2));
+    }
+    bedFilter.type = b.type;
+    bedFilter.frequency.setTargetAtTime(b.freq, now, 0.4);
+    bedFilter.Q.setTargetAtTime(b.q, now, 0.4);
+    /* Slow: a bed that crossfades quickly is a transition, and a bed that
+     * crossfades slowly is a place changing around you. */
+    bedGain.gain.setTargetAtTime(gain, now, 0.9);
   }
 
   // --- the coherence ramp --------------------------------------------------
@@ -9915,7 +11320,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   RS.audio = {
     BAND_TONE, BEAT_SCALE,
     init, unlock, setEnabled, isEnabled, isReady, suspend, resume,
-    updateDrone, updateRamp,
+    updateDrone, updateRamp, updateBed, BEDS,
     click, seat, step, crystal, discover, upheaval, purchase, deny
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
@@ -10553,6 +11958,197 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — bloom, and the only reason the game can afford it.
+ *
+ * ── Why this is worth a file ──────────────────────────────────────────────
+ *
+ * Everything in this game emits: nodes ignite as you approach them, filaments
+ * glow, a star is a disc of light, a crystallising lock is a ring that
+ * brightens for four seconds. All of it was drawn with radial gradients, which
+ * is what you do when you have no post pass — and radial gradients are how you
+ * *fake* the look of light without any of the behaviour. Two bright things next
+ * to each other did not add up. A small very bright thing looked the same as a
+ * large dim one. Nothing spilled onto anything.
+ *
+ * A real bloom pass fixes all three at once and, unusually, the game can afford
+ * it: the sim costs about 0.02 ms a frame and drawing costs 0.6–1.3 ms against
+ * a 16 ms budget, so there has been an enormous amount of headroom sitting
+ * unused since the first commit.
+ *
+ * ── How ───────────────────────────────────────────────────────────────────
+ *
+ * The cheapest bloom that actually looks like bloom, in Canvas2D:
+ *
+ *   1. Downscale the frame to 1/DOWN, which is both the cost saving and the
+ *      first blur — the browser's bilinear filter does that work for free.
+ *   2. Knock out everything below the threshold, so only things that are
+ *      genuinely bright bleed. Without this, bloom is just a haze.
+ *   3. Blur by repeatedly drawing the small canvas onto itself at slight
+ *      offsets — a box blur, separable, four taps a pass.
+ *   4. Draw it back over the frame with 'lighter'.
+ *
+ * At quarter resolution on a 1280×860 canvas that is a 320×215 buffer and
+ * about ten compositing operations. It costs well under a millisecond and it is
+ * the single largest visual change in the codebase.
+ *
+ * ── The threshold step is the whole trick ─────────────────────────────────
+ *
+ * Canvas2D has no shaders, so "keep only the bright parts" has to be done with
+ * compositing. `difference` against a grey, then a hard multiply, gets close
+ * enough: what survives is what was brighter than the grey, and everything else
+ * collapses toward black. It is not a filmic threshold curve and it does not
+ * need to be — it needs to stop dim things from glowing, which it does.
+ */
+(function (RS) {
+  'use strict';
+
+  /* Quarter resolution. Eighth is faster and visibly blocky on the thin
+   * strokes this game is mostly made of; half costs four times as much for a
+   * difference nobody can see. */
+  const DOWN = 4;
+  /* How many blur passes. Three is the point where the falloff stops looking
+   * like a stack of copies. */
+  const PASSES = 3;
+
+  let buf = null, bctx = null, tmp = null, tctx = null;
+  let bw = 0, bh = 0;
+  let enabled = true;
+
+  function ensure(w, h) {
+    const nw = Math.max(1, Math.round(w / DOWN));
+    const nh = Math.max(1, Math.round(h / DOWN));
+    if (buf && bw === nw && bh === nh) return true;
+    bw = nw; bh = nh;
+    valid = false;
+    if (!buf) {
+      /* OffscreenCanvas where it exists, a detached <canvas> where it does
+       * not — the difference is a few percent and not worth a code path that
+       * only runs on one of them. */
+      buf = typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(nw, nh) : document.createElement('canvas');
+      tmp = typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(nw, nh) : document.createElement('canvas');
+    }
+    buf.width = nw; buf.height = nh;
+    tmp.width = nw; tmp.height = nh;
+    bctx = buf.getContext('2d');
+    tctx = tmp.getContext('2d');
+    return !!(bctx && tctx);
+  }
+
+  /* `amount` 0..1 scales the whole effect, so a scope can bloom harder than
+   * another and the transition can push it. */
+  /* ── Why the capture happens at the *top* of the frame ────────────────────
+   *
+   * Measured, because the first version of this was four times slower than it
+   * had any right to be. The individual steps cost, on a 320×215 buffer:
+   *
+   *     downscale 0.0 ms · threshold 0.3 · blur 0.9 · composite 0.1
+   *
+   * — about 1.3 ms in total. But called at the end of the frame, after the
+   * world had been drawn, `apply` measured **16 ms at p95**: an entire frame
+   * budget, for 1.3 ms of work.
+   *
+   * The difference is the flush. Sampling a canvas that has drawing queued on
+   * it forces the browser to finish all of that work first, and the attunement
+   * field queues a great deal — fifteen nodes laying down radial gradients
+   * under 'lighter'. The bloom was not slow; it was waiting.
+   *
+   * So the capture happens at the *start* of the frame instead, before the
+   * clear, when the canvas still holds the previous frame's finished image and
+   * nothing is queued on it — which is exactly the idle condition that measured
+   * zero. The glow is therefore one frame behind the thing making it, which at
+   * 60 Hz is 16 ms of latency on light spill and is not a thing anyone can see.
+   *
+   * `STRIDE` then halves the remaining work again: bloom is low-frequency, and
+   * the glow around a thing that moved two pixels is the same glow.
+   */
+  const STRIDE = 2;
+  let frame = 0, valid = false;
+
+  /* Called before the frame is cleared. Reads last frame's image. */
+  function capture(canvas, w, h, threshold) {
+    if (!enabled) return;
+    if (!ensure(w, h)) return;
+    if (valid && (frame++ % STRIDE) !== 0) return;
+    frame = 1;
+    const t = threshold == null ? 0.42 : threshold;
+
+    // 1 — downscale. The browser's filter is the first blur, for free.
+    bctx.globalCompositeOperation = 'copy';
+    bctx.globalAlpha = 1;
+    bctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, bw, bh);
+
+    /* 2 — threshold. `difference` against grey pushes anything darker than the
+     * grey toward black and leaves the bright parts standing; the `multiply`
+     * then crushes what is left of the midtones. Blunt, and it does the one job
+     * it has to do: stop dim things from glowing. */
+    const g = Math.round(t * 255);
+    bctx.globalCompositeOperation = 'difference';
+    bctx.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+    bctx.fillRect(0, 0, bw, bh);
+    bctx.globalCompositeOperation = 'multiply';
+    bctx.drawImage(buf, 0, 0);
+    bctx.globalCompositeOperation = 'source-over';
+
+    // 3 — blur, by drawing the buffer onto itself at four offsets per pass.
+    for (let p = 0; p < PASSES; p++) {
+      const r = 1 + p * 1.6;
+      tctx.globalCompositeOperation = 'copy';
+      tctx.globalAlpha = 1;
+      tctx.drawImage(buf, 0, 0);
+      bctx.globalAlpha = 0.30;
+      bctx.globalCompositeOperation = 'source-over';
+      bctx.drawImage(tmp, -r, 0);
+      bctx.drawImage(tmp, r, 0);
+      bctx.drawImage(tmp, 0, -r);
+      bctx.drawImage(tmp, 0, r);
+      bctx.globalAlpha = 1;
+    }
+    valid = true;
+  }
+
+  // 4 — add it back, at the end of the frame. 'lighter': light adds.
+  function composite(ctx, w, h, amount) {
+    if (!enabled || !valid || amount <= 0.004) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = amount;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(buf, 0, 0, bw, bh, 0, 0, w, h);
+    ctx.restore();
+  }
+
+  /* ── Warm-up ──────────────────────────────────────────────────────────────
+   *
+   * The first frame that runs this pipeline costs about ten milliseconds more
+   * than every subsequent one: allocating two canvases, uploading them, and
+   * whatever the browser does the first time it sees `difference` and
+   * `multiply` at a given size. Steady state is free — measured at 60.5 fps
+   * with bloom on and 60.5 with it off — but the cost lands in the player's
+   * first second, which is the worst possible second for it to land in.
+   *
+   * Run once during boot, when a few milliseconds are invisible. Called from
+   * `main.start`.
+   */
+  function warm(ctx, canvas, w, h) {
+    if (!ensure(w, h)) return false;
+    for (let i = 0; i <= STRIDE; i++) {
+      capture(canvas, w, h, 0.5);
+      composite(ctx, w, h, 0.005);
+    }
+    valid = false;
+    return true;
+  }
+
+  function setEnabled(on) { enabled = !!on; valid = false; }
+  function isEnabled() { return enabled; }
+
+  RS.bloom = { DOWN, PASSES, STRIDE, capture, composite, warm, setEnabled, isEnabled };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the renderer.
  *
  * The field is drawn in normalised space: the origin is the point of
@@ -11055,6 +12651,135 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
   }
 
+  /* ── The molecule ────────────────────────────────────────────────────────
+   *
+   * A coiled chain of sites, bonded. Handedness is the whole point, so it is
+   * the loudest thing on screen: warm for the minority hand, cool for the
+   * majority, neutral green for the achiral sites where the question does not
+   * arise. On a sterile world the two colours are evenly mixed; on a living one
+   * the screen is nearly one colour and the odd warm site is the find.
+   */
+  function drawMolecule(ctx, game, t) {
+    const m = game.scene.molecule;
+    if (!m) return;
+    const ct = game.scene.molT || 0;
+
+    /* Bonds first. Line weight is bond order, which is the essence's
+     * persistence — how tightly it holds on, everywhere in the game. */
+    for (let i = 0; i < m.sites.length - 1; i++) {
+      const a = m.sites[i], b = m.sites[i + 1];
+      ctx.strokeStyle = hsl(200, 0.3, 0.55, 0.35);
+      ctx.lineWidth = Math.max(1, px(0.002 * a.bond));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+      /* A double or triple bond is drawn as such — it is a real distinction
+       * and it costs one extra line. */
+      for (let k = 1; k < a.bond; k++) {
+        const dx = (b.y - a.y), dy = -(b.x - a.x);
+        const len = Math.hypot(dx, dy) + 1e-5;
+        const off = px(0.006 * k) / len;
+        ctx.beginPath();
+        ctx.moveTo(sx(a.x) + dx * off, sy(a.y) + dy * off);
+        ctx.lineTo(sx(b.x) + dx * off, sy(b.y) + dy * off);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < m.sites.length; i++) {
+      const st = m.sites[i];
+      const wob = Math.sin(ct * 1.3 + i * 0.7) * 0.006;
+      const X = sx(st.x + wob), Y = sy(st.y + wob);
+      /* The minority hand gets a halo, because on a homochiral world it is the
+       * one thing in the scope worth crossing the screen for. */
+      if (st.hand < 0 && m.bias > 0.4) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(st.size * 4));
+        g.addColorStop(0, hsl(24, 0.9, 0.6, 0.4));
+        g.addColorStop(1, hsl(24, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(st.size * 4), 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = hsl(st.hue, st.chiral ? 0.75 : 0.35, 0.62, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(st.size), 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Orbital shells ──────────────────────────────────────────────────────
+   *
+   * Concentric shells with their occupants on them. Spin is drawn as a tick
+   * above or below — the only quantum number that has nowhere else to go, and
+   * the one that makes two otherwise identical occupants distinguishable, which
+   * is exactly the situation TWIN describes.
+   */
+  function drawShells(ctx, game, t) {
+    const sh = game.scene.shells;
+    if (!sh) return;
+
+    for (let n = 1; n <= sh.shells; n++) {
+      const r = 0.16 + (n - 1) / sh.shells * 0.74;
+      ctx.strokeStyle = hsl(200, 0.4, 0.5, 0.13);
+      ctx.lineWidth = Math.max(1, px(0.002));
+      ctx.beginPath();
+      ctx.ellipse(view.cx, view.cy, px(r), px(r * 0.9), 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < sh.occupants.length; i++) {
+      const oc = sh.occupants[i];
+      /* Occupants precess around their shell at a rate set by n, so an inner
+       * shell visibly runs faster — which is true and is the cheapest possible
+       * way to say "this one is more tightly bound". */
+      const a = oc.ang + t * (0.30 / oc.q.n);
+      const X = sx(Math.cos(a) * oc.rad), Y = sy(Math.sin(a) * oc.rad * 0.9);
+
+      /* Displaced occupants are excited states — about to fall back, and worth
+       * catching before they do. */
+      if (oc.excited) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(0.05));
+        g.addColorStop(0, hsl(46, 0.9, 0.66, 0.42));
+        g.addColorStop(1, hsl(46, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(0.05), 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = hsl(oc.hue, 0.7, 0.66, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(0.013), 0, TAU); ctx.fill();
+
+      /* Spin: a tick up or down. */
+      ctx.strokeStyle = hsl(oc.hue, 0.8, 0.75, 0.8);
+      ctx.lineWidth = Math.max(1, px(0.0022));
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X, Y + px(0.022) * (oc.spin > 0 ? -1 : 1));
+      ctx.stroke();
+    }
+  }
+
+  /* Whatever lives here. Deliberately small and dim: they are the difference
+   * between a place and a diagram, not the thing you are looking at, and a
+   * scope whose traffic competes with its nodes for attention would be worse
+   * than one with none. */
+  function drawInhabitants(ctx, game, t) {
+    const inh = game.scene.inhabitants;
+    if (!inh || !inh.list.length) return;
+    for (let i = 0; i < inh.list.length; i++) {
+      const o = inh.list[i];
+      const X = sx(o.x), Y = sy(o.y);
+      const r = px(o.size);
+      ctx.fillStyle = hsl(o.hue, 0.7, 0.62, 0.30 * o.bright);
+      ctx.beginPath(); ctx.arc(X, Y, r, 0, TAU); ctx.fill();
+      /* A short wake in the direction of travel — the cheapest possible way to
+       * say "this is going somewhere" rather than "this is a dot". */
+      ctx.strokeStyle = hsl(o.hue, 0.7, 0.6, 0.16 * o.bright);
+      ctx.lineWidth = Math.max(1, r * 0.7);
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X - Math.cos(o.heading) * r * 4, Y - Math.sin(o.heading) * r * 4);
+      ctx.stroke();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -11302,6 +13027,28 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // --- main ----------------------------------------------------------------
 
+  /* ── How much each scope glows ───────────────────────────────────────────
+   *
+   * Bloom is not a uniform filter here; it is part of what a place *is*. The
+   * foam seethes with light because everything in it is an event; a planet
+   * surface barely blooms at all because it is lit rather than luminous; the
+   * ensemble glows hard because it is not a place, it is a set of relations
+   * drawn as light. The threshold moves with it — a scope full of dim things
+   * needs a lower bar or nothing bleeds at all.
+   */
+  const BLOOM = {
+    field:     { amt: 0.85, thr: 0.34 },
+    foam:      { amt: 1.15, thr: 0.30 },
+    shells:    { amt: 0.95, thr: 0.34 },
+    molecular: { amt: 0.75, thr: 0.38 },
+    cellular:  { amt: 0.80, thr: 0.36 },
+    planet:    { amt: 0.42, thr: 0.55 },
+    system:    { amt: 1.05, thr: 0.40 },
+    galaxy:    { amt: 1.00, thr: 0.36 },
+    web:       { amt: 0.90, thr: 0.32 },
+    ensemble:  { amt: 1.10, thr: 0.30 }
+  };
+
   function draw(game, canvas, ctx, dt) {
     resize(canvas);
     const S = RS.feel.state;
@@ -11323,6 +13070,17 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     vis.tierMix.set(D.space.value).step(dt);
 
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+
+    /* Bloom captures *here*, before the clear, while the canvas still holds the
+     * previous frame's finished image and nothing is queued on it. Sampling a
+     * canvas with drawing queued on it forces a pipeline flush — measured at
+     * 16 ms in this scope, against 1.3 ms of actual work. See bloom.js. */
+    if (game.settings.bloom !== false && RS.bloom) {
+      const kb = BLOOM[game.scene ? game.scene.kind : 'field'] || BLOOM.field;
+      const trc = game.scene ? game.scene.transition : 0;
+      RS.bloom.capture(canvas, view.w, view.h, kb.thr * (1 - trc * 0.35));
+    }
+
     ctx.clearRect(0, 0, view.w, view.h);
 
     // deep background
@@ -11339,6 +13097,31 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     ctx.translate(view.cx, view.cy);
     ctx.rotate(S.shakeRot);
     ctx.scale(zoom, zoom);
+    /* ── Arrival, as movement ────────────────────────────────────────────
+     *
+     * The scope change scales the whole world: descending the ladder starts
+     * you zoomed out and settles inward, climbing starts you zoomed in and
+     * pulls back. It is one multiply on a transform that already exists, and
+     * it is the difference between "the picture changed" and "you went
+     * somewhere" — which matters because the ladder *is* the navigation, and a
+     * cut makes twenty-two rungs read as twenty-two destinations rather than
+     * as one continuous axis. */
+    const sc = game.scene;
+    if (sc && sc.transition > 0.001 && sc.transitionDir) {
+      const k = ease.outCubic(1 - sc.transition);
+      /* Descending the ladder is zooming *in*: things grow toward you as you
+       * approach their scale, so the world starts small and expands into place.
+       * Climbing is zooming out: it starts large and contracts. Getting this
+       * backwards — which the first version did — makes descending feel like
+       * retreating, and it is the kind of error that is obvious the moment you
+       * see it and invisible while you are writing it. */
+      const from = sc.transitionDir < 0 ? 0.62 : 1.55;
+      const z = from + (1 - from) * k;
+      ctx.translate(view.cx, view.cy);
+      ctx.scale(z, z);
+      ctx.translate(-view.cx, -view.cy);
+    }
+
     ctx.translate(-view.cx + S.shakeX * px(0.08), -view.cy + S.shakeY * px(0.08));
 
     /* Scene dispatch. The attunement field, the solar system and a planet
@@ -11364,6 +13147,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       const inWeb = kind === 'web';
       const inFoam = kind === 'foam';
       const inEnsemble = kind === 'ensemble';
+      const inMol = kind === 'molecular';
+      const inShells = kind === 'shells';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -11375,6 +13160,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       else if (inWeb) drawWeb(ctx, game, t);
       else if (inFoam) drawFoam(ctx, game, t);
       else if (inEnsemble) drawEnsemble(ctx, game, t);
+      else if (inMol) drawMolecule(ctx, game, t);
+      else if (inShells) drawShells(ctx, game, t);
 
       /* The rim. A membrane in a cell, the horizon in the web, and absent in
        * the foam — there is no boundary at a scale where nothing persists long
@@ -11397,6 +13184,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         if (nodes[i].resolved > 0.5) drawNode(ctx, game, nodes[i], t);
       }
 
+      /* Inhabitants, under the nodes: whatever lives at this scope, doing what
+       * it was already doing. */
+      drawInhabitants(ctx, game, t);
+
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);
 
@@ -11416,14 +13207,53 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       }
     }
 
-    /* Scene transitions flash the whole frame rather than cross-fading two
-     * render targets — cheaper, and it reads as reality being re-rendered
-     * around you, which is what is actually happening. */
+    /* ── Arrival ─────────────────────────────────────────────────────────
+     *
+     * This was a white flash, which said "something changed" and nothing else.
+     * The ladder is the navigation, so a scope change is a movement — and which
+     * way you went is the one thing the transition should communicate.
+     *
+     * Rings travel *inward* when you descend the ladder and *outward* when you
+     * climb it, at a speed that falls as the transition settles. It is two
+     * strokes and a fill; the point is not the effect, it is that the direction
+     * is never ambiguous, so twenty-two rungs read as one continuous axis
+     * rather than as twenty-two destinations.
+     */
     if (game.scene && game.scene.transition > 0.01) {
+      const tr = game.scene.transition;
+      const dir = game.scene.transitionDir || 0;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, game.scene.transition * 0.28);
+
+      /* The wash, dimmer than it was — it is now the background of the
+       * movement rather than the whole of it. */
+      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, tr * 0.16);
       ctx.fillRect(0, 0, view.w, view.h);
+
+      if (dir !== 0) {
+        /* `u` runs 0 → 1 as the transition settles, so the rings sweep once
+         * rather than pulsing. Inward means they close on you; outward means
+         * they leave. */
+        const u = 1 - tr;
+        const maxR = Math.hypot(view.w, view.h) * 0.6;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          const off = i * 0.22;
+          const k = clamp01(u + off);
+          /* And the rings stream the way the world does: outward past you when
+           * you dive in, inward past you when you pull back. */
+          const r = dir < 0
+            ? lerp(px(0.05), maxR, ease.outCubic(k))
+            : lerp(maxR, px(0.05), ease.outCubic(k));
+          const a = tr * (1 - Math.abs(k - 0.5) * 1.1) * 0.5;
+          if (a <= 0.005) continue;
+          ctx.strokeStyle = hsl(vis.hue.value + i * 12, 0.7, 0.66, a);
+          ctx.lineWidth = Math.max(1.5, px(0.012) * (1 - k * 0.6));
+          ctx.beginPath();
+          ctx.arc(view.cx, view.cy, Math.max(1, r), 0, TAU);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
 
@@ -11432,6 +13262,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     drawFloaters(ctx);
 
     ctx.restore();
+
+    /* ── Bloom ───────────────────────────────────────────────────────────
+     *
+     * After the world and before the vignette, so light spills between things
+     * and the vignette still darkens the edge of the result rather than being
+     * bloomed itself. Pushed hard during a transition, which is most of why an
+     * arrival now reads as an event rather than as a cut. */
+    if (game.settings.bloom !== false && RS.bloom) {
+      const b = BLOOM[kind] || BLOOM.field;
+      const tr = game.scene ? game.scene.transition : 0;
+      RS.bloom.composite(ctx, view.w, view.h,
+        b.amt * (1 + tr * 1.4) * (game.settings.reduceMotion ? 0.6 : 1));
+    }
+
     drawPost(ctx);
   }
 
@@ -11890,15 +13734,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const aHue = atmosphereHue(p);
     const starHue = p.system.primary.cls.hue;
     const thick = clamp01(p.pressure / 2.2);
+
+    /* ── Day and night ───────────────────────────────────────────────────
+     *
+     * `daylight` is the star's elevation softened through a terminator whose
+     * width is the atmosphere's own — so a dense world has a long twilight and
+     * an airless one snaps from noon to night, which is why the Moon has no
+     * dusk. On a tidally locked world it does not change with time at all: it
+     * changes with *longitude*, and half the world never sees the star.
+     *
+     * Everything below reads this one number, which is why the whole day/night
+     * cycle costs a sine and two cosines rather than a lighting model. */
+    const lt = s.clock;
+    const day = lt && lt.ok ? lt.sun.daylight : 1;
+    /* Twilight reddens near the terminator: long path length through the
+     * atmosphere scatters the short wavelengths out, and only a world with air
+     * can do it. */
+    const redshift = clamp01(1 - Math.abs(day - 0.5) * 2) * thick * 34;
+
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    sky.addColorStop(0, hsl(aHue, 0.5 * thick, 0.04 + thick * 0.28, 1));
-    sky.addColorStop(1, hsl(lerp(aHue, starHue, 0.45), 0.55 * thick, 0.06 + thick * 0.5, 1));
+    sky.addColorStop(0, hsl(aHue, 0.5 * thick, (0.04 + thick * 0.28) * (0.10 + day * 0.90), 1));
+    sky.addColorStop(1, hsl(lerp(aHue, starHue, 0.45) - redshift,
+      0.55 * thick * (0.5 + day * 0.5), (0.06 + thick * 0.5) * (0.08 + day * 0.92), 1));
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, horizon);
 
     /* Stars, visible only where the air is thin enough not to scatter them
-     * out. This is the same physics that makes Earth's daytime sky opaque. */
-    const starVis = clamp01(1 - thick * 1.5);
+     * out — and at night, on any world with air at all, for exactly the same
+     * reason. This is the same physics that makes Earth's daytime sky opaque. */
+    const starVis = clamp01(clamp01(1 - thick * 1.5) + clamp01(1 - day) * thick);
     if (starVis > 0.02) {
       ctx.fillStyle = 'rgba(255,255,255,' + (starVis * 0.75).toFixed(2) + ')';
       for (let i = 0; i < 90; i++) {
@@ -12819,22 +14683,40 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function init(game, bus) {
     for (const id of ['insight-val', 'rate-val', 'gnosis-val', 'progress-fill', 'progress-pct',
       'tier-name', 'tier-sci', 'layer-name', 'layer-rules', 'objective',
-      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title',
-      'btn-upgrades', 'btn-codex', 'btn-settings', 'btn-drawer-close', 'beat-hint',
-      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar', 'btn-contact', 'contact-hint',
-      'btn-guide', 'btn-paths']) {
+      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title', 'drawer-tabs',
+      'btn-drawer-close', 'beat-hint', 'btn-menu',
+      'scene-tag', 'body-bar', 'btn-contact', 'contact-hint']) {
       el[id] = $(id);
     }
 
-    el['btn-upgrades'].addEventListener('click', () => toggleDrawer(game, bus, 'upgrades'));
-    el['btn-codex'].addEventListener('click', () => toggleDrawer(game, bus, 'codex'));
-    el['btn-settings'].addEventListener('click', () => toggleDrawer(game, bus, 'settings'));
-    el['btn-world'].addEventListener('click', () => toggleDrawer(game, bus, 'world'));
-    el['btn-vessels'].addEventListener('click', () => toggleDrawer(game, bus, 'vessels'));
+    /* One button, one drawer, tabs inside it. There were seven topbar buttons
+     * and every new panel added another; on a phone they were already competing
+     * with the insight readout for the same strip. Contact is the exception and
+     * stays where it is, because it is event-driven — a channel opening is
+     * something that happens *to* you, and burying it behind a menu would make
+     * it missable. */
+    el['btn-menu'].addEventListener('click', () => toggleDrawer(game, bus, drawerOpen ? null : lastTab));
     el['btn-contact'].addEventListener('click', () => toggleDrawer(game, bus, 'contact'));
-    el['btn-guide'].addEventListener('click', () => toggleDrawer(game, bus, 'guide'));
-    el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
+
+    el['drawer-tabs'].addEventListener('click', ev => {
+      const t = ev.target.closest('[data-tab]');
+      if (t) { lastTab = t.dataset.tab; openDrawer(game, bus, t.dataset.tab); }
+    });
+
+    /* The pilot bar is rebuilt every frame, so its two controls are delegated
+     * too. Both exist so that changing body — the thing you most often want to
+     * do the instant a body stops working — does not require opening a drawer,
+     * scrolling past research, and closing it again. */
+    el['body-bar'].addEventListener('click', ev => {
+      const open = ev.target.closest('[data-open]');
+      if (open) { toggleDrawer(game, bus, open.dataset.open); return; }
+      const emb = ev.target.closest('[data-embark]');
+      if (emb) {
+        const r = RS.scenes.embark(game, bus, emb.dataset.embark);
+        if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+      }
+    });
 
     /* Delegated, because the drawer body is rebuilt wholesale on every open and
      * per-node listeners would leak. */
@@ -12844,6 +14726,16 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         const [dialId, kind] = btn.dataset.buy.split(':');
         const res = RS.game.tryUpgrade(game, bus, dialId, kind);
         if (!res.ok) bus.emit('ui:deny', res);
+        renderDrawer(game, bus);
+        return;
+      }
+      const cyc = ev.target.closest('[data-cycle]');
+      if (cyc) {
+        const k = cyc.dataset.cycle;
+        const order = ['all', 'key', 'off'];
+        const i = order.indexOf(game.settings[k]);
+        game.settings[k] = order[(i + 1) % order.length];
+        bus.emit('settings', { key: k, value: game.settings[k] });
         renderDrawer(game, bus);
         return;
       }
@@ -12985,6 +14877,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
         (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
       el['layer-name'].style.color = hsl(291, 0.7, 0.72);
+    } else if (sc.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sub + ' · ' + r.chiral + ' chiral sites' +
+        (r.anomalous ? ' · ' + r.anomalous + ' of the wrong hand ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(r.bias > 0.5 ? 150 : 196, 0.7, 0.72);
+    } else if (sc.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      setText('layer-name', 'ORBITAL SHELLS');
+      setText('layer-rules', r.occupied + '/' + r.capacity + ' states filled · ' +
+        r.displaced + ' displaced outward · ' + r.degenerate + ' degenerate' +
+        (r.bonus > 1.05 ? ' ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(210, 0.7, 0.72);
     } else if (sc.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       setText('layer-name', r.title.toUpperCase());
@@ -12994,7 +14899,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       el['layer-name'].style.color = hsl(150, 0.7, 0.72);
     } else if (sc.kind === 'planet' && sc.planet) {
       const p = sc.planet;
-      setText('layer-name', p.name.toUpperCase());
+      const when = RS.localtime.describe(sc.clock);
+      setText('layer-name', p.name.toUpperCase() + (when ? ' · ' + sc.clock.sun.phase.toUpperCase() : ''));
       setText('layer-rules', p.type.name + ' · ' + Math.round(p.surfaceTemp) + ' K · ' +
         p.gravity.toFixed(2) + ' g · ' +
         (p.pressure < 0.01 ? 'no atmosphere' : p.pressure.toFixed(2) + ' bar') +
@@ -13051,33 +14957,68 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         ' (' + (c.lock.total * 100).toFixed(0) + '% lock)');
   }
 
-  /* The body bar only exists while embodied, and it shows the three things a
-   * pilot actually needs: charge, hold, and — when riding a mind — how much of
-   * that creature is currently you. */
+  /* ── The pilot bar ───────────────────────────────────────────────────────
+   *
+   * Visible only while embodied, and it answers the four questions a pilot
+   * actually has, in the order they matter:
+   *
+   *   what am I flying          glyph and name
+   *   what do the dials do      the archetype's own dialMap, live
+   *   how long have I got       charge, and endurance in seconds at this draw
+   *   is anything wrong         strain, and the blocked reason plus the fix
+   *
+   * The dial map is the important addition. Every body reinterprets the same
+   * four controls, which is the whole ergonomic idea — and until now the only
+   * place that mapping appeared was a drawer you had to close to fly.
+   */
   function renderBodyBar(game) {
     const bar = el['body-bar'];
-    if (!game.inhabiting) {
+    const st = RS.vessel.statusOf(game);
+    if (!st) {
       if (bar.dataset.on !== '0') { bar.dataset.on = '0'; bar.innerHTML = ''; bar.style.opacity = '0'; }
       return;
     }
     bar.dataset.on = '1';
     bar.style.opacity = '1';
-    const b = game.body;
-    const arch = RS.vessel.archOf(b);
-    const cf = clamp01(b.charge / arch.capacity);
-    const env = RS.vessel.environmentFor(game);
-    const blocked = RS.vessel.canOperate(arch, env);
-    const poss = b.mindState ? b.mindState.possession : null;
+
+    const a = st.arch, dm = a.dialMap;
+    const chargeHue = st.chargeFrac > 0.25 ? 160 : 0;
+    /* Endurance is the number that says whether to turn back, so it is stated
+     * in seconds rather than as a bar the player has to integrate by eye. */
+    const end = st.endurance === Infinity ? '∞'
+      : st.endurance > 90 ? Math.round(st.endurance / 60) + 'm'
+        : Math.round(st.endurance) + 's';
+
+    const dial = (sym, hue, what) =>
+      '<span class="bb-dial" style="--h:' + hue + '"><b>' + sym + '</b>' + what + '</span>';
 
     bar.innerHTML =
-      '<span class="bb-glyph" style="color:' + hsl(arch.hue, 0.8, 0.7) + '">' + arch.glyph + '</span>' +
-      '<span class="bb-name">' + arch.name + '</span>' +
-      '<span class="bb-meter" title="charge"><b style="width:' + (cf * 100).toFixed(0) +
-        '%;background:' + hsl(cf > 0.25 ? 160 : 0, 0.85, 0.6) + '"></b></span>' +
-      (b.holdMass > 0 ? '<span class="bb-tag">' + fmt(b.holdMass) + 'u</span>' : '') +
-      (poss != null ? '<span class="bb-tag" style="color:#f0abfc" title="how much of this mind is you">' +
-        (poss * 100).toFixed(0) + '% you</span>' : '') +
-      (blocked ? '<span class="bb-warn">' + blocked + '</span>' : '');
+      '<button class="bb-head" data-open="vessels" title="Change body">' +
+        '<span class="bb-glyph" style="color:' + hsl(a.hue, 0.8, 0.7) + '">' + a.glyph + '</span>' +
+        '<span class="bb-name">' + a.name + '</span>' +
+      '</button>' +
+      '<span class="bb-meter" title="charge ' + Math.round(st.charge) + '/' + st.capacity + '">' +
+        '<b style="width:' + (st.chargeFrac * 100).toFixed(0) + '%;background:' +
+        hsl(chargeHue, 0.85, 0.6) + '"></b></span>' +
+      '<span class="bb-tag" title="endurance at this draw">' + end + '</span>' +
+      (st.strain > 0.12
+        ? '<span class="bb-tag" style="color:' + hsl(st.strain > 0.7 ? 8 : 40, 0.8, 0.66) +
+          '" title="wear — change body before this reaches 100%">strain ' +
+          Math.round(st.strain * 100) + '%</span>' : '') +
+      (st.holdMass > 0 ? '<span class="bb-tag">' + fmt(st.holdMass) + 'u</span>' : '') +
+      (st.possession != null ? '<span class="bb-tag" style="color:#f0abfc" ' +
+        'title="how much of this mind is you">' + (st.possession * 100).toFixed(0) + '% you</span>' : '') +
+      '<span class="bb-dials">' +
+        dial('τ', 43, dm.time) + dial('Σ', 338, dm.space) +
+        dial('Δ', 268, dm.phase) + dial('φ', 187, dm.frequency) +
+      '</span>' +
+      (st.blocked
+        ? '<span class="bb-warn">' + st.blocked +
+          (st.alternative
+            ? ' — <button class="bb-fix" data-embark="' + st.alternative.id + '">take ' +
+              st.alternative.name + '</button>'
+            : ' — no body you have works here') + '</span>'
+        : '');
   }
 
   /* The node readout. Names the thing, names its essence, and — the part that
@@ -13228,6 +15169,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
             r.bonus.toFixed(2) + '</div>' : '');
       return;
     }
+    if (s.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(r.bias > 0.5 ? 150 : 196, 0.8, 0.72) + '">&#9901;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (r.host ? '<div class="ro-sub" style="margin-top:4px">' + r.host + ' &middot; ' +
+          r.chiral + ' of ' + RS.molecular.SITE_COUNT + ' sites are chiral</div>' : '') +
+        (r.anomalous
+          ? '<div class="ro-sub" style="color:' + hsl(24, 0.85, 0.68) + '">' + r.anomalous +
+            ' of the hand life here does not use &mdash; &times;' + r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.8, 0.72) + '">&#9096;</span>' +
+        '<span class="ro-title">Orbital Shells</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">' + r.occupied + '/' + r.capacity +
+        ' states filled</div>' +
+        (r.displaced ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.68) + '">' +
+          r.displaced + ' pushed outward &mdash; excited, and about to fall back</div>' : '') +
+        (r.degenerate ? '<div class="ro-sub" style="color:' + hsl(150, 0.7, 0.66) + '">' +
+          r.degenerate + ' degenerate &mdash; same energy, different state. This is where chemistry comes from.</div>' : '');
+      return;
+    }
     if (s.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       const c = s.cell;
@@ -13249,6 +15218,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (s.kind === 'planet' && s.planet) {
       const p = s.planet;
       const su = s.surface;
+      /* Where in the day, the year, and the tide. All of it was already
+       * derived and none of it was ever shown. */
+      const when = RS.localtime.describe(s.clock);
       node.innerHTML =
         '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(p.type.hue, 0.8, 0.7) + '">&#9679;</span>' +
         '<span class="ro-title">' + p.name + '</span></div>' +
@@ -13257,6 +15229,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         (su ? '<div class="ro-sub" style="margin-top:4px;color:' + hsl(su.biome.hue, 0.6, 0.7) + '">' +
           su.biome.name + ' &middot; ' + Math.round(su.T) + ' K &middot; lat ' +
           (su.lat * 57.3).toFixed(0) + '&deg;</div>' : '') +
+        (when ? '<div class="ro-sub" style="margin-top:4px;color:' +
+          hsl(s.clock.sun.daylight > 0.5 ? 45 : 220, 0.55, 0.68) + '">' + when + '</div>' : '') +
         (s.agents.length ? '<div class="ro-sub" style="margin-top:4px">' + s.agents.length +
           ' minds nearby</div>' : '');
       return;
@@ -13279,28 +15253,141 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // --- toasts --------------------------------------------------------------
 
+  /* ── Notifications ────────────────────────────────────────────────────────
+   *
+   * These used to be centred, three deep, and long-lived, which meant that
+   * during the parts of the game that generate the most events — arriving
+   * somewhere, a run of discoveries — a wall of cards sat directly over the
+   * thing the cards were about. A notification that hides the world it is
+   * describing is worse than no notification.
+   *
+   * Four changes, in order of how much they matter:
+   *
+   *   1. They live in the top-right corner, out of the world entirely.
+   *   2. There are at most two, and a third replaces the oldest immediately
+   *      rather than queueing behind it.
+   *   3. Repeats coalesce. Sweeping Δ across the ensemble used to fire one
+   *      card per universe; now the card updates in place and shows a count.
+   *   4. Chatter is filtered by a setting, and the default is to show only
+   *      what a player would want interrupting them.
+   *
+   * Nothing here is load-bearing: every notification restates something that
+   * is also visible in the readout, the objective line or the guide. That is
+   * the property that makes filtering them safe.
+   */
+  const PRIORITY = { warn: 3, major: 3, gnosis: 2, buy: 1, info: 1, seat: 0 };
+  /* 'all' shows everything; 'key' drops routine chatter and dial seating;
+   * 'off' shows nothing but warnings, because a warning is the one kind that
+   * exists to stop you wasting your time. */
+  const LEVELS = { all: 0, key: 1, off: 3 };
+  let notifyLevel = 'key';
+
+  const MAX_TOASTS = 2;
+  /* title → { node, at, n, timer } — one entry per distinct message, so a
+   * repeat updates rather than stacks. */
+  const liveToasts = new Map();
+
+  function setNotifyLevel(v) { notifyLevel = LEVELS[v] != null ? v : 'key'; }
+
   function toast(opts) {
+    const kind = opts.kind || 'info';
+    if ((PRIORITY[kind] != null ? PRIORITY[kind] : 1) < LEVELS[notifyLevel]) return;
+
+    const key = opts.title;
+    const existing = liveToasts.get(key);
+    if (existing) {
+      /* Coalesce. The card stays where it is and gains a count, so a burst
+       * reads as "this happened four times" rather than as four cards. */
+      existing.n++;
+      const c = existing.node.querySelector('u');
+      if (c) c.textContent = '×' + existing.n;
+      else existing.node.querySelector('b').insertAdjacentHTML('beforeend',
+        ' <u style="font-style:normal;text-decoration:none;opacity:.55">×' + existing.n + '</u>');
+      clearTimeout(existing.timer);
+      existing.timer = setTimeout(() => retire(key), opts.ms || 3000);
+      return;
+    }
+
     const t = document.createElement('div');
-    t.className = 'toast ' + (opts.kind || 'info');
+    t.className = 'toast ' + kind;
     if (opts.hue != null) t.style.setProperty('--h', opts.hue);
+    /* Only the loudest kinds get a second line. Everything else is a title,
+     * because a title is readable at a glance and a paragraph is not. */
+    const wantBody = opts.body && (PRIORITY[kind] >= 2);
     t.innerHTML = '<i>' + (opts.icon || '◈') + '</i><span><b>' + opts.title + '</b>' +
-      (opts.body ? '<em>' + opts.body + '</em>' : '') + '</span>';
+      (wantBody ? '<em>' + opts.body + '</em>' : '') + '</span>';
     el['toasts'].appendChild(t);
-    /* Cap the stack — a burst of discoveries otherwise walls off the field. */
-    while (el['toasts'].children.length > 3) el['toasts'].removeChild(el['toasts'].firstChild);
-    setTimeout(() => {
-      t.classList.add('out');
-      setTimeout(() => t.remove(), 420);
-    }, opts.ms || 3400);
+
+    const rec = { node: t, n: 1, timer: null };
+    liveToasts.set(key, rec);
+    /* Retire the oldest immediately rather than letting a burst queue up —
+     * a card the player never had time to read is just flicker. */
+    while (liveToasts.size > MAX_TOASTS) retire(liveToasts.keys().next().value);
+    rec.timer = setTimeout(() => retire(key), opts.ms || 3000);
+  }
+
+  function retire(key) {
+    const rec = liveToasts.get(key);
+    if (!rec) return;
+    liveToasts.delete(key);
+    clearTimeout(rec.timer);
+    rec.node.classList.add('out');
+    setTimeout(() => rec.node.remove(), 380);
   }
 
   // --- drawers -------------------------------------------------------------
 
-  function toggleDrawer(game, bus, which) {
-    if (drawerOpen === which) { closeDrawer(); return; }
+  /* ── The panels ───────────────────────────────────────────────────────────
+   *
+   * Ordered as a player needs them: what is in front of me, what am I flying,
+   * what do I know, where am I going, how does this work, and settings. `when`
+   * decides whether a tab is worth showing at all — the World tab is
+   * meaningless in the attunement field and its absence is information.
+   */
+  const TABS = [
+    { id: 'world', label: 'World', glyph: '🜨',
+      when: g => g.scene.kind !== 'field' && g.scene.kind !== 'ensemble' },
+    { id: 'vessels', label: 'Bodies', glyph: '⋀', when: () => true },
+    { id: 'upgrades', label: 'Dials', glyph: '⚙', when: () => true },
+    { id: 'codex', label: 'Codex', glyph: '◇', when: () => true },
+    { id: 'paths', label: 'Paths', glyph: '◈', when: () => true },
+    { id: 'guide', label: 'Guide', glyph: '?', when: () => true },
+    { id: 'settings', label: 'Settings', glyph: '⋯', when: () => true }
+  ];
+  /* Reopening the drawer returns you to the panel you were last in, because a
+   * drawer that always opens on the same tab is a drawer you have to navigate
+   * every single time. */
+  let lastTab = 'upgrades';
+
+  function openDrawer(game, bus, which) {
     drawerOpen = which;
+    if (which && which !== 'contact') lastTab = which;
     el['drawer'].classList.add('open');
+    renderTabs(game);
     renderDrawer(game, bus);
+  }
+
+  function toggleDrawer(game, bus, which) {
+    if (!which || drawerOpen === which) { closeDrawer(); return; }
+    openDrawer(game, bus, which);
+  }
+
+  function renderTabs(game) {
+    const nav = el['drawer-tabs'];
+    if (!nav) return;
+    let h = '';
+    for (const t of TABS) {
+      if (!t.when(game)) continue;
+      h += '<button data-tab="' + t.id + '"' + (drawerOpen === t.id ? ' class="on"' : '') +
+        '><span>' + t.glyph + '</span>' + t.label + '</button>';
+    }
+    /* Contact only appears as a tab once there is a channel — otherwise it is
+     * a door to an empty room. */
+    if (game.scene.contact) {
+      h += '<button data-tab="contact"' + (drawerOpen === 'contact' ? ' class="on"' : '') +
+        '><span>◉</span>Contact</button>';
+    }
+    nav.innerHTML = h;
   }
 
   function closeDrawer() {
@@ -13310,6 +15397,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   function renderDrawer(game, bus) {
     if (!drawerOpen) return;
+    /* The tab row is part of the drawer, so an action that rebuilds the body —
+     * buying an upgrade, taking a body — must not leave the tabs showing a
+     * stale selection or a scope-conditional tab that no longer applies. */
+    renderTabs(game);
     const titles = { upgrades: 'DIALS', codex: 'CODEX', settings: 'SETTINGS',
       world: 'WORLD', vessels: 'BODIES & RESEARCH', contact: 'CONTACT',
       guide: 'HOW THIS WORKS', paths: 'PATHWAYS' };
@@ -13372,18 +15463,90 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function codexHTML(game) {
     let h = '<div class="codex-tabs">';
 
-    h += '<section><h3>Essences <em>' + RS.fractal.totalGnosis(game) + ' contexts recognised</em></h3>' +
+    /* ── The essence sheet ───────────────────────────────────────────────
+     *
+     * This is the player's map of the generative core, and it is the single
+     * most useful screen in the game: every mechanic anywhere is one of six
+     * primitives parameterised by the four numbers listed here, so a filled-in
+     * row is a prediction about twelve layers at twenty-two scales.
+     *
+     * Unrevealed axes are drawn as blanks rather than hidden, because the shape
+     * of what you do not know yet is itself information — you can see that
+     * Cascade has three axes left and go hunting it deliberately, which is the
+     * whole RECOGNITION pathway.
+     */
+    const AXIS_META = [
+      { key: 'complexity', sym: 'C', hue: 268, lo: 'simple', hi: 'intricate' },
+      { key: 'branching', sym: 'B', hue: 12, lo: 'single', hi: 'many' },
+      { key: 'symmetry', sym: 'S', hue: 150, lo: 'lopsided', hi: 'even' },
+      { key: 'persistence', sym: 'P', hue: 43, lo: 'fleeting', hi: 'lasting' }
+    ];
+    const totalAxes = RS.fractal.ESSENCES.length * 4;
+    let shown = 0;
+    for (const e of RS.fractal.ESSENCES) shown += RS.fractal.predicted(game, e.id, {}).revealed;
+
+    h += '<section><h3>Essences <em>' + shown + ' / ' + totalAxes + ' axes read</em></h3>' +
       '<p class="blurb">One alphabet, spelled differently by every layer and every scale. ' +
-      'Recognising an essence somewhere new deepens it everywhere.</p><div class="ess-grid">';
+      'Four numbers each, and every mechanic in the game is those numbers fed to one of six ' +
+      'primitives — so a filled row is a prediction about twelve layers at twenty-two scales. ' +
+      'Blanks are what you have not read yet.</p><div class="ess-sheet">';
+
     for (const e of RS.fractal.ESSENCES) {
-      const g = RS.fractal.gnosisOf(game, e.id);
-      h += '<div class="ess' + (g ? '' : ' unknown') + '">' +
-        '<span class="g">' + (g ? e.glyph : '·') + '</span>' +
-        '<span class="n">' + (g ? e.name : '—') + '</span>' +
-        '<span class="lv">' + (g ? '×' + g : '') + '</span>' +
-        (g ? '<span class="t">' + e.trait + '</span>' : '') +
-        (g ? '<span class="b">+' + ((RS.fractal.gnosisBonus(game, e.id) - 1) * 100).toFixed(0) + '% yield</span>' : '') +
+      const n = RS.fractal.gnosisOf(game, e.id);
+      const pr = RS.fractal.predicted(game, e.id, {});
+      const met = n > 0;
+      /* What is still to come, so a player can pick a target. */
+      const nextAt = RS.fractal.REVEAL_AT[pr.revealed];
+      const toGo = nextAt != null ? nextAt - n : 0;
+
+      let bars = '';
+      for (const a of AXIS_META) {
+        const v = pr[a.key];
+        const known = v !== undefined;
+        bars += '<span class="ax' + (known ? '' : ' blank') + '" style="--h:' + a.hue + '" ' +
+          'title="' + a.key + (known ? ': ' + v.toFixed(2) + ' — ' +
+            (v > 0.66 ? a.hi : v < 0.34 ? a.lo : 'middling') : ' — not read yet') + '">' +
+          '<b>' + a.sym + '</b>' +
+          (known ? '<i style="width:' + (v * 100).toFixed(0) + '%"></i>' : '') +
+          '</span>';
+      }
+
+      /* The forms this essence takes, which is the fractal claim made concrete:
+       * the same information wearing eight different local names. Only shown
+       * once met, because the point is recognising it, not reading it off. */
+      const forms = met && e.forms
+        ? Object.keys(e.forms).filter(k => e.forms[k]).map(k => e.forms[k]).slice(0, 4).join(' · ')
+        : '';
+
+      h += '<div class="ess-row' + (met ? '' : ' unknown') + '">' +
+        '<span class="eg">' + (met ? e.glyph : '·') + '</span>' +
+        '<span class="en">' + (met ? e.name : '—') +
+          '<em>' + (met ? e.trait : 'not yet met') + '</em></span>' +
+        '<span class="eax">' + bars + '</span>' +
+        '<span class="ect">' + (met ? '×' + n : '') +
+          (toGo > 0 && met ? '<em>+' + toGo + ' to read</em>' :
+            met ? '<em>complete</em>' : '') + '</span>' +
+        (forms ? '<span class="ef">' + forms + '</span>' : '') +
         '</div>';
+    }
+    h += '</div></section>';
+
+    /* ── The primitives ──────────────────────────────────────────────────
+     *
+     * The other half of the map. The axes above are the numbers; these are the
+     * six functions they are fed to, and which bands run which. Without this,
+     * the axes are a stat block; with it, they are a prediction.
+     */
+    h += '<section><h3>Primitives <em>every mechanic is one of these</em></h3><div class="list">';
+    for (const id of RS.emergence.IDS) {
+      const L = RS.emergence.LABELS[id];
+      const bands = RS.spectrum.BANDS.filter(b => RS.spectrum.usesPrim(b, id));
+      const held = bands.filter(b => game.known.bands[b.id]);
+      h += '<div class="row' + (held.length ? '' : ' dim') + '" style="--h:200">' +
+        '<span class="g">' + L.glyph + '</span>' +
+        '<span class="n">' + L.name + '<em>' + held.length + ' / ' + bands.length + ' layers held</em></span>' +
+        '<span class="d">' + L.blurb + '<br><i style="opacity:.55">' +
+        bands.map(b => b.name).join(', ') + '</i></span></div>';
     }
     h += '</div></section>';
 
@@ -13425,7 +15588,17 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       row('audio', 'Audio', 'Procedural synthesis. The beat tone is how you tune by ear — strongly recommended.') +
       row('haptics', 'Haptics', 'Detent ticks and impacts through the vibration motor.') +
       row('reduceMotion', 'Reduce motion', 'Disables screen shake and thins particle bursts.') +
+      row('bloom', 'Bloom', 'Light spills between bright things. Costs about half a millisecond.') +
       row('showSci', 'Scientific notes', 'Show the physical definition of each scale.') +
+      /* A cycle rather than a toggle, because three states is the right number:
+       * everything, only what would be worth interrupting you, and nothing but
+       * warnings. */
+      '<button class="set-row" data-cycle="notify"><span class="k">Notifications</span>' +
+      '<span class="d">' +
+        (s.notify === 'all' ? 'Everything, including routine chatter.'
+          : s.notify === 'off' ? 'Warnings only. Everything else is in the readout anyway.'
+            : 'Arrivals, discoveries and warnings. Not chatter.') +
+      '</span><span class="cyc">' + (s.notify || 'key').toUpperCase() + '</span></button>' +
       '<div class="stats"><h3>Session</h3>' +
       '<div>Crystallised <b>' + fmt(game.stats.crystals) + '</b></div>' +
       '<div>Best single <b>' + fmt(game.stats.bestSingle) + ' Ψ</b></div>' +
@@ -13791,7 +15964,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           : 'Expand the consciousness field to reach it.') + '</div>';
   }
 
-  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
+  RS.ui = {
+    setNotifyLevel, init, render, toast, toggleDrawer, openDrawer, closeDrawer, renderDrawer, renderTabs, setText, TABS,
+    worldHTML, vesselsHTML, contactHTML, codexHTML, upgradesHTML, settingsHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -14005,6 +16180,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         foam: { hue: 291, icon: '∴',
           title: () => 'quantum foam',
           body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
+        molecular: { hue: 196, icon: '⌬',
+          title: sc => sc.molecule && sc.molecule.bias > 0.5 ? 'homochiral chemistry' : 'racemic chemistry',
+          body: sc => sc.molecule && sc.molecule.bias > 0.5
+            ? 'Life here settled which hand it uses. Find one of the other.'
+            : 'Both hands in equal numbers. Nothing here is choosing.' },
+        shells: { hue: 210, icon: '⌸',
+          title: () => 'orbital shells',
+          body: () => 'No two occupants may share a state. Finite places, and they are taken.' },
         cellular: { hue: 150, icon: '❋',
           title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
           body: sc => {
@@ -14037,6 +16220,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     });
 
     bus.on('ensemble:adopt', ({ block, distance }) => {
+      game.stats.blocksAdopted = (game.stats.blocksAdopted || 0) + 1;
+      game.stats.farthestBlock = Math.max(game.stats.farthestBlock || 0, distance);
       RS.audio.upheaval(1.2 + distance);
       RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
       RS.ui.toast({
@@ -14288,6 +16473,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (key === 'audio') RS.audio.setEnabled(value);
       if (key === 'haptics') RS.feel.setHaptics(value);
       if (key === 'reduceMotion') RS.feel.setReduceMotion(value);
+      if (key === 'notify') RS.ui.setNotifyLevel(value);
+      if (key === 'bloom' && RS.bloom) RS.bloom.setEnabled(value);
     });
   }
 
@@ -14554,6 +16741,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     RS.feel.init({ reduceMotion: game.settings.reduceMotion, haptics: game.settings.haptics });
     RS.audio.setEnabled(game.settings.audio);
+    RS.ui.setNotifyLevel(game.settings.notify);
+    if (RS.bloom) {
+      RS.bloom.setEnabled(game.settings.bloom !== false);
+      /* Pay the pipeline's first-frame cost now, while nobody is looking. */
+      RS.bloom.warm(fieldCtx, fieldCanvas,
+        fieldCanvas.clientWidth || window.innerWidth,
+        fieldCanvas.clientHeight || window.innerHeight);
+    }
     RS.ui.init(game, bus);
     RS.reactions.wire(game, bus);
     RS.input.attach(hudCanvas, game, bus, {
@@ -14621,25 +16816,31 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     rafId = requestAnimationFrame(loop);
   }
 
-  /* Three staggered lines instead of a modal. The game is genuinely not
-   * obvious and pretending otherwise costs players; a wall of text costs
-   * more. */
+  /* First run. Four staggered cards used to overlap each other and the world
+   * they were describing; now they arrive one at a time, well spaced, and each
+   * has retired before the next appears. Deliberately shown at `major` so the
+   * notification setting cannot hide the only tutorial the game has — and
+   * deliberately only four, because the guide is written against live state and
+   * pointing at it is worth more than any amount of text here. */
+  const FIRST_RUN = [
+    { at: 0, icon: '◉', hue: 205, title: 'You are a point of consciousness',
+      body: 'You cannot move. You can only change what is rendered to you.' },
+    { at: 6500, icon: 'φ', hue: 187, title: 'Turn the φ dial',
+      body: 'Drag it in a circle. Swing wide for fine control, and listen for the beat.' },
+    { at: 13000, icon: '◈', hue: 43, title: 'Hold the lock',
+      body: 'Line up the arcs around yourself. Coherence fills while you hold.' },
+    { at: 19500, icon: '?', hue: 200, title: 'Lost? Tap ? at any time',
+      body: 'The guide describes whatever is in front of you right now.' }
+  ];
+
   function firstRunHints() {
-    RS.ui.toast({ kind: 'major', icon: '◉', ms: 7000,
-      title: 'You are a point of consciousness',
-      body: 'You cannot move. You can only change what is rendered to you.' });
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: 'φ', hue: 187, ms: 7000,
-      title: 'Turn the φ dial',
-      body: 'Drag it in a circle. Swing your finger wide for fine control. Listen for the beat.' }), 4200);
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '◈', hue: 43, ms: 7000,
-      title: 'Hold the lock',
-      body: 'Line up the arcs around yourself. Coherence fills while you hold.' }), 8400);
-    /* The game is genuinely deep and the guide is written against live state,
-     * so pointing at it is worth more than any amount of additional tutorial
-     * text here. */
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '?', hue: 200, ms: 9000,
-      title: 'Lost? Tap ? at any time',
-      body: 'The guide describes whatever is actually in front of you — this scene, these dials, this mode.' }), 12600);
+    for (const h of FIRST_RUN) {
+      const fire = () => RS.ui.toast({
+        kind: 'major', icon: h.icon, hue: h.hue, ms: 5200,
+        title: h.title, body: h.body
+      });
+      if (h.at === 0) fire(); else setTimeout(fire, h.at);
+    }
   }
 
   function onResize() {
@@ -14690,6 +16891,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       RS.audio.updateDrone(D.value, band,
         RS.spectrum.resonanceOf(band, D.value, focus) * (inField ? 1 : 0.22),
         RS.spectrum.isGhost(band, focus));
+      /* The scope's ambient bed. Silent in a vacuum, which is both correct
+       * and the reason arriving in an atmosphere lands. */
+      RS.audio.updateBed(game.scene.kind,
+        game.scene.planet ? game.scene.planet.pressure : 0);
+
       const n = inField ? game.focusNode : null;
       RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index, n);
 

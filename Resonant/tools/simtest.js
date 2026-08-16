@@ -22,8 +22,8 @@ const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
-  'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
-  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
+  'js/neural.js', 'js/vessel.js', 'js/inhabitants.js', 'js/localtime.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
+  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js', 'js/audio.js', 'js/ui.js'
 ];
 
 const sandbox = {
@@ -1671,8 +1671,8 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
 
   /* The essences must be *distinguishable*. If two sit on top of each other in
    * all four axes they generate identical mechanics everywhere and the player
-   * can never tell them apart — which would quietly collapse 14 essences into
-   * fewer. */
+   * can never tell them apart — which would quietly collapse the essence set
+   * into a smaller one. */
   let collisions = [];
   for (let i = 0; i < E.length; i++) {
     for (let j = i + 1; j < E.length; j++) {
@@ -2094,7 +2094,7 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
    * soak swings by 3× on the seed alone — enough to make two layers that are
    * provably identical in every derived parameter look like a balance problem,
    * which is a good way to spend an afternoon tuning noise. */
-  const SEEDS = [4201, 77003, 918277];
+  const SEEDS = [4201, 77003, 918277, 31771, 655219];
   function soakAvg(band) {
     const runs = SEEDS.map(sd => soak(band, 90, sd));
     const out = {};
@@ -2286,9 +2286,11 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   }
   assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL) === 'cellular',
     'the cellular rung shows the cellular scope, not a planet surface');
-  assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL - 1) === 'planet' &&
-         RS.scenes.sceneForTier(RS.scenes.TIER_CELL + 1) === 'planet',
-    'and its neighbours are unaffected');
+  /* And it does not leak: a one-rung scope owns exactly one rung, whatever
+   * happens to be on either side of it as the ladder fills in. */
+  assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL - 1) !== 'cellular' &&
+         RS.scenes.sceneForTier(RS.scenes.TIER_CELL + 1) !== 'cellular',
+    'and it owns exactly that one rung');
   assert(RS.scenes.tierForScene('cellular') === RS.scenes.TIER_CELL,
     'a pathway can name the rung the cellular scope is entered at');
 }
@@ -2852,6 +2854,771 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(broke.length === 0,
     'Cascade branches identically in fifty alternative universes: ' + (broke.slice(0, 3).join(', ') || 'no exceptions'));
   assert(RS.physics.isOurs(), 'and we are back in ours');
+}
+
+
+// ── notifications are filterable, and never load-bearing ─────────────────
+{
+  /* The rule that makes filtering safe: every notification restates something
+   * the readout, the objective line or the guide also says — so the default is
+   * to show only what a player would want interrupting them. */
+  const g = RS.game.newGame(1);
+  assert(g.settings.notify === 'key', 'a new game shows arrivals and discoveries, not chatter');
+}
+
+// ── the pilot has something to read ──────────────────────────────────────
+{
+  const g = RS.game.newGame(606);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  g.insight = 1e9;
+  RS.influence.tryResearch(g, nullBus, 'locomotion');
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_PLANET);
+  for (let i = 0; i < 30; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+
+  assert(RS.vessel.statusOf(g) === null, 'unembodied, there is no pilot status to show');
+
+  /* Whichever body works where this seed happened to put us. A walker refusing
+   * because the sample point is underwater is the game working, not a failure —
+   * and the mote works everywhere, which is what it is for. */
+  let r = RS.scenes.embark(g, nullBus, 'walker');
+  if (!r.ok) r = RS.scenes.embark(g, nullBus, 'mote');
+  assert(r.ok, 'embarked (' + (r.reason || 'ok') + ')');
+  const st = RS.vessel.statusOf(g);
+  assert(st, 'embodied, there is');
+  for (const k of ['charge', 'capacity', 'chargeFrac', 'strain', 'speed', 'endurance']) {
+    assert(Number.isFinite(st[k]) || st[k] === Infinity, 'pilot status reports ' + k);
+  }
+  assert(st.chargeFrac > 0 && st.chargeFrac <= 1, 'charge reads as a fraction');
+  assert(st.arch.dialMap && st.arch.dialMap.time && st.arch.dialMap.space,
+    'and the body names what its dials do');
+
+  /* Endurance must be a real budget: a body burning more than it recovers has
+   * a finite time on it, and one that is recovering has none. */
+  const arch = st.arch;
+  const still = RS.vessel.enduranceOf(arch, { charge: 100, vx: 0, vy: 0 }, st.env);
+  const flat = RS.vessel.enduranceOf(arch, { charge: 100, vx: 3, vy: 3 }, st.env);
+  assert(flat <= still, 'working hard costs endurance');
+  assert(flat > 0, 'and there is always some left to spend');
+
+  /* The half of "this body cannot work here" that was missing: which one can. */
+  const ocean = { medium: RS.vessel.MEDIUM.LIQUID, gravity: 1, pressure: 1,
+    temperature: 290, flux: 1, roughness: 0.2, hasMinds: false, label: 'ocean' };
+  assert(RS.vessel.canOperate(RS.vessel.BY_ID.walker, ocean), 'a walker cannot swim');
+  const alt = RS.vessel.BY_ID.swimmer;
+  assert(alt && !RS.vessel.canOperate(alt, ocean), 'but a swimmer can');
+
+  /* `bestHere` must never suggest the body you are already wearing, or the fix
+   * button on the pilot bar would do nothing. */
+  const here = RS.vessel.bestHere(g, st.arch.id);
+  assert(!here || here.id !== st.arch.id, 'the suggested alternative is an alternative');
+
+  /* And when a body genuinely cannot work, the status must carry the fix
+   * rather than only the complaint. Cytoplasm is the cleanest case: nothing but
+   * the ciliate and the mote function there. */
+  const g2 = RS.game.newGame(88);
+  g2.vessels.unlocked.walker = true;
+  g2.vessels.unlocked.ciliate = true;
+  g2.scene.kind = 'cellular';
+  g2.scene.planet = { name: 'X', surfaceTemp: 290, pressure: 1, gravity: 1, flux: 1,
+    biosphere: { complexity: 0.5, stage: { name: 'Complex' } } };
+  g2.scene.cell = RS.cellular.cellAt(g2, g2.scene.planet, 0, 0);
+  g2.body = RS.vessel.newBody('walker');
+  g2.inhabiting = true;
+  const bad = RS.vessel.statusOf(g2);
+  assert(bad.blocked, 'a walker in cytoplasm is blocked');
+  assert(bad.alternative && bad.alternative.id === 'ciliate',
+    'and the status names the body that would work: ' +
+    (bad.alternative ? bad.alternative.name : 'none'));
+}
+
+
+// ── molecular: handedness, and what it says about a world ────────────────
+{
+  const g = RS.game.newGame(4004);
+
+  /* Symmetry decides chirality, straight through — an essence whose mirror
+   * image is itself has no handedness, which is what perfect symmetry means. */
+  assert(!RS.molecular.isChiral(RS.fractal.ESSENCE_BY_ID.lattice),
+    'a perfectly symmetric essence is achiral');
+  assert(RS.molecular.isChiral(RS.fractal.ESSENCE_BY_ID.cascade),
+    'an asymmetric one is not');
+
+  /* Homochirality is a measurement of the biosphere, so it must be zero on a
+   * dead world and rise with complexity — that is the whole reason the scope
+   * tells you anything. */
+  const dead = { name: 'Dead', biosphere: null };
+  const faint = { name: 'Faint', biosphere: { complexity: 0.08 } };
+  const deep = { name: 'Deep', biosphere: { complexity: 0.9 } };
+  assert(RS.molecular.homochiralityOf(dead) === 0, 'nothing chooses on a sterile world');
+  assert(RS.molecular.homochiralityOf(faint) > 0, 'the first life already biases the mixture');
+  assert(RS.molecular.homochiralityOf(deep) > RS.molecular.homochiralityOf(faint),
+    'and a deep biosphere has very nearly settled it');
+  assert(RS.molecular.homochiralityOf(deep) < 1, 'but never completely');
+
+  /* The mixture must actually come out that way when sampled, or the number is
+   * a label rather than a measurement. */
+  function minorityRate(planet) {
+    let chiral = 0, minority = 0;
+    for (let i = 0; i < 120; i++) {
+      const m = RS.molecular.moleculeAt(g, planet, i * 0.017, i, null);
+      chiral += m.chiral; minority += m.minority;
+    }
+    return minority / Math.max(1, chiral);
+  }
+  const rDead = minorityRate(dead), rDeep = minorityRate(deep);
+  assert(rDead > 0.35 && rDead < 0.65,
+    'a sterile world is a near-even mixture (' + rDead.toFixed(2) + ')');
+  assert(rDeep < 0.12,
+    'a living one is overwhelmingly one hand (' + rDeep.toFixed(2) + ')');
+  assert(rDeep > 0, 'and the wrong hand still turns up sometimes — that is the find');
+
+  /* Purity, and no NaN. */
+  const a = RS.molecular.moleculeAt(g, deep, 0.5, 3, null);
+  const b = RS.molecular.moleculeAt(g, deep, 0.5, 3, null);
+  assert(a.sites.every((x, i) => x.hand === b.sites[i].hand && x.x === b.sites[i].x),
+    'a molecule is a pure function of its address');
+  for (const st of a.sites) {
+    assert(Number.isFinite(st.x) && Number.isFinite(st.size) && st.bond >= 1,
+      'every site is well formed');
+  }
+}
+
+// ── orbital shells: exclusion is the mechanic ────────────────────────────
+{
+  const g = RS.game.newGame(1717);
+  const sh = RS.shells.shellsAt(g, 3, null);
+
+  /* The rule. If two occupants ever share a state the scope is claiming
+   * something about physics that it is not doing. */
+  const seen = new Set();
+  let clash = null;
+  for (const oc of sh.occupants) {
+    const k = RS.shells.stateKey(oc.q);
+    if (seen.has(k)) clash = k;
+    seen.add(k);
+  }
+  assert(!clash, 'no two occupants share a state: ' + (clash || 'none do'));
+  assert(sh.occupants.length === RS.fractal.ESSENCES.length,
+    'every essence finds somewhere to be');
+  assert(sh.capacity > sh.occupants.length,
+    'and there is room, so the placement always terminates (' +
+    sh.occupants.length + '/' + sh.capacity + ')');
+
+  /* Quantum numbers must be legal, or the diagram is decorative. */
+  for (const oc of sh.occupants) {
+    assert(oc.q.n >= 1 && oc.q.n <= RS.shells.N_MAX, 'n is in range');
+    assert(oc.q.l >= 0 && oc.q.l <= oc.q.n - 1, 'l < n');
+    assert(Math.abs(oc.q.m) <= oc.q.l, '|m| <= l');
+    assert(oc.q.s === 1 || oc.q.s === -1, 'spin is a half-integer either way');
+  }
+
+  /* The essence axes have to be what places things, or nothing a player
+   * learned elsewhere helps them here. */
+  const attractor = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.attractor);
+  const cascade = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.cascade);
+  assert(attractor.l < cascade.l,
+    'a converging essence wants a spherical subshell and a branching one does not (' +
+    attractor.l + ' vs ' + cascade.l + ')');
+  const emergence = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.emergence);
+  const voidE = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.void);
+  assert(emergence.n > voidE.n, 'and a complex essence sits further out than an empty one');
+
+  /* Slot counts are the real ones: 2, 6, 10, 14. */
+  assert(RS.shells.slotsIn(0) === 2 && RS.shells.slotsIn(1) === 6 &&
+         RS.shells.slotsIn(2) === 10 && RS.shells.slotsIn(3) === 14,
+    's, p, d and f hold the numbers they hold');
+
+  /* Madelung: 4s fills before 3d, which is why the periodic table looks the
+   * way it does. If this inverts, the scope is teaching something false. */
+  assert(RS.shells.energyOf(4, 0) < RS.shells.energyOf(3, 2),
+    '4s sits below 3d, as it must');
+
+  const bonus = RS.shells.bonusFor({ scene: { kind: 'shells', shells: sh } });
+  assert(bonus >= 1 && bonus < 4, 'the scope pays a bounded premium (×' + bonus.toFixed(2) + ')');
+}
+
+// ── the ladder is complete ───────────────────────────────────────────────
+{
+  const g = RS.game.newGame(9090);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  const seen = Object.create(null);
+  let broke = null;
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g, g.dials.space, i);
+    for (let k = 0; k < 20; k++) { RS.scenes.tick(g, nullBus, 1 / 60); RS.field.tick(g, nullBus, 1 / 60); }
+    const want = RS.scenes.sceneForTier(i);
+    seen[want] = true;
+    if (g.scene.kind !== want) broke = RS.cosmos.TIERS[i].id + ' → ' + g.scene.kind;
+    if (!Number.isFinite(g.insight)) broke = RS.cosmos.TIERS[i].id + ' (NaN)';
+  }
+  assert(!broke, 'every rung lands on its scope: ' + (broke || 'all 22'));
+  assert(Object.keys(seen).length === RS.scenes.SCENES.length,
+    'and all ' + RS.scenes.SCENES.length + ' scopes are reachable by turning Σ');
+
+  /* No rung falls back to a scope that is not about it. `planet` is allowed to
+   * cover a range; nothing else may quietly absorb a rung it does not describe. */
+  const fallback = [];
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    const id = RS.scenes.sceneForTier(i);
+    const sc = RS.scenes.SCENE_BY_ID[id];
+    if (sc.last - sc.first > 4 && id !== 'field' && id !== 'planet') fallback.push(RS.cosmos.TIERS[i].id);
+  }
+  assert(fallback.length === 0, 'no rung is absorbed by an unrelated scope: ' + (fallback.join(', ') || 'none'));
+}
+
+
+// ── six pathways, all of them live ───────────────────────────────────────
+/* The panel is generated from live state rather than scripted, which is what
+ * makes it a progression system rather than a checklist. So the test is not
+ * "does it render" but "does it say something true, from any state, and does it
+ * stop repeating its first step once that step is done". */
+{
+  function paths(g) {
+    const html = RS.guide.pathwaysHTML(g);
+    assert(typeof html === 'string' && html.length > 400, 'the pathways panel renders');
+    return html;
+  }
+
+  /* From nothing. */
+  const g0 = RS.game.newGame(70001);
+  const h0 = paths(g0);
+  for (const name of ['TUNE', 'REACH', 'CONTACT', 'INWARD', 'BEYOND', 'RECOGNITION']) {
+    assert(h0.indexOf(name) >= 0, name + ' is offered from the first minute');
+  }
+  /* A route whose first step is unreachable must say how to make it reachable,
+   * not tell the player to go somewhere their dial cannot reach. */
+  assert(/Σ RANGE/.test(h0), 'and a route that is gated names the gate');
+
+  /* From a fully-opened game. Every route must still say something, and none
+   * may still be on step one. */
+  const g1 = RS.game.newGame(70002);
+  for (const d of ['frequency', 'phase', 'time', 'space']) {
+    for (const k of ['range', 'precision', 'focus']) {
+      for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g1.dials[d], k);
+    }
+  }
+  g1.insight = 1e12;
+  for (const node of RS.influence.RESEARCH) RS.influence.tryResearch(g1, nullBus, node.id);
+  for (const t of RS.cosmos.TIERS) g1.known.tiers[t.id] = true;
+  for (const b of RS.spectrum.BANDS) g1.known.bands[b.id] = true;
+  for (const e of RS.fractal.ESSENCES) {
+    g1.gnosis[e.id] = [];
+    for (let i = 0; i < 9; i++) g1.gnosis[e.id].push(e.id + '@' + i + ':0');
+  }
+  g1.stats.blocksAdopted = 5;
+  g1.stats.farthestBlock = 0.8;
+  const h1 = paths(g1);
+  assert(!/Buy Σ RANGE/.test(h1), 'a fully-ranged observer is not told to buy range');
+  assert(!/Research MICROSCOPY/.test(h1), 'nor to research what it already has');
+  assert(/fully read|predict any layer/.test(h1),
+    'and RECOGNITION acknowledges a complete ledger');
+
+  /* Foresight has to be the thing RECOGNITION measures — the panel must agree
+   * with `fractal.predicted` rather than keeping its own count. */
+  const g2 = RS.game.newGame(70003);
+  g2.gnosis.cascade = ['cascade@1:0', 'cascade@2:0', 'cascade@3:0', 'cascade@4:0'];
+  const h2 = paths(g2);
+  assert(h2.indexOf('Cascade') >= 0,
+    'the essence closest to a reveal is named: ' + (h2.indexOf('Cascade') >= 0));
+  const pr = RS.fractal.predicted(g2, 'cascade', {});
+  assert(pr.revealed === 2, 'four contexts is two axes, and the panel counts the same way');
+
+  /* Every route must survive every scene, because the panel is openable from
+   * anywhere and a route that throws in one scope is a crash in normal play. */
+  const g3 = RS.game.newGame(70004);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g3.dials.space, 'range');
+  let broke = null;
+  for (let i = 0; i < RS.cosmos.TIERS.length && !broke; i++) {
+    RS.dials.setValue(g3, g3.dials.space, i);
+    for (let k = 0; k < 12; k++) RS.scenes.tick(g3, nullBus, 1 / 60);
+    try { paths(g3); RS.guide.guideHTML(g3); }
+    catch (e) { broke = RS.cosmos.TIERS[i].id + ': ' + e.message; }
+  }
+  assert(!broke, 'the pathways and guide panels open in every scope: ' + (broke || 'all 22'));
+}
+
+// ── the routes are genuinely alternative ─────────────────────────────────
+/* The claim is that a player can lead with any route. That is only true if the
+ * *gates* differ: if every route bottoms out on the same purchase, there is one
+ * route wearing six hats. */
+{
+  const g = RS.game.newGame(70005);
+  /* INWARD and BEYOND gate on opposite ends of the same dial, which is the
+   * cleanest possible demonstration that they are different directions. */
+  const inward = RS.scenes.tierForScene('cellular');
+  const beyond = RS.scenes.tierForScene('web');
+  assert(inward < RS.cosmos.ROOT_INDEX && beyond > RS.cosmos.ROOT_INDEX,
+    'INWARD and BEYOND run in opposite directions from the root');
+
+  /* RECOGNITION gates on nothing purchasable at all — it is the one route that
+   * cannot be bought, only played. */
+  const before = RS.fractal.totalGnosis(g);
+  g.insight = 1e12;
+  for (const node of RS.influence.RESEARCH) RS.influence.tryResearch(g, nullBus, node.id);
+  for (const d of ['frequency', 'space']) {
+    for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials[d], 'range');
+  }
+  assert(RS.fractal.totalGnosis(g) === before,
+    'no amount of insight buys a single context of gnosis');
+
+  /* And CONTACT is the only one another party can advance for you. */
+  assert(typeof RS.contact.act === 'function', 'contact has actions a culture performs');
+}
+
+
+// ── the codex is the essence sheet ───────────────────────────────────────
+/* The player's map of the generative core. It must show exactly what has been
+ * earned — no more, because that would give away foresight, and no less,
+ * because the blanks are how a player picks their next target. */
+{
+  const g = RS.game.newGame(80808);
+  const empty = RS.ui.codexHTML(g);
+  assert(typeof empty === 'string' && empty.length > 500, 'the codex renders from nothing');
+  assert(empty.indexOf('0 / ' + (RS.fractal.ESSENCES.length * 4) + ' axes read') >= 0,
+    'and an unread ledger reads as zero axes');
+  /* Nothing may leak before it is earned: no essence name, no trait, no number. */
+  let leaked = [];
+  for (const e of RS.fractal.ESSENCES) {
+    /* Scoped to the essence sheet's own name slot: the primitives section below
+     * it is vocabulary rather than a secret, and is meant to be readable from
+     * the first minute. */
+    if (empty.indexOf('class="en">' + e.name + '<') >= 0) leaked.push(e.name);
+    if (e.trait && empty.indexOf(e.trait) >= 0) leaked.push(e.id + ' trait');
+    if (e.forms && e.forms.cell && empty.indexOf(e.forms.cell) >= 0) leaked.push(e.id + ' form');
+  }
+  assert(leaked.length === 0, 'an unmet essence gives nothing away: ' + (leaked.slice(0,3).join(', ') || 'nothing'));
+
+  /* Meeting one reveals its name and trait but still not its numbers — two
+   * contexts is the first axis, and one is none. */
+  g.gnosis.cascade = ['cascade@1:0'];
+  const one = RS.ui.codexHTML(g);
+  assert(one.indexOf('class="en">Cascade<') >= 0, 'a met essence is named');
+  assert(one.indexOf('1 / ' + (RS.fractal.ESSENCES.length * 4)) < 0,
+    'but one context is not yet an axis');
+  assert(one.indexOf('0 / ' + (RS.fractal.ESSENCES.length * 4) + ' axes read') >= 0,
+    'the count agrees: still zero axes');
+
+  /* And the sheet must agree with `predicted` exactly, at every level. */
+  for (const n of [0, 2, 4, 6, 8, 12]) {
+    const g2 = RS.game.newGame(1234);
+    g2.gnosis.cascade = [];
+    for (let i = 0; i < n; i++) g2.gnosis.cascade.push('cascade@' + i + ':0');
+    const pr = RS.fractal.predicted(g2, 'cascade', {});
+    const html = RS.ui.codexHTML(g2);
+    let bars = 0;
+    for (const a of RS.fractal.AXES) if (pr[a] !== undefined) bars++;
+    assert(bars === pr.revealed, n + ' contexts reveals ' + pr.revealed + ' axes');
+    assert(html.indexOf(bars + ' / ' + (RS.fractal.ESSENCES.length * 4) + ' axes read') >= 0,
+      'and the sheet says so (' + n + ' contexts → ' + bars + ')');
+  }
+
+  /* A fully-read essence must offer nothing more to read, or the sheet would
+   * send a player hunting something they already have. */
+  const g3 = RS.game.newGame(55);
+  g3.gnosis.spiral = [];
+  for (let i = 0; i < 12; i++) g3.gnosis.spiral.push('spiral@' + i + ':0');
+  const full = RS.ui.codexHTML(g3);
+  assert(full.indexOf('complete') >= 0, 'a fully-read essence says it is complete');
+
+  /* No primitive may share a display name with an essence: the codex lists
+   * both, and a player reading "Flow" twice for two different things is a
+   * legibility failure rather than a coincidence. */
+  const essNames = new Set(RS.fractal.ESSENCES.map(e => e.name));
+  for (const id of RS.emergence.IDS) {
+    assert(!essNames.has(RS.emergence.LABELS[id].name),
+      'the ' + id + ' primitive does not collide with an essence name (' +
+      RS.emergence.LABELS[id].name + ')');
+  }
+
+  /* The primitives half. Without it the axes are a stat block rather than a
+   * prediction, so every one must be listed with the bands that run it. */
+  for (const id of RS.emergence.IDS) {
+    assert(full.indexOf(RS.emergence.LABELS[id].name) >= 0, id + ' is on the sheet');
+  }
+  for (const b of RS.spectrum.BANDS) {
+    let listed = false;
+    for (const id of b.prim) {
+      if (RS.spectrum.usesPrim(b, id)) listed = true;
+    }
+    assert(listed, b.id + ' runs at least one primitive the sheet can show it under');
+  }
+}
+
+
+// ── nowhere is empty ─────────────────────────────────────────────────────
+/* `neural.mindAt` works at any address and, until this landed, exactly two
+ * things called it. The claim is not "there are dots moving" — it is that the
+ * inhabitants were already doing this before you arrived, which is only true if
+ * their positions are derived rather than spawned. */
+{
+  const g = RS.game.newGame(90210);
+  const kinds = Object.keys(RS.inhabitants.KINDS);
+  assert(kinds.length >= 8, 'most scopes declare inhabitants (' + kinds.length + ')');
+
+  /* Every scope in the registry must have an entry, or a scope quietly ships
+   * empty and nobody notices. */
+  const missing = [];
+  for (const sc of RS.scenes.SCENES) {
+    if (!RS.inhabitants.KINDS[sc.id]) missing.push(sc.id);
+  }
+  assert(missing.length === 0, 'every scope declares what lives in it: ' + (missing.join(', ') || 'all do'));
+
+  /* Derivation, not spawning: the same address at the same time is the same
+   * population, and it exists at t=0 without anything having created it. */
+  const a = RS.inhabitants.inhabitantsFor(g, 'cellular', 0, 1 / 60, null);
+  assert(a.list.length > 0, 'a cell has traffic in it the instant you look');
+  const b = RS.inhabitants.inhabitantsFor(g, 'cellular', 0, 1 / 60, null);
+  /* The *path* is pure; the mind riding it is not, and should not be — a
+   * population that produced byte-identical output on every call would be an
+   * animation rather than a set of things with something going on inside them.
+   * So the base path must match exactly, and the real position must be close to
+   * it but free to differ. */
+  assert(a.list.every((x, i) => Math.abs(x.bx - b.list[i].bx) < 1e-9),
+    'the derived path is the same at the same address and time');
+  assert(a.list.every((x, i) => Math.hypot(x.x - x.bx, x.y - x.by) < 0.1),
+    'and the mind perturbs it rather than replacing it');
+
+  /* And it moves — a derived population that does not advance with t is a
+   * still life. */
+  const later = RS.inhabitants.inhabitantsFor(g, 'cellular', 9.0, 1 / 60, null);
+  let moved = 0;
+  for (let i = 0; i < later.list.length; i++) {
+    if (Math.hypot(later.list[i].bx - a.list[i].bx, later.list[i].by - a.list[i].by) > 0.05) moved++;
+  }
+  assert(moved > later.list.length / 2, 'and it has visibly moved on by nine seconds');
+
+  /* Bounded, and never NaN, across every scope and a long span of time. */
+  let bad = null;
+  for (const k of kinds) {
+    for (let t = 0; t < 600; t += 7.3) {
+      const r = RS.inhabitants.inhabitantsFor(g, k, t, 1 / 60, null);
+      for (const o of r.list) {
+        if (!Number.isFinite(o.x) || !Number.isFinite(o.y) || !Number.isFinite(o.bright)) bad = k + '@' + t;
+        if (Math.hypot(o.x, o.y) > 1.6) bad = k + '@' + t + ' escaped';
+      }
+    }
+  }
+  assert(!bad, 'inhabitants stay finite and stay home: ' + (bad || 'all of them'));
+
+  /* Different places have different populations, or "returning here" means
+   * nothing. */
+  const g2 = RS.game.newGame(90210);
+  g2.scene.cellIndex = 7;
+  g2.scene.cell = { type: { id: 'x' } };
+  const other = RS.inhabitants.inhabitantsFor(g2, 'cellular', 0, 1 / 60, null);
+  assert(other.list.some((x, i) => Math.abs(x.bx - a.list[i].bx) > 1e-6),
+    'a different cell has different traffic');
+
+  /* The mind state cache must not grow without bound across a long session
+   * that visits many places. */
+  const before = RS.inhabitants.states.size;
+  for (let i = 0; i < 400; i++) {
+    const gg = RS.game.newGame(i);
+    RS.inhabitants.inhabitantsFor(gg, 'web', i, 1 / 60, null);
+  }
+  assert(RS.inhabitants.states.size <= 260,
+    'mind state stays bounded over a long session (' + before + ' → ' + RS.inhabitants.states.size + ')');
+
+  /* And they exist in the live game, in every scope, without being asked for. */
+  const g3 = RS.game.newGame(4);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g3.dials.space, 'range');
+  const empty = [];
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g3, g3.dials.space, i);
+    for (let k = 0; k < 15; k++) RS.scenes.tick(g3, nullBus, 1 / 60);
+    const want = RS.inhabitants.KINDS[g3.scene.kind];
+    if (want && want.n && (!g3.scene.inhabitants || !g3.scene.inhabitants.list.length)) {
+      empty.push(RS.cosmos.TIERS[i].id);
+    }
+  }
+  assert(empty.length === 0, 'every scope is populated in play: ' + (empty.join(', ') || 'all of them'));
+}
+
+// ── silence where there is no medium ─────────────────────────────────────
+/* The one place the physics and the sound design are the same decision. */
+{
+  const B = RS.audio.BEDS;
+  for (const sc of RS.scenes.SCENES) {
+    assert(B[sc.id], sc.id + ' has an ambient bed defined');
+  }
+  assert(B.system.gain === 0 && B.galaxy.gain === 0,
+    'sound does not propagate in a vacuum, so the vacuum scopes are silent');
+  assert(B.planet.gain > 0, 'and a surface with air is not');
+  assert(B.web.freq < B.foam.freq / 10,
+    'the largest scope drones and the smallest seethes');
+}
+
+
+// ── local time was derived all along and never shown ─────────────────────
+{
+  const g = RS.game.newGame(31337);
+  /* Hunt the neighbourhood rather than assuming the home system has one — a
+   * seed whose nearest star is all tidally locked worlds is a legitimate
+   * galaxy, not a broken test. */
+  let p = null;
+  for (let sx = -2; sx <= 2 && !p; sx++) {
+    for (let sy = -2; sy <= 2 && !p; sy++) {
+      const sys = RS.stellar.systemAt(g.seed, sx, sy, 0);
+      if (!sys) continue;
+      for (let i = 0; i < sys.bodies.length; i++) {
+        if (sys.bodies[i].kind !== 'planet') continue;
+        const q = RS.scenes.derivePlanet(g, sys, i);
+        if (q && q.type.landable && !q.tidallyLocked && q.dayHours < 400) { p = q; break; }
+      }
+    }
+  }
+  assert(p, 'the galaxy contains a rotating world to stand on');
+  if (!p) p = { tidallyLocked: false, dayHours: 24, axialTilt: 0.4, pressure: 1, moons: null };
+
+  /* A rotating world must actually have a day: the star has to rise and set. */
+  let hi = -2, lo = 2;
+  for (let k = 0; k < 400; k++) {
+    const t = k * (p.dayHours / RS.localtime.HOURS_PER_YEAR) / 40;
+    const sun = RS.localtime.sunAt(p, 0, 0, t, null);
+    if (sun.elevation > hi) hi = sun.elevation;
+    if (sun.elevation < lo) lo = sun.elevation;
+  }
+  assert(hi > 0.5 && lo < -0.5, 'the star rises and sets (' + lo.toFixed(2) + ' … ' + hi.toFixed(2) + ')');
+
+  /* A tidally locked world must not. Half of it never sees the star, and that
+   * is the single most important fact about the commonest kind of habitable
+   * world there is. */
+  const locked = { tidallyLocked: true, dayHours: 1e6, axialTilt: 0, pressure: 1, moons: null };
+  const sub = RS.localtime.sunAt(locked, 0, 0, 0, null);
+  const anti = RS.localtime.sunAt(locked, 180, 0, 0, null);
+  assert(sub.elevation > 0.95, 'the substellar point is directly under the star');
+  assert(anti.elevation < -0.95, 'and the antistellar point never sees it');
+  const later = RS.localtime.sunAt(locked, 0, 0, 900, null);
+  assert(Math.abs(later.elevation - sub.elevation) < 1e-9,
+    'and nine hundred years later, nothing has moved');
+  assert(sub.phase === 'substellar' && anti.phase === 'night side',
+    'a locked world has places rather than times of day');
+  assert(RS.localtime.seasonOf(locked, 40, sub) === 'no seasons',
+    'and no seasons either');
+
+  /* Twilight width follows atmospheric thickness — a thin world snaps from day
+   * to night, which is why the Moon has no dusk. */
+  const thin = { tidallyLocked: false, dayHours: 24, axialTilt: 0.4, pressure: 0.001 };
+  const thick = { tidallyLocked: false, dayHours: 24, axialTilt: 0.4, pressure: 3 };
+  function twilightSpan(w) {
+    let n = 0;
+    for (let k = 0; k < 2000; k++) {
+      const d = RS.localtime.sunAt(w, 0, 0, k / 2000 * (24 / RS.localtime.HOURS_PER_YEAR), null).daylight;
+      if (d > 0.05 && d < 0.95) n++;
+    }
+    return n / 2000;
+  }
+  assert(twilightSpan(thick) > twilightSpan(thin) * 2,
+    'a dense atmosphere has a long twilight and an airless world has none (' +
+    twilightSpan(thick).toFixed(3) + ' vs ' + twilightSpan(thin).toFixed(3) + ')');
+
+  /* Seasons must actually turn over a year, and reverse between hemispheres. */
+  const tilted = { tidallyLocked: false, dayHours: 24, axialTilt: 0.41, pressure: 1 };
+  const seasons = new Set();
+  for (let k = 0; k < 24; k++) {
+    seasons.add(RS.localtime.seasonOf(tilted, 45, RS.localtime.sunAt(tilted, 0, 45, k / 24, null)));
+  }
+  assert(seasons.size >= 4, 'a tilted world has a year with seasons in it (' + [...seasons].join(', ') + ')');
+  const midYear = RS.localtime.sunAt(tilted, 0, 45, 0.25, null);
+  assert(RS.localtime.seasonOf(tilted, 45, midYear) !== RS.localtime.seasonOf(tilted, -45, midYear),
+    'and the hemispheres disagree about which one it is');
+
+  /* Tides scale as the cube of distance, which is why a close small moon beats
+   * a distant large one — the thing everyone gets wrong. */
+  const near = { moons: { list: [{ massE: 0.01, a: 0.001, period: 3 }] } };
+  const far = { moons: { list: [{ massE: 1.0, a: 0.01, period: 30 }] } };
+  assert(RS.localtime.tideAt(near, 0, null).height > RS.localtime.tideAt(far, 0, null).height,
+    'a close small moon out-pulls a distant large one');
+  assert(RS.localtime.tideAt({ moons: null }, 0, null).height === 0, 'and a moonless world has no tide');
+
+  /* No NaN anywhere, over a long span and every latitude. */
+  let bad = null;
+  for (let lat = -90; lat <= 90; lat += 15) {
+    for (let t = 0; t < 50; t += 0.37) {
+      const sun = RS.localtime.sunAt(p, 0, lat, t, null);
+      if (!Number.isFinite(sun.elevation) || !Number.isFinite(sun.daylight)) bad = lat + '@' + t;
+      if (sun.daylight < 0 || sun.daylight > 1) bad = lat + '@' + t + ' out of range';
+    }
+  }
+  assert(!bad, 'the sun is finite everywhere and everywhen: ' + (bad || 'clean'));
+
+  /* And it reaches the readout, which is the entire point. */
+  const g2 = RS.game.newGame(31337);
+  g2.scene.planet = p;
+  g2.scene.lon = 0; g2.scene.lat = 20; g2.scene.t = 0.3;
+  const st = RS.localtime.stateFor(g2, null);
+  const line = RS.localtime.describe(st);
+  assert(line.length > 8 && /day|night|midday|twilight|dusk|afternoon/.test(line),
+    'the readout says where in the day you are: "' + line + '"');
+}
+
+
+// ── one drawer, tabs inside it ───────────────────────────────────────────
+{
+  /* Seven topbar buttons became one. The risk of that change is a panel that
+   * becomes unreachable, so: every panel the drawer can render must be
+   * reachable as a tab from somewhere. */
+  const g = RS.game.newGame(6161);
+  const panels = ['upgrades', 'codex', 'settings', 'world', 'vessels', 'contact', 'guide', 'paths'];
+  const tabIds = RS.ui.TABS.map(t => t.id);
+  for (const id of panels) {
+    if (id === 'contact') continue;  // conditional; checked below
+    assert(tabIds.indexOf(id) >= 0, id + ' is reachable as a tab');
+  }
+
+  /* Every tab must be available somewhere on the ladder — a tab whose `when`
+   * is never true is a panel nobody can open. */
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  const everSeen = Object.create(null);
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g, g.dials.space, i);
+    for (let k = 0; k < 12; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+    for (const t of RS.ui.TABS) if (t.when(g)) everSeen[t.id] = true;
+  }
+  const never = RS.ui.TABS.filter(t => !everSeen[t.id]).map(t => t.id);
+  assert(never.length === 0, 'every tab is available somewhere: ' + (never.join(', ') || 'all of them'));
+
+  /* And the World tab must genuinely hide where it is meaningless, or the
+   * conditional is decoration. */
+  RS.dials.setValue(g, g.dials.space, RS.cosmos.ROOT_INDEX);
+  for (let k = 0; k < 12; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  const world = RS.ui.TABS.find(t => t.id === 'world');
+  assert(!world.when(g), 'the World tab is absent in the attunement field');
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_PLANET);
+  for (let k = 0; k < 20; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  assert(world.when(g), 'and present on a surface');
+}
+
+// ── arrival says which way you went ──────────────────────────────────────
+{
+  const g = RS.game.newGame(7272);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+
+  /* The ladder is the navigation, so a scope change is a movement and the
+   * direction must be derived rather than guessed — inward toward the small,
+   * outward toward the vast, for every pair of scopes without anybody
+   * enumerating them. */
+  RS.dials.setValue(g, g.dials.space, RS.cosmos.ROOT_INDEX);
+  for (let k = 0; k < 15; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_CELL);
+  for (let k = 0; k < 15; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  assert(g.scene.transitionDir < 0, 'descending the ladder reads as inward');
+
+  RS.dials.setValue(g, g.dials.space, RS.cosmos.TIERS.length - 1);
+  for (let k = 0; k < 15; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  assert(g.scene.transitionDir > 0, 'and climbing it reads as outward');
+
+  /* Every ordered pair of scopes must produce a direction — a zero would draw
+   * nothing and leave the change unexplained. */
+  let flat = [];
+  for (const a of RS.scenes.SCENES) {
+    for (const b of RS.scenes.SCENES) {
+      if (a.id === b.id) continue;
+      const d = Math.sign(RS.scenes.tierForScene(b.id) - RS.scenes.tierForScene(a.id));
+      if (d === 0) flat.push(a.id + '→' + b.id);
+    }
+  }
+  assert(flat.length === 0, 'every scope change has a direction: ' + (flat.join(', ') || 'all of them'));
+}
+
+
+// ── an essence is 4 numbers, and that is the whole of it ─────────────────
+/* The property the architecture exists to have, asserted rather than assumed:
+ * an essence is four numbers, eight form names and a trait, and adding one adds
+ * it to twelve layers, twenty-two rungs, six primitives, nine scopes and every
+ * geometry at once. Nothing else in the codebase may need to know how many
+ * there are.
+ *
+ * This is the test that would fail if someone hardcoded a count, sized an array
+ * to fourteen, or wrote a switch over essence ids — and every one of those is
+ * an easy thing to do by accident. */
+{
+  const E = RS.fractal.ESSENCES;
+  const g = RS.game.newGame(15150);
+
+  /* Complete: every essence must carry the full contract, or it is inert
+   * somewhere and the player meets a hole. */
+  const geoms = ['foam', 'orbital', 'chain', 'cell', 'body', 'disc', 'web', 'abstract'];
+  for (const e of E) {
+    assert(typeof e.trait === 'string' && e.trait.length > 12, e.id + ' says what it is');
+    for (const a of RS.fractal.AXES) {
+      assert(typeof e[a] === 'number' && e[a] >= 0 && e[a] <= 1, e.id + ' has a real ' + a);
+    }
+    for (const geo of geoms) {
+      assert(e.forms && typeof e.forms[geo] === 'string' && e.forms[geo].length,
+        e.id + ' has a name at ' + geo);
+    }
+  }
+
+  /* Every primitive must produce something finite for every essence — not
+   * "most of them", which is what a table sized to fourteen would give. */
+  const EM = RS.emergence;
+  for (const e of E) {
+    for (const tier of [0, 5, 13, 21]) {
+      const g1 = EM.GATE(e, tier, 1.5, {});
+      assert(Number.isFinite(g1.period) && g1.period > 0, e.id + ' gates at rung ' + tier);
+    }
+    assert(EM.NEST(e, {}).depth >= 1, e.id + ' nests');
+    assert(Number.isFinite(EM.FLOW(e, 0.3, 0.2, 1, {}).gx), e.id + ' flows');
+    assert(EM.ORDER(e, 7, {}).prereqs.length >= 1, e.id + ' orders');
+    assert(EM.ORDER(e, 7, {}).prereqs.indexOf(e.id) < 0, e.id + ' does not require itself');
+    assert(Number.isFinite(EM.TWIN(e, 7, {}).separation), e.id + ' twins');
+    assert(Number.isFinite(EM.INVERT(e, {}).strength), e.id + ' inverts');
+  }
+
+  /* And the self-similar generator must draw it at every geometry, with the
+   * same topology — which is the claim, not a side effect. */
+  for (const e of E) {
+    const base = RS.selfsimilar.topology(RS.selfsimilar.build(e, geoms[0], 11, null));
+    for (const geo of geoms) {
+      const t = RS.selfsimilar.topology(RS.selfsimilar.build(e, geo, 11, null));
+      assert(t === base, e.id + ' has one skeleton at every geometry (' + geo + ')');
+    }
+  }
+
+  /* Every scope that names essences must reach the new ones — a scope that
+   * enumerated fourteen would silently never show the fifteenth. */
+  const seenInCells = new Set();
+  const planet = { name: 'T', surfaceTemp: 290, pressure: 1, gravity: 1, flux: 1,
+    biosphere: { complexity: 0.8, stage: { name: 'Complex' } } };
+  for (let i = 0; i < 300; i++) {
+    for (const o of RS.cellular.cellAt(g, planet, i * 0.011, i).organelles) seenInCells.add(o.essence.id);
+  }
+  assert(seenInCells.size === E.length,
+    'every essence can appear in a cell (' + seenInCells.size + '/' + E.length + ')');
+
+  const inShells = new Set(RS.shells.shellsAt(g, 3, null).occupants.map(o => o.essence.id));
+  assert(inShells.size === E.length, 'and every one has a state in the shells');
+
+  const inMol = new Set();
+  for (let i = 0; i < 300; i++) {
+    for (const st of RS.molecular.moleculeAt(g, planet, i * 0.013, i, null).sites) inMol.add(st.essence.id);
+  }
+  assert(inMol.size === E.length, 'and a site in a molecule');
+
+  /* The codex must grow with them rather than showing a fixed fourteen. */
+  const html = RS.ui.codexHTML(g);
+  assert(html.indexOf('/ ' + (E.length * 4) + ' axes read') >= 0,
+    'the codex counts ' + (E.length * 4) + ' axes, not a hardcoded number');
+  let rows = 0, from = 0;
+  while ((from = html.indexOf('class="ess-row', from + 1)) >= 0) rows++;
+  assert(rows === E.length, 'and draws a row for each (' + rows + ')');
+
+  /* Distinctness is asserted once, above, at the threshold that block owns —
+   * duplicating it here at a stricter one would mean two assertions disagreeing
+   * about the same invariant, and the stricter of the two would start failing
+   * on a pair that has been fine since the axes were authored.
+   *
+   */
+  /* The two holes the new ones fill. Before them, every branching essence was
+   * lopsided — a player could reasonably have concluded that branching implies
+   * asymmetry, which a snowflake disproves. */
+  const symBranch = E.filter(e => e.branching > 0.6 && e.symmetry > 0.7);
+  assert(symBranch.length > 0,
+    'something branches *and* is symmetric: ' + symBranch.map(e => e.id).join(', '));
+  const intricateVolatile = E.filter(e => e.complexity > 0.7 && e.branching < 0.35 && e.persistence < 0.3);
+  assert(intricateVolatile.length > 0,
+    'something is intricate, unbranched and fleeting: ' + intricateVolatile.map(e => e.id).join(', '));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

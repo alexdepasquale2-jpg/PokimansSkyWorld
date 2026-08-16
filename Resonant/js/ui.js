@@ -23,22 +23,40 @@
   function init(game, bus) {
     for (const id of ['insight-val', 'rate-val', 'gnosis-val', 'progress-fill', 'progress-pct',
       'tier-name', 'tier-sci', 'layer-name', 'layer-rules', 'objective',
-      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title',
-      'btn-upgrades', 'btn-codex', 'btn-settings', 'btn-drawer-close', 'beat-hint',
-      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar', 'btn-contact', 'contact-hint',
-      'btn-guide', 'btn-paths']) {
+      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title', 'drawer-tabs',
+      'btn-drawer-close', 'beat-hint', 'btn-menu',
+      'scene-tag', 'body-bar', 'btn-contact', 'contact-hint']) {
       el[id] = $(id);
     }
 
-    el['btn-upgrades'].addEventListener('click', () => toggleDrawer(game, bus, 'upgrades'));
-    el['btn-codex'].addEventListener('click', () => toggleDrawer(game, bus, 'codex'));
-    el['btn-settings'].addEventListener('click', () => toggleDrawer(game, bus, 'settings'));
-    el['btn-world'].addEventListener('click', () => toggleDrawer(game, bus, 'world'));
-    el['btn-vessels'].addEventListener('click', () => toggleDrawer(game, bus, 'vessels'));
+    /* One button, one drawer, tabs inside it. There were seven topbar buttons
+     * and every new panel added another; on a phone they were already competing
+     * with the insight readout for the same strip. Contact is the exception and
+     * stays where it is, because it is event-driven — a channel opening is
+     * something that happens *to* you, and burying it behind a menu would make
+     * it missable. */
+    el['btn-menu'].addEventListener('click', () => toggleDrawer(game, bus, drawerOpen ? null : lastTab));
     el['btn-contact'].addEventListener('click', () => toggleDrawer(game, bus, 'contact'));
-    el['btn-guide'].addEventListener('click', () => toggleDrawer(game, bus, 'guide'));
-    el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
+
+    el['drawer-tabs'].addEventListener('click', ev => {
+      const t = ev.target.closest('[data-tab]');
+      if (t) { lastTab = t.dataset.tab; openDrawer(game, bus, t.dataset.tab); }
+    });
+
+    /* The pilot bar is rebuilt every frame, so its two controls are delegated
+     * too. Both exist so that changing body — the thing you most often want to
+     * do the instant a body stops working — does not require opening a drawer,
+     * scrolling past research, and closing it again. */
+    el['body-bar'].addEventListener('click', ev => {
+      const open = ev.target.closest('[data-open]');
+      if (open) { toggleDrawer(game, bus, open.dataset.open); return; }
+      const emb = ev.target.closest('[data-embark]');
+      if (emb) {
+        const r = RS.scenes.embark(game, bus, emb.dataset.embark);
+        if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+      }
+    });
 
     /* Delegated, because the drawer body is rebuilt wholesale on every open and
      * per-node listeners would leak. */
@@ -48,6 +66,16 @@
         const [dialId, kind] = btn.dataset.buy.split(':');
         const res = RS.game.tryUpgrade(game, bus, dialId, kind);
         if (!res.ok) bus.emit('ui:deny', res);
+        renderDrawer(game, bus);
+        return;
+      }
+      const cyc = ev.target.closest('[data-cycle]');
+      if (cyc) {
+        const k = cyc.dataset.cycle;
+        const order = ['all', 'key', 'off'];
+        const i = order.indexOf(game.settings[k]);
+        game.settings[k] = order[(i + 1) % order.length];
+        bus.emit('settings', { key: k, value: game.settings[k] });
         renderDrawer(game, bus);
         return;
       }
@@ -189,6 +217,19 @@
       setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
         (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
       el['layer-name'].style.color = hsl(291, 0.7, 0.72);
+    } else if (sc.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sub + ' · ' + r.chiral + ' chiral sites' +
+        (r.anomalous ? ' · ' + r.anomalous + ' of the wrong hand ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(r.bias > 0.5 ? 150 : 196, 0.7, 0.72);
+    } else if (sc.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      setText('layer-name', 'ORBITAL SHELLS');
+      setText('layer-rules', r.occupied + '/' + r.capacity + ' states filled · ' +
+        r.displaced + ' displaced outward · ' + r.degenerate + ' degenerate' +
+        (r.bonus > 1.05 ? ' ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(210, 0.7, 0.72);
     } else if (sc.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       setText('layer-name', r.title.toUpperCase());
@@ -198,7 +239,8 @@
       el['layer-name'].style.color = hsl(150, 0.7, 0.72);
     } else if (sc.kind === 'planet' && sc.planet) {
       const p = sc.planet;
-      setText('layer-name', p.name.toUpperCase());
+      const when = RS.localtime.describe(sc.clock);
+      setText('layer-name', p.name.toUpperCase() + (when ? ' · ' + sc.clock.sun.phase.toUpperCase() : ''));
       setText('layer-rules', p.type.name + ' · ' + Math.round(p.surfaceTemp) + ' K · ' +
         p.gravity.toFixed(2) + ' g · ' +
         (p.pressure < 0.01 ? 'no atmosphere' : p.pressure.toFixed(2) + ' bar') +
@@ -255,33 +297,68 @@
         ' (' + (c.lock.total * 100).toFixed(0) + '% lock)');
   }
 
-  /* The body bar only exists while embodied, and it shows the three things a
-   * pilot actually needs: charge, hold, and — when riding a mind — how much of
-   * that creature is currently you. */
+  /* ── The pilot bar ───────────────────────────────────────────────────────
+   *
+   * Visible only while embodied, and it answers the four questions a pilot
+   * actually has, in the order they matter:
+   *
+   *   what am I flying          glyph and name
+   *   what do the dials do      the archetype's own dialMap, live
+   *   how long have I got       charge, and endurance in seconds at this draw
+   *   is anything wrong         strain, and the blocked reason plus the fix
+   *
+   * The dial map is the important addition. Every body reinterprets the same
+   * four controls, which is the whole ergonomic idea — and until now the only
+   * place that mapping appeared was a drawer you had to close to fly.
+   */
   function renderBodyBar(game) {
     const bar = el['body-bar'];
-    if (!game.inhabiting) {
+    const st = RS.vessel.statusOf(game);
+    if (!st) {
       if (bar.dataset.on !== '0') { bar.dataset.on = '0'; bar.innerHTML = ''; bar.style.opacity = '0'; }
       return;
     }
     bar.dataset.on = '1';
     bar.style.opacity = '1';
-    const b = game.body;
-    const arch = RS.vessel.archOf(b);
-    const cf = clamp01(b.charge / arch.capacity);
-    const env = RS.vessel.environmentFor(game);
-    const blocked = RS.vessel.canOperate(arch, env);
-    const poss = b.mindState ? b.mindState.possession : null;
+
+    const a = st.arch, dm = a.dialMap;
+    const chargeHue = st.chargeFrac > 0.25 ? 160 : 0;
+    /* Endurance is the number that says whether to turn back, so it is stated
+     * in seconds rather than as a bar the player has to integrate by eye. */
+    const end = st.endurance === Infinity ? '∞'
+      : st.endurance > 90 ? Math.round(st.endurance / 60) + 'm'
+        : Math.round(st.endurance) + 's';
+
+    const dial = (sym, hue, what) =>
+      '<span class="bb-dial" style="--h:' + hue + '"><b>' + sym + '</b>' + what + '</span>';
 
     bar.innerHTML =
-      '<span class="bb-glyph" style="color:' + hsl(arch.hue, 0.8, 0.7) + '">' + arch.glyph + '</span>' +
-      '<span class="bb-name">' + arch.name + '</span>' +
-      '<span class="bb-meter" title="charge"><b style="width:' + (cf * 100).toFixed(0) +
-        '%;background:' + hsl(cf > 0.25 ? 160 : 0, 0.85, 0.6) + '"></b></span>' +
-      (b.holdMass > 0 ? '<span class="bb-tag">' + fmt(b.holdMass) + 'u</span>' : '') +
-      (poss != null ? '<span class="bb-tag" style="color:#f0abfc" title="how much of this mind is you">' +
-        (poss * 100).toFixed(0) + '% you</span>' : '') +
-      (blocked ? '<span class="bb-warn">' + blocked + '</span>' : '');
+      '<button class="bb-head" data-open="vessels" title="Change body">' +
+        '<span class="bb-glyph" style="color:' + hsl(a.hue, 0.8, 0.7) + '">' + a.glyph + '</span>' +
+        '<span class="bb-name">' + a.name + '</span>' +
+      '</button>' +
+      '<span class="bb-meter" title="charge ' + Math.round(st.charge) + '/' + st.capacity + '">' +
+        '<b style="width:' + (st.chargeFrac * 100).toFixed(0) + '%;background:' +
+        hsl(chargeHue, 0.85, 0.6) + '"></b></span>' +
+      '<span class="bb-tag" title="endurance at this draw">' + end + '</span>' +
+      (st.strain > 0.12
+        ? '<span class="bb-tag" style="color:' + hsl(st.strain > 0.7 ? 8 : 40, 0.8, 0.66) +
+          '" title="wear — change body before this reaches 100%">strain ' +
+          Math.round(st.strain * 100) + '%</span>' : '') +
+      (st.holdMass > 0 ? '<span class="bb-tag">' + fmt(st.holdMass) + 'u</span>' : '') +
+      (st.possession != null ? '<span class="bb-tag" style="color:#f0abfc" ' +
+        'title="how much of this mind is you">' + (st.possession * 100).toFixed(0) + '% you</span>' : '') +
+      '<span class="bb-dials">' +
+        dial('τ', 43, dm.time) + dial('Σ', 338, dm.space) +
+        dial('Δ', 268, dm.phase) + dial('φ', 187, dm.frequency) +
+      '</span>' +
+      (st.blocked
+        ? '<span class="bb-warn">' + st.blocked +
+          (st.alternative
+            ? ' — <button class="bb-fix" data-embark="' + st.alternative.id + '">take ' +
+              st.alternative.name + '</button>'
+            : ' — no body you have works here') + '</span>'
+        : '');
   }
 
   /* The node readout. Names the thing, names its essence, and — the part that
@@ -432,6 +509,34 @@
             r.bonus.toFixed(2) + '</div>' : '');
       return;
     }
+    if (s.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(r.bias > 0.5 ? 150 : 196, 0.8, 0.72) + '">&#9901;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (r.host ? '<div class="ro-sub" style="margin-top:4px">' + r.host + ' &middot; ' +
+          r.chiral + ' of ' + RS.molecular.SITE_COUNT + ' sites are chiral</div>' : '') +
+        (r.anomalous
+          ? '<div class="ro-sub" style="color:' + hsl(24, 0.85, 0.68) + '">' + r.anomalous +
+            ' of the hand life here does not use &mdash; &times;' + r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.8, 0.72) + '">&#9096;</span>' +
+        '<span class="ro-title">Orbital Shells</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">' + r.occupied + '/' + r.capacity +
+        ' states filled</div>' +
+        (r.displaced ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.68) + '">' +
+          r.displaced + ' pushed outward &mdash; excited, and about to fall back</div>' : '') +
+        (r.degenerate ? '<div class="ro-sub" style="color:' + hsl(150, 0.7, 0.66) + '">' +
+          r.degenerate + ' degenerate &mdash; same energy, different state. This is where chemistry comes from.</div>' : '');
+      return;
+    }
     if (s.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       const c = s.cell;
@@ -453,6 +558,9 @@
     if (s.kind === 'planet' && s.planet) {
       const p = s.planet;
       const su = s.surface;
+      /* Where in the day, the year, and the tide. All of it was already
+       * derived and none of it was ever shown. */
+      const when = RS.localtime.describe(s.clock);
       node.innerHTML =
         '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(p.type.hue, 0.8, 0.7) + '">&#9679;</span>' +
         '<span class="ro-title">' + p.name + '</span></div>' +
@@ -461,6 +569,8 @@
         (su ? '<div class="ro-sub" style="margin-top:4px;color:' + hsl(su.biome.hue, 0.6, 0.7) + '">' +
           su.biome.name + ' &middot; ' + Math.round(su.T) + ' K &middot; lat ' +
           (su.lat * 57.3).toFixed(0) + '&deg;</div>' : '') +
+        (when ? '<div class="ro-sub" style="margin-top:4px;color:' +
+          hsl(s.clock.sun.daylight > 0.5 ? 45 : 220, 0.55, 0.68) + '">' + when + '</div>' : '') +
         (s.agents.length ? '<div class="ro-sub" style="margin-top:4px">' + s.agents.length +
           ' minds nearby</div>' : '');
       return;
@@ -483,28 +593,141 @@
 
   // --- toasts --------------------------------------------------------------
 
+  /* ── Notifications ────────────────────────────────────────────────────────
+   *
+   * These used to be centred, three deep, and long-lived, which meant that
+   * during the parts of the game that generate the most events — arriving
+   * somewhere, a run of discoveries — a wall of cards sat directly over the
+   * thing the cards were about. A notification that hides the world it is
+   * describing is worse than no notification.
+   *
+   * Four changes, in order of how much they matter:
+   *
+   *   1. They live in the top-right corner, out of the world entirely.
+   *   2. There are at most two, and a third replaces the oldest immediately
+   *      rather than queueing behind it.
+   *   3. Repeats coalesce. Sweeping Δ across the ensemble used to fire one
+   *      card per universe; now the card updates in place and shows a count.
+   *   4. Chatter is filtered by a setting, and the default is to show only
+   *      what a player would want interrupting them.
+   *
+   * Nothing here is load-bearing: every notification restates something that
+   * is also visible in the readout, the objective line or the guide. That is
+   * the property that makes filtering them safe.
+   */
+  const PRIORITY = { warn: 3, major: 3, gnosis: 2, buy: 1, info: 1, seat: 0 };
+  /* 'all' shows everything; 'key' drops routine chatter and dial seating;
+   * 'off' shows nothing but warnings, because a warning is the one kind that
+   * exists to stop you wasting your time. */
+  const LEVELS = { all: 0, key: 1, off: 3 };
+  let notifyLevel = 'key';
+
+  const MAX_TOASTS = 2;
+  /* title → { node, at, n, timer } — one entry per distinct message, so a
+   * repeat updates rather than stacks. */
+  const liveToasts = new Map();
+
+  function setNotifyLevel(v) { notifyLevel = LEVELS[v] != null ? v : 'key'; }
+
   function toast(opts) {
+    const kind = opts.kind || 'info';
+    if ((PRIORITY[kind] != null ? PRIORITY[kind] : 1) < LEVELS[notifyLevel]) return;
+
+    const key = opts.title;
+    const existing = liveToasts.get(key);
+    if (existing) {
+      /* Coalesce. The card stays where it is and gains a count, so a burst
+       * reads as "this happened four times" rather than as four cards. */
+      existing.n++;
+      const c = existing.node.querySelector('u');
+      if (c) c.textContent = '×' + existing.n;
+      else existing.node.querySelector('b').insertAdjacentHTML('beforeend',
+        ' <u style="font-style:normal;text-decoration:none;opacity:.55">×' + existing.n + '</u>');
+      clearTimeout(existing.timer);
+      existing.timer = setTimeout(() => retire(key), opts.ms || 3000);
+      return;
+    }
+
     const t = document.createElement('div');
-    t.className = 'toast ' + (opts.kind || 'info');
+    t.className = 'toast ' + kind;
     if (opts.hue != null) t.style.setProperty('--h', opts.hue);
+    /* Only the loudest kinds get a second line. Everything else is a title,
+     * because a title is readable at a glance and a paragraph is not. */
+    const wantBody = opts.body && (PRIORITY[kind] >= 2);
     t.innerHTML = '<i>' + (opts.icon || '◈') + '</i><span><b>' + opts.title + '</b>' +
-      (opts.body ? '<em>' + opts.body + '</em>' : '') + '</span>';
+      (wantBody ? '<em>' + opts.body + '</em>' : '') + '</span>';
     el['toasts'].appendChild(t);
-    /* Cap the stack — a burst of discoveries otherwise walls off the field. */
-    while (el['toasts'].children.length > 3) el['toasts'].removeChild(el['toasts'].firstChild);
-    setTimeout(() => {
-      t.classList.add('out');
-      setTimeout(() => t.remove(), 420);
-    }, opts.ms || 3400);
+
+    const rec = { node: t, n: 1, timer: null };
+    liveToasts.set(key, rec);
+    /* Retire the oldest immediately rather than letting a burst queue up —
+     * a card the player never had time to read is just flicker. */
+    while (liveToasts.size > MAX_TOASTS) retire(liveToasts.keys().next().value);
+    rec.timer = setTimeout(() => retire(key), opts.ms || 3000);
+  }
+
+  function retire(key) {
+    const rec = liveToasts.get(key);
+    if (!rec) return;
+    liveToasts.delete(key);
+    clearTimeout(rec.timer);
+    rec.node.classList.add('out');
+    setTimeout(() => rec.node.remove(), 380);
   }
 
   // --- drawers -------------------------------------------------------------
 
-  function toggleDrawer(game, bus, which) {
-    if (drawerOpen === which) { closeDrawer(); return; }
+  /* ── The panels ───────────────────────────────────────────────────────────
+   *
+   * Ordered as a player needs them: what is in front of me, what am I flying,
+   * what do I know, where am I going, how does this work, and settings. `when`
+   * decides whether a tab is worth showing at all — the World tab is
+   * meaningless in the attunement field and its absence is information.
+   */
+  const TABS = [
+    { id: 'world', label: 'World', glyph: '🜨',
+      when: g => g.scene.kind !== 'field' && g.scene.kind !== 'ensemble' },
+    { id: 'vessels', label: 'Bodies', glyph: '⋀', when: () => true },
+    { id: 'upgrades', label: 'Dials', glyph: '⚙', when: () => true },
+    { id: 'codex', label: 'Codex', glyph: '◇', when: () => true },
+    { id: 'paths', label: 'Paths', glyph: '◈', when: () => true },
+    { id: 'guide', label: 'Guide', glyph: '?', when: () => true },
+    { id: 'settings', label: 'Settings', glyph: '⋯', when: () => true }
+  ];
+  /* Reopening the drawer returns you to the panel you were last in, because a
+   * drawer that always opens on the same tab is a drawer you have to navigate
+   * every single time. */
+  let lastTab = 'upgrades';
+
+  function openDrawer(game, bus, which) {
     drawerOpen = which;
+    if (which && which !== 'contact') lastTab = which;
     el['drawer'].classList.add('open');
+    renderTabs(game);
     renderDrawer(game, bus);
+  }
+
+  function toggleDrawer(game, bus, which) {
+    if (!which || drawerOpen === which) { closeDrawer(); return; }
+    openDrawer(game, bus, which);
+  }
+
+  function renderTabs(game) {
+    const nav = el['drawer-tabs'];
+    if (!nav) return;
+    let h = '';
+    for (const t of TABS) {
+      if (!t.when(game)) continue;
+      h += '<button data-tab="' + t.id + '"' + (drawerOpen === t.id ? ' class="on"' : '') +
+        '><span>' + t.glyph + '</span>' + t.label + '</button>';
+    }
+    /* Contact only appears as a tab once there is a channel — otherwise it is
+     * a door to an empty room. */
+    if (game.scene.contact) {
+      h += '<button data-tab="contact"' + (drawerOpen === 'contact' ? ' class="on"' : '') +
+        '><span>◉</span>Contact</button>';
+    }
+    nav.innerHTML = h;
   }
 
   function closeDrawer() {
@@ -514,6 +737,10 @@
 
   function renderDrawer(game, bus) {
     if (!drawerOpen) return;
+    /* The tab row is part of the drawer, so an action that rebuilds the body —
+     * buying an upgrade, taking a body — must not leave the tabs showing a
+     * stale selection or a scope-conditional tab that no longer applies. */
+    renderTabs(game);
     const titles = { upgrades: 'DIALS', codex: 'CODEX', settings: 'SETTINGS',
       world: 'WORLD', vessels: 'BODIES & RESEARCH', contact: 'CONTACT',
       guide: 'HOW THIS WORKS', paths: 'PATHWAYS' };
@@ -576,18 +803,90 @@
   function codexHTML(game) {
     let h = '<div class="codex-tabs">';
 
-    h += '<section><h3>Essences <em>' + RS.fractal.totalGnosis(game) + ' contexts recognised</em></h3>' +
+    /* ── The essence sheet ───────────────────────────────────────────────
+     *
+     * This is the player's map of the generative core, and it is the single
+     * most useful screen in the game: every mechanic anywhere is one of six
+     * primitives parameterised by the four numbers listed here, so a filled-in
+     * row is a prediction about twelve layers at twenty-two scales.
+     *
+     * Unrevealed axes are drawn as blanks rather than hidden, because the shape
+     * of what you do not know yet is itself information — you can see that
+     * Cascade has three axes left and go hunting it deliberately, which is the
+     * whole RECOGNITION pathway.
+     */
+    const AXIS_META = [
+      { key: 'complexity', sym: 'C', hue: 268, lo: 'simple', hi: 'intricate' },
+      { key: 'branching', sym: 'B', hue: 12, lo: 'single', hi: 'many' },
+      { key: 'symmetry', sym: 'S', hue: 150, lo: 'lopsided', hi: 'even' },
+      { key: 'persistence', sym: 'P', hue: 43, lo: 'fleeting', hi: 'lasting' }
+    ];
+    const totalAxes = RS.fractal.ESSENCES.length * 4;
+    let shown = 0;
+    for (const e of RS.fractal.ESSENCES) shown += RS.fractal.predicted(game, e.id, {}).revealed;
+
+    h += '<section><h3>Essences <em>' + shown + ' / ' + totalAxes + ' axes read</em></h3>' +
       '<p class="blurb">One alphabet, spelled differently by every layer and every scale. ' +
-      'Recognising an essence somewhere new deepens it everywhere.</p><div class="ess-grid">';
+      'Four numbers each, and every mechanic in the game is those numbers fed to one of six ' +
+      'primitives — so a filled row is a prediction about twelve layers at twenty-two scales. ' +
+      'Blanks are what you have not read yet.</p><div class="ess-sheet">';
+
     for (const e of RS.fractal.ESSENCES) {
-      const g = RS.fractal.gnosisOf(game, e.id);
-      h += '<div class="ess' + (g ? '' : ' unknown') + '">' +
-        '<span class="g">' + (g ? e.glyph : '·') + '</span>' +
-        '<span class="n">' + (g ? e.name : '—') + '</span>' +
-        '<span class="lv">' + (g ? '×' + g : '') + '</span>' +
-        (g ? '<span class="t">' + e.trait + '</span>' : '') +
-        (g ? '<span class="b">+' + ((RS.fractal.gnosisBonus(game, e.id) - 1) * 100).toFixed(0) + '% yield</span>' : '') +
+      const n = RS.fractal.gnosisOf(game, e.id);
+      const pr = RS.fractal.predicted(game, e.id, {});
+      const met = n > 0;
+      /* What is still to come, so a player can pick a target. */
+      const nextAt = RS.fractal.REVEAL_AT[pr.revealed];
+      const toGo = nextAt != null ? nextAt - n : 0;
+
+      let bars = '';
+      for (const a of AXIS_META) {
+        const v = pr[a.key];
+        const known = v !== undefined;
+        bars += '<span class="ax' + (known ? '' : ' blank') + '" style="--h:' + a.hue + '" ' +
+          'title="' + a.key + (known ? ': ' + v.toFixed(2) + ' — ' +
+            (v > 0.66 ? a.hi : v < 0.34 ? a.lo : 'middling') : ' — not read yet') + '">' +
+          '<b>' + a.sym + '</b>' +
+          (known ? '<i style="width:' + (v * 100).toFixed(0) + '%"></i>' : '') +
+          '</span>';
+      }
+
+      /* The forms this essence takes, which is the fractal claim made concrete:
+       * the same information wearing eight different local names. Only shown
+       * once met, because the point is recognising it, not reading it off. */
+      const forms = met && e.forms
+        ? Object.keys(e.forms).filter(k => e.forms[k]).map(k => e.forms[k]).slice(0, 4).join(' · ')
+        : '';
+
+      h += '<div class="ess-row' + (met ? '' : ' unknown') + '">' +
+        '<span class="eg">' + (met ? e.glyph : '·') + '</span>' +
+        '<span class="en">' + (met ? e.name : '—') +
+          '<em>' + (met ? e.trait : 'not yet met') + '</em></span>' +
+        '<span class="eax">' + bars + '</span>' +
+        '<span class="ect">' + (met ? '×' + n : '') +
+          (toGo > 0 && met ? '<em>+' + toGo + ' to read</em>' :
+            met ? '<em>complete</em>' : '') + '</span>' +
+        (forms ? '<span class="ef">' + forms + '</span>' : '') +
         '</div>';
+    }
+    h += '</div></section>';
+
+    /* ── The primitives ──────────────────────────────────────────────────
+     *
+     * The other half of the map. The axes above are the numbers; these are the
+     * six functions they are fed to, and which bands run which. Without this,
+     * the axes are a stat block; with it, they are a prediction.
+     */
+    h += '<section><h3>Primitives <em>every mechanic is one of these</em></h3><div class="list">';
+    for (const id of RS.emergence.IDS) {
+      const L = RS.emergence.LABELS[id];
+      const bands = RS.spectrum.BANDS.filter(b => RS.spectrum.usesPrim(b, id));
+      const held = bands.filter(b => game.known.bands[b.id]);
+      h += '<div class="row' + (held.length ? '' : ' dim') + '" style="--h:200">' +
+        '<span class="g">' + L.glyph + '</span>' +
+        '<span class="n">' + L.name + '<em>' + held.length + ' / ' + bands.length + ' layers held</em></span>' +
+        '<span class="d">' + L.blurb + '<br><i style="opacity:.55">' +
+        bands.map(b => b.name).join(', ') + '</i></span></div>';
     }
     h += '</div></section>';
 
@@ -629,7 +928,17 @@
       row('audio', 'Audio', 'Procedural synthesis. The beat tone is how you tune by ear — strongly recommended.') +
       row('haptics', 'Haptics', 'Detent ticks and impacts through the vibration motor.') +
       row('reduceMotion', 'Reduce motion', 'Disables screen shake and thins particle bursts.') +
+      row('bloom', 'Bloom', 'Light spills between bright things. Costs about half a millisecond.') +
       row('showSci', 'Scientific notes', 'Show the physical definition of each scale.') +
+      /* A cycle rather than a toggle, because three states is the right number:
+       * everything, only what would be worth interrupting you, and nothing but
+       * warnings. */
+      '<button class="set-row" data-cycle="notify"><span class="k">Notifications</span>' +
+      '<span class="d">' +
+        (s.notify === 'all' ? 'Everything, including routine chatter.'
+          : s.notify === 'off' ? 'Warnings only. Everything else is in the readout anyway.'
+            : 'Arrivals, discoveries and warnings. Not chatter.') +
+      '</span><span class="cyc">' + (s.notify || 'key').toUpperCase() + '</span></button>' +
       '<div class="stats"><h3>Session</h3>' +
       '<div>Crystallised <b>' + fmt(game.stats.crystals) + '</b></div>' +
       '<div>Best single <b>' + fmt(game.stats.bestSingle) + ' Ψ</b></div>' +
@@ -995,5 +1304,7 @@
           : 'Expand the consciousness field to reach it.') + '</div>';
   }
 
-  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
+  RS.ui = {
+    setNotifyLevel, init, render, toast, toggleDrawer, openDrawer, closeDrawer, renderDrawer, renderTabs, setText, TABS,
+    worldHTML, vesselsHTML, contactHTML, codexHTML, upgradesHTML, settingsHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

@@ -246,12 +246,18 @@ generated from live state rather than written out:
   means *in this mode, in this body*, which rungs of the ladder are open, what
   each symbol on screen is, and how the beat works. A player who is confused
   reads about their situation, not about the game in the abstract.
-- **◈ — Pathways.** The game has three genuinely different routes forward and no
-  way to tell from the inside. **TUNE** is pure dial skill and needs nothing.
-  **REACH** is research, bodies, worlds and structures. **CONTACT** is the
-  shortcut — a culture hands you charts and research you would otherwise buy.
-  They feed each other, none is mandatory, and each one always states a concrete
-  next step.
+- **&#9672; Pathways.** Six genuinely different routes forward, and no way to tell
+  that from the inside. **TUNE** is pure dial skill and needs nothing. **REACH**
+  is research, bodies, worlds and structures. **CONTACT** is the shortcut — a
+  culture hands you charts and research you would otherwise buy. **INWARD** runs
+  down the ladder through the four small scopes to the one place you change a
+  world from inside it. **BEYOND** runs up it, through structure formation to
+  the laws themselves. **RECOGNITION** is hunting one essence across contexts
+  until you can predict it — only a real strategy since gnosis became foresight.
+  They feed each other, none is mandatory, and each always states a concrete
+  next step computed from live state. The gates genuinely differ: INWARD and
+  BEYOND run in opposite directions from the root, and RECOGNITION is the one
+  route no amount of insight can buy.
 
 ## Scopes
 
@@ -260,6 +266,8 @@ Turning Σ is how you travel, and each range of rungs is somewhere different.
 | Σ | scope | what it is | only here |
 |---|---|---|---|
 | planck · quantum | **Quantum foam** | pairs borrowing existence and paying it back | **no body works**; find the one that never cancelled |
+| nucleonic · atomic | **Orbital shells** | finite states, and no two may be the same | catch a degeneracy — where chemistry comes from |
+| molecular | **Molecular** | coiled chains, and handedness | read a biosphere's depth off a bag of molecules |
 | cellular | **Cytoplasm** | inside one cell of a living world | change a biosphere from inside it |
 | planetary and within | **Surface** | stand on a world | terrain, weather, creatures, structures |
 | stellar · system | **System** | one gravity well and everything bound to it | trade, contact, orbital mechanics |
@@ -327,6 +335,37 @@ what was borrowed is never repaid — which, at the largest scale, is the reason
 there is anything at all rather than nothing. Finding one is the scope's
 discovery.
 
+### Orbital shells
+
+The only scope with a **finite, contested** set of places to be. No two
+occupants may share a full set of quantum numbers — that is not a rule anybody
+chose, it is what "fermion" means, and it is why matter takes up space and why
+there is a periodic table. An essence's four axes decide the state it wants:
+complexity picks the shell, branching picks the subshell (s is spherical; p, d
+and f have progressively more lobes), symmetry picks the orientation,
+persistence picks the spin. Two essences that want the same state genuinely
+fight over it, and the loser is pushed outward into an excited state that is
+about to fall back.
+
+The find is **degeneracy** — different states that happen to share an energy.
+`4s` sits below `3d`, which the suite asserts, because that ordering is why the
+periodic table has the shape it has.
+
+### Molecular
+
+A molecule with four different groups on a carbon comes in two mirror-image
+forms that cannot be superimposed, with identical energies and identical
+spectra. Life uses one almost exclusively — every amino acid on Earth is
+left-handed — and nobody knows why it went that way.
+
+So on a sterile world the two hands appear in equal numbers, and on a living one
+the chemistry is **homochiral**. You can read a biosphere's depth off a bag of
+molecules without ever seeing an organism, which is a real technique. The find is
+the exception: on a homochiral world, the rare molecule of the wrong hand.
+
+Handedness comes from `symmetry`, straight through — an essence at symmetry 1.0
+is achiral, because its mirror image *is* itself.
+
 ### Ensemble
 
 The premise's last claim. So far "local rules" has meant a rung's geometry and a
@@ -349,6 +388,104 @@ property of physics rather than of the fractal store.
 Leaving restores our block, always. An alternative universe you had forgotten
 you were standing in would silently re-derive every star in the game and read as
 a bug rather than a mechanic.
+
+## Light, and arriving somewhere
+
+Everything in this game emits — nodes ignite as you approach them, filaments
+glow, a star is a disc of light — and all of it was drawn with radial gradients,
+which is how you fake the *look* of light without any of its behaviour. Two
+bright things did not add up. A small very bright thing looked like a large dim
+one. Nothing spilled onto anything.
+
+`bloom.js` is a real post pass: downscale to a quarter (the browser's bilinear
+filter is the first blur, free), threshold with `difference` and `multiply` so
+only genuinely bright things bleed, box-blur by drawing the buffer onto itself,
+composite back with `lighter`. Each scope declares how hard it glows — the foam
+seethes because everything in it is an event; a planet surface barely blooms
+because it is lit rather than luminous.
+
+**The capture happens at the top of the frame, before the clear**, and that is
+the entire performance story. Measured in isolation the steps cost 1.3 ms;
+called at the end of the frame they cost **16 ms**, because sampling a canvas
+with drawing queued on it forces the browser to finish all of it first. Captured
+before the clear — when the canvas holds last frame's finished image and nothing
+is queued — the flush is free. The glow is one frame behind what makes it, which
+at 60 Hz nobody can see.
+
+It still costs about 3 fps in the busiest scope and nothing measurable in the
+others, so there is a settings toggle.
+
+### Arrival
+
+`scene.transition` was a white flash, which says "something changed" and nothing
+else. The ladder *is* the navigation, so a scope change is a movement, and the
+one thing it has to communicate is which way you went.
+
+Descending zooms in: the world starts small and expands into place, and rings
+stream outward past you. Climbing does the reverse. The direction is derived
+from the rungs the two scopes occupy, so it is right for every pair without
+anyone enumerating them — and the suite checks that no ordered pair produces a
+zero, because a zero would draw nothing and leave the change unexplained.
+
+## Nowhere is empty
+
+`neural.mindAt` builds a small recurrent network from any address and steps it
+for about 200 multiply-adds. It was in the codebase from the solar layer onward,
+and exactly two things called it: creatures on a planet surface, and the mind
+you ride. Every other scope was furniture — a cell with no traffic, a filament
+with nothing falling down it, an atom whose shells were a diagram.
+
+Every scope now has its own inhabitants, from the same generator: transitions
+dropping between states in the shells, catalysts working the chain, vesicles on
+the cytoskeleton, ships in transit, somebody else's probes, galaxies falling
+down filaments, and whatever does the observing in a universe that is not ours.
+
+**They act before you arrive and continue after you leave.** Nothing is spawned
+on entry or despawned on exit, because an inhabitant that begins existing when
+you look at it is a decoration. Each one's *path* is a pure function of
+(address, scene time) — so it costs nothing while you are elsewhere, because it
+is not being simulated, it is being derived — and a real recurrent mind rides
+that path and perturbs it, so what a thing does is emergent rather than
+scripted. The test suite checks both halves: the path is byte-identical at the
+same address and time, and the mind moves it without replacing it.
+
+### Time you can feel standing in it
+
+`dayHours`, `axialTilt`, `tidallyLocked` and a full list of `moons` with real
+orbital periods have been derived since the solar layer landed. Every one of
+those numbers was correct, none was rendered, and a surface looked the same at
+every hour of every day of every year on every world.
+
+Now the star's elevation is a real solar-elevation calculation in (planet,
+longitude, latitude, epoch) — closed-form, so scrubbing τ across a thousand
+years costs exactly what standing still costs, and τ gains a second meaning on a
+surface without gaining a second control.
+
+- **Twilight width is the atmosphere's own.** A dense world has a long dusk that
+  reddens as the light path lengthens; an airless one snaps from noon to night,
+  which is why the Moon has no dusk.
+- **A tidally locked world has places instead of times of day.** The substellar
+  point is directly under the star forever, the antistellar point never sees it,
+  and nine hundred years later nothing has moved. That is the single most
+  important fact about the commonest kind of habitable world in the real galaxy,
+  and standing on one used to look exactly like standing on Earth.
+- **Seasons turn**, from the real declination swing, and the hemispheres
+  disagree about which one it is.
+- **Tides scale as the cube of distance**, so a close small moon out-pulls a
+  distant large one, and several moons produce a genuinely messy tide with
+  occasional spring alignments rather than simply a bigger one.
+
+### And silence where there is no medium
+
+One ambient bed per scope: seething broadband in the foam, a resonant ring in
+the shells, fluid pulse in a cell, a vast low drone in the web. On a planet
+surface the wind scales with real atmospheric pressure and saturates, so Mars is
+essentially silent and Venus is not ninety times louder than Earth.
+
+The system and galaxy scopes are **silent**, because sound does not propagate
+where there is no medium. It is the one place where the physics and the sound
+design are the same decision, and the contrast when you descend into an
+atmosphere is worth more than any amount of texture would have been.
 
 ## Six primitives
 
@@ -376,7 +513,7 @@ vital    ▸ nest flow       unity      ▸ all six
 emotive  ▸ flow twin       mnemonic   ▸ order nest
 ```
 
-**14 essences × 4 axes = 56 authored numbers**, and everything else is composed
+**16 essences × 4 axes = 64 authored numbers**, and everything else is composed
 from them. The point is not economy of code — it is that knowledge *transfers*.
 Once you learn that `Cascade` branches (0.90), you know its rhythm subdivides
 five ways, its dependency graph fans out four wide, its nests are wide and
@@ -390,6 +527,23 @@ you arrive because a rhythm is a thing in time; Probabilistic does the same for
 Δ because the halves of a superposition differ by phase. And each primitive
 carries a friction number that pays back the throughput it costs, so composing a
 new band cannot silently create a layer that is a demotion to reach.
+
+### The codex is the essence sheet
+
+The player's map of the generative core, and the most useful screen in the game
+once you know what it is for. Every essence gets a row: its four axes as bars,
+its trait, how many contexts it has been met in, how many more until the next
+axis, and the names it wears at each geometry.
+
+Unrevealed axes are drawn as **blanks rather than hidden**, because the shape of
+what you do not know is itself information — you can see that an essence has
+three axes left and go hunting it deliberately, which is the whole RECOGNITION
+pathway. The sheet's count agrees with `fractal.predicted` exactly, and the test
+suite verifies that an unmet essence gives away nothing: not its name, not its
+trait, not one of its form names.
+
+Below it, the six primitives and which bands run each. Without that half the
+axes are a stat block; with it, they are a prediction.
 
 ### Understanding becomes foresight
 
@@ -537,6 +691,8 @@ All audio is synthesised at runtime — there are no sound files.
 | `contact.js` | carriers, awareness, standing, dialogue, uplift |
 | `guide.js` | the live guide and the three pathways |
 | `neural.js` | derived recurrent minds; the influence channel |
+| `inhabitants.js` | what lives in each scope — derived paths, real minds riding them |
+| `localtime.js` | solar elevation, seasons and tides, closed-form in place and epoch |
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
 | `scenes.js` | the scene registry, the modal split, agents |
@@ -544,8 +700,11 @@ All audio is synthesised at runtime — there are no sound files.
 | `scene_web.js` | Cosmic web: logistic structure formation, voids, the event horizon |
 | `scene_foam.js` | Quantum foam: virtual pairs, lifetimes from persistence, ejection |
 | `scene_ensemble.js` | Ensemble: alternative law, adoption, the two-universe specimen |
+| `scene_molecular.js` | Molecular: chirality, and what homochirality says about a world |
+| `scene_shells.js` | Orbital shells: exclusion, Aufbau placement, degeneracy |
 | `physics.js` | the constants, gathered and swappable; ours is the default block |
 | `game.js` `save.js` | state, economy, objectives, persistence |
+| `bloom.js` | the post pass: threshold, blur, and why it captures before the clear |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
 | `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
 | `render.js` `worldrender.js` `hud.js` `ui.js` `input.js` `reactions.js` | presentation |
@@ -609,24 +768,33 @@ revealed) and reads its dialogue off the rendered DOM.
 
 ## Status
 
-This is a foundation, and complete as one: all three scenes are playable end to
-end, every system named above is implemented and tested rather than stubbed.
+**Complete as designed.** Every phase of the plan this was built against has
+landed, and the invariants are held by 952 assertions rather than by intention:
 
-The clearest things to build next — none of which require changing the
-architecture, because the sparse-delta and derive-everything decisions were made
-to accommodate them:
+- All **22 rungs** have a scope of their own, every one reachable by turning Σ,
+  none absorbed by a scope that is not about it.
+- All **12 layers** are winnable and measurably distinct, composed from six
+  primitives and 64 authored numbers.
+- **Six pathways** through it, each computed from live state, gating on
+  genuinely different things.
+- Nothing is stored. `node tools/build.mjs` still emits one self-contained HTML
+  file with no dependencies and no build step, and it runs at 60 fps.
 
-- **The last three rungs.** Eighteen of the twenty-two have a view of their
-  own. What is left is Molecular (`chain`) and the two orbital-shell rungs
-  (`orbital`) — both small, both following the pattern the other scopes
-  established. Scenes are a registry (`SCENES` in `scenes.js`) and the suite
-  asserts the ladder is covered without gaps, so adding one is a row and a
-  file.
-- **Culture-to-culture relations.** Standing is per-player right now. Cultures
-  knowing about *each other* — and about what you did to their neighbours — is
-  the same derived-plus-delta pattern with one more index.
-- **Riding a civilisation.** Riding a mind works. Biasing a culture's
-  trajectory rather than a creature's is the same influence mechanic one scale
-  up, and `civOf` is already a closed-form curve waiting to be perturbed.
-- **Contact at range.** Carriers currently need you in the system. A probe left
-  behind, or a beacon network, could hold a channel open across light years.
+What a next pass would most usefully do, in order of how much it would change
+the game:
+
+- **Culture-to-culture relations.** Standing is per-player. Cultures knowing
+  about *each other* — and about what you did to their neighbours — is the same
+  derived-plus-delta pattern with one more index.
+- **Riding a civilisation.** Riding a mind works. Biasing a culture's trajectory
+  rather than a creature's is the same influence mechanic one scale up, and
+  `civOf` is already a closed-form curve waiting to be perturbed.
+- **Contact at range.** Carriers need you in the system. A probe left behind, or
+  a beacon network, could hold a channel open across light years.
+- **More essences.** The generative core is 16 × 4 numbers now — two were added
+  after everything else was finished, purely to exercise the property the whole
+  architecture exists to have, and **nothing else in the codebase was touched**:
+  no band table, no scene, no renderer, no primitive. They appear in twelve
+  layers, twenty-two rungs, nine scopes and every geometry because that is how
+  the first fourteen got there too. A test now asserts it, so a hardcoded count
+  or an array sized to the essence list would fail loudly.

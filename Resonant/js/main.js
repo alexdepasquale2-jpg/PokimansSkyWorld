@@ -60,6 +60,14 @@
 
     RS.feel.init({ reduceMotion: game.settings.reduceMotion, haptics: game.settings.haptics });
     RS.audio.setEnabled(game.settings.audio);
+    RS.ui.setNotifyLevel(game.settings.notify);
+    if (RS.bloom) {
+      RS.bloom.setEnabled(game.settings.bloom !== false);
+      /* Pay the pipeline's first-frame cost now, while nobody is looking. */
+      RS.bloom.warm(fieldCtx, fieldCanvas,
+        fieldCanvas.clientWidth || window.innerWidth,
+        fieldCanvas.clientHeight || window.innerHeight);
+    }
     RS.ui.init(game, bus);
     RS.reactions.wire(game, bus);
     RS.input.attach(hudCanvas, game, bus, {
@@ -127,25 +135,31 @@
     rafId = requestAnimationFrame(loop);
   }
 
-  /* Three staggered lines instead of a modal. The game is genuinely not
-   * obvious and pretending otherwise costs players; a wall of text costs
-   * more. */
+  /* First run. Four staggered cards used to overlap each other and the world
+   * they were describing; now they arrive one at a time, well spaced, and each
+   * has retired before the next appears. Deliberately shown at `major` so the
+   * notification setting cannot hide the only tutorial the game has — and
+   * deliberately only four, because the guide is written against live state and
+   * pointing at it is worth more than any amount of text here. */
+  const FIRST_RUN = [
+    { at: 0, icon: '◉', hue: 205, title: 'You are a point of consciousness',
+      body: 'You cannot move. You can only change what is rendered to you.' },
+    { at: 6500, icon: 'φ', hue: 187, title: 'Turn the φ dial',
+      body: 'Drag it in a circle. Swing wide for fine control, and listen for the beat.' },
+    { at: 13000, icon: '◈', hue: 43, title: 'Hold the lock',
+      body: 'Line up the arcs around yourself. Coherence fills while you hold.' },
+    { at: 19500, icon: '?', hue: 200, title: 'Lost? Tap ? at any time',
+      body: 'The guide describes whatever is in front of you right now.' }
+  ];
+
   function firstRunHints() {
-    RS.ui.toast({ kind: 'major', icon: '◉', ms: 7000,
-      title: 'You are a point of consciousness',
-      body: 'You cannot move. You can only change what is rendered to you.' });
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: 'φ', hue: 187, ms: 7000,
-      title: 'Turn the φ dial',
-      body: 'Drag it in a circle. Swing your finger wide for fine control. Listen for the beat.' }), 4200);
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '◈', hue: 43, ms: 7000,
-      title: 'Hold the lock',
-      body: 'Line up the arcs around yourself. Coherence fills while you hold.' }), 8400);
-    /* The game is genuinely deep and the guide is written against live state,
-     * so pointing at it is worth more than any amount of additional tutorial
-     * text here. */
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '?', hue: 200, ms: 9000,
-      title: 'Lost? Tap ? at any time',
-      body: 'The guide describes whatever is actually in front of you — this scene, these dials, this mode.' }), 12600);
+    for (const h of FIRST_RUN) {
+      const fire = () => RS.ui.toast({
+        kind: 'major', icon: h.icon, hue: h.hue, ms: 5200,
+        title: h.title, body: h.body
+      });
+      if (h.at === 0) fire(); else setTimeout(fire, h.at);
+    }
   }
 
   function onResize() {
@@ -196,6 +210,11 @@
       RS.audio.updateDrone(D.value, band,
         RS.spectrum.resonanceOf(band, D.value, focus) * (inField ? 1 : 0.22),
         RS.spectrum.isGhost(band, focus));
+      /* The scope's ambient bed. Silent in a vacuum, which is both correct
+       * and the reason arriving in an atmosphere lands. */
+      RS.audio.updateBed(game.scene.kind,
+        game.scene.planet ? game.scene.planet.pressure : 0);
+
       const n = inField ? game.focusNode : null;
       RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index, n);
 

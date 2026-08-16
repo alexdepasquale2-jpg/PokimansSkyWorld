@@ -207,6 +207,14 @@
         foam: { hue: 291, icon: '∴',
           title: () => 'quantum foam',
           body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
+        molecular: { hue: 196, icon: '⌬',
+          title: sc => sc.molecule && sc.molecule.bias > 0.5 ? 'homochiral chemistry' : 'racemic chemistry',
+          body: sc => sc.molecule && sc.molecule.bias > 0.5
+            ? 'Life here settled which hand it uses. Find one of the other.'
+            : 'Both hands in equal numbers. Nothing here is choosing.' },
+        shells: { hue: 210, icon: '⌸',
+          title: () => 'orbital shells',
+          body: () => 'No two occupants may share a state. Finite places, and they are taken.' },
         cellular: { hue: 150, icon: '❋',
           title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
           body: sc => {
@@ -239,6 +247,8 @@
     });
 
     bus.on('ensemble:adopt', ({ block, distance }) => {
+      game.stats.blocksAdopted = (game.stats.blocksAdopted || 0) + 1;
+      game.stats.farthestBlock = Math.max(game.stats.farthestBlock || 0, distance);
       RS.audio.upheaval(1.2 + distance);
       RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
       RS.ui.toast({
@@ -490,6 +500,8 @@
       if (key === 'audio') RS.audio.setEnabled(value);
       if (key === 'haptics') RS.feel.setHaptics(value);
       if (key === 'reduceMotion') RS.feel.setReduceMotion(value);
+      if (key === 'notify') RS.ui.setNotifyLevel(value);
+      if (key === 'bloom' && RS.bloom) RS.bloom.setEnabled(value);
     });
   }
 

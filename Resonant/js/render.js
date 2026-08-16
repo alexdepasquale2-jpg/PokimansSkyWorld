@@ -500,6 +500,135 @@
     }
   }
 
+  /* ── The molecule ────────────────────────────────────────────────────────
+   *
+   * A coiled chain of sites, bonded. Handedness is the whole point, so it is
+   * the loudest thing on screen: warm for the minority hand, cool for the
+   * majority, neutral green for the achiral sites where the question does not
+   * arise. On a sterile world the two colours are evenly mixed; on a living one
+   * the screen is nearly one colour and the odd warm site is the find.
+   */
+  function drawMolecule(ctx, game, t) {
+    const m = game.scene.molecule;
+    if (!m) return;
+    const ct = game.scene.molT || 0;
+
+    /* Bonds first. Line weight is bond order, which is the essence's
+     * persistence — how tightly it holds on, everywhere in the game. */
+    for (let i = 0; i < m.sites.length - 1; i++) {
+      const a = m.sites[i], b = m.sites[i + 1];
+      ctx.strokeStyle = hsl(200, 0.3, 0.55, 0.35);
+      ctx.lineWidth = Math.max(1, px(0.002 * a.bond));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+      /* A double or triple bond is drawn as such — it is a real distinction
+       * and it costs one extra line. */
+      for (let k = 1; k < a.bond; k++) {
+        const dx = (b.y - a.y), dy = -(b.x - a.x);
+        const len = Math.hypot(dx, dy) + 1e-5;
+        const off = px(0.006 * k) / len;
+        ctx.beginPath();
+        ctx.moveTo(sx(a.x) + dx * off, sy(a.y) + dy * off);
+        ctx.lineTo(sx(b.x) + dx * off, sy(b.y) + dy * off);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < m.sites.length; i++) {
+      const st = m.sites[i];
+      const wob = Math.sin(ct * 1.3 + i * 0.7) * 0.006;
+      const X = sx(st.x + wob), Y = sy(st.y + wob);
+      /* The minority hand gets a halo, because on a homochiral world it is the
+       * one thing in the scope worth crossing the screen for. */
+      if (st.hand < 0 && m.bias > 0.4) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(st.size * 4));
+        g.addColorStop(0, hsl(24, 0.9, 0.6, 0.4));
+        g.addColorStop(1, hsl(24, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(st.size * 4), 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = hsl(st.hue, st.chiral ? 0.75 : 0.35, 0.62, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(st.size), 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Orbital shells ──────────────────────────────────────────────────────
+   *
+   * Concentric shells with their occupants on them. Spin is drawn as a tick
+   * above or below — the only quantum number that has nowhere else to go, and
+   * the one that makes two otherwise identical occupants distinguishable, which
+   * is exactly the situation TWIN describes.
+   */
+  function drawShells(ctx, game, t) {
+    const sh = game.scene.shells;
+    if (!sh) return;
+
+    for (let n = 1; n <= sh.shells; n++) {
+      const r = 0.16 + (n - 1) / sh.shells * 0.74;
+      ctx.strokeStyle = hsl(200, 0.4, 0.5, 0.13);
+      ctx.lineWidth = Math.max(1, px(0.002));
+      ctx.beginPath();
+      ctx.ellipse(view.cx, view.cy, px(r), px(r * 0.9), 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < sh.occupants.length; i++) {
+      const oc = sh.occupants[i];
+      /* Occupants precess around their shell at a rate set by n, so an inner
+       * shell visibly runs faster — which is true and is the cheapest possible
+       * way to say "this one is more tightly bound". */
+      const a = oc.ang + t * (0.30 / oc.q.n);
+      const X = sx(Math.cos(a) * oc.rad), Y = sy(Math.sin(a) * oc.rad * 0.9);
+
+      /* Displaced occupants are excited states — about to fall back, and worth
+       * catching before they do. */
+      if (oc.excited) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(0.05));
+        g.addColorStop(0, hsl(46, 0.9, 0.66, 0.42));
+        g.addColorStop(1, hsl(46, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(0.05), 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = hsl(oc.hue, 0.7, 0.66, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(0.013), 0, TAU); ctx.fill();
+
+      /* Spin: a tick up or down. */
+      ctx.strokeStyle = hsl(oc.hue, 0.8, 0.75, 0.8);
+      ctx.lineWidth = Math.max(1, px(0.0022));
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X, Y + px(0.022) * (oc.spin > 0 ? -1 : 1));
+      ctx.stroke();
+    }
+  }
+
+  /* Whatever lives here. Deliberately small and dim: they are the difference
+   * between a place and a diagram, not the thing you are looking at, and a
+   * scope whose traffic competes with its nodes for attention would be worse
+   * than one with none. */
+  function drawInhabitants(ctx, game, t) {
+    const inh = game.scene.inhabitants;
+    if (!inh || !inh.list.length) return;
+    for (let i = 0; i < inh.list.length; i++) {
+      const o = inh.list[i];
+      const X = sx(o.x), Y = sy(o.y);
+      const r = px(o.size);
+      ctx.fillStyle = hsl(o.hue, 0.7, 0.62, 0.30 * o.bright);
+      ctx.beginPath(); ctx.arc(X, Y, r, 0, TAU); ctx.fill();
+      /* A short wake in the direction of travel — the cheapest possible way to
+       * say "this is going somewhere" rather than "this is a dot". */
+      ctx.strokeStyle = hsl(o.hue, 0.7, 0.6, 0.16 * o.bright);
+      ctx.lineWidth = Math.max(1, r * 0.7);
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X - Math.cos(o.heading) * r * 4, Y - Math.sin(o.heading) * r * 4);
+      ctx.stroke();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -747,6 +876,28 @@
 
   // --- main ----------------------------------------------------------------
 
+  /* ── How much each scope glows ───────────────────────────────────────────
+   *
+   * Bloom is not a uniform filter here; it is part of what a place *is*. The
+   * foam seethes with light because everything in it is an event; a planet
+   * surface barely blooms at all because it is lit rather than luminous; the
+   * ensemble glows hard because it is not a place, it is a set of relations
+   * drawn as light. The threshold moves with it — a scope full of dim things
+   * needs a lower bar or nothing bleeds at all.
+   */
+  const BLOOM = {
+    field:     { amt: 0.85, thr: 0.34 },
+    foam:      { amt: 1.15, thr: 0.30 },
+    shells:    { amt: 0.95, thr: 0.34 },
+    molecular: { amt: 0.75, thr: 0.38 },
+    cellular:  { amt: 0.80, thr: 0.36 },
+    planet:    { amt: 0.42, thr: 0.55 },
+    system:    { amt: 1.05, thr: 0.40 },
+    galaxy:    { amt: 1.00, thr: 0.36 },
+    web:       { amt: 0.90, thr: 0.32 },
+    ensemble:  { amt: 1.10, thr: 0.30 }
+  };
+
   function draw(game, canvas, ctx, dt) {
     resize(canvas);
     const S = RS.feel.state;
@@ -768,6 +919,17 @@
     vis.tierMix.set(D.space.value).step(dt);
 
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+
+    /* Bloom captures *here*, before the clear, while the canvas still holds the
+     * previous frame's finished image and nothing is queued on it. Sampling a
+     * canvas with drawing queued on it forces a pipeline flush — measured at
+     * 16 ms in this scope, against 1.3 ms of actual work. See bloom.js. */
+    if (game.settings.bloom !== false && RS.bloom) {
+      const kb = BLOOM[game.scene ? game.scene.kind : 'field'] || BLOOM.field;
+      const trc = game.scene ? game.scene.transition : 0;
+      RS.bloom.capture(canvas, view.w, view.h, kb.thr * (1 - trc * 0.35));
+    }
+
     ctx.clearRect(0, 0, view.w, view.h);
 
     // deep background
@@ -784,6 +946,31 @@
     ctx.translate(view.cx, view.cy);
     ctx.rotate(S.shakeRot);
     ctx.scale(zoom, zoom);
+    /* ── Arrival, as movement ────────────────────────────────────────────
+     *
+     * The scope change scales the whole world: descending the ladder starts
+     * you zoomed out and settles inward, climbing starts you zoomed in and
+     * pulls back. It is one multiply on a transform that already exists, and
+     * it is the difference between "the picture changed" and "you went
+     * somewhere" — which matters because the ladder *is* the navigation, and a
+     * cut makes twenty-two rungs read as twenty-two destinations rather than
+     * as one continuous axis. */
+    const sc = game.scene;
+    if (sc && sc.transition > 0.001 && sc.transitionDir) {
+      const k = ease.outCubic(1 - sc.transition);
+      /* Descending the ladder is zooming *in*: things grow toward you as you
+       * approach their scale, so the world starts small and expands into place.
+       * Climbing is zooming out: it starts large and contracts. Getting this
+       * backwards — which the first version did — makes descending feel like
+       * retreating, and it is the kind of error that is obvious the moment you
+       * see it and invisible while you are writing it. */
+      const from = sc.transitionDir < 0 ? 0.62 : 1.55;
+      const z = from + (1 - from) * k;
+      ctx.translate(view.cx, view.cy);
+      ctx.scale(z, z);
+      ctx.translate(-view.cx, -view.cy);
+    }
+
     ctx.translate(-view.cx + S.shakeX * px(0.08), -view.cy + S.shakeY * px(0.08));
 
     /* Scene dispatch. The attunement field, the solar system and a planet
@@ -809,6 +996,8 @@
       const inWeb = kind === 'web';
       const inFoam = kind === 'foam';
       const inEnsemble = kind === 'ensemble';
+      const inMol = kind === 'molecular';
+      const inShells = kind === 'shells';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -820,6 +1009,8 @@
       else if (inWeb) drawWeb(ctx, game, t);
       else if (inFoam) drawFoam(ctx, game, t);
       else if (inEnsemble) drawEnsemble(ctx, game, t);
+      else if (inMol) drawMolecule(ctx, game, t);
+      else if (inShells) drawShells(ctx, game, t);
 
       /* The rim. A membrane in a cell, the horizon in the web, and absent in
        * the foam — there is no boundary at a scale where nothing persists long
@@ -842,6 +1033,10 @@
         if (nodes[i].resolved > 0.5) drawNode(ctx, game, nodes[i], t);
       }
 
+      /* Inhabitants, under the nodes: whatever lives at this scope, doing what
+       * it was already doing. */
+      drawInhabitants(ctx, game, t);
+
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);
 
@@ -861,14 +1056,53 @@
       }
     }
 
-    /* Scene transitions flash the whole frame rather than cross-fading two
-     * render targets — cheaper, and it reads as reality being re-rendered
-     * around you, which is what is actually happening. */
+    /* ── Arrival ─────────────────────────────────────────────────────────
+     *
+     * This was a white flash, which said "something changed" and nothing else.
+     * The ladder is the navigation, so a scope change is a movement — and which
+     * way you went is the one thing the transition should communicate.
+     *
+     * Rings travel *inward* when you descend the ladder and *outward* when you
+     * climb it, at a speed that falls as the transition settles. It is two
+     * strokes and a fill; the point is not the effect, it is that the direction
+     * is never ambiguous, so twenty-two rungs read as one continuous axis
+     * rather than as twenty-two destinations.
+     */
     if (game.scene && game.scene.transition > 0.01) {
+      const tr = game.scene.transition;
+      const dir = game.scene.transitionDir || 0;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, game.scene.transition * 0.28);
+
+      /* The wash, dimmer than it was — it is now the background of the
+       * movement rather than the whole of it. */
+      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, tr * 0.16);
       ctx.fillRect(0, 0, view.w, view.h);
+
+      if (dir !== 0) {
+        /* `u` runs 0 → 1 as the transition settles, so the rings sweep once
+         * rather than pulsing. Inward means they close on you; outward means
+         * they leave. */
+        const u = 1 - tr;
+        const maxR = Math.hypot(view.w, view.h) * 0.6;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          const off = i * 0.22;
+          const k = clamp01(u + off);
+          /* And the rings stream the way the world does: outward past you when
+           * you dive in, inward past you when you pull back. */
+          const r = dir < 0
+            ? lerp(px(0.05), maxR, ease.outCubic(k))
+            : lerp(maxR, px(0.05), ease.outCubic(k));
+          const a = tr * (1 - Math.abs(k - 0.5) * 1.1) * 0.5;
+          if (a <= 0.005) continue;
+          ctx.strokeStyle = hsl(vis.hue.value + i * 12, 0.7, 0.66, a);
+          ctx.lineWidth = Math.max(1.5, px(0.012) * (1 - k * 0.6));
+          ctx.beginPath();
+          ctx.arc(view.cx, view.cy, Math.max(1, r), 0, TAU);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
 
@@ -877,6 +1111,20 @@
     drawFloaters(ctx);
 
     ctx.restore();
+
+    /* ── Bloom ───────────────────────────────────────────────────────────
+     *
+     * After the world and before the vignette, so light spills between things
+     * and the vignette still darkens the edge of the result rather than being
+     * bloomed itself. Pushed hard during a transition, which is most of why an
+     * arrival now reads as an event rather than as a cut. */
+    if (game.settings.bloom !== false && RS.bloom) {
+      const b = BLOOM[kind] || BLOOM.field;
+      const tr = game.scene ? game.scene.transition : 0;
+      RS.bloom.composite(ctx, view.w, view.h,
+        b.amt * (1 + tr * 1.4) * (game.settings.reduceMotion ? 0.6 : 1));
+    }
+
     drawPost(ctx);
   }
 

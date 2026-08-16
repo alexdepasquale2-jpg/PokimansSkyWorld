@@ -39,14 +39,12 @@
       <span id="progress-pct">0%</span>
     </div>
     <div id="tools">
+      <!-- Contact stays separate on purpose: it is the one panel that is
+           event-driven rather than something you go and look at, and burying an
+           incoming channel two taps deep would make it missable. Everything
+           else is one drawer with tabs. -->
       <button id="btn-contact" class="tool" title="Contact" data-on="0">◉</button>
-      <button id="btn-world" class="tool" title="World">🜨</button>
-      <button id="btn-vessels" class="tool" title="Bodies &amp; research">⋀</button>
-      <button id="btn-upgrades" class="tool" title="Dials">⚙</button>
-      <button id="btn-codex" class="tool" title="Codex">☰</button>
-      <button id="btn-paths" class="tool" title="Pathways">◈</button>
-      <button id="btn-guide" class="tool" title="How this works">?</button>
-      <button id="btn-settings" class="tool" title="Settings">⋯</button>
+      <button id="btn-menu" class="tool" title="Panels">☰</button>
     </div>
   </header>
 
@@ -80,6 +78,11 @@
       <h2 id="drawer-title">DIALS</h2>
       <button id="btn-drawer-close" aria-label="Close">✕</button>
     </header>
+    <!-- One row of tabs instead of seven topbar buttons. The tabs are only
+         drawn for panels that are worth opening right now — the World tab is
+         meaningless in the attunement field — so the row shrinks and grows with
+         where you are. -->
+    <nav id="drawer-tabs"></nav>
     <div id="drawer-body"></div>
   </aside>
 
@@ -118,6 +121,8 @@
 <script src="js/planet.js"></script>
 <script src="js/neural.js"></script>
 <script src="js/vessel.js"></script>
+<script src="js/inhabitants.js"></script>
+<script src="js/localtime.js"></script>
 <script src="js/influence.js"></script>
 <script src="js/galaxy.js"></script>
 <script src="js/contact.js"></script>
@@ -126,11 +131,14 @@
 <script src="js/scene_web.js"></script>
 <script src="js/scene_foam.js"></script>
 <script src="js/scene_ensemble.js"></script>
+<script src="js/scene_molecular.js"></script>
+<script src="js/scene_shells.js"></script>
 <script src="js/scenes.js"></script>
 <script src="js/game.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/feel.js"></script>
 <script src="js/primhud.js"></script>
+<script src="js/bloom.js"></script>
 <script src="js/render.js"></script>
 <script src="js/worldrender.js"></script>
 <script src="js/hud.js"></script>

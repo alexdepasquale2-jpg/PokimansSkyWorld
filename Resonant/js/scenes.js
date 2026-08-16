@@ -53,11 +53,21 @@
   const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
   const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
   const TIER_ENSEMBLE = RS.cosmos.BY_ID.inflationary.index;  // 18
+  const TIER_ATOMIC = RS.cosmos.BY_ID.atomic.index;          // 3
+  const TIER_MOLECULAR = RS.cosmos.BY_ID.molecular.index;    // 4
 
   const SCENES = [
     {
       id: 'foam', name: 'Quantum Foam', first: 0, last: TIER_QUANTUM,
       blurb: 'Below the scale at which anything persists. No body works here.'
+    },
+    {
+      id: 'shells', name: 'Orbital Shells', first: TIER_QUANTUM + 1, last: TIER_ATOMIC,
+      blurb: 'Where no two occupants may share a state. That is why matter takes up space.'
+    },
+    {
+      id: 'molecular', name: 'Molecular', first: TIER_MOLECULAR, last: TIER_MOLECULAR,
+      blurb: 'Chains and handedness. A living world settles which hand it uses and never revisits it.'
     },
     {
       id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
@@ -130,6 +140,15 @@
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Local time at the current lon/lat — day, season, tide. */
+      clock: null,
+      transitionDir: 0,
+      /* Inhabitants — derived per frame, never persisted. */
+      inhabitants: null,
+      localT: 0,
+      /* Molecular and orbital shells. */
+      molecule: null, molIndex: 0, molT: 0,
+      shells: null, shellT: 0,
       /* Ensemble. `blockNode` is the alternative physics currently adopted;
        * `specimen` is one address derived under both blocks side by side. */
       ensemble: null,
@@ -250,6 +269,11 @@
     }
     s.tGyr = s.t * 1e-9;
 
+    /* Local time. Closed-form in (planet, lon, lat, epoch), so scrubbing τ
+     * across a thousand years costs exactly what standing still costs — and it
+     * gives τ a second meaning on a surface without a second control. */
+    if (s.planet) s.clock = RS.localtime.stateFor(game, s.clock);
+
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
@@ -257,6 +281,14 @@
     else if (s.kind === 'web') RS.web.tick(game, bus, dt);
     else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
     else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
+    else if (s.kind === 'molecular') RS.molecular.tick(game, bus, dt);
+    else if (s.kind === 'shells') RS.shells.tick(game, bus, dt);
+
+    /* Inhabitants, in every scope. Derived rather than spawned, so they were
+     * already doing this before you arrived and will be doing it when you come
+     * back — and cost nothing at all while you are elsewhere. */
+    s.inhabitants = RS.inhabitants.inhabitantsFor(game, s.kind, s.t * 1e-4 + s.localT, dt, s.inhabitants);
+    s.localT = (s.localT || 0) + dt;
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -270,6 +302,12 @@
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+    /* Which way you went. The ladder is the navigation, so a scope change is a
+     * *movement* — inward toward the small or outward toward the vast — and a
+     * cut that does not say which makes the whole thing feel like a menu.
+     * Derived from the rungs the two scopes occupy, so it is right for every
+     * pair without anybody enumerating them. */
+    s.transitionDir = Math.sign(tierForScene(kind) - tierForScene(s.lastKind)) || 0;
 
     /* Leaving the Ensemble always restores our own block. An alternative
      * universe you had forgotten you were standing in would silently re-derive
@@ -329,6 +367,19 @@
     } else if (kind === 'ensemble') {
       s.agents.length = 0;
       RS.ensemble.enter(game, bus);
+    } else if (kind === 'molecular') {
+      /* Molecules belong to a world, so the same rule as the cell: arriving
+       * without one chosen picks the one the surface scene would have. */
+      if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
+      if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
+      s.agents.length = 0;
+      s.molecule = null;
+      RS.molecular.enter(game, bus);
+    } else if (kind === 'shells') {
+      /* Shells belong to nothing in particular — an atom is an atom anywhere,
+       * which is itself the point of the rung. */
+      s.agents.length = 0;
+      RS.shells.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -738,7 +789,7 @@
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE, TIER_ATOMIC, TIER_MOLECULAR,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
