@@ -89,7 +89,7 @@
      * got past pond scum, which is the sort of thing only a galaxy-scale
      * census catches. simtest now runs that census. */
     const stability = 0.35 + 0.4 * p.magnetosphere + 0.25 * p.tectonics;
-    const r = 3.2 * p.habitability * stability * (0.6 + hashF(h, 102) * 0.9);
+    const r = RS.physics.abiogenesis() * p.habitability * stability * (0.6 + hashF(h, 102) * 0.9);
 
     const complexity = clamp01(logistic(t, 1.0, 0.012, r));
     const stage = stageOf(complexity);

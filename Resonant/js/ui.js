@@ -168,6 +168,34 @@
         sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
         sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
       el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'web') {
+      const r = RS.web.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.tGyr.toFixed(2) + ' Gyr · ' + r.formed + '/' +
+        RS.web.NODE_COUNT + ' collapsed · largest void ' + r.voidGpc.toFixed(3) + ' Gpc' +
+        (r.disconnected ? ' · ' + r.disconnected + ' beyond the horizon' : '') +
+        (r.assembling > 0.25 ? ' · ASSEMBLING ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(276, 0.7, 0.72);
+    } else if (sc.kind === 'ensemble') {
+      const r = RS.ensemble.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.rows
+        ? r.sub + ' · ' + Math.round(r.distance * 100) + '% unlike ours · ×' + r.bonus.toFixed(2)
+        : r.sub);
+      el['layer-name'].style.color = hsl(r.rows ? 186 + r.distance * 120 : 210, 0.7, 0.72);
+    } else if (sc.kind === 'foam') {
+      const r = RS.foam.readout(game);
+      setText('layer-name', 'QUANTUM FOAM');
+      setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
+        (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(291, 0.7, 0.72);
+    } else if (sc.kind === 'cellular') {
+      const r = RS.cellular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sterile ? r.sub
+        : (r.sub + ' · ' + r.organelles + ' organelles · inside ' + r.host +
+           (r.expression > 0.005 ? ' · expression ' + Math.round(r.expression * 100) + '%' : '')));
+      el['layer-name'].style.color = hsl(150, 0.7, 0.72);
     } else if (sc.kind === 'planet' && sc.planet) {
       const p = sc.planet;
       setText('layer-name', p.name.toUpperCase());
@@ -340,6 +368,86 @@
           p.name + ' &mdash; ' + p.type.name +
           (p.biosphere ? ' &middot; ' + p.biosphere.stage.name : '') +
           (p.civ ? ' &middot; ' + p.civ.tier.name : '') + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'web') {
+      const r = RS.web.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(276, 0.8, 0.72) + '">&#8259;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">t = ' + r.tGyr.toFixed(2) +
+        ' Gyr &middot; ' + r.formed + ' collapsed &middot; void ' + r.voidGpc.toFixed(3) + ' Gpc</div>' +
+        (r.assembling > 0.25
+          ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.66) + '">assembling now &mdash; &times;' +
+            r.bonus.toFixed(2) + ' while it lasts</div>' : '') +
+        (r.disconnected
+          ? '<div class="ro-sub" style="color:' + hsl(200, 0.6, 0.68) + '">' + r.disconnected +
+            ' structures past the horizon &mdash; no signal has ever crossed</div>' : '');
+      return;
+    }
+    if (s.kind === 'ensemble') {
+      const r = RS.ensemble.readout(game);
+      if (!r.rows) {
+        node.innerHTML =
+          '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.6, 0.72) + '">&#8757;</span>' +
+          '<span class="ro-title">' + r.title + '</span></div>' +
+          '<div class="ro-sub">' + r.sub + '</div>';
+        return;
+      }
+      /* Every axis, against ours. This is the scope's whole content, and it has
+       * to be a comparison rather than a list of numbers — "×1.7 of ours" says
+       * something; "9812 K" says nothing without the other column. */
+      const rows = r.rows.map(x =>
+        '<div class="ro-sub" style="display:flex;gap:6px">' +
+        '<b style="min-width:112px;font-weight:400;opacity:.7">' + x.name + '</b>' +
+        '<span style="color:' + hsl(x.mult > 1 ? 36 : 190, 0.7, 0.7) + '">&times;' +
+        x.mult.toFixed(2) + '</span>' +
+        '<span style="opacity:.65">' + x.says + '</span></div>').join('');
+      const sp = r.specimen;
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(186 + r.distance * 120, 0.8, 0.72) + '">&#8757;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">Level ' + r.level + ' &middot; ' + r.sub + '</div>' +
+        rows +
+        (sp && sp.ours && sp.there
+          ? '<div class="ro-sub" style="margin-top:5px;opacity:.8">' + sp.ours.name +
+            ', derived twice: ' + Math.round(sp.ours.temp) + ' K / ' + sp.ours.living +
+            ' alive here &mdash; ' + Math.round(sp.there.temp) + ' K / ' + sp.there.living +
+            ' alive there</div>' : '');
+      return;
+    }
+    if (s.kind === 'foam') {
+      const r = RS.foam.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(291, 0.8, 0.72) + '">&#8756;</span>' +
+        '<span class="ro-title">Quantum Foam</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">mean lifetime ' + r.meanLife.toFixed(2) +
+        ' s &mdash; slow &tau; down or nothing will hold still</div>' +
+        (r.survivors
+          ? '<div class="ro-sub" style="color:' + hsl(46, 0.85, 0.68) + '">' + r.survivors +
+            ' fluctuation' + (r.survivors > 1 ? 's' : '') + ' never cancelled &mdash; &times;' +
+            r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'cellular') {
+      const r = RS.cellular.readout(game);
+      const c = s.cell;
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(150, 0.8, 0.7) + '">&#10059;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (c ? '<div class="ro-sub" style="margin-top:4px">' +
+          /* Naming the organelles is the point: these are the same essences the
+           * player has met at every other scale, wearing their cellular names. */
+          c.organelles.slice(0, 4).map(o => o.form).join(' &middot; ') +
+          (c.organelles.length > 4 ? ' &middot; +' + (c.organelles.length - 4) : '') + '</div>' : '') +
+        (r.expression > 0.005
+          ? '<div class="ro-sub" style="margin-top:4px;color:' + hsl(140, 0.7, 0.66) + '">' +
+            'expression ' + Math.round(r.expression * 100) + '% &mdash; ' + r.host +
+            ' is measurably more complex than its baseline</div>' : '');
       return;
     }
     if (s.kind === 'planet' && s.planet) {

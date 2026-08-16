@@ -166,6 +166,32 @@
    * is to think about. */
   function demandOf(band) { return band.prim.length; }
 
+  /* ── Paying for friction ──────────────────────────────────────────────────
+   *
+   * `yield` is a promise; what a layer actually pays is yield × throughput,
+   * and the primitives move throughput by nearly an order of magnitude. A gate
+   * shuts you out for half of every cycle. A missing antecedent stops you
+   * outright. A nest hands you children without a search. Left alone, the
+   * Electromagnetic layer paid two thirds of what the tutorial layer did,
+   * which means climbing the spectrum was a demotion.
+   *
+   * These six numbers buy that back. They are per *primitive*, not per band —
+   * six instead of twelve — so composing a new band cannot silently create a
+   * dead layer, and adding a primitive to an existing one automatically prices
+   * itself in.
+   *
+   * Additive rather than multiplicative on purpose: Unity runs all six, and
+   * multiplying would make the last band pay seventy times what the second-
+   * last does rather than a handful.
+   */
+  const FRICTION = { gate: 1.4, twin: 1.0, order: 2.0, invert: 0.4, nest: 0.0, flow: 0.0 };
+
+  function frictionOf(band) {
+    let sum = 0;
+    for (let i = 0; i < band.prim.length; i++) sum += FRICTION[band.prim[i]] || 0;
+    return 1 + sum;
+  }
+
   const PHI_MIN = 0;
   const PHI_MAX = 1000;
 
@@ -278,6 +304,6 @@
   RS.spectrum = {
     BANDS, BY_ID, PHI_MIN, PHI_MAX,
     effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz,
-    usesPrim, demandOf
+    usesPrim, demandOf, frictionOf, FRICTION
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

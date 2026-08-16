@@ -253,6 +253,166 @@ generated from live state rather than written out:
   They feed each other, none is mandatory, and each one always states a concrete
   next step.
 
+## Scopes
+
+Turning Σ is how you travel, and each range of rungs is somewhere different.
+
+| Σ | scope | what it is | only here |
+|---|---|---|---|
+| planck · quantum | **Quantum foam** | pairs borrowing existence and paying it back | **no body works**; find the one that never cancelled |
+| cellular | **Cytoplasm** | inside one cell of a living world | change a biosphere from inside it |
+| planetary and within | **Surface** | stand on a world | terrain, weather, creatures, structures |
+| stellar · system | **System** | one gravity well and everything bound to it | trade, contact, orbital mechanics |
+| interstellar · cluster | **Star map** | the stars around you | where to go next |
+| local group → hubble | **Cosmic web** | filaments and voids | **tau is the age of the universe** |
+| galactic · interstellar | **Attunement field** | tune layers, hold manifestations | the spectrum itself |
+| inflationary → mathematical | **Ensemble** | alternative blocks of physical law | **the constants change under you** |
+
+Each scope is deliberately a *place* rather than a rule set: the attunement loop
+runs exactly as it does anywhere else, so a player who learned to read a rhythm
+in the Electromagnetic layer reads one on arrival anywhere. What changes is what
+the place is made of, and what your work there is worth.
+
+### Cytoplasm
+
+- The cell is derived from the host planet's own biosphere. A sterile world has
+  no cell to enter and says so; a microbial one is a bare prokaryote; a
+  complex one is a tissue or neural cell full of machinery.
+- **Organelles are essences.** `essenceAt` excludes tier and band, so the same
+  essence that was a spiral arm at the galactic rung is a Coiled Flagellum
+  here — and its four axes are the same four axes.
+- **Expression.** Crystallising inside a cell writes a delta that raises that
+  biosphere's complexity. It is the only place you act on a world *from inside
+  it*, and the change is visible from orbit afterwards. Saturating, because a
+  biosphere is a logistic curve: you can accelerate a world, not replace it.
+- **A body that works there, and bodies that honestly do not.** At a few
+  microns the Reynolds number is ~1e-4, so inertia does not exist and a
+  reversible stroke returns you exactly where you started. The Swimmer that
+  works in an ocean refuses cytoplasm and says why; the Ciliate — almost no
+  mass, enormous drag — is the body for a place where nothing coasts.
+
+### Cosmic web
+
+τ stops being a throttle and becomes the age of the universe. The structure is a
+*function* of it — growth is a closed-form logistic on each node's own primordial
+seed, so scrubbing thirteen billion years costs the same as scrubbing one. At
+0.8 Gyr nothing has collapsed and the whole slab is void; by 13.8 there are 34
+collapsed nodes and 119 filaments between them.
+
+- **A filament pays best while it is assembling**, when its growth *rate* is at
+  peak rather than its size. Reading the clock instead of the picture is a skill
+  that exists nowhere else, and the present day is usually the wrong moment to
+  be standing in.
+- **Past the event horizon** — 4.9 Gpc comoving, not the 14.3 Gpc particle
+  horizon — a structure is visible and permanently incommunicado: its old light
+  is already on its way, and nothing sent from now on will ever cross in either
+  direction. An essence recognised out there cannot be corroborated locally,
+  which is the purest statement the game can make of its own premise. The
+  Hubble-volume rung is the only slab wide enough to contain any.
+- Voids are measured, not labelled: the distance from a grid of sample points to
+  the nearest *collapsed* node, so they genuinely shrink as structure forms.
+
+### Quantum foam
+
+**You cannot wear a body here.** A body is a persistent arrangement of matter,
+and nothing at 10⁻³⁵ m persists long enough to be arranged. It is the only scope
+that refuses one outright, and it refuses for the reason that is true of the
+*place* rather than of the vessel.
+
+Everything here is a countdown, and how long a pair lasts is `persistence` — the
+axis the player has been reading everywhere else, doing here exactly what it
+says on the tin. A Memory hangs around long enough to work; a Seed is gone
+before the reticle catches it. Rarely a pair separates too far to recombine and
+what was borrowed is never repaid — which, at the largest scale, is the reason
+there is anything at all rather than nothing. Finding one is the scope's
+discovery.
+
+### Ensemble
+
+The premise's last claim. So far "local rules" has meant a rung's geometry and a
+band's primitives. Here it means **the laws**.
+
+`physics.js` gathers the numbers `stellar.js` and `planet.js` used to hardcode —
+the solar photospheric temperature, the Salpeter slope, the Jeans escape factor
+of six, the mass–luminosity exponents, the greenhouse coefficients — into one
+named block. Hardcoded they are physics; gathered they are *one block among
+many*. An ensemble node is an alternative block, derived from its address, and
+Δ points at one. Stand in it and the constants swap: every star, world and
+biosphere derived from that moment comes out of the new universe.
+
+The scope's picture is one address derived twice, side by side: the same system,
+under our laws and under those. And the essences are still the same essences —
+Cascade still branches, in fifty alternative universes, which the suite asserts,
+because if it stopped the game would be claiming its own information is a
+property of physics rather than of the fractal store.
+
+Leaving restores our block, always. An alternative universe you had forgotten
+you were standing in would silently re-derive every star in the game and read as
+a bug rather than a mechanic.
+
+## Six primitives
+
+There are no per-layer minigames. There are **six functions**, and every mechanic
+anywhere is one or more of them, parameterised by the **four numbers** each
+essence carries and scaled by the rung's clock.
+
+| | |
+|---|---|
+| **Gate** ▮ | available only in windows. `persistence` sets the period, `branching` the subdivision, `symmetry` the duty |
+| **Nest** ◇ | contains smaller copies. `complexity` sets the depth, `branching` the fanout, `symmetry` the shrink |
+| **Flow** ≈ | has a direction. `branching` sets divergence, `persistence` steadiness |
+| **Order** → | needs its antecedents first. `branching` sets how many, `complexity` how deep the chain |
+| **Twin** ◐ | exists twice, one load-bearing. `symmetry` sets how close, `persistence` the tell |
+| **Invert** ○ | reads backwards. `persistence` is what resists it |
+
+A band declares which are live. That is the whole of its gameplay:
+
+```
+baryonic ▸ flow            causal     ▸ order
+thermal  ▸ flow            archetypal ▸ nest order
+em       ▸ gate            noetic     ▸ nest gate flow
+probab.  ▸ twin            null       ▸ invert
+vital    ▸ nest flow       unity      ▸ all six
+emotive  ▸ flow twin       mnemonic   ▸ order nest
+```
+
+**14 essences × 4 axes = 56 authored numbers**, and everything else is composed
+from them. The point is not economy of code — it is that knowledge *transfers*.
+Once you learn that `Cascade` branches (0.90), you know its rhythm subdivides
+five ways, its dependency graph fans out four wide, its nests are wide and
+shallow and its gradient sprays rather than converges — **in every layer, at
+every scale, before you have ever played it there.** Twelve hand-written modes
+cannot do that, because nothing learned in one predicts anything in another.
+
+Difficulty and payout are derived from the same place. Which dials a layer
+demands comes from its primitives — Electromagnetic makes τ matter the instant
+you arrive because a rhythm is a thing in time; Probabilistic does the same for
+Δ because the halves of a superposition differ by phase. And each primitive
+carries a friction number that pays back the throughput it costs, so composing a
+new band cannot silently create a layer that is a demotion to reach.
+
+### Understanding becomes foresight
+
+Recognising an essence in enough contexts reveals its axes one at a time, in an
+order seeded per world, so two players build different intuitions about the same
+essence. Once an axis is revealed the HUD **draws the expected behaviour behind
+the measured one** — the rhythm bar ghosts the predicted subdivision, the depth
+gauge ghosts the predicted descent.
+
+Early on the ghost is absent and you play by looking. Later it lands exactly on
+the real thing before it happens, and you are playing by knowing. That gap
+closing is the reward the gnosis ledger builds toward, and it is something you
+see rather than a percentage in a menu.
+
+### One generator
+
+`selfsimilar.js` draws a molecule and a galaxy with the *same* function, driven
+by the same four axes. `geometry` picks the stroke — `chain` draws bonds, `cell`
+draws lobes, `web` draws filaments, `disc` draws arms — and nothing else. The
+topology is identical across geometries for the same essence, and the test suite
+asserts it, because two shapes drawn by two unrelated routines are alike only
+because someone said so.
+
 ## Why it is all formulae
 
 **Nothing in this game is stored.** There is no array of world objects anywhere
@@ -365,8 +525,10 @@ All audio is synthesised at runtime — there are no sound files.
 | `cosmos.js` | the 22-rung scale ladder, real scales + Tegmark levels |
 | `spectrum.js` | 12 reality layers as Gaussian bands, resonance, focus gating |
 | `dials.js` | dial physics, detents, encoder ticks, upgrade economics |
-| `fractal.js` | essences, address→manifestation, the gnosis ledger |
-| `field.js` | the attunement loop: four-dial alignment, coherence, per-layer rules |
+| `fractal.js` | essences and their four axes, address→manifestation, gnosis as foresight |
+| `emergence.js` | the six primitives — every mechanic in the game is one of these |
+| `selfsimilar.js` | one recursive generator; `geometry` picks the stroke and nothing else |
+| `field.js` | the attunement loop: four-dial alignment, coherence, primitive dispatch |
 | `orbital.js` | Kepler/Halley, Hill spheres, Roche limits, Hohmann transfers |
 | `stellar.js` | IMF, mass–luminosity, habitable zones, system architecture |
 | `planet.js` | Jeans escape, greenhouse, terrain fields, biomes, resources |
@@ -377,9 +539,15 @@ All audio is synthesised at runtime — there are no sound files.
 | `neural.js` | derived recurrent minds; the influence channel |
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
-| `scenes.js` | scene stack, the modal split, agents |
+| `scenes.js` | the scene registry, the modal split, agents |
+| `scene_cellular.js` | Cytoplasm: derived cells, organelles as essences, expression |
+| `scene_web.js` | Cosmic web: logistic structure formation, voids, the event horizon |
+| `scene_foam.js` | Quantum foam: virtual pairs, lifetimes from persistence, ejection |
+| `scene_ensemble.js` | Ensemble: alternative law, adoption, the two-universe specimen |
+| `physics.js` | the constants, gathered and swappable; ours is the default block |
 | `game.js` `save.js` | state, economy, objectives, persistence |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
+| `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
 | `render.js` `worldrender.js` `hud.js` `ui.js` `input.js` `reactions.js` | presentation |
 
 `reactions.js` is the single place where "something happened" becomes "the
@@ -448,9 +616,12 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **Per-layer gameplay modes as full scenes.** The twelve `mode` rules currently
-  vary the attunement field; the framework is there for each to become its own
-  view the way the solar and galactic layers did.
+- **The last three rungs.** Eighteen of the twenty-two have a view of their
+  own. What is left is Molecular (`chain`) and the two orbital-shell rungs
+  (`orbital`) — both small, both following the pattern the other scopes
+  established. Scenes are a registry (`SCENES` in `scenes.js`) and the suite
+  asserts the ladder is covered without gaps, so adding one is a row and a
+  file.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

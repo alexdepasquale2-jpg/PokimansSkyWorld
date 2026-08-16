@@ -33,20 +33,82 @@
   const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;         // 10
   const TIER_CLUSTER = RS.cosmos.BY_ID.cluster.index;       // 12
 
-  /* Which scene a given rung of the scale ladder shows. The ladder *is* the
-   * navigation, so there is no separate "travel" mode to learn — and the four
-   * scenes line up with what you would actually perceive at each scale:
+  const TIER_CELL = RS.cosmos.BY_ID.cellular.index;          // 5
+
+  /* ── The scene registry ───────────────────────────────────────────────────
    *
-   *   ≤ planetary     a surface you can stand on
-   *   ≤ system        one gravity well and everything bound to it
-   *   ≤ cluster       neighbouring stars — the scale at which you choose
-   *   > cluster       the attunement field, where layers are tuned
+   * Which scene a given rung of the ladder shows. The ladder *is* the
+   * navigation, so there is no separate "travel" mode to learn, and each scene
+   * lines up with what you would actually perceive at that scale.
+   *
+   * A table rather than a cascade of ifs, because the ladder has twenty-two
+   * rungs and only five of them currently show something of their own — every
+   * remaining scope is a row here plus a file, and adding one must not mean
+   * editing a chain of comparisons in three modules. `first` and `last` are
+   * inclusive rung indices; **more specific entries come first**, because the
+   * first match wins and a scope like Cellular sits inside the range the
+   * surface scene would otherwise claim.
    */
+  const TIER_QUANTUM = RS.cosmos.BY_ID.quantum.index;        // 1
+  const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
+  const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
+  const TIER_ENSEMBLE = RS.cosmos.BY_ID.inflationary.index;  // 18
+
+  const SCENES = [
+    {
+      id: 'foam', name: 'Quantum Foam', first: 0, last: TIER_QUANTUM,
+      blurb: 'Below the scale at which anything persists. No body works here.'
+    },
+    {
+      id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
+      blurb: 'Inside one cell of a living world. The machinery, at its own scale.'
+    },
+    {
+      id: 'web', name: 'Cosmic Web', first: TIER_GROUP, last: TIER_HUBBLE,
+      blurb: 'Filaments and voids, assembling over thirteen billion years.'
+    },
+    {
+      id: 'ensemble', name: 'Ensemble', first: TIER_ENSEMBLE, last: RS.cosmos.TIERS.length - 1,
+      blurb: 'Alternative blocks of physical law. Stand in one and the constants change.'
+    },
+    {
+      id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
+      blurb: 'A surface you can stand on.'
+    },
+    {
+      id: 'system', name: 'System', first: TIER_PLANET + 1, last: TIER_SYSTEM,
+      blurb: 'One gravity well and everything bound to it.'
+    },
+    {
+      id: 'galaxy', name: 'Star Map', first: TIER_SYSTEM + 1, last: TIER_CLUSTER,
+      blurb: 'Neighbouring stars — the scale at which you choose.'
+    },
+    {
+      id: 'field', name: 'Attunement Field', first: TIER_CLUSTER + 1,
+      last: RS.cosmos.TIERS.length - 1,
+      blurb: 'Where layers are tuned and manifestations are held.'
+    }
+  ];
+
+  const SCENE_BY_ID = Object.create(null);
+  for (const sc of SCENES) SCENE_BY_ID[sc.id] = sc;
+
   function sceneForTier(idx) {
-    if (idx <= TIER_PLANET) return 'planet';
-    if (idx <= TIER_SYSTEM) return 'system';
-    if (idx <= TIER_CLUSTER) return 'galaxy';
+    for (let i = 0; i < SCENES.length; i++) {
+      if (idx >= SCENES[i].first && idx <= SCENES[i].last) return SCENES[i].id;
+    }
     return 'field';
+  }
+
+  /* The rung a scene is actually entered at, so a pathway can say "turn Σ to
+   * here" and mean something precise. Not simply `first`: a broad scope's range
+   * can have a narrower one carved out of its start, so this asks the same
+   * question the game asks — the first rung that really resolves to this id. */
+  function tierForScene(id) {
+    const sc = SCENE_BY_ID[id];
+    if (!sc) return RS.cosmos.ROOT_INDEX;
+    for (let i = sc.first; i <= sc.last; i++) if (sceneForTier(i) === id) return i;
+    return sc.first;
   }
 
   function newScene() {
@@ -55,6 +117,25 @@
       /* Where in the cosmos we are pointed. Addresses, not objects. */
       systemAddr: null,
       system: null,
+      /* Cellular scope. `cell` is derived on arrival and never persisted — only
+       * the index is, because the cell is a pure function of it. */
+      cell: null,
+      cellIndex: 0,
+      cellT: 0,
+      /* Cosmic web. `webT` is an offset from the present in Gyr — the only
+       * place in the game where τ is measured against the age of the
+       * universe. */
+      web: null,
+      webT: 0,
+      /* Quantum foam. */
+      foam: null,
+      foamT: 0,
+      /* Ensemble. `blockNode` is the alternative physics currently adopted;
+       * `specimen` is one address derived under both blocks side by side. */
+      ensemble: null,
+      ensembleT: 0,
+      blockNode: null,
+      specimen: null,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -172,6 +253,10 @@
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
+    else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
+    else if (s.kind === 'web') RS.web.tick(game, bus, dt);
+    else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
+    else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -185,6 +270,15 @@
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+
+    /* Leaving the Ensemble always restores our own block. An alternative
+     * universe you had forgotten you were standing in would silently re-derive
+     * every star in the game and read as a bug rather than as a mechanic — so
+     * the swap is scoped to the one place that owns it, unconditionally, on
+     * the way out. */
+    if (s.lastKind === 'ensemble' && kind !== 'ensemble' && RS.ensemble) {
+      RS.ensemble.release(game, bus);
+    }
 
     if (kind === 'galaxy') {
       /* The map centres on wherever the player currently is, so zooming out
@@ -217,6 +311,24 @@
       s.agents.length = 0;
       s.lon = 0; s.lat = 0;
       sampleSurface(game);
+    } else if (kind === 'cellular') {
+      /* You are always inside a cell *of somewhere*. Arriving without a world
+       * chosen picks the same one the surface scene would have — descending Σ
+       * from a surface should put you inside something that lives there rather
+       * than somewhere unrelated. */
+      if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
+      if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
+      s.agents.length = 0;
+      RS.cellular.enter(game, bus);
+    } else if (kind === 'web') {
+      s.agents.length = 0;
+      RS.web.enter(game, bus);
+    } else if (kind === 'foam') {
+      s.agents.length = 0;
+      RS.foam.enter(game, bus);
+    } else if (kind === 'ensemble') {
+      s.agents.length = 0;
+      RS.ensemble.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -531,6 +643,16 @@
     const arch = RS.vessel.BY_ID[archId];
     if (!arch) return { ok: false, reason: 'unknown vessel' };
     if (!game.vessels.unlocked[archId]) return { ok: false, reason: 'not researched' };
+    /* Some scopes refuse bodies outright rather than refusing a particular
+     * one. The Quantum Foam is the only such place: a body is a persistent
+     * arrangement of matter and nothing at that scale persists, so there is
+     * nothing to arrange. Checked before the per-vessel predicate, because the
+     * reason is about the *place* and answering "a walker needs a surface"
+     * would be true and beside the point. */
+    if (game.scene.kind === 'foam') {
+      return { ok: false,
+        reason: 'nothing persists at this scale — there is nothing for a body to be made of' };
+    }
     const env = RS.vessel.environmentFor(game);
     const blocked = RS.vessel.canOperate(arch, env);
     if (blocked) return { ok: false, reason: blocked };
@@ -616,8 +738,8 @@
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM,
-    sceneForTier, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE,
+    SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
     TIER_CLUSTER, civAt, tickContact

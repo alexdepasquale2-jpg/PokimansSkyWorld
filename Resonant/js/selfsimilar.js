@@ -49,7 +49,7 @@
   const STRIDE = 7;
 
   function newBuffer() {
-    return { data: new Float32Array(MAX_SEGMENTS * STRIDE), count: 0, depthMax: 0 };
+    return { data: new Float32Array(MAX_SEGMENTS * STRIDE), count: 0, depthMax: 0, extent: 1 };
   }
 
   /* Build the structure. Pure and deterministic: the same essence always
@@ -73,8 +73,25 @@
     const jitter = (1 - a.s) * 0.8;
 
     grow(buf, 0, 0, -Math.PI / 2, 1, 0, depth, fanout, decay, spread, jitter, seed >>> 0);
+
+    /* How far the skeleton actually reaches from the origin. It varies a great
+     * deal by essence — a persistent branching one accumulates segment lengths
+     * outward and reaches several units, a converging one barely leaves 1 —
+     * so a caller that needs the drawing to fit inside something (a cell
+     * membrane, a node's glyph box) cannot use a constant. Measured once here
+     * rather than guessed at every call site. */
+    let ext = 1e-3;
+    for (let s = 0; s < buf.count; s++) {
+      const i = s * STRIDE;
+      const d = Math.hypot(buf.data[i + 2], buf.data[i + 3]);
+      if (d > ext) ext = d;
+    }
+    buf.extent = ext;
     return buf;
   }
+
+  /* The `radius` to pass to `draw` so the whole figure fits inside `want`. */
+  function fit(buf, want) { return want / (buf ? buf.extent : 1); }
 
   function grow(buf, x, y, ang, len, d, maxD, fanout, decay, spread, jitter, seed) {
     if (d >= maxD || buf.count >= MAX_SEGMENTS) return;
@@ -212,5 +229,5 @@
     return buf.count + ':' + buf.depthMax;
   }
 
-  RS.selfsimilar = { MAX_SEGMENTS, STRIDE, newBuffer, build, draw, topology };
+  RS.selfsimilar = { MAX_SEGMENTS, STRIDE, newBuffer, build, draw, topology, fit };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

@@ -232,134 +232,272 @@
   /* The essence glyphs. Each is drawn from the manifestation's own derived
    * parameters, so two instances of the same essence are recognisably the same
    * shape without being identical drawings. */
+  /* ── One generator, every essence ────────────────────────────────────────
+   *
+   * This used to be fourteen hand-drawn cases — a spiral routine, a lattice
+   * routine, a cascade routine. They looked fine and they proved nothing: two
+   * shapes drawn by two unrelated functions are alike only because someone
+   * said so. Now every essence comes out of `selfsimilar.build()`, driven by
+   * the same four axes that drive its behaviour, and `geometry` decides only
+   * how the ink is laid down.
+   *
+   * So a Cascade in a molecular tier and a Cascade in a filament tier are the
+   * same skeleton rendered as bonds and as filaments — demonstrably the same
+   * essence rather than nominally so — and a player can see the kinship before
+   * they can name it. It also reaches the 42 form names that were previously
+   * unreachable, because a geometry is no longer tied to a hand-written case.
+   */
   function drawEssence(ctx, man, x, y, r, hue, alpha, t) {
-    const cx = sx(x), cy = sy(y), R = px(r);
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(t * 0.15 * man.twist);
-    ctx.strokeStyle = hsl(hue, man.sat + 0.15, 0.68, alpha);
-    ctx.fillStyle = hsl(hue, man.sat + 0.15, 0.62, alpha * 0.55);
-    ctx.lineWidth = Math.max(1, R * 0.09);
-    ctx.lineCap = 'round';
-    const arms = man.arms;
-
-    switch (man.essence.id) {
-      case 'boundary':
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.arc(0, 0, R * (0.5 + i * 0.26), 0.4 + i * 0.5, Math.PI * 1.6 + i * 0.5);
-          ctx.stroke();
-        }
-        break;
-      case 'flow':
-        for (let s = 0; s < 3; s++) {
-          ctx.beginPath();
-          for (let i = 0; i <= 22; i++) {
-            const u = i / 22;
-            const px2 = (u - 0.5) * R * 2.2;
-            const py2 = Math.sin(u * 7 + t * 2.2 + s * 1.5) * R * 0.34 + (s - 1) * R * 0.34;
-            i === 0 ? ctx.moveTo(px2, py2) : ctx.lineTo(px2, py2);
-          }
-          ctx.stroke();
-        }
-        break;
-      case 'recursion':
-        for (let i = 0; i < 4; i++) {
-          const rr = R * Math.pow(0.62, i);
-          ctx.beginPath();
-          ctx.arc(R * (1 - Math.pow(0.62, i)) * 0.5, 0, rr, 0, TAU);
-          ctx.stroke();
-        }
-        break;
-      case 'attractor':
-        for (let i = 4; i >= 1; i--) {
-          ctx.globalAlpha = alpha * (0.2 + i * 0.16);
-          ctx.beginPath(); ctx.arc(0, 0, R * i * 0.27, 0, TAU); ctx.fill();
-        }
-        ctx.globalAlpha = alpha;
-        break;
-      case 'duality':
-        ctx.beginPath(); ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, R, Math.PI / 2, -Math.PI / 2); ctx.stroke();
-        break;
-      case 'emergence':
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * TAU + t * 0.4;
-          const rr = R * (0.55 + Math.sin(t * 1.6 + i * 0.9) * 0.42);
-          ctx.beginPath();
-          ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, R * 0.11, 0, TAU);
-          ctx.fill();
-        }
-        break;
-      case 'threshold':
-        ctx.beginPath();
-        ctx.moveTo(-R, R * 0.5); ctx.lineTo(0, R * 0.5);
-        ctx.lineTo(0, -R * 0.5); ctx.lineTo(R, -R * 0.5);
-        ctx.stroke();
-        break;
-      case 'lattice':
-        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-          ctx.beginPath();
-          ctx.arc(i * R * 0.62, j * R * 0.62, R * 0.13, 0, TAU);
-          ctx.fill();
-        }
-        break;
-      case 'spiral':
-        ctx.beginPath();
-        for (let i = 0; i <= 46; i++) {
-          const u = i / 46;
-          const a = u * TAU * 1.9 * (man.twist > 0 ? 1 : -1);
-          const rr = u * R * 1.15;
-          i === 0 ? ctx.moveTo(0, 0) : ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-        }
-        ctx.stroke();
-        break;
-      case 'void':
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, TAU); ctx.stroke();
-        break;
-      case 'seed':
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.3, 0, TAU); ctx.fill();
-        for (let i = 0; i < arms; i++) {
-          const a = (i / arms) * TAU + t * 0.3;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a) * R * 0.45, Math.sin(a) * R * 0.45);
-          ctx.lineTo(Math.cos(a) * R * 1.05, Math.sin(a) * R * 1.05);
-          ctx.stroke();
-        }
-        break;
-      case 'weave':
-        for (let i = 0; i < 3; i++) {
-          const a = (i / 3) * Math.PI + t * 0.1;
-          ctx.beginPath();
-          ctx.moveTo(-Math.cos(a) * R, -Math.sin(a) * R);
-          ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R);
-          ctx.stroke();
-        }
-        break;
-      case 'cascade': {
-        const branch = (x0, y0, a, len, d) => {
-          if (d <= 0) return;
-          const x1 = x0 + Math.cos(a) * len, y1 = y0 + Math.sin(a) * len;
-          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          branch(x1, y1, a - 0.5, len * 0.62, d - 1);
-          branch(x1, y1, a + 0.5, len * 0.62, d - 1);
-        };
-        branch(0, R, -Math.PI / 2, R * 0.72, 3);
-        break;
-      }
-      case 'memory':
-        for (let i = 0; i < 5; i++) {
-          ctx.globalAlpha = alpha * (1 - i * 0.17);
-          ctx.beginPath();
-          ctx.arc(0, R * 0.3 - i * R * 0.22, R * 0.85, Math.PI * 1.1, Math.PI * 1.9);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = alpha;
-        break;
-      default:
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.8, 0, TAU); ctx.stroke();
+    const geom = (RS.cosmos.TIERS[man.tierIndex] || RS.cosmos.TIERS[0]).geometry;
+    /* Cached on the manifestation: the skeleton is pure in (essence, geometry,
+     * seed), so it is built once and redrawn every frame for free. */
+    let buf = man.__ss;
+    if (!buf || buf.__geom !== geom) {
+      buf = man.__ss = RS.selfsimilar.build(man.essence, geom, man.seed, buf);
+      buf.__geom = geom;
     }
+    ctx.save();
+    ctx.translate(sx(x), sy(y));
+    ctx.rotate(t * 0.15 * man.twist);
+    /* Fitted rather than scaled, so a branching essence and a converging one
+     * occupy the same footprint on screen — otherwise a Cascade node reads as
+     * five times the size of an Attractor node of identical potency, and size
+     * is supposed to mean something. */
+    RS.selfsimilar.draw(ctx, buf, 0, 0, RS.selfsimilar.fit(buf, px(r) * 1.6),
+      hue, man.sat + 0.15, alpha, t);
     ctx.restore();
+  }
+
+  /* ── The cell ─────────────────────────────────────────────────────────────
+   *
+   * Organelles are essences, and they are drawn by the *same* generator that
+   * draws a galaxy — `selfsimilar` with geometry `cell`, which lays the same
+   * skeleton down as soft lobes instead of spiral arms. So a Cascade in here
+   * is visibly the Cascade you met at the galactic rung, and the four `cell`
+   * form names that were written and unreachable finally appear.
+   */
+  function drawCell(ctx, game, t) {
+    const c = game.scene.cell;
+    if (!c) return;
+    const ct = game.scene.cellT || 0;
+
+    /* Cytoplasmic streaming, drawn as a faint rotating wash so the interior is
+     * never still — a static cell reads as a diagram rather than a living
+     * thing. */
+    const g = ctx.createRadialGradient(view.cx, view.cy, 0, view.cx, view.cy, px(1.0));
+    g.addColorStop(0, hsl(c.type.hue, 0.4, 0.30, 0.20));
+    g.addColorStop(1, hsl(c.type.hue - 20, 0.4, 0.12, 0.06));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.fill();
+
+    for (let i = 0; i < c.organelles.length; i++) {
+      const o = c.organelles[i];
+      /* Each drifts on its own slow circle — streaming, not orbit. */
+      const a = Math.atan2(o.y, o.x) + ct * o.drift;
+      const r = Math.hypot(o.x, o.y) * (1 + Math.sin(ct * 0.8 + o.phase) * 0.05);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+
+      let buf = o.__ss;
+      if (!buf) buf = o.__ss = RS.selfsimilar.build(o.essence, 'cell', i * 7919 + 13, buf);
+      /* Kept inside the membrane. The generator's extent depends on the
+       * essence — a branching one reaches much further than a converging one
+       * from the same nominal size — so scale against the room actually left
+       * between here and the wall rather than against a constant. */
+      const room = Math.max(0.14, 0.95 - r);
+      ctx.save();
+      ctx.translate(sx(x), sy(y));
+      ctx.rotate(ct * 0.12 * (i % 2 ? 1 : -1));
+      RS.selfsimilar.draw(ctx, buf, 0, 0,
+        RS.selfsimilar.fit(buf, px(Math.min(o.size * 3.4, room))), o.hue, 0.75, 1.0, t);
+      ctx.restore();
+    }
+  }
+
+  /* ── The cosmic web ──────────────────────────────────────────────────────
+   *
+   * Drawn as a function of cosmic time, so scrubbing τ visibly assembles it:
+   * uncollapsed overdensities are faint smears, collapsed ones are bright, and
+   * filaments appear between them only once the growing mode has had time to
+   * bridge the gap. A node currently at peak growth rate gets a halo, because
+   * "assembling now" is the thing the scope pays for and a player has to be
+   * able to see it rather than infer it from a number.
+   */
+  function drawWeb(ctx, game, t) {
+    const w = game.scene.web;
+    if (!w) return;
+
+    /* Filaments first, under everything. */
+    ctx.lineCap = 'round';
+    for (let i = 0; i < w.links.length; i++) {
+      const L = w.links[i];
+      const a = w.nodes[L.a], b = w.nodes[L.b];
+      ctx.strokeStyle = hsl(276, 0.45, 0.55, 0.06 + L.strength * 0.30);
+      ctx.lineWidth = Math.max(0.6, px(0.002 + L.strength * 0.006));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < w.nodes.length; i++) {
+      const n = w.nodes[i];
+      const X = sx(n.x), Y = sy(n.y);
+      const size = px(0.012 + n.amp * 0.026) * (0.4 + n.growth * 0.9);
+
+      /* Beyond the horizon: drawn in outline only. It is there, it is real,
+       * and no signal from it has ever reached here — the ring says so without
+       * a word of explanation. */
+      if (n.beyond) {
+        ctx.strokeStyle = hsl(200, 0.5, 0.62, 0.28 + n.growth * 0.30);
+        ctx.lineWidth = Math.max(1, px(0.0025));
+        ctx.setLineDash([px(0.008), px(0.008)]);
+        ctx.beginPath(); ctx.arc(X, Y, size * 1.5, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      /* Assembling: a halo at peak growth rate. This is the tell. */
+      if (n.assembly > 0.25) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, size * 5);
+        g.addColorStop(0, hsl(46, 0.85, 0.62, 0.30 * n.assembly));
+        g.addColorStop(1, hsl(46, 0.85, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, size * 5, 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = n.formed
+        ? hsl(276 + n.amp * 40, 0.6, 0.52 + n.growth * 0.22, 0.35 + n.growth * 0.5)
+        : hsl(230, 0.3, 0.4, 0.10 + n.growth * 0.2);
+      ctx.beginPath(); ctx.arc(X, Y, size, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Quantum foam ────────────────────────────────────────────────────────
+   *
+   * Pairs, springing apart and annihilating. The one that does not close is
+   * drawn as a line rather than a pair of dots, because it is no longer a pair
+   * — it is the thing that got away, and it should be the only stable object
+   * on a screen where nothing else is.
+   */
+  function drawFoam(ctx, game, t) {
+    const f = game.scene.foam;
+    if (!f) return;
+    for (let i = 0; i < f.pairs.length; i++) {
+      const p = f.pairs[i];
+      if (p.presence < 0.02) continue;
+      const dx = Math.cos(p.ang + Math.PI / 2) * p.sep;
+      const dy = Math.sin(p.ang + Math.PI / 2) * p.sep;
+      const x1 = sx(p.x + dx), y1 = sy(p.y + dy);
+      const x2 = sx(p.x - dx), y2 = sy(p.y - dy);
+      const r = px(0.008) * (0.5 + p.presence);
+
+      if (p.survives) {
+        ctx.strokeStyle = hsl(46, 0.9, 0.68, 0.55 * p.presence);
+        ctx.lineWidth = Math.max(1, px(0.0035));
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+      /* Opposite hues, because the two halves of a pair are opposite in every
+       * quantum number they have. */
+      ctx.fillStyle = hsl(p.hue, 0.75, 0.66, 0.75 * p.presence);
+      ctx.beginPath(); ctx.arc(x1, y1, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = hsl(p.hue + 180, 0.75, 0.66, 0.75 * p.presence);
+      ctx.beginPath(); ctx.arc(x2, y2, r, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── The ensemble ────────────────────────────────────────────────────────
+   *
+   * Universes have no spatial form, so there is nothing here to draw *as a
+   * place* — only relations, which is exactly what the `abstract` geometry is
+   * for. Each block is one essence rendered by the same generator that renders
+   * everything else, and the further a block sits from ours the further out and
+   * the more saturated it is drawn. The one Δ is pointed at gets a ring.
+   */
+  function drawEnsemble(ctx, game, t) {
+    const e = game.scene.ensemble;
+    if (!e) return;
+    const sel = game.scene.blockNode;
+
+    /* The compass. Δ is the selector in this scope and nothing else uses it, so
+     * the needle is worth drawing plainly. */
+    const phi = game.dials.phase.value;
+    ctx.strokeStyle = hsl(268, 0.5, 0.6, 0.22);
+    ctx.lineWidth = Math.max(1, px(0.003));
+    ctx.beginPath();
+    ctx.moveTo(view.cx, view.cy);
+    ctx.lineTo(sx(Math.cos(phi) * 0.9), sy(Math.sin(phi) * 0.9));
+    ctx.stroke();
+
+    for (let i = 0; i < e.nodes.length; i++) {
+      const n = e.nodes[i];
+      const on = sel === n;
+      let buf = n.__ss;
+      if (!buf) buf = n.__ss = RS.selfsimilar.build(n.essence, 'abstract', n.idx, buf);
+
+      ctx.save();
+      ctx.translate(sx(n.x), sy(n.y));
+      ctx.rotate(t * 0.06 * (1 + n.distance));
+      /* `abstract` draws dashed relations and dotted nodes, both of which are
+       * faint by construction — so this scope needs a much higher alpha than a
+       * lobed or filamentary one to read at all. */
+      RS.selfsimilar.draw(ctx, buf, 0, 0,
+        RS.selfsimilar.fit(buf, px(0.09 + n.distance * 0.07)),
+        n.hue, 0.5 + n.distance * 0.45, on ? 1.0 : 0.82, t);
+      ctx.restore();
+
+      if (on) {
+        ctx.strokeStyle = hsl(n.hue, 0.9, 0.75, 0.85);
+        ctx.lineWidth = Math.max(2, px(0.006));
+        ctx.beginPath();
+        ctx.arc(sx(n.x), sy(n.y), px(0.15 + Math.sin(t * 2.2) * 0.008), 0, TAU);
+        ctx.stroke();
+      } else {
+        /* Unselected blocks still get a mark, so the compass has visible
+         * detents rather than a needle sweeping through fog. */
+        ctx.fillStyle = hsl(n.hue, 0.6, 0.6, 0.35);
+        ctx.beginPath(); ctx.arc(sx(n.x), sy(n.y), Math.max(1.5, px(0.005)), 0, TAU); ctx.fill();
+      }
+    }
+
+    /* The specimen: one address, two universes. Two stars side by side, sized
+     * and coloured by what each block actually derives. */
+    const sp = game.scene.specimen;
+    if (sp && sp.ours && sp.there) {
+      const y = view.cy + px(0.70);
+      /* Wide enough apart that the two captions cannot collide — they are the
+       * comparison, so overlapping them destroys the only thing this picture
+       * is for. */
+      const pairs = [[sp.ours, view.cx - px(0.42), 'ours'], [sp.there, view.cx + px(0.42), 'there']];
+      for (const [d, x, tag] of pairs) {
+        const r = px(0.018) * Math.pow(clamp(d.lum, 0.001, 1e5), 0.12);
+        /* Star colour from its derived temperature — the difference between the
+         * two discs *is* the difference between the two universes, so it has to
+         * run the right way: 3000 K is red, 5800 K is yellow-white, 10000 K and
+         * up is blue. A linear ramp gets this backwards at one end or the
+         * other, because the yellow-to-blue half of the sequence covers three
+         * times the temperature range that the red-to-yellow half does. */
+        const hue = d.temp < 5000
+          ? lerp(16, 44, clamp01((d.temp - 2500) / 2500))
+          : lerp(44, 215, clamp01((d.temp - 5000) / 6000));
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+        g.addColorStop(0, hsl(hue, 0.75, 0.72, 0.9));
+        g.addColorStop(1, hsl(hue, 0.75, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
+        ctx.fillStyle = hsl(hue, 0.5, 0.85, 0.95);
+        ctx.beginPath(); ctx.arc(x, y, Math.max(2, r), 0, TAU); ctx.fill();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = hsl(0, 0, 0.62, 0.75);
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillText(tag, x, y + px(0.085));
+        ctx.fillStyle = hsl(hue, 0.5, 0.78, 0.9);
+        ctx.font = '11px ui-monospace, Menlo, monospace';
+        ctx.fillText(Math.round(d.temp) + ' K', x, y + px(0.135));
+        ctx.fillStyle = hsl(d.living ? 140 : 0, 0.5, 0.66, 0.8);
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillText(d.living + '/' + d.worlds + ' alive', x, y + px(0.175));
+      }
+    }
   }
 
   function drawNode(ctx, game, n, t) {
@@ -662,16 +800,35 @@
     } else if (kind === 'planet') {
       RS.worldrender.drawPlanet(ctx, game, dt);
     } else {
+      /* The Cellular scope runs the same attunement loop as the field, because
+       * that is the whole argument for having six primitives: a new scope is a
+       * different *place*, not a different rule set. What changes is what the
+       * place is made of — a membrane instead of a rim, organelles instead of
+       * empty space — and what your work there does to the world outside. */
+      const inCell = kind === 'cellular';
+      const inWeb = kind === 'web';
+      const inFoam = kind === 'foam';
+      const inEnsemble = kind === 'ensemble';
+
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
       const upheavalFade = 1 - game.field.upheaval * 0.55;
       drawBackdrop(ctx, game, tb.a.geometry, tb.a.hue, (1 - tb.t) * 0.55 * upheavalFade, t);
       if (tb.b !== tb.a) drawBackdrop(ctx, game, tb.b.geometry, tb.b.hue, tb.t * 0.55 * upheavalFade, t);
 
-      // rim
-      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, 0.20);
-      ctx.lineWidth = Math.max(1, px(0.004));
-      ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
+      if (inCell) drawCell(ctx, game, t);
+      else if (inWeb) drawWeb(ctx, game, t);
+      else if (inFoam) drawFoam(ctx, game, t);
+      else if (inEnsemble) drawEnsemble(ctx, game, t);
+
+      /* The rim. A membrane in a cell, the horizon in the web, and absent in
+       * the foam — there is no boundary at a scale where nothing persists long
+       * enough to have one. */
+      if (!inFoam) {
+        ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
+        ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
+        ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
+      }
 
       drawBeatRing(ctx, game, dt, t);
 
@@ -687,6 +844,21 @@
 
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);
+
+      /* The live primitives for whatever you are working on, stacked in the
+       * gap between the reticle and the instruments. Anchored to the viewport
+       * rather than to the node: a readout that chases a drifting node is
+       * unreadable, and this one has to be legible while you are concentrating
+       * on something else. */
+      if (game.focusNode && game.focusNode.resolved > 0.25) {
+        const rows = RS.primhud;
+        const bandHue = vis.hue.value;
+        const bottom = (RS.hud && RS.hud.layout.clusterTop) ? RS.hud.layout.clusterTop : view.h * 0.78;
+        const need = RS.spectrum.BANDS[game.focusNode.man.bandIndex].prim.length;
+        const y0 = bottom - 10 - need * rows.ROW_H;
+        rows.drawFor(ctx, game, game.focusNode, 22, y0,
+          bandHue, 0.35 + game.focusNode.resolved * 0.6);
+      }
     }
 
     /* Scene transitions flash the whole frame rather than cross-fading two

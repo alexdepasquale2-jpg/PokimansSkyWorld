@@ -21,7 +21,11 @@
   'use strict';
   const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
 
-  const T_SUN = 5772;          // K
+  /* The block's numbers, read live rather than closed over — stepping into an
+   * ensemble node swaps the physics under everything, and a cached constant
+   * would quietly keep deriving the old universe. Geometry stays fixed: a solar
+   * radius is a unit of length, not a law. */
+  const P = RS.physics;
   const AU_PER_SOLAR_RADIUS = 0.00465047;
   const EARTH_MASSES_PER_SOLAR = 332946;
 
@@ -30,22 +34,21 @@
    * makes the galaxy overwhelmingly M dwarfs with a scattering of giants —
    * which is both true and much better design than a uniform spread, because
    * it makes a big star an event. */
-  const IMF_ALPHA = 2.35;
-  const M_MIN = 0.08, M_MAX = 40;
-  const P_MIN = Math.pow(M_MIN, 1 - IMF_ALPHA);
-  const P_MAX = Math.pow(M_MAX, 1 - IMF_ALPHA);
-
   function sampleMass(u) {
-    return Math.pow(P_MIN + u * (P_MAX - P_MIN), 1 / (1 - IMF_ALPHA));
+    const a = P.imfAlpha(), lo = P.mMin(), hi = P.mMax();
+    const pLo = Math.pow(lo, 1 - a);
+    const pHi = Math.pow(hi, 1 - a);
+    return Math.pow(pLo + u * (pHi - pLo), 1 / (1 - a));
   }
 
   /* ── Mass–luminosity relation ─────────────────────────────────────────────
    * Piecewise, as observed. The breaks are real: below ~0.43 M☉ the star is
    * fully convective, above ~2 M☉ radiation pressure starts to dominate. */
   function luminosityOf(m) {
-    if (m < 0.43) return 0.23 * Math.pow(m, 2.3);
-    if (m < 2) return Math.pow(m, 4);
-    if (m < 55) return 1.4 * Math.pow(m, 3.5);
+    const b = P.get();
+    if (m < 0.43) return 0.23 * Math.pow(m, b.mlLow);
+    if (m < 2) return Math.pow(m, b.mlMid);
+    if (m < 55) return 1.4 * Math.pow(m, b.mlHigh);
     return 32000 * m;
   }
 
@@ -57,7 +60,7 @@
   /* Effective temperature by inverting Stefan–Boltzmann: L = 4πR²σT⁴. In solar
    * units that collapses to T = T☉·(L/R²)^¼. */
   function temperatureOf(L, R) {
-    return T_SUN * Math.pow(L / (R * R), 0.25);
+    return P.tSun() * Math.pow(L / (R * R), 0.25);
   }
 
   /* Main-sequence lifetime in Gyr. Fuel scales with mass, burn rate with
@@ -309,7 +312,7 @@
   }
 
   RS.stellar = {
-    T_SUN, AU_PER_SOLAR_RADIUS, EARTH_MASSES_PER_SOLAR, CLASSES,
+     AU_PER_SOLAR_RADIUS, EARTH_MASSES_PER_SOLAR, CLASSES,
     sampleMass, luminosityOf, radiusOf, temperatureOf, lifetimeOf, classify,
     habitableZone, frostLine, metallicityAt, makeStar, companionCount,
     systemAt, nameSystem, bodyName, fluxAt, skyStars

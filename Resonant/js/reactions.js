@@ -180,19 +180,71 @@
     bus.on('scene:change', ({ kind, from, scene }) => {
       /* Arriving in a different world is the biggest transition the game has
        * after a first-contact discovery, so it gets a full upheaval. */
-      const hue = kind === 'system' ? 285 : kind === 'planet' ? 130 : 200;
+      /* One table rather than a chain of ternaries: there are five scopes now
+       * and more coming, and a scope that forgets to name itself here arrives
+       * announcing that it is the attunement field. */
+      const ARRIVAL = {
+        field: { hue: 200, icon: '◉',
+          title: () => 'the attunement field',
+          body: () => 'Tuning again. φ selects the layer.' },
+        galaxy: { hue: 190, icon: '✦',
+          title: () => 'the star map',
+          body: () => 'Tap a star to select it. Tap again to travel.' },
+        system: { hue: 285, icon: '◇',
+          title: sc => sc.system ? sc.system.name : 'a system',
+          body: () => 'Unembodied: τ scrubs this system’s history. Tap a world to select it.' },
+        planet: { hue: 130, icon: '●',
+          title: sc => sc.planet ? sc.planet.name : 'a world',
+          body: () => 'Take a body to touch this world.' },
+        web: { hue: 276, icon: '⁂',
+          title: sc => (RS.cosmos.BY_ID[sc.web && sc.web.tierId] || { name: 'the cosmic web' }).name,
+          body: sc => sc.web
+            ? 'τ is the age of the universe here. Scrub it and watch the structure assemble.'
+            : 'Filaments and voids.' },
+        ensemble: { hue: 210, icon: '∵',
+          title: sc => 'level ' + (sc.ensemble ? sc.ensemble.family : 'I') + ' ensemble',
+          body: () => 'Alternative blocks of law. Turn Δ to stand in one — the constants change under you.' },
+        foam: { hue: 291, icon: '∴',
+          title: () => 'quantum foam',
+          body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
+        cellular: { hue: 150, icon: '❋',
+          title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
+          body: sc => {
+            const why = RS.cellular.reasonSterile(sc.planet);
+            if (why) return 'Nothing to be inside here — ' + why + '.';
+            return 'Inside ' + sc.planet.name + '. What you crystallise here, it becomes.';
+          } }
+      };
+      const a = ARRIVAL[kind] || ARRIVAL.field;
       RS.audio.upheaval(1.4);
-      RS.feel.FX.upheaval(hue, 1.3);
+      RS.feel.FX.upheaval(a.hue, 1.3);
       RS.feel.vignette(0.5);
-      const label = kind === 'system' ? (scene.system ? scene.system.name : 'a system')
-        : kind === 'planet' ? (scene.planet ? scene.planet.name : 'a world')
-          : 'the attunement field';
       RS.ui.toast({
-        kind: 'major', icon: kind === 'system' ? '◇' : kind === 'planet' ? '●' : '◉',
-        hue, ms: 4200, title: label.toUpperCase(),
-        body: kind === 'field' ? 'Tuning again. φ selects the layer.'
-          : kind === 'system' ? 'Unembodied: τ scrubs this system’s history. Tap a world to select it.'
-            : 'Take a body to touch this world.'
+        kind: 'major', icon: a.icon, hue: a.hue, ms: 4200,
+        title: String(a.title(scene)).toUpperCase(),
+        body: a.body(scene)
+      });
+    });
+
+    /* Ejection is the Quantum Foam scope's entire introduction, so it gets a
+     * real one rather than a silent state change. */
+    bus.on('foam:eject', ({ arch }) => {
+      RS.audio.upheaval(1.8);
+      RS.feel.FX.upheaval(291, 1.6);
+      RS.ui.toast({
+        kind: 'major', icon: '·', hue: 291, ms: 5200, title: 'BODY LOST',
+        body: 'A ' + (arch ? arch.name.toLowerCase() : 'body') +
+          ' is a persistent arrangement of matter. There is no such thing here.'
+      });
+    });
+
+    bus.on('ensemble:adopt', ({ block, distance }) => {
+      RS.audio.upheaval(1.2 + distance);
+      RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
+      RS.ui.toast({
+        kind: 'major', icon: '∵', hue: 186 + distance * 120, ms: 5000,
+        title: block.name.toUpperCase(),
+        body: block.blurb + ' Everything derives from here under these constants.'
       });
     });
 

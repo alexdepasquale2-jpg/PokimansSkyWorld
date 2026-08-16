@@ -67,14 +67,14 @@
 
   function thermalVelocity(T, mu) { return 0.1574 * Math.sqrt(T / mu); }
 
-  function retains(vEsc, T, mu) { return vEsc > 6 * thermalVelocity(T, mu); }
+  function retains(vEsc, T, mu) { return vEsc > RS.physics.jeans() * thermalVelocity(T, mu); }
 
   /* ── Temperature ──────────────────────────────────────────────────────────
    * Equilibrium temperature from flux and albedo, then a greenhouse term.
    * 278.5 K is the equilibrium temperature of a zero-albedo body at 1 AU from
    * the Sun, which is the constant that makes the rest dimensionless. */
   function equilibriumTemp(flux, albedo) {
-    return 278.5 * Math.pow(Math.max(1e-9, flux) * (1 - albedo), 0.25);
+    return RS.physics.tEq1AU() * Math.pow(Math.max(1e-9, flux) * (1 - albedo), 0.25);
   }
 
   /* Greenhouse forcing. Saturating rather than linear, because doubling an
@@ -83,7 +83,7 @@
    * being special-cased. */
   function greenhouseFactor(pressure, opacity) {
     const tau = pressure * opacity;
-    return 1 + 0.42 * Math.pow(tau, 0.42);
+    return 1 + RS.physics.greenhouseK() * Math.pow(tau, RS.physics.greenhouseP());
   }
 
   // ── the planet ───────────────────────────────────────────────────────────
@@ -282,10 +282,10 @@
    * the galaxy; loosening them makes contact routine. */
   function habitabilityOf(p) {
     if (!p.type.landable) return 0;
-    const temp = Math.exp(-Math.pow((p.surfaceTemp - 288) / 58, 2));
+    const temp = Math.exp(-Math.pow((p.surfaceTemp - 288) / RS.physics.habSigma(), 2));
     const grav = Math.exp(-Math.pow((p.gravity - 1) / 0.85, 2));
     const press = p.pressure < 0.02 ? 0 : Math.exp(-Math.pow(Math.log(p.pressure / 1.0) / 1.5, 2));
-    const water = clamp01(p.hydrosphere * 5);
+    const water = clamp01(p.hydrosphere * RS.physics.waterWeight());
     const shield = 0.3 + 0.7 * p.magnetosphere;
     return clamp01(temp * grav * press * water * shield);
   }
