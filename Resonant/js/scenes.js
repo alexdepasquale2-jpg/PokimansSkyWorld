@@ -142,6 +142,7 @@
       foamT: 0,
       /* Local time at the current lon/lat — day, season, tide. */
       clock: null,
+      transitionDir: 0,
       /* Inhabitants — derived per frame, never persisted. */
       inhabitants: null,
       localT: 0,
@@ -301,6 +302,12 @@
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+    /* Which way you went. The ladder is the navigation, so a scope change is a
+     * *movement* — inward toward the small or outward toward the vast — and a
+     * cut that does not say which makes the whole thing feel like a menu.
+     * Derived from the rungs the two scopes occupy, so it is right for every
+     * pair without anybody enumerating them. */
+    s.transitionDir = Math.sign(tierForScene(kind) - tierForScene(s.lastKind)) || 0;
 
     /* Leaving the Ensemble always restores our own block. An alternative
      * universe you had forgotten you were standing in would silently re-derive

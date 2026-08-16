@@ -625,6 +625,37 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   .ess-row .ax { width: 26px; }
 }
 
+
+/* ── the drawer's tab row ──────────────────────────────────────────────────
+ *
+ * Seven topbar buttons became one. On a phone they were already competing with
+ * the insight readout for the same strip, and every new panel added another —
+ * so the panels moved inside the drawer they all open into, which is where a
+ * player is already looking when they want a different one.
+ */
+#drawer-tabs {
+  display: flex; gap: 2px; padding: 0 10px 8px;
+  overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+#drawer-tabs::-webkit-scrollbar { display: none; }
+#drawer-tabs button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: 0; border-radius: 7px;
+  padding: 6px 9px; cursor: pointer;
+  font: inherit; font-size: 8.5px; letter-spacing: .05em;
+  color: var(--dim); white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+#drawer-tabs button span { font-size: 13px; line-height: 1; }
+#drawer-tabs button:hover { color: var(--ink); background: rgba(140, 175, 220, .07); }
+#drawer-tabs button.on {
+  color: var(--ink);
+  border-bottom-color: hsl(190, 70%, 60%);
+  background: rgba(140, 175, 220, .09);
+}
+
 </style>
 </head>
 <body>
@@ -652,14 +683,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       <span id="progress-pct">0%</span>
     </div>
     <div id="tools">
+      <!-- Contact stays separate on purpose: it is the one panel that is
+           event-driven rather than something you go and look at, and burying an
+           incoming channel two taps deep would make it missable. Everything
+           else is one drawer with tabs. -->
       <button id="btn-contact" class="tool" title="Contact" data-on="0">◉</button>
-      <button id="btn-world" class="tool" title="World">🜨</button>
-      <button id="btn-vessels" class="tool" title="Bodies &amp; research">⋀</button>
-      <button id="btn-upgrades" class="tool" title="Dials">⚙</button>
-      <button id="btn-codex" class="tool" title="Codex">☰</button>
-      <button id="btn-paths" class="tool" title="Pathways">◈</button>
-      <button id="btn-guide" class="tool" title="How this works">?</button>
-      <button id="btn-settings" class="tool" title="Settings">⋯</button>
+      <button id="btn-menu" class="tool" title="Panels">☰</button>
     </div>
   </header>
 
@@ -693,6 +722,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       <h2 id="drawer-title">DIALS</h2>
       <button id="btn-drawer-close" aria-label="Close">✕</button>
     </header>
+    <!-- One row of tabs instead of seven topbar buttons. The tabs are only
+         drawn for panels that are worth opening right now — the World tab is
+         meaningless in the attunement field — so the row shrinks and grows with
+         where you are. -->
+    <nav id="drawer-tabs"></nav>
     <div id="drawer-body"></div>
   </aside>
 
@@ -9751,6 +9785,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       foamT: 0,
       /* Local time at the current lon/lat — day, season, tide. */
       clock: null,
+      transitionDir: 0,
       /* Inhabitants — derived per frame, never persisted. */
       inhabitants: null,
       localT: 0,
@@ -9910,6 +9945,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     s.lastKind = s.kind;
     s.kind = kind;
     s.transition = 1;
+    /* Which way you went. The ladder is the navigation, so a scope change is a
+     * *movement* — inward toward the small or outward toward the vast — and a
+     * cut that does not say which makes the whole thing feel like a menu.
+     * Derived from the rungs the two scopes occupy, so it is right for every
+     * pair without anybody enumerating them. */
+    s.transitionDir = Math.sign(tierForScene(kind) - tierForScene(s.lastKind)) || 0;
 
     /* Leaving the Ensemble always restores our own block. An alternative
      * universe you had forgotten you were standing in would silently re-derive
@@ -12882,14 +12923,51 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       }
     }
 
-    /* Scene transitions flash the whole frame rather than cross-fading two
-     * render targets — cheaper, and it reads as reality being re-rendered
-     * around you, which is what is actually happening. */
+    /* ── Arrival ─────────────────────────────────────────────────────────
+     *
+     * This was a white flash, which said "something changed" and nothing else.
+     * The ladder is the navigation, so a scope change is a movement — and which
+     * way you went is the one thing the transition should communicate.
+     *
+     * Rings travel *inward* when you descend the ladder and *outward* when you
+     * climb it, at a speed that falls as the transition settles. It is two
+     * strokes and a fill; the point is not the effect, it is that the direction
+     * is never ambiguous, so twenty-two rungs read as one continuous axis
+     * rather than as twenty-two destinations.
+     */
     if (game.scene && game.scene.transition > 0.01) {
+      const tr = game.scene.transition;
+      const dir = game.scene.transitionDir || 0;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, game.scene.transition * 0.28);
+
+      /* The wash, dimmer than it was — it is now the background of the
+       * movement rather than the whole of it. */
+      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, tr * 0.16);
       ctx.fillRect(0, 0, view.w, view.h);
+
+      if (dir !== 0) {
+        /* `u` runs 0 → 1 as the transition settles, so the rings sweep once
+         * rather than pulsing. Inward means they close on you; outward means
+         * they leave. */
+        const u = 1 - tr;
+        const maxR = Math.hypot(view.w, view.h) * 0.6;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          const off = i * 0.22;
+          const k = clamp01(u + off);
+          const r = dir < 0
+            ? lerp(maxR, px(0.05), ease.outCubic(k))
+            : lerp(px(0.05), maxR, ease.outCubic(k));
+          const a = tr * (1 - Math.abs(k - 0.5) * 1.1) * 0.5;
+          if (a <= 0.005) continue;
+          ctx.strokeStyle = hsl(vis.hue.value + i * 12, 0.7, 0.66, a);
+          ctx.lineWidth = Math.max(1.5, px(0.012) * (1 - k * 0.6));
+          ctx.beginPath();
+          ctx.arc(view.cx, view.cy, Math.max(1, r), 0, TAU);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
 
@@ -14305,22 +14383,26 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function init(game, bus) {
     for (const id of ['insight-val', 'rate-val', 'gnosis-val', 'progress-fill', 'progress-pct',
       'tier-name', 'tier-sci', 'layer-name', 'layer-rules', 'objective',
-      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title',
-      'btn-upgrades', 'btn-codex', 'btn-settings', 'btn-drawer-close', 'beat-hint',
-      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar', 'btn-contact', 'contact-hint',
-      'btn-guide', 'btn-paths']) {
+      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title', 'drawer-tabs',
+      'btn-drawer-close', 'beat-hint', 'btn-menu',
+      'scene-tag', 'body-bar', 'btn-contact', 'contact-hint']) {
       el[id] = $(id);
     }
 
-    el['btn-upgrades'].addEventListener('click', () => toggleDrawer(game, bus, 'upgrades'));
-    el['btn-codex'].addEventListener('click', () => toggleDrawer(game, bus, 'codex'));
-    el['btn-settings'].addEventListener('click', () => toggleDrawer(game, bus, 'settings'));
-    el['btn-world'].addEventListener('click', () => toggleDrawer(game, bus, 'world'));
-    el['btn-vessels'].addEventListener('click', () => toggleDrawer(game, bus, 'vessels'));
+    /* One button, one drawer, tabs inside it. There were seven topbar buttons
+     * and every new panel added another; on a phone they were already competing
+     * with the insight readout for the same strip. Contact is the exception and
+     * stays where it is, because it is event-driven — a channel opening is
+     * something that happens *to* you, and burying it behind a menu would make
+     * it missable. */
+    el['btn-menu'].addEventListener('click', () => toggleDrawer(game, bus, drawerOpen ? null : lastTab));
     el['btn-contact'].addEventListener('click', () => toggleDrawer(game, bus, 'contact'));
-    el['btn-guide'].addEventListener('click', () => toggleDrawer(game, bus, 'guide'));
-    el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
+
+    el['drawer-tabs'].addEventListener('click', ev => {
+      const t = ev.target.closest('[data-tab]');
+      if (t) { lastTab = t.dataset.tab; openDrawer(game, bus, t.dataset.tab); }
+    });
 
     /* The pilot bar is rebuilt every frame, so its two controls are delegated
      * too. Both exist so that changing body — the thing you most often want to
@@ -14955,11 +15037,57 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // --- drawers -------------------------------------------------------------
 
-  function toggleDrawer(game, bus, which) {
-    if (drawerOpen === which) { closeDrawer(); return; }
+  /* ── The panels ───────────────────────────────────────────────────────────
+   *
+   * Ordered as a player needs them: what is in front of me, what am I flying,
+   * what do I know, where am I going, how does this work, and settings. `when`
+   * decides whether a tab is worth showing at all — the World tab is
+   * meaningless in the attunement field and its absence is information.
+   */
+  const TABS = [
+    { id: 'world', label: 'World', glyph: '🜨',
+      when: g => g.scene.kind !== 'field' && g.scene.kind !== 'ensemble' },
+    { id: 'vessels', label: 'Bodies', glyph: '⋀', when: () => true },
+    { id: 'upgrades', label: 'Dials', glyph: '⚙', when: () => true },
+    { id: 'codex', label: 'Codex', glyph: '◇', when: () => true },
+    { id: 'paths', label: 'Paths', glyph: '◈', when: () => true },
+    { id: 'guide', label: 'Guide', glyph: '?', when: () => true },
+    { id: 'settings', label: 'Settings', glyph: '⋯', when: () => true }
+  ];
+  /* Reopening the drawer returns you to the panel you were last in, because a
+   * drawer that always opens on the same tab is a drawer you have to navigate
+   * every single time. */
+  let lastTab = 'upgrades';
+
+  function openDrawer(game, bus, which) {
     drawerOpen = which;
+    if (which && which !== 'contact') lastTab = which;
     el['drawer'].classList.add('open');
+    renderTabs(game);
     renderDrawer(game, bus);
+  }
+
+  function toggleDrawer(game, bus, which) {
+    if (!which || drawerOpen === which) { closeDrawer(); return; }
+    openDrawer(game, bus, which);
+  }
+
+  function renderTabs(game) {
+    const nav = el['drawer-tabs'];
+    if (!nav) return;
+    let h = '';
+    for (const t of TABS) {
+      if (!t.when(game)) continue;
+      h += '<button data-tab="' + t.id + '"' + (drawerOpen === t.id ? ' class="on"' : '') +
+        '><span>' + t.glyph + '</span>' + t.label + '</button>';
+    }
+    /* Contact only appears as a tab once there is a channel — otherwise it is
+     * a door to an empty room. */
+    if (game.scene.contact) {
+      h += '<button data-tab="contact"' + (drawerOpen === 'contact' ? ' class="on"' : '') +
+        '><span>◉</span>Contact</button>';
+    }
+    nav.innerHTML = h;
   }
 
   function closeDrawer() {
@@ -14969,6 +15097,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   function renderDrawer(game, bus) {
     if (!drawerOpen) return;
+    /* The tab row is part of the drawer, so an action that rebuilds the body —
+     * buying an upgrade, taking a body — must not leave the tabs showing a
+     * stale selection or a scope-conditional tab that no longer applies. */
+    renderTabs(game);
     const titles = { upgrades: 'DIALS', codex: 'CODEX', settings: 'SETTINGS',
       world: 'WORLD', vessels: 'BODIES & RESEARCH', contact: 'CONTACT',
       guide: 'HOW THIS WORKS', paths: 'PATHWAYS' };
@@ -15532,7 +15664,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.ui = {
-    setNotifyLevel, init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText,
+    setNotifyLevel, init, render, toast, toggleDrawer, openDrawer, closeDrawer, renderDrawer, renderTabs, setText, TABS,
     worldHTML, vesselsHTML, contactHTML, codexHTML, upgradesHTML, settingsHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 

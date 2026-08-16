@@ -609,3 +609,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   .ess-row .ef { display: none; }
   .ess-row .ax { width: 26px; }
 }
+
+
+/* ── the drawer's tab row ──────────────────────────────────────────────────
+ *
+ * Seven topbar buttons became one. On a phone they were already competing with
+ * the insight readout for the same strip, and every new panel added another —
+ * so the panels moved inside the drawer they all open into, which is where a
+ * player is already looking when they want a different one.
+ */
+#drawer-tabs {
+  display: flex; gap: 2px; padding: 0 10px 8px;
+  overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+#drawer-tabs::-webkit-scrollbar { display: none; }
+#drawer-tabs button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: 0; border-radius: 7px;
+  padding: 6px 9px; cursor: pointer;
+  font: inherit; font-size: 8.5px; letter-spacing: .05em;
+  color: var(--dim); white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+#drawer-tabs button span { font-size: 13px; line-height: 1; }
+#drawer-tabs button:hover { color: var(--ink); background: rgba(140, 175, 220, .07); }
+#drawer-tabs button.on {
+  color: var(--ink);
+  border-bottom-color: hsl(190, 70%, 60%);
+  background: rgba(140, 175, 220, .09);
+}

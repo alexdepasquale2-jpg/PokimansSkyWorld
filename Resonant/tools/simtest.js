@@ -3452,5 +3452,74 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
     'the readout says where in the day you are: "' + line + '"');
 }
 
+
+// ── one drawer, tabs inside it ───────────────────────────────────────────
+{
+  /* Seven topbar buttons became one. The risk of that change is a panel that
+   * becomes unreachable, so: every panel the drawer can render must be
+   * reachable as a tab from somewhere. */
+  const g = RS.game.newGame(6161);
+  const panels = ['upgrades', 'codex', 'settings', 'world', 'vessels', 'contact', 'guide', 'paths'];
+  const tabIds = RS.ui.TABS.map(t => t.id);
+  for (const id of panels) {
+    if (id === 'contact') continue;  // conditional; checked below
+    assert(tabIds.indexOf(id) >= 0, id + ' is reachable as a tab');
+  }
+
+  /* Every tab must be available somewhere on the ladder — a tab whose `when`
+   * is never true is a panel nobody can open. */
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  const everSeen = Object.create(null);
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g, g.dials.space, i);
+    for (let k = 0; k < 12; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+    for (const t of RS.ui.TABS) if (t.when(g)) everSeen[t.id] = true;
+  }
+  const never = RS.ui.TABS.filter(t => !everSeen[t.id]).map(t => t.id);
+  assert(never.length === 0, 'every tab is available somewhere: ' + (never.join(', ') || 'all of them'));
+
+  /* And the World tab must genuinely hide where it is meaningless, or the
+   * conditional is decoration. */
+  RS.dials.setValue(g, g.dials.space, RS.cosmos.ROOT_INDEX);
+  for (let k = 0; k < 12; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  const world = RS.ui.TABS.find(t => t.id === 'world');
+  assert(!world.when(g), 'the World tab is absent in the attunement field');
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_PLANET);
+  for (let k = 0; k < 20; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  assert(world.when(g), 'and present on a surface');
+}
+
+// ── arrival says which way you went ──────────────────────────────────────
+{
+  const g = RS.game.newGame(7272);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+
+  /* The ladder is the navigation, so a scope change is a movement and the
+   * direction must be derived rather than guessed — inward toward the small,
+   * outward toward the vast, for every pair of scopes without anybody
+   * enumerating them. */
+  RS.dials.setValue(g, g.dials.space, RS.cosmos.ROOT_INDEX);
+  for (let k = 0; k < 15; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_CELL);
+  for (let k = 0; k < 15; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  assert(g.scene.transitionDir < 0, 'descending the ladder reads as inward');
+
+  RS.dials.setValue(g, g.dials.space, RS.cosmos.TIERS.length - 1);
+  for (let k = 0; k < 15; k++) RS.scenes.tick(g, nullBus, 1 / 60);
+  assert(g.scene.transitionDir > 0, 'and climbing it reads as outward');
+
+  /* Every ordered pair of scopes must produce a direction — a zero would draw
+   * nothing and leave the change unexplained. */
+  let flat = [];
+  for (const a of RS.scenes.SCENES) {
+    for (const b of RS.scenes.SCENES) {
+      if (a.id === b.id) continue;
+      const d = Math.sign(RS.scenes.tierForScene(b.id) - RS.scenes.tierForScene(a.id));
+      if (d === 0) flat.push(a.id + '→' + b.id);
+    }
+  }
+  assert(flat.length === 0, 'every scope change has a direction: ' + (flat.join(', ') || 'all of them'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -23,22 +23,26 @@
   function init(game, bus) {
     for (const id of ['insight-val', 'rate-val', 'gnosis-val', 'progress-fill', 'progress-pct',
       'tier-name', 'tier-sci', 'layer-name', 'layer-rules', 'objective',
-      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title',
-      'btn-upgrades', 'btn-codex', 'btn-settings', 'btn-drawer-close', 'beat-hint',
-      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar', 'btn-contact', 'contact-hint',
-      'btn-guide', 'btn-paths']) {
+      'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title', 'drawer-tabs',
+      'btn-drawer-close', 'beat-hint', 'btn-menu',
+      'scene-tag', 'body-bar', 'btn-contact', 'contact-hint']) {
       el[id] = $(id);
     }
 
-    el['btn-upgrades'].addEventListener('click', () => toggleDrawer(game, bus, 'upgrades'));
-    el['btn-codex'].addEventListener('click', () => toggleDrawer(game, bus, 'codex'));
-    el['btn-settings'].addEventListener('click', () => toggleDrawer(game, bus, 'settings'));
-    el['btn-world'].addEventListener('click', () => toggleDrawer(game, bus, 'world'));
-    el['btn-vessels'].addEventListener('click', () => toggleDrawer(game, bus, 'vessels'));
+    /* One button, one drawer, tabs inside it. There were seven topbar buttons
+     * and every new panel added another; on a phone they were already competing
+     * with the insight readout for the same strip. Contact is the exception and
+     * stays where it is, because it is event-driven — a channel opening is
+     * something that happens *to* you, and burying it behind a menu would make
+     * it missable. */
+    el['btn-menu'].addEventListener('click', () => toggleDrawer(game, bus, drawerOpen ? null : lastTab));
     el['btn-contact'].addEventListener('click', () => toggleDrawer(game, bus, 'contact'));
-    el['btn-guide'].addEventListener('click', () => toggleDrawer(game, bus, 'guide'));
-    el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
+
+    el['drawer-tabs'].addEventListener('click', ev => {
+      const t = ev.target.closest('[data-tab]');
+      if (t) { lastTab = t.dataset.tab; openDrawer(game, bus, t.dataset.tab); }
+    });
 
     /* The pilot bar is rebuilt every frame, so its two controls are delegated
      * too. Both exist so that changing body — the thing you most often want to
@@ -673,11 +677,57 @@
 
   // --- drawers -------------------------------------------------------------
 
-  function toggleDrawer(game, bus, which) {
-    if (drawerOpen === which) { closeDrawer(); return; }
+  /* ── The panels ───────────────────────────────────────────────────────────
+   *
+   * Ordered as a player needs them: what is in front of me, what am I flying,
+   * what do I know, where am I going, how does this work, and settings. `when`
+   * decides whether a tab is worth showing at all — the World tab is
+   * meaningless in the attunement field and its absence is information.
+   */
+  const TABS = [
+    { id: 'world', label: 'World', glyph: '🜨',
+      when: g => g.scene.kind !== 'field' && g.scene.kind !== 'ensemble' },
+    { id: 'vessels', label: 'Bodies', glyph: '⋀', when: () => true },
+    { id: 'upgrades', label: 'Dials', glyph: '⚙', when: () => true },
+    { id: 'codex', label: 'Codex', glyph: '◇', when: () => true },
+    { id: 'paths', label: 'Paths', glyph: '◈', when: () => true },
+    { id: 'guide', label: 'Guide', glyph: '?', when: () => true },
+    { id: 'settings', label: 'Settings', glyph: '⋯', when: () => true }
+  ];
+  /* Reopening the drawer returns you to the panel you were last in, because a
+   * drawer that always opens on the same tab is a drawer you have to navigate
+   * every single time. */
+  let lastTab = 'upgrades';
+
+  function openDrawer(game, bus, which) {
     drawerOpen = which;
+    if (which && which !== 'contact') lastTab = which;
     el['drawer'].classList.add('open');
+    renderTabs(game);
     renderDrawer(game, bus);
+  }
+
+  function toggleDrawer(game, bus, which) {
+    if (!which || drawerOpen === which) { closeDrawer(); return; }
+    openDrawer(game, bus, which);
+  }
+
+  function renderTabs(game) {
+    const nav = el['drawer-tabs'];
+    if (!nav) return;
+    let h = '';
+    for (const t of TABS) {
+      if (!t.when(game)) continue;
+      h += '<button data-tab="' + t.id + '"' + (drawerOpen === t.id ? ' class="on"' : '') +
+        '><span>' + t.glyph + '</span>' + t.label + '</button>';
+    }
+    /* Contact only appears as a tab once there is a channel — otherwise it is
+     * a door to an empty room. */
+    if (game.scene.contact) {
+      h += '<button data-tab="contact"' + (drawerOpen === 'contact' ? ' class="on"' : '') +
+        '><span>◉</span>Contact</button>';
+    }
+    nav.innerHTML = h;
   }
 
   function closeDrawer() {
@@ -687,6 +737,10 @@
 
   function renderDrawer(game, bus) {
     if (!drawerOpen) return;
+    /* The tab row is part of the drawer, so an action that rebuilds the body —
+     * buying an upgrade, taking a body — must not leave the tabs showing a
+     * stale selection or a scope-conditional tab that no longer applies. */
+    renderTabs(game);
     const titles = { upgrades: 'DIALS', codex: 'CODEX', settings: 'SETTINGS',
       world: 'WORLD', vessels: 'BODIES & RESEARCH', contact: 'CONTACT',
       guide: 'HOW THIS WORKS', paths: 'PATHWAYS' };
@@ -1250,6 +1304,6 @@
   }
 
   RS.ui = {
-    setNotifyLevel, init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText,
+    setNotifyLevel, init, render, toast, toggleDrawer, openDrawer, closeDrawer, renderDrawer, renderTabs, setText, TABS,
     worldHTML, vesselsHTML, contactHTML, codexHTML, upgradesHTML, settingsHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

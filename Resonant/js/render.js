@@ -998,14 +998,51 @@
       }
     }
 
-    /* Scene transitions flash the whole frame rather than cross-fading two
-     * render targets — cheaper, and it reads as reality being re-rendered
-     * around you, which is what is actually happening. */
+    /* ── Arrival ─────────────────────────────────────────────────────────
+     *
+     * This was a white flash, which said "something changed" and nothing else.
+     * The ladder is the navigation, so a scope change is a movement — and which
+     * way you went is the one thing the transition should communicate.
+     *
+     * Rings travel *inward* when you descend the ladder and *outward* when you
+     * climb it, at a speed that falls as the transition settles. It is two
+     * strokes and a fill; the point is not the effect, it is that the direction
+     * is never ambiguous, so twenty-two rungs read as one continuous axis
+     * rather than as twenty-two destinations.
+     */
     if (game.scene && game.scene.transition > 0.01) {
+      const tr = game.scene.transition;
+      const dir = game.scene.transitionDir || 0;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, game.scene.transition * 0.28);
+
+      /* The wash, dimmer than it was — it is now the background of the
+       * movement rather than the whole of it. */
+      ctx.fillStyle = hsl(vis.hue.value, 0.6, 0.5, tr * 0.16);
       ctx.fillRect(0, 0, view.w, view.h);
+
+      if (dir !== 0) {
+        /* `u` runs 0 → 1 as the transition settles, so the rings sweep once
+         * rather than pulsing. Inward means they close on you; outward means
+         * they leave. */
+        const u = 1 - tr;
+        const maxR = Math.hypot(view.w, view.h) * 0.6;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          const off = i * 0.22;
+          const k = clamp01(u + off);
+          const r = dir < 0
+            ? lerp(maxR, px(0.05), ease.outCubic(k))
+            : lerp(px(0.05), maxR, ease.outCubic(k));
+          const a = tr * (1 - Math.abs(k - 0.5) * 1.1) * 0.5;
+          if (a <= 0.005) continue;
+          ctx.strokeStyle = hsl(vis.hue.value + i * 12, 0.7, 0.66, a);
+          ctx.lineWidth = Math.max(1.5, px(0.012) * (1 - k * 0.6));
+          ctx.beginPath();
+          ctx.arc(view.cx, view.cy, Math.max(1, r), 0, TAU);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
 

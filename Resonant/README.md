@@ -729,24 +729,30 @@ revealed) and reads its dialogue off the rendered DOM.
 
 ## Status
 
-This is a foundation, and complete as one: all three scenes are playable end to
-end, every system named above is implemented and tested rather than stubbed.
+**Complete as designed.** Every phase of the plan this was built against has
+landed, and the invariants are held by 952 assertions rather than by intention:
 
-The clearest things to build next — none of which require changing the
-architecture, because the sparse-delta and derive-everything decisions were made
-to accommodate them:
+- All **22 rungs** have a scope of their own, every one reachable by turning Σ,
+  none absorbed by a scope that is not about it.
+- All **12 layers** are winnable and measurably distinct, composed from six
+  primitives and 56 authored numbers.
+- **Six pathways** through it, each computed from live state, gating on
+  genuinely different things.
+- Nothing is stored. `node tools/build.mjs` still emits one self-contained HTML
+  file with no dependencies and no build step, and it runs at 60 fps.
 
-- **Arrival.** `scene.transition` is a white flash. Changing scope should show
-  *movement* between scopes — falling inward, climbing outward — because the
-  ladder is the navigation and a cut makes it feel like a menu.
-- **Interface.** Seven topbar buttons and growing. They want to be one tabbed
-  drawer — World / Bodies / Codex / Pathways / Guide / Settings — with Contact
-  staying separate because it is event-driven and must remain unmissable.
-- **Culture-to-culture relations.** Standing is per-player right now. Cultures
-  knowing about *each other* — and about what you did to their neighbours — is
-  the same derived-plus-delta pattern with one more index.
-- **Riding a civilisation.** Riding a mind works. Biasing a culture's
-  trajectory rather than a creature's is the same influence mechanic one scale
-  up, and `civOf` is already a closed-form curve waiting to be perturbed.
-- **Contact at range.** Carriers currently need you in the system. A probe left
-  behind, or a beacon network, could hold a channel open across light years.
+What a next pass would most usefully do, in order of how much it would change
+the game:
+
+- **Culture-to-culture relations.** Standing is per-player. Cultures knowing
+  about *each other* — and about what you did to their neighbours — is the same
+  derived-plus-delta pattern with one more index.
+- **Riding a civilisation.** Riding a mind works. Biasing a culture's trajectory
+  rather than a creature's is the same influence mechanic one scale up, and
+  `civOf` is already a closed-form curve waiting to be perturbed.
+- **Contact at range.** Carriers need you in the system. A probe left behind, or
+  a beacon network, could hold a channel open across light years.
+- **More essences.** The generative core is 14 × 4 numbers. Adding a fifteenth
+  essence adds it to every layer, every scope and every geometry at once — which
+  is the property the whole architecture exists to have, and it has never been
+  exercised.
