@@ -1671,8 +1671,8 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
 
   /* The essences must be *distinguishable*. If two sit on top of each other in
    * all four axes they generate identical mechanics everywhere and the player
-   * can never tell them apart — which would quietly collapse 14 essences into
-   * fewer. */
+   * can never tell them apart — which would quietly collapse the essence set
+   * into a smaller one. */
   let collisions = [];
   for (let i = 0; i < E.length; i++) {
     for (let j = i + 1; j < E.length; j++) {
@@ -2094,7 +2094,7 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
    * soak swings by 3× on the seed alone — enough to make two layers that are
    * provably identical in every derived parameter look like a balance problem,
    * which is a good way to spend an afternoon tuning noise. */
-  const SEEDS = [4201, 77003, 918277];
+  const SEEDS = [4201, 77003, 918277, 31771, 655219];
   function soakAvg(band) {
     const runs = SEEDS.map(sd => soak(band, 90, sd));
     const out = {};
@@ -3519,6 +3519,106 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
     }
   }
   assert(flat.length === 0, 'every scope change has a direction: ' + (flat.join(', ') || 'all of them'));
+}
+
+
+// ── an essence is 4 numbers, and that is the whole of it ─────────────────
+/* The property the architecture exists to have, asserted rather than assumed:
+ * an essence is four numbers, eight form names and a trait, and adding one adds
+ * it to twelve layers, twenty-two rungs, six primitives, nine scopes and every
+ * geometry at once. Nothing else in the codebase may need to know how many
+ * there are.
+ *
+ * This is the test that would fail if someone hardcoded a count, sized an array
+ * to fourteen, or wrote a switch over essence ids — and every one of those is
+ * an easy thing to do by accident. */
+{
+  const E = RS.fractal.ESSENCES;
+  const g = RS.game.newGame(15150);
+
+  /* Complete: every essence must carry the full contract, or it is inert
+   * somewhere and the player meets a hole. */
+  const geoms = ['foam', 'orbital', 'chain', 'cell', 'body', 'disc', 'web', 'abstract'];
+  for (const e of E) {
+    assert(typeof e.trait === 'string' && e.trait.length > 12, e.id + ' says what it is');
+    for (const a of RS.fractal.AXES) {
+      assert(typeof e[a] === 'number' && e[a] >= 0 && e[a] <= 1, e.id + ' has a real ' + a);
+    }
+    for (const geo of geoms) {
+      assert(e.forms && typeof e.forms[geo] === 'string' && e.forms[geo].length,
+        e.id + ' has a name at ' + geo);
+    }
+  }
+
+  /* Every primitive must produce something finite for every essence — not
+   * "most of them", which is what a table sized to fourteen would give. */
+  const EM = RS.emergence;
+  for (const e of E) {
+    for (const tier of [0, 5, 13, 21]) {
+      const g1 = EM.GATE(e, tier, 1.5, {});
+      assert(Number.isFinite(g1.period) && g1.period > 0, e.id + ' gates at rung ' + tier);
+    }
+    assert(EM.NEST(e, {}).depth >= 1, e.id + ' nests');
+    assert(Number.isFinite(EM.FLOW(e, 0.3, 0.2, 1, {}).gx), e.id + ' flows');
+    assert(EM.ORDER(e, 7, {}).prereqs.length >= 1, e.id + ' orders');
+    assert(EM.ORDER(e, 7, {}).prereqs.indexOf(e.id) < 0, e.id + ' does not require itself');
+    assert(Number.isFinite(EM.TWIN(e, 7, {}).separation), e.id + ' twins');
+    assert(Number.isFinite(EM.INVERT(e, {}).strength), e.id + ' inverts');
+  }
+
+  /* And the self-similar generator must draw it at every geometry, with the
+   * same topology — which is the claim, not a side effect. */
+  for (const e of E) {
+    const base = RS.selfsimilar.topology(RS.selfsimilar.build(e, geoms[0], 11, null));
+    for (const geo of geoms) {
+      const t = RS.selfsimilar.topology(RS.selfsimilar.build(e, geo, 11, null));
+      assert(t === base, e.id + ' has one skeleton at every geometry (' + geo + ')');
+    }
+  }
+
+  /* Every scope that names essences must reach the new ones — a scope that
+   * enumerated fourteen would silently never show the fifteenth. */
+  const seenInCells = new Set();
+  const planet = { name: 'T', surfaceTemp: 290, pressure: 1, gravity: 1, flux: 1,
+    biosphere: { complexity: 0.8, stage: { name: 'Complex' } } };
+  for (let i = 0; i < 300; i++) {
+    for (const o of RS.cellular.cellAt(g, planet, i * 0.011, i).organelles) seenInCells.add(o.essence.id);
+  }
+  assert(seenInCells.size === E.length,
+    'every essence can appear in a cell (' + seenInCells.size + '/' + E.length + ')');
+
+  const inShells = new Set(RS.shells.shellsAt(g, 3, null).occupants.map(o => o.essence.id));
+  assert(inShells.size === E.length, 'and every one has a state in the shells');
+
+  const inMol = new Set();
+  for (let i = 0; i < 300; i++) {
+    for (const st of RS.molecular.moleculeAt(g, planet, i * 0.013, i, null).sites) inMol.add(st.essence.id);
+  }
+  assert(inMol.size === E.length, 'and a site in a molecule');
+
+  /* The codex must grow with them rather than showing a fixed fourteen. */
+  const html = RS.ui.codexHTML(g);
+  assert(html.indexOf('/ ' + (E.length * 4) + ' axes read') >= 0,
+    'the codex counts ' + (E.length * 4) + ' axes, not a hardcoded number');
+  let rows = 0, from = 0;
+  while ((from = html.indexOf('class="ess-row', from + 1)) >= 0) rows++;
+  assert(rows === E.length, 'and draws a row for each (' + rows + ')');
+
+  /* Distinctness is asserted once, above, at the threshold that block owns —
+   * duplicating it here at a stricter one would mean two assertions disagreeing
+   * about the same invariant, and the stricter of the two would start failing
+   * on a pair that has been fine since the axes were authored.
+   *
+   */
+  /* The two holes the new ones fill. Before them, every branching essence was
+   * lopsided — a player could reasonably have concluded that branching implies
+   * asymmetry, which a snowflake disproves. */
+  const symBranch = E.filter(e => e.branching > 0.6 && e.symmetry > 0.7);
+  assert(symBranch.length > 0,
+    'something branches *and* is symmetric: ' + symBranch.map(e => e.id).join(', '));
+  const intricateVolatile = E.filter(e => e.complexity > 0.7 && e.branching < 0.35 && e.persistence < 0.3);
+  assert(intricateVolatile.length > 0,
+    'something is intricate, unbranched and fleeting: ' + intricateVolatile.map(e => e.id).join(', '));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

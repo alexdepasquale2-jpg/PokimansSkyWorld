@@ -1872,9 +1872,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    *
    * ── The four axes: the entire authored seed of the game ──────────────────
    *
-   * Fourteen essences × four numbers = 56 values, and every mechanic in the
-   * game is generated from them (see emergence.js). 12 bands × 14 essences ×
-   * 8 geometries = 1344 distinct situations, all traceable back to this table
+   * Sixteen essences × four numbers = 64 values, and every mechanic in the
+   * game is generated from them (see emergence.js). 12 bands × 16 essences ×
+   * 8 geometries = 1536 distinct situations, all traceable back to this table
    * — which is what makes them *recognisable* rather than merely various.
    *
    *   complexity   how much structure it carries      → nesting depth, ordering depth
@@ -1963,6 +1963,37 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       trait: 'One event that spends itself buying a thousand others.',
       forms: { foam: 'Decay Chain', orbital: 'Auger Cascade', chain: 'Reaction Cascade',
         cell: 'Signal Cascade', body: 'Avalanche', disc: 'Starburst', web: 'Merger Chain', abstract: 'Entailment' } },
+    /* ── The two that were added last ─────────────────────────────────────
+     *
+     * Added to exercise the property the whole architecture exists to have:
+     * an essence is 4 numbers, 8 form names and a trait, and adding one adds it
+     * to twelve layers, twenty-two rungs, six primitives and every scope at
+     * once. No band table, no scene, no renderer and no primitive was touched
+     * to put these in the game — which is either a trivial observation about
+     * data-driven design or the entire point, depending on whether you believe
+     * the first fourteen were generated the same way. They were.
+     *
+     * They also fill two genuine holes in the axis space. Nothing branched
+     * *and* was symmetric — every branching essence was lopsided, so a player
+     * could have concluded that branching implies asymmetry, which is false and
+     * a snowflake disproves it. And nothing was intricate, unbranched and
+     * volatile all at once, which is what turbulence is. */
+    { id: 'dendrite', name: 'Dendrite', glyph: '❋', hueShift: 58, complexity: 0.60,
+      /* Reaches out many ways, and every way is the same way. High branching
+       * with high symmetry — a snowflake, a radiolarian, a nerve arbor. */
+      branching: 0.80, symmetry: 0.92, persistence: 0.45,
+      trait: 'Reaches out in every direction at once, and every direction is the same one.',
+      forms: { foam: 'Vertex Sheaf', orbital: 'Hybrid Orbital', chain: 'Dendrimer',
+        cell: 'Arbor', body: 'Frost Fern', disc: 'Tidal Tail', web: 'Filament Node',
+        abstract: 'Free Group' } },
+    { id: 'turbulence', name: 'Turbulence', glyph: '≀', hueShift: -52, complexity: 0.85,
+      /* Intricate, unbranched, lopsided and gone in a moment. The one thing
+       * with no structure you can hold on to and far too much to describe. */
+      branching: 0.25, symmetry: 0.10, persistence: 0.18,
+      trait: 'Too much structure to describe and none of it lasts long enough to try.',
+      forms: { foam: 'Vacuum Churn', orbital: 'Correlation Hole', chain: 'Molten Tangle',
+        cell: 'Cytoplasmic Churn', body: 'Storm', disc: 'Shear Front', web: 'Infall Shock',
+        abstract: 'Mixing Map' } },
     { id: 'memory', name: 'Memory', glyph: '⌸', hueShift: -46, complexity: 0.65,
       branching: 0.20, symmetry: 0.60, persistence: 1.00,
       trait: 'The present shaped by something that has already stopped existing.',
@@ -2218,7 +2249,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
  * (cosmos.js). A band declares which primitives are live (spectrum.js). A tier
  * declares how fast and how they are drawn.
  *
- *     56 authored numbers  ×  6 functions  =  1344 distinct situations
+ *     64 authored numbers  ×  6 functions  =  1536 distinct situations
  *
  * ── Why this and not twelve hand-written modes ────────────────────────────
  *
@@ -2237,7 +2268,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
  * ── Contract ──────────────────────────────────────────────────────────────
  *
  * Every function here is pure, allocation-free (writes into a caller-owned
- * `out`), finite for all 14 essences × 22 tiers, and reads *all four* axes so
+ * `out`), finite for all 16 essences × 22 tiers, and reads *all four* axes so
  * no essence is inert in any primitive. They are called per node per frame, so
  * they must stay cheap — no trigonometry beyond one sin/cos, no allocation.
  */

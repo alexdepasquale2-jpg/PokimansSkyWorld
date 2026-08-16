@@ -475,7 +475,7 @@ vital    ▸ nest flow       unity      ▸ all six
 emotive  ▸ flow twin       mnemonic   ▸ order nest
 ```
 
-**14 essences × 4 axes = 56 authored numbers**, and everything else is composed
+**16 essences × 4 axes = 64 authored numbers**, and everything else is composed
 from them. The point is not economy of code — it is that knowledge *transfers*.
 Once you learn that `Cascade` branches (0.90), you know its rhythm subdivides
 five ways, its dependency graph fans out four wide, its nests are wide and
@@ -735,7 +735,7 @@ landed, and the invariants are held by 952 assertions rather than by intention:
 - All **22 rungs** have a scope of their own, every one reachable by turning Σ,
   none absorbed by a scope that is not about it.
 - All **12 layers** are winnable and measurably distinct, composed from six
-  primitives and 56 authored numbers.
+  primitives and 64 authored numbers.
 - **Six pathways** through it, each computed from live state, gating on
   genuinely different things.
 - Nothing is stored. `node tools/build.mjs` still emits one self-contained HTML
@@ -752,7 +752,10 @@ the game:
   `civOf` is already a closed-form curve waiting to be perturbed.
 - **Contact at range.** Carriers need you in the system. A probe left behind, or
   a beacon network, could hold a channel open across light years.
-- **More essences.** The generative core is 14 × 4 numbers. Adding a fifteenth
-  essence adds it to every layer, every scope and every geometry at once — which
-  is the property the whole architecture exists to have, and it has never been
-  exercised.
+- **More essences.** The generative core is 16 × 4 numbers now — two were added
+  after everything else was finished, purely to exercise the property the whole
+  architecture exists to have, and **nothing else in the codebase was touched**:
+  no band table, no scene, no renderer, no primitive. They appear in twelve
+  layers, twenty-two rungs, nine scopes and every geometry because that is how
+  the first fourteen got there too. A test now asserts it, so a hardcoded count
+  or an array sized to the essence list would fail loudly.
