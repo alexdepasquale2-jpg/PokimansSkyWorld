@@ -491,6 +491,16 @@
     updateDerived(game);
   }
 
+  /* The scope multiplier. Kept here rather than in each scope so the payout
+   * has exactly one shape, and so a scope that forgets to define one is 1×
+   * rather than NaN. */
+  function scopeBonus(game) {
+    const k = game.scene && game.scene.kind;
+    if (k === 'web' && RS.web) return RS.web.bonusFor(game);
+    if (k === 'foam' && RS.foam) return RS.foam.bonusFor(game);
+    return 1;
+  }
+
   /* What fraction of the idle floor a band pays out. See the call site. */
   function passiveShareOf(band) {
     if (!RS.spectrum.usesPrim(band, 'flow')) return 0;
@@ -674,8 +684,14 @@
     const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 8);
     /* What the layer charges you in throughput, paid back per crystal. */
     const frictionMul = RS.spectrum.frictionOf(band);
+    /* And what the *scope* is worth. Each scope that has an only-here reason
+     * to be worked declares its own multiplier — the Cosmic Web pays for
+     * catching a filament while it assembles and for reaching past the
+     * horizon, the Quantum Foam pays for a fluctuation that never cancelled.
+     * Absent anywhere without one, so no scope has to opt out. */
+    const scopeMul = scopeBonus(game);
     const amount = man.potency * band.yield * gnosisMul * depthMul *
-      nestMul * orderMul * effortMul * frictionMul * game.yieldMul;
+      nestMul * orderMul * effortMul * frictionMul * scopeMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -742,6 +758,6 @@
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
     holdTimeOf, spawnNode, applyOffline, updateDerived,
-    applyPrimitives, passiveShareOf, holdsAntecedent, DIAL_LOAD, ORDER_WINDOW
+    applyPrimitives, passiveShareOf, holdsAntecedent, scopeBonus, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

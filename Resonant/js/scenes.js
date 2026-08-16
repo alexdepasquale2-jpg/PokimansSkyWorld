@@ -49,10 +49,22 @@
    * first match wins and a scope like Cellular sits inside the range the
    * surface scene would otherwise claim.
    */
+  const TIER_QUANTUM = RS.cosmos.BY_ID.quantum.index;        // 1
+  const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
+  const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
+
   const SCENES = [
+    {
+      id: 'foam', name: 'Quantum Foam', first: 0, last: TIER_QUANTUM,
+      blurb: 'Below the scale at which anything persists. No body works here.'
+    },
     {
       id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
       blurb: 'Inside one cell of a living world. The machinery, at its own scale.'
+    },
+    {
+      id: 'web', name: 'Cosmic Web', first: TIER_GROUP, last: TIER_HUBBLE,
+      blurb: 'Filaments and voids, assembling over thirteen billion years.'
     },
     {
       id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
@@ -83,11 +95,15 @@
     return 'field';
   }
 
-  /* The rung a scene is entered at, so a pathway can say "turn Σ to here" and
-   * mean something precise. */
+  /* The rung a scene is actually entered at, so a pathway can say "turn Σ to
+   * here" and mean something precise. Not simply `first`: a broad scope's range
+   * can have a narrower one carved out of its start, so this asks the same
+   * question the game asks — the first rung that really resolves to this id. */
   function tierForScene(id) {
     const sc = SCENE_BY_ID[id];
-    return sc ? sc.first : RS.cosmos.ROOT_INDEX;
+    if (!sc) return RS.cosmos.ROOT_INDEX;
+    for (let i = sc.first; i <= sc.last; i++) if (sceneForTier(i) === id) return i;
+    return sc.first;
   }
 
   function newScene() {
@@ -101,6 +117,14 @@
       cell: null,
       cellIndex: 0,
       cellT: 0,
+      /* Cosmic web. `webT` is an offset from the present in Gyr — the only
+       * place in the game where τ is measured against the age of the
+       * universe. */
+      web: null,
+      webT: 0,
+      /* Quantum foam. */
+      foam: null,
+      foamT: 0,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -219,6 +243,8 @@
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
     else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
+    else if (s.kind === 'web') RS.web.tick(game, bus, dt);
+    else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -273,6 +299,12 @@
       if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
       s.agents.length = 0;
       RS.cellular.enter(game, bus);
+    } else if (kind === 'web') {
+      s.agents.length = 0;
+      RS.web.enter(game, bus);
+    } else if (kind === 'foam') {
+      s.agents.length = 0;
+      RS.foam.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -587,6 +619,16 @@
     const arch = RS.vessel.BY_ID[archId];
     if (!arch) return { ok: false, reason: 'unknown vessel' };
     if (!game.vessels.unlocked[archId]) return { ok: false, reason: 'not researched' };
+    /* Some scopes refuse bodies outright rather than refusing a particular
+     * one. The Quantum Foam is the only such place: a body is a persistent
+     * arrangement of matter and nothing at that scale persists, so there is
+     * nothing to arrange. Checked before the per-vessel predicate, because the
+     * reason is about the *place* and answering "a walker needs a surface"
+     * would be true and beside the point. */
+    if (game.scene.kind === 'foam') {
+      return { ok: false,
+        reason: 'nothing persists at this scale — there is nothing for a body to be made of' };
+    }
     const env = RS.vessel.environmentFor(game);
     const blocked = RS.vessel.canOperate(arch, env);
     if (blocked) return { ok: false, reason: blocked };
@@ -672,7 +714,7 @@
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,

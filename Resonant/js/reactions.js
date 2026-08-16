@@ -196,6 +196,14 @@
         planet: { hue: 130, icon: '●',
           title: sc => sc.planet ? sc.planet.name : 'a world',
           body: () => 'Take a body to touch this world.' },
+        web: { hue: 276, icon: '⁂',
+          title: sc => (RS.cosmos.BY_ID[sc.web && sc.web.tierId] || { name: 'the cosmic web' }).name,
+          body: sc => sc.web
+            ? 'τ is the age of the universe here. Scrub it and watch the structure assemble.'
+            : 'Filaments and voids.' },
+        foam: { hue: 291, icon: '∴',
+          title: () => 'quantum foam',
+          body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
         cellular: { hue: 150, icon: '❋',
           title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
           body: sc => {
@@ -212,6 +220,18 @@
         kind: 'major', icon: a.icon, hue: a.hue, ms: 4200,
         title: String(a.title(scene)).toUpperCase(),
         body: a.body(scene)
+      });
+    });
+
+    /* Ejection is the Quantum Foam scope's entire introduction, so it gets a
+     * real one rather than a silent state change. */
+    bus.on('foam:eject', ({ arch }) => {
+      RS.audio.upheaval(1.8);
+      RS.feel.FX.upheaval(291, 1.6);
+      RS.ui.toast({
+        kind: 'major', icon: '·', hue: 291, ms: 5200, title: 'BODY LOST',
+        body: 'A ' + (arch ? arch.name.toLowerCase() : 'body') +
+          ' is a persistent arrangement of matter. There is no such thing here.'
       });
     });
 

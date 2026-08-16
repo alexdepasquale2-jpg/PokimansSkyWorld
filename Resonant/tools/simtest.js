@@ -23,7 +23,7 @@ const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
   'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
-  'js/scene_cellular.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
+  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
 ];
 
 const sandbox = {
@@ -2485,6 +2485,211 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   const man = RS.fractal.resolve(g2.seed, 13, 0, 1, 1, 0);
   assert(RS.cellular.expressFrom(g2, nullBus, man) === null,
     'crystallising in the attunement field does not rewrite a distant biosphere');
+}
+
+// ── the cosmic web: structure as a function of time ──────────────────────
+{
+  const g = RS.game.newGame(8181);
+
+  /* Growth must be monotone in time and saturating — a logistic, not a ramp,
+   * because structure formation runs away once it starts and then stops. */
+  let prev = -1, mono = true;
+  for (let t = 0.1; t < 60; t += 0.4) {
+    const v = RS.web.growthAt(0.6, 6, t);
+    if (v < prev - 1e-12) mono = false;
+    prev = v;
+  }
+  assert(mono, 'overdensity only ever grows');
+  assert(RS.web.growthAt(0.6, 6, 0.1) < 0.05, 'and starts from nearly nothing');
+  assert(RS.web.growthAt(0.6, 6, 40) > 0.98, 'and finishes');
+
+  /* Big primordial seeds collapse earlier. This is the one fact the scope
+   * teaches, so it had better be true of the numbers. */
+  assert(RS.web.growthAt(0.9, 2, 3) > RS.web.growthAt(0.2, 9, 3),
+    'a large primordial overdensity is further along at the same epoch');
+
+  /* Assembly peaks in the middle and is near zero at both ends — the whole
+   * point of the scope's bonus is that "now" is usually the wrong time. */
+  const early = RS.web.assemblyAt(0.6, 6, 0.5);
+  const peak = RS.web.assemblyAt(0.6, 6, 6);
+  const late = RS.web.assemblyAt(0.6, 6, 40);
+  assert(peak > 0.98, 'assembly peaks when a structure is half-collapsed');
+  assert(early < 0.1 && late < 0.1, 'and is negligible before and long after');
+
+  /* The structure itself. */
+  const early2 = RS.web.webAt(g, 0, 0, 'web', 0.4, null);
+  const now = RS.web.webAt(g, 0, 0, 'web', RS.web.AGE_NOW, null);
+  const far = RS.web.webAt(g, 0, 0, 'web', 60, null);
+  assert(early2.formed < now.formed, 'more has collapsed by the present day (' +
+    early2.formed + ' → ' + now.formed + ')');
+  assert(now.formed <= far.formed, 'and no less by the far future');
+  assert(early2.links.length < now.links.length,
+    'the filament network genuinely assembles rather than fading in');
+
+  /* Voids are measured, not labelled — and they must be bigger when less has
+   * collapsed, because an uncollapsed node does not fill a void. */
+  assert(early2.deepestVoid > now.deepestVoid,
+    'voids are larger before structure forms (' + early2.deepestVoid.toFixed(3) +
+    ' vs ' + now.deepestVoid.toFixed(3) + ')');
+  assert(now.voidGpc > 0.01 && now.voidGpc < RS.web.HORIZON_GPC,
+    'the largest void is a real size in real units (' + now.voidGpc.toFixed(3) + ' Gpc)');
+
+  /* Purity: same address, same structure. */
+  const a = RS.web.webAt(g, 2, -1, 'web', 5, null);
+  const b = RS.web.webAt(g, 2, -1, 'web', 5, null);
+  assert(a.nodes.every((n, i) => n.x === b.nodes[i].x && n.growth === b.nodes[i].growth),
+    'a slab of the web is a pure function of its address and the epoch');
+
+  /* The rungs look at genuinely different volumes, and only the largest can
+   * see past the horizon — which is the correct physics and also the only
+   * reason to climb to it. */
+  const spans = ['group', 'supercluster', 'web', 'hubble'].map(id => RS.web.spanFor(id));
+  for (let i = 1; i < spans.length; i++) {
+    assert(spans[i] > spans[i - 1], 'each rung of the web scope sees a larger volume');
+  }
+  const grp = RS.web.webAt(g, 0, 0, 'group', RS.web.AGE_NOW, null);
+  assert(grp.disconnected === 0, 'nothing in the Local Group is beyond the horizon');
+  const hub = RS.web.webAt(g, 0, 0, 'hubble', RS.web.AGE_NOW, null);
+  assert(hub.disconnected > 0,
+    'and the Hubble-volume rung does reach past it (' + hub.disconnected + ' structures)');
+
+  /* No NaN anywhere across the whole τ range the dial can reach. */
+  let bad = null;
+  for (const id of ['group', 'supercluster', 'web', 'hubble']) {
+    for (let t = 0.02; t < 95; t += 1.7) {
+      const w = RS.web.webAt(g, 1, 1, id, t, null);
+      if (!Number.isFinite(w.voidGpc) || !Number.isFinite(w.assembling)) bad = id + '@' + t;
+      for (const n of w.nodes) if (!Number.isFinite(n.growth) || !Number.isFinite(n.x)) bad = id + '@' + t;
+    }
+  }
+  assert(!bad, 'the web is finite everywhere τ can reach: ' + (bad || 'clean'));
+}
+
+// ── quantum foam: nothing persists, including you ────────────────────────
+{
+  const g = RS.game.newGame(313);
+
+  /* Lifetime is persistence, straight through. A player who has read that axis
+   * anywhere else in the game can predict how long things last here. */
+  const memory = RS.fractal.ESSENCE_BY_ID.memory;
+  const seed = RS.fractal.ESSENCE_BY_ID.seed;
+  assert(RS.foam.lifetimeOf(memory, 1) > RS.foam.lifetimeOf(seed, 1) * 3,
+    'a persistent essence lasts far longer than a volatile one');
+
+  /* And the rung's clock scales it, so one rung out is visibly calmer. */
+  assert(RS.foam.lifetimeOf(memory, 1) > RS.foam.lifetimeOf(memory, 0),
+    'the Planck rung seethes faster than the quantum rung');
+
+  /* Survivors are rare, derived and stable — a fluctuation that got away is
+   * always the one that got away. */
+  let n = 0;
+  for (let i = 0; i < 2000; i++) if (RS.foam.survivesAt(12345, i)) n++;
+  assert(n > 40 && n < 160, 'survivors are rare but real (' + n + ' in 2000)');
+  assert(RS.foam.survivesAt(12345, 7) === RS.foam.survivesAt(12345, 7),
+    'and stable per address');
+
+  /* Pairs close unless they survive: separation returns to zero over a cycle
+   * for an ordinary pair, and does not for a survivor. */
+  const f = RS.foam.foamAt(g, 1, 0, null);
+  assert(f.pairs.length === RS.foam.PAIR_COUNT, 'the foam is fully populated');
+  let closes = 0, opens = 0;
+  for (const p of f.pairs) (p.survives ? opens++ : closes++);
+  assert(closes > 0, 'most pairs annihilate');
+  assert(f.survivors === opens, 'the survivor count is the survivor count');
+
+  let bad = null;
+  for (let t = 0; t < 400; t += 0.7) {
+    const ff = RS.foam.foamAt(g, 0.5, t, null);
+    for (const p of ff.pairs) {
+      if (!Number.isFinite(p.sep) || !Number.isFinite(p.presence) || p.presence < 0 || p.presence > 1) {
+        bad = 'pair ' + p.i + ' @' + t;
+      }
+    }
+  }
+  assert(!bad, 'the foam is finite and bounded for any t: ' + (bad || 'clean'));
+
+  /* Ejection. The scope's whole introduction, and it must be enforced every
+   * frame rather than only on arrival — otherwise a player embarks from a
+   * drawer while standing in it and the rule quietly stops being true. */
+  const g2 = RS.game.newGame(99);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g2.dials.space, 'range');
+  g2.insight = 1e9;
+  RS.influence.tryResearch(g2, nullBus, 'locomotion');
+  RS.dials.setValue(g2, g2.dials.space, RS.scenes.TIER_PLANET);
+  for (let i = 0; i < 20; i++) RS.scenes.tick(g2, nullBus, 1 / 60);
+  const emb = RS.scenes.embark(g2, nullBus, 'walker');
+  assert(emb.ok, 'a body can be taken on a surface (' + (emb.reason || 'ok') + ')');
+  assert(g2.inhabiting, 'and you are wearing it');
+
+  /* Σ is the vessel's vertical axis while embodied, so the ladder is
+   * deliberately unavailable until you step out — you cannot walk to the
+   * Planck scale. Step out, then descend. */
+  RS.scenes.disembark(g2, nullBus);
+  RS.dials.setValue(g2, g2.dials.space, 0);
+  for (let i = 0; i < 30; i++) RS.scenes.tick(g2, nullBus, 1 / 60);
+  assert(g2.scene.kind === 'foam', 'the Planck rung is the foam scope');
+
+  /* And the scope refuses a body outright, for the reason that is actually
+   * true of the place rather than of the vessel. */
+  const denied = RS.scenes.embark(g2, nullBus, 'walker');
+  assert(!denied.ok && /persist/.test(denied.reason),
+    'the foam refuses a body for the right reason: ' + denied.reason);
+  assert(!g2.inhabiting, 'and you stay a bare mote');
+
+  /* Belt and braces: if anything ever does put a body down here — a loaded
+   * save, a future scope transition — the tick takes it back off. */
+  g2.body = RS.vessel.newBody('walker');
+  g2.inhabiting = true;
+  for (let i = 0; i < 6; i++) RS.scenes.tick(g2, nullBus, 1 / 60);
+  assert(!g2.inhabiting, 'a body that somehow arrives here does not survive the frame');
+}
+
+// ── scope payouts exist, are bounded, and only fire in their scope ───────
+{
+  const g = RS.game.newGame(555);
+  /* Everywhere with no scope hook is exactly 1× — a scope must not have to opt
+   * out of a multiplier it never heard of. */
+  for (const kind of ['field', 'planet', 'system', 'galaxy', 'cellular']) {
+    g.scene.kind = kind;
+    assert(RS.field.scopeBonus(g) === 1, kind + ' has no scope multiplier');
+  }
+  g.scene.kind = 'web';
+  g.scene.web = RS.web.webAt(g, 0, 0, 'hubble', 4, null);
+  const wb = RS.field.scopeBonus(g);
+  assert(wb > 1 && wb < 8, 'the web pays a bounded premium (×' + wb.toFixed(2) + ')');
+  g.scene.kind = 'foam';
+  g.scene.foam = RS.foam.foamAt(g, 1, 0, null);
+  const fb = RS.field.scopeBonus(g);
+  assert(fb >= 1 && fb < 5, 'the foam pays a bounded premium (×' + fb.toFixed(2) + ')');
+}
+
+// ── every rung, every scope, no gaps and no wreckage ─────────────────────
+{
+  const g = RS.game.newGame(4242);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  const seen = Object.create(null);
+  let broke = null;
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g, g.dials.space, i);
+    for (let k = 0; k < 20; k++) { RS.scenes.tick(g, nullBus, 1 / 60); RS.field.tick(g, nullBus, 1 / 60); }
+    const want = RS.scenes.sceneForTier(i);
+    seen[want] = (seen[want] || 0) + 1;
+    if (g.scene.kind !== want) broke = RS.cosmos.TIERS[i].id + ' → ' + g.scene.kind;
+    if (!Number.isFinite(g.insight)) broke = RS.cosmos.TIERS[i].id + ' (NaN insight)';
+  }
+  assert(!broke, 'a full Σ sweep lands correctly on all 22 rungs: ' + (broke || 'clean'));
+  assert(Object.keys(seen).length === RS.scenes.SCENES.length,
+    'and every registered scope is actually reachable by turning Σ (' +
+    Object.keys(seen).sort().join(', ') + ')');
+
+  /* Every scope must have somewhere to be entered from, and the guide names
+   * each one, so nothing is a place you can only arrive at by accident. */
+  for (const sc of RS.scenes.SCENES) {
+    assert(RS.scenes.sceneForTier(RS.scenes.tierForScene(sc.id)) === sc.id,
+      sc.id + ' is entered at the rung it claims');
+    assert(typeof sc.blurb === 'string' && sc.blurb.length > 12,
+      sc.id + ' explains what it is');
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

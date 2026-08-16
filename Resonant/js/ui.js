@@ -168,6 +168,20 @@
         sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
         sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
       el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'web') {
+      const r = RS.web.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.tGyr.toFixed(2) + ' Gyr · ' + r.formed + '/' +
+        RS.web.NODE_COUNT + ' collapsed · largest void ' + r.voidGpc.toFixed(3) + ' Gpc' +
+        (r.disconnected ? ' · ' + r.disconnected + ' beyond the horizon' : '') +
+        (r.assembling > 0.25 ? ' · ASSEMBLING ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(276, 0.7, 0.72);
+    } else if (sc.kind === 'foam') {
+      const r = RS.foam.readout(game);
+      setText('layer-name', 'QUANTUM FOAM');
+      setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
+        (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(291, 0.7, 0.72);
     } else if (sc.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       setText('layer-name', r.title.toUpperCase());
@@ -347,6 +361,36 @@
           p.name + ' &mdash; ' + p.type.name +
           (p.biosphere ? ' &middot; ' + p.biosphere.stage.name : '') +
           (p.civ ? ' &middot; ' + p.civ.tier.name : '') + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'web') {
+      const r = RS.web.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(276, 0.8, 0.72) + '">&#8259;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">t = ' + r.tGyr.toFixed(2) +
+        ' Gyr &middot; ' + r.formed + ' collapsed &middot; void ' + r.voidGpc.toFixed(3) + ' Gpc</div>' +
+        (r.assembling > 0.25
+          ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.66) + '">assembling now &mdash; &times;' +
+            r.bonus.toFixed(2) + ' while it lasts</div>' : '') +
+        (r.disconnected
+          ? '<div class="ro-sub" style="color:' + hsl(200, 0.6, 0.68) + '">' + r.disconnected +
+            ' structures past the horizon &mdash; no signal has ever crossed</div>' : '');
+      return;
+    }
+    if (s.kind === 'foam') {
+      const r = RS.foam.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(291, 0.8, 0.72) + '">&#8756;</span>' +
+        '<span class="ro-title">Quantum Foam</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">mean lifetime ' + r.meanLife.toFixed(2) +
+        ' s &mdash; slow &tau; down or nothing will hold still</div>' +
+        (r.survivors
+          ? '<div class="ro-sub" style="color:' + hsl(46, 0.85, 0.68) + '">' + r.survivors +
+            ' fluctuation' + (r.survivors > 1 ? 's' : '') + ' never cancelled &mdash; &times;' +
+            r.bonus.toFixed(2) + '</div>' : '');
       return;
     }
     if (s.kind === 'cellular') {

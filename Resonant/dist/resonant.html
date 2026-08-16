@@ -3055,6 +3055,16 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     updateDerived(game);
   }
 
+  /* The scope multiplier. Kept here rather than in each scope so the payout
+   * has exactly one shape, and so a scope that forgets to define one is 1×
+   * rather than NaN. */
+  function scopeBonus(game) {
+    const k = game.scene && game.scene.kind;
+    if (k === 'web' && RS.web) return RS.web.bonusFor(game);
+    if (k === 'foam' && RS.foam) return RS.foam.bonusFor(game);
+    return 1;
+  }
+
   /* What fraction of the idle floor a band pays out. See the call site. */
   function passiveShareOf(band) {
     if (!RS.spectrum.usesPrim(band, 'flow')) return 0;
@@ -3238,8 +3248,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 8);
     /* What the layer charges you in throughput, paid back per crystal. */
     const frictionMul = RS.spectrum.frictionOf(band);
+    /* And what the *scope* is worth. Each scope that has an only-here reason
+     * to be worked declares its own multiplier — the Cosmic Web pays for
+     * catching a filament while it assembles and for reaching past the
+     * horizon, the Quantum Foam pays for a fluctuation that never cancelled.
+     * Absent anywhere without one, so no scope has to opt out. */
+    const scopeMul = scopeBonus(game);
     const amount = man.potency * band.yield * gnosisMul * depthMul *
-      nestMul * orderMul * effortMul * frictionMul * game.yieldMul;
+      nestMul * orderMul * effortMul * frictionMul * scopeMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -3306,7 +3322,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
     holdTimeOf, spawnNode, applyOffline, updateDerived,
-    applyPrimitives, passiveShareOf, holdsAntecedent, DIAL_LOAD, ORDER_WINDOW
+    applyPrimitives, passiveShareOf, holdsAntecedent, scopeBonus, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -7107,7 +7123,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       { name: 'Surface', range: 'planetary and within', what: 'Stand on a world. Needs a body.',
         active: sc.kind === 'planet', hue: 130 },
       { name: 'Cytoplasm', range: 'cellular', what: 'Inside one cell of a living world. Work here and its biosphere changes.',
-        active: sc.kind === 'cellular', hue: 150 }
+        active: sc.kind === 'cellular', hue: 150 },
+      { name: 'Quantum foam', range: 'planck · quantum', what: 'Nothing persists, including your body. Find the pair that never cancelled.',
+        active: sc.kind === 'foam', hue: 291 },
+      { name: 'Cosmic web', range: 'local group → hubble volume', what: 'τ is the age of the universe. Catch a filament while it assembles.',
+        active: sc.kind === 'web', hue: 276 }
     ];
     for (const r of rungs) {
       h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +
@@ -7505,6 +7525,454 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — the Cosmic Web scope. Four rungs, one structure, thirteen billion
+ * years of it assembling while you watch.
+ *
+ * ── Why this scope, and why τ is the whole point of it ────────────────────
+ *
+ * Rungs 14–17 (Local Group, Supercluster, Cosmic Web, Hubble Volume) all
+ * rendered the attunement field, which meant the largest structure in the
+ * universe looked exactly like the inside of an atom. It also meant the `web`
+ * geometry — written, and the right answer for four separate rungs — never
+ * appeared as anything but a faint backdrop.
+ *
+ * The only-here rule is **time**. Everywhere else in the game τ is a throttle
+ * or a scrub over a few million years. Here it is the age of the universe, and
+ * the structure is a *function* of it: at 0.5 Gyr the sky is nearly uniform, by
+ * 3 Gyr the overdensities have found each other, and by 13.8 the filaments are
+ * unmistakable and the voids between them are most of the volume. Nothing is
+ * integrated — the growth is a closed-form logistic on each node's own
+ * primordial seed, so scrubbing thirteen billion years costs the same as
+ * scrubbing one.
+ *
+ * ── What you can find only here ───────────────────────────────────────────
+ *
+ * **Disconnection.** Past the cosmological *event* horizon — about 4.9 Gpc
+ * comoving, not the 14.3 Gpc particle horizon — you can still see a structure,
+ * because its old light is already on its way, but nothing you send will ever
+ * arrive and nothing it sends from now on ever will either. Visible and
+ * permanently incommunicado. An essence recognised out there is information
+ * you have no way to corroborate locally, which is the purest statement the
+ * game can make of its own premise, and it is worth accordingly more. It is
+ * also why the Hubble-volume rung is worth climbing to: it is the only slab
+ * wide enough to contain anything past that line.
+ *
+ * **Assembly.** A filament pays best while it is actually forming — when its
+ * growth rate, not its size, is at maximum. Reading the clock rather than the
+ * picture is the skill, and it is a skill that exists nowhere else in the game.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  /* Age of the universe now, in Gyr. Structure formation is measured against
+   * this, and the scope lets τ run past it — a supercluster in 40 Gyr is a
+   * legitimate thing to look at and the curve is defined there. */
+  const AGE_NOW = 13.79;
+
+  /* Comoving radius of the observable universe, in Gpc — how far the *slab*
+   * can extend, because that is everything there is to look at. */
+  const HORIZON_GPC = 14.3;
+
+  /* The cosmological *event* horizon, and the one that matters here. Structures
+   * further away than this can be seen — their old light is already on its way
+   * — but no signal sent from here will ever reach them, and nothing they send
+   * from now on will ever reach us. They are visible and permanently
+   * incommunicado, which is a much stranger and more useful fact than "too far
+   * to see", and it is why the Hubble-volume rung is worth climbing to. */
+  const EVENT_HORIZON_GPC = 4.9;
+
+  const NODE_COUNT = 34;
+
+  /* Each rung of this scope looks at a different slab of the same structure —
+   * the volume grows by about an order of magnitude a rung, so what was one
+   * node at the Local Group rung is a speck at the Hubble rung. */
+  const SPANS = {
+    group: 0.004,          // ~4 Mpc: the Local Group and its neighbours
+    supercluster: 0.11,    // ~110 Mpc: Laniakea-scale
+    web: 1.4,              // Gpc: the filament network proper
+    hubble: HORIZON_GPC    // everything there is
+  };
+
+  function spanFor(tierId) { return SPANS[tierId] || SPANS.web; }
+
+  /* ── Growth ───────────────────────────────────────────────────────────────
+   *
+   * Overdensity against the mean, as a logistic in cosmic time. Each node has
+   * its own primordial seed amplitude and its own collapse time, both hashed —
+   * which is the honest shape: structure formation is one process running at
+   * different rates on a spectrum of initial perturbations, not a set of
+   * objects that appear on a schedule.
+   */
+  function growthAt(seedAmp, collapseGyr, tGyr) {
+    if (!(tGyr > 0)) return 0;
+    /* Steepness rises with the seed: a big primordial overdensity collapses
+     * fast once it goes, a small one takes forever. */
+    const k = 0.35 + seedAmp * 1.1;
+    return 1 / (1 + Math.exp(-k * (tGyr - collapseGyr)));
+  }
+
+  /* d(growth)/dt, normalised to its own peak. This is what "assembling now"
+   * means, and it is the number the bonus reads. */
+  function assemblyAt(seedAmp, collapseGyr, tGyr) {
+    const g = growthAt(seedAmp, collapseGyr, tGyr);
+    /* Logistic derivative is k·g·(1-g), peaking at g = 0.5 where it equals
+     * k/4 — so g·(1-g)·4 is exactly the fraction of peak rate, with no need
+     * to know k. */
+    return clamp01(g * (1 - g) * 4);
+  }
+
+  /* ── The slab ─────────────────────────────────────────────────────────────
+   *
+   * Derived from (worldSeed, sector, rung). Pure, so the same patch of sky is
+   * the same patch every time, and scrubbing τ moves the structure rather than
+   * re-rolling it.
+   */
+  function webAt(game, sx, sy, tierId, tGyr, out) {
+    const span = spanFor(tierId);
+    const seed = hashN(game.seed ^ 0x5EED, sx, sy, tierId.length * 977);
+    const o = out || {};
+    const nodes = o.nodes || (o.nodes = []);
+    nodes.length = 0;
+
+    let deepestVoid = 0, assembling = 0, disconnected = 0;
+
+    for (let i = 0; i < NODE_COUNT; i++) {
+      const h = hashN(seed, i, 0x11);
+      const ang = hashF(h, 1) * TAU;
+      /* Uniform in area, not in radius — otherwise everything piles into the
+       * middle and the "void" measurement is meaningless. */
+      const rad = Math.sqrt(hashF(h, 2)) * 0.95;
+      const amp = 0.15 + hashF(h, 3) * 0.85;
+      /* Collapse time: big seeds collapse early. Real, and it is why the
+       * universe looks lumpier the further back the picture is taken from. */
+      const collapse = lerp(9.5, 1.2, amp);
+      const g = growthAt(amp, collapse, tGyr);
+      const asm = assemblyAt(amp, collapse, tGyr);
+      if (asm > assembling) assembling = asm;
+
+      /* Comoving distance of this node, in Gpc, from the span of the rung. */
+      const dist = rad * span;
+      const beyond = dist > EVENT_HORIZON_GPC;
+      if (beyond) disconnected++;
+
+      nodes.push({
+        i,
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
+        amp, collapse,
+        growth: g,
+        assembly: asm,
+        dist,
+        beyond,
+        /* An essence, addressed exactly as the field addresses one, so the
+         * thing you recognise in a supercluster is the thing you recognised in
+         * a cell. */
+        essence: RS.fractal.essenceAt(game.seed, sx * 613 + i, sy * 811),
+        /* Only structures that have actually collapsed are visible as
+         * anything. Before that they are a smoothly overdense region. */
+        formed: g > 0.5
+      });
+    }
+
+    /* Voids. Measured properly: for a grid of sample points, the distance to
+     * the nearest *formed* node. The biggest such distance is the deepest void
+     * in this slab, and finding it is a real observation rather than a label —
+     * it also genuinely grows with τ, because a node that has not collapsed
+     * does not fill a void. */
+    /* Before anything has collapsed the whole slab is void, and the loop below
+     * would report zero because it never finds a node to measure against —
+     * which is exactly backwards. An empty universe is not a universe without
+     * voids; it is a universe that is nothing but one. */
+    let anyFormed = false;
+    for (const n of nodes) if (n.formed) { anyFormed = true; break; }
+    if (!anyFormed) deepestVoid = 0.95;
+
+    for (let gx = -3; gx <= 3; gx++) {
+      for (let gy = -3; gy <= 3; gy++) {
+        const px = gx / 3.4, py = gy / 3.4;
+        if (Math.hypot(px, py) > 0.95) continue;
+        let near = Infinity;
+        for (const n of nodes) {
+          if (!n.formed) continue;
+          const d = Math.hypot(n.x - px, n.y - py);
+          if (d < near) near = d;
+        }
+        if (anyFormed && near !== Infinity && near > deepestVoid) deepestVoid = near;
+      }
+    }
+
+    /* Filaments. A pair is linked when both have collapsed and they are close
+     * enough that the growing mode had time to bridge them — which is a
+     * function of τ, so the network genuinely assembles rather than fading in.
+     */
+    const links = o.links || (o.links = []);
+    links.length = 0;
+    const reach = 0.22 + clamp01(tGyr / AGE_NOW) * 0.26;
+    for (let a = 0; a < nodes.length; a++) {
+      if (!nodes[a].formed) continue;
+      for (let b = a + 1; b < nodes.length; b++) {
+        if (!nodes[b].formed) continue;
+        const d = Math.hypot(nodes[a].x - nodes[b].x, nodes[a].y - nodes[b].y);
+        if (d > reach) continue;
+        links.push({ a, b, d, strength: clamp01(1 - d / reach) });
+      }
+    }
+
+    o.span = span;
+    o.tierId = tierId;
+    o.tGyr = tGyr;
+    o.deepestVoid = deepestVoid;
+    /* In real units, which is the number worth reporting: the largest void in
+     * the local universe is about 0.3 Gpc across, so this should land in the
+     * same neighbourhood at the web rung. */
+    o.voidGpc = deepestVoid * span;
+    o.assembling = assembling;
+    o.disconnected = disconnected;
+    o.formed = nodes.reduce((n, x) => n + (x.formed ? 1 : 0), 0);
+    return o;
+  }
+
+  /* Cosmic time from the τ dial. Unembodied τ is a scrub everywhere else too;
+   * here the scale is the age of the universe, which is what makes the same
+   * control feel completely different without being a different control. */
+  function timeOf(game) {
+    const s = game.scene;
+    return Math.max(0.02, AGE_NOW + (s.webT || 0));
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    const D = game.dials;
+    /* τ scrubs Gyr rather than years. Cubic in the dial so a small turn is a
+     * careful look at one collapse and a big one is the whole history. */
+    const rate = Math.sign(D.time.value) * Math.pow(Math.abs(D.time.value), 3) * 1.4;
+    s.webT = clamp((s.webT || 0) + rate * dt, -AGE_NOW + 0.05, 90);
+
+    const tier = RS.cosmos.TIERS[clamp(Math.round(D.space.value), 0, RS.cosmos.TIERS.length - 1)];
+    s.web = webAt(game, game.galaxy.sx, game.galaxy.sy, tier.id, timeOf(game), s.web);
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    s.webT = s.webT || 0;
+    tick(game, bus, 0);
+    bus.emit('web:enter', { web: s.web });
+    return s.web;
+  }
+
+  /* ── The only-here payout ─────────────────────────────────────────────────
+   *
+   * Two multipliers, both of which require reading something no other scope
+   * shows you: whether the structure you are working is *assembling right now*,
+   * and whether it is causally *disconnected* from here.
+   */
+  function bonusFor(game) {
+    const s = game.scene;
+    if (s.kind !== 'web' || !s.web) return 1;
+    /* Assembly: at most double, and only while the growth rate is near its
+     * peak. Sitting at the present day is the *worst* time to work a filament
+     * that finished collapsing eight billion years ago. */
+    const asm = 1 + s.web.assembling * 1.0;
+    /* Disconnection: information from beyond the horizon cannot be checked
+     * against anything local, which is either worthless or the most valuable
+     * thing in the game depending on whether you believe the premise. The game
+     * believes the premise. */
+    const dis = 1 + clamp01(s.web.disconnected / NODE_COUNT) * 1.6;
+    return asm * dis;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const w = s.web;
+    if (!w) return { title: 'Cosmic Web', sub: 'resolving…' };
+    const t = w.tGyr;
+    return {
+      title: (RS.cosmos.BY_ID[w.tierId] || { name: 'Cosmic Web' }).name,
+      sub: t < 1 ? 'Nearly uniform. Structure has not found itself yet.'
+        : t < 5 ? 'Overdensities are collapsing. The network is finding its shape.'
+          : t < 20 ? 'Filaments and voids. Most of the volume is empty.'
+            : 'Long past the present. The web has finished, and is coming apart.',
+      tGyr: t,
+      formed: w.formed,
+      voidGpc: w.voidGpc,
+      assembling: w.assembling,
+      disconnected: w.disconnected,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.web = {
+    AGE_NOW, HORIZON_GPC, EVENT_HORIZON_GPC, NODE_COUNT, SPANS, spanFor,
+    growthAt, assemblyAt, webAt, timeOf, tick, enter, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the Quantum Foam scope. Rungs 0–1, and no body allowed.
+ *
+ * ── The rule that only exists here ────────────────────────────────────────
+ *
+ * **You are ejected from whatever you were riding on arrival.** A body is a
+ * persistent arrangement of matter, and there is no such thing at 10⁻³⁵ m —
+ * nothing here lasts long enough to be arranged. Being thrown back to the bare
+ * mote teaches that in one second, and no amount of explanatory text would do
+ * it as well. It is also the only place in the game where a scope takes
+ * something away from you, which is worth exactly once.
+ *
+ * ── What the scope is made of ─────────────────────────────────────────────
+ *
+ * Virtual pairs. Each one borrows energy against time and pays it back by
+ * annihilating, and how long it gets is `persistence` — the axis a player has
+ * been reading everywhere else in the game, doing here what it says on the tin.
+ * A Memory (1.00) hangs around long enough to be worked; a Seed (0.10) is gone
+ * before the reticle catches it. The whole field seethes because everything in
+ * it is a countdown.
+ *
+ * ── What you can find only here ───────────────────────────────────────────
+ *
+ * **A fluctuation that did not cancel.** Rarely, a pair separates far enough
+ * that it cannot recombine, and what was borrowed is never repaid — which, at
+ * the largest scale, is the reason there is anything at all rather than nothing.
+ * Finding one is the scope's discovery, it is worth a great deal, and it is
+ * derived rather than rolled, so a given fluctuation at a given address is
+ * always the one that survives.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  const PAIR_COUNT = 40;
+
+  /* How long a pair lasts, in local seconds. The energy–time uncertainty
+   * relation says a bigger borrowing is a shorter one, and `persistence` is
+   * exactly the game's word for how long a thing insists on existing — so the
+   * two line up without either having to be bent. */
+  function lifetimeOf(ess, scale) {
+    const p = RS.emergence.axes(ess).p;
+    /* Divided by the rung's clock: the Planck rung runs 34× and the quantum
+     * rung 12×, so the same essence seethes visibly faster one rung in. */
+    const clock = Math.max(0.02, RS.cosmos.clockAt(scale));
+    return lerp(0.12, 2.4, p) / clock * 12;
+  }
+
+  /* Does this pair separate far enough to escape recombination? Rare, derived,
+   * and stable per address — a survivor is always a survivor. */
+  function survivesAt(seed, i) {
+    return (hashN(seed >>> 0, i, 0x501171) % 23) === 0;
+  }
+
+  function foamAt(game, scale, t, out) {
+    const o = out || {};
+    const pairs = o.pairs || (o.pairs = []);
+    pairs.length = 0;
+    const seed = hashN(game.seed ^ 0xF0A3, Math.round(scale * 8), 0x11);
+
+    let survivors = 0;
+    for (let i = 0; i < PAIR_COUNT; i++) {
+      const h = hashN(seed, i, 3);
+      const ess = RS.fractal.essenceAt(game.seed, i * 331, Math.round(scale * 100));
+      const life = lifetimeOf(ess, scale);
+      /* Each pair runs its own cycle with its own offset, so the field
+       * seethes rather than blinking in unison. */
+      const off = hashF(h, 1) * life;
+      const age = ((t + off) % life + life) % life;
+      const u = age / life;
+      const survives = survivesAt(seed, i);
+      if (survives) survivors++;
+
+      const ang = hashF(h, 2) * TAU;
+      const rad = Math.sqrt(hashF(h, 3)) * 0.92;
+      /* Separation: the pair springs apart and, unless it is a survivor,
+       * comes back together to annihilate. That arc *is* the mechanic — a
+       * pair is only workable near the top of it. */
+      const sep = survives
+        ? clamp01(u * 1.6) * 0.30
+        : Math.sin(u * Math.PI) * 0.16;
+
+      pairs.push({
+        i, essence: ess,
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
+        ang, sep, life, age, u,
+        survives,
+        /* Presence: fades in at birth and out at annihilation, so the field
+         * reads as a boil rather than a strobe. A survivor never fades. */
+        presence: survives ? clamp01(u * 4) : clamp01(Math.sin(u * Math.PI) * 1.8),
+        hue: 268 + hashF(h, 4) * 60 - 30
+      });
+    }
+    o.pairs = pairs;
+    o.survivors = survivors;
+    o.scale = scale;
+    o.t = t;
+    return o;
+  }
+
+  /* Ejection. Called on arrival, and it is the scope's whole introduction. */
+  function eject(game, bus) {
+    if (!game.inhabiting) return null;
+    const arch = RS.vessel.archOf(game.body);
+    RS.scenes.disembark(game, bus);
+    bus.emit('foam:eject', { arch });
+    return arch;
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    s.foamT = s.foamT || 0;
+    eject(game, bus);
+    s.foam = foamAt(game, game.dials.space.value, s.foamT, s.foam);
+    bus.emit('foam:enter', { foam: s.foam });
+    return s.foam;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    const D = game.dials;
+    /* Time here runs at the rung's own clock, which is three orders of
+     * magnitude faster than anywhere the player has been. τ still scales it,
+     * so slowing right down is the only way to work anything — and that is a
+     * real strategy rather than a suggestion. */
+    s.foamT = (s.foamT || 0) + dt * Math.abs(D.time.value);
+    s.foam = foamAt(game, D.space.value, s.foamT, s.foam);
+    /* A body cannot be taken here at all, so keep enforcing it rather than
+     * only checking on arrival. */
+    if (game.inhabiting) eject(game, bus);
+  }
+
+  /* What working a survivor is worth. Large on purpose: it is rare, it is the
+   * scope's only discovery, and it is the reason the universe is not empty. */
+  function bonusFor(game) {
+    const s = game.scene;
+    if (s.kind !== 'foam' || !s.foam) return 1;
+    return 1 + clamp01(s.foam.survivors / 4) * 2.4;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const f = s.foam;
+    if (!f) return { title: 'Quantum Foam', sub: 'resolving…' };
+    /* Mean lifetime across what is currently manifesting — the number that
+     * tells a player whether slowing τ down would help. */
+    let life = 0;
+    for (const p of f.pairs) life += p.life;
+    life /= Math.max(1, f.pairs.length);
+    return {
+      title: 'Quantum Foam',
+      sub: 'No body persists here. Pairs borrow existence and pay it back.',
+      survivors: f.survivors,
+      meanLife: life,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.foam = {
+    PAIR_COUNT, lifetimeOf, survivesAt, foamAt, eject, enter, tick, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the scene stack: field → system → planet surface.
  *
  * ── The modal split, and why it is the best idea in this file ──────────────
@@ -7556,10 +8024,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * first match wins and a scope like Cellular sits inside the range the
    * surface scene would otherwise claim.
    */
+  const TIER_QUANTUM = RS.cosmos.BY_ID.quantum.index;        // 1
+  const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
+  const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
+
   const SCENES = [
+    {
+      id: 'foam', name: 'Quantum Foam', first: 0, last: TIER_QUANTUM,
+      blurb: 'Below the scale at which anything persists. No body works here.'
+    },
     {
       id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
       blurb: 'Inside one cell of a living world. The machinery, at its own scale.'
+    },
+    {
+      id: 'web', name: 'Cosmic Web', first: TIER_GROUP, last: TIER_HUBBLE,
+      blurb: 'Filaments and voids, assembling over thirteen billion years.'
     },
     {
       id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
@@ -7590,11 +8070,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return 'field';
   }
 
-  /* The rung a scene is entered at, so a pathway can say "turn Σ to here" and
-   * mean something precise. */
+  /* The rung a scene is actually entered at, so a pathway can say "turn Σ to
+   * here" and mean something precise. Not simply `first`: a broad scope's range
+   * can have a narrower one carved out of its start, so this asks the same
+   * question the game asks — the first rung that really resolves to this id. */
   function tierForScene(id) {
     const sc = SCENE_BY_ID[id];
-    return sc ? sc.first : RS.cosmos.ROOT_INDEX;
+    if (!sc) return RS.cosmos.ROOT_INDEX;
+    for (let i = sc.first; i <= sc.last; i++) if (sceneForTier(i) === id) return i;
+    return sc.first;
   }
 
   function newScene() {
@@ -7608,6 +8092,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       cell: null,
       cellIndex: 0,
       cellT: 0,
+      /* Cosmic web. `webT` is an offset from the present in Gyr — the only
+       * place in the game where τ is measured against the age of the
+       * universe. */
+      web: null,
+      webT: 0,
+      /* Quantum foam. */
+      foam: null,
+      foamT: 0,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -7726,6 +8218,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
     else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
+    else if (s.kind === 'web') RS.web.tick(game, bus, dt);
+    else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -7780,6 +8274,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
       s.agents.length = 0;
       RS.cellular.enter(game, bus);
+    } else if (kind === 'web') {
+      s.agents.length = 0;
+      RS.web.enter(game, bus);
+    } else if (kind === 'foam') {
+      s.agents.length = 0;
+      RS.foam.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -8094,6 +8594,16 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const arch = RS.vessel.BY_ID[archId];
     if (!arch) return { ok: false, reason: 'unknown vessel' };
     if (!game.vessels.unlocked[archId]) return { ok: false, reason: 'not researched' };
+    /* Some scopes refuse bodies outright rather than refusing a particular
+     * one. The Quantum Foam is the only such place: a body is a persistent
+     * arrangement of matter and nothing at that scale persists, so there is
+     * nothing to arrange. Checked before the per-vessel predicate, because the
+     * reason is about the *place* and answering "a walker needs a surface"
+     * would be true and beside the point. */
+    if (game.scene.kind === 'foam') {
+      return { ok: false,
+        reason: 'nothing persists at this scale — there is nothing for a body to be made of' };
+    }
     const env = RS.vessel.environmentFor(game);
     const blocked = RS.vessel.canOperate(arch, env);
     if (blocked) return { ok: false, reason: blocked };
@@ -8179,7 +8689,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
@@ -8385,6 +8895,37 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         return { text: 'Turn Σ inward to descend to ' + s.planet.name + '. τ scrubs its history while you are unembodied.', kind: 'descend' };
       }
       return { text: 'Tap a world to select it.', kind: 'select' };
+    }
+    if (s.kind === 'web') {
+      const w = s.web;
+      if (!w) return { text: 'Resolving the structure…', kind: 'wait' };
+      if (w.tGyr < 1) {
+        return { text: 'Almost nothing has collapsed yet. Turn τ forward and watch it assemble.',
+          kind: 'scrub' };
+      }
+      if (w.assembling > 0.25) {
+        return { text: 'A filament is at peak growth right now — ×' +
+          RS.web.bonusFor(game).toFixed(2) + ' while it lasts. Crystallise before it finishes.',
+          kind: 'express' };
+      }
+      return { text: 'Nothing is assembling at ' + w.tGyr.toFixed(1) +
+        ' Gyr. Scrub τ to find a collapse in progress.', kind: 'scrub' };
+    }
+    if (s.kind === 'foam') {
+      const f = s.foam;
+      if (!f) return { text: 'Resolving…', kind: 'wait' };
+      const r = RS.foam.readout(game);
+      if (r.meanLife < 1.2) {
+        return { text: 'Nothing here lasts ' + r.meanLife.toFixed(2) +
+          ' s. Bring τ down toward zero — slow time is the only way to hold anything.',
+          kind: 'scrub' };
+      }
+      if (f.survivors) {
+        return { text: f.survivors + ' fluctuation' + (f.survivors > 1 ? 's' : '') +
+          ' never cancelled — the bright, still one. Work that. ×' +
+          RS.foam.bonusFor(game).toFixed(2) + '.', kind: 'express' };
+      }
+      return { text: 'Every pair here closes. Sweep Σ for a slab where one did not.', kind: 'select' };
     }
     if (s.kind === 'cellular') {
       const why = RS.cellular.reasonSterile(s.planet);
@@ -9812,6 +10353,97 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
   }
 
+  /* ── The cosmic web ──────────────────────────────────────────────────────
+   *
+   * Drawn as a function of cosmic time, so scrubbing τ visibly assembles it:
+   * uncollapsed overdensities are faint smears, collapsed ones are bright, and
+   * filaments appear between them only once the growing mode has had time to
+   * bridge the gap. A node currently at peak growth rate gets a halo, because
+   * "assembling now" is the thing the scope pays for and a player has to be
+   * able to see it rather than infer it from a number.
+   */
+  function drawWeb(ctx, game, t) {
+    const w = game.scene.web;
+    if (!w) return;
+
+    /* Filaments first, under everything. */
+    ctx.lineCap = 'round';
+    for (let i = 0; i < w.links.length; i++) {
+      const L = w.links[i];
+      const a = w.nodes[L.a], b = w.nodes[L.b];
+      ctx.strokeStyle = hsl(276, 0.45, 0.55, 0.06 + L.strength * 0.30);
+      ctx.lineWidth = Math.max(0.6, px(0.002 + L.strength * 0.006));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < w.nodes.length; i++) {
+      const n = w.nodes[i];
+      const X = sx(n.x), Y = sy(n.y);
+      const size = px(0.012 + n.amp * 0.026) * (0.4 + n.growth * 0.9);
+
+      /* Beyond the horizon: drawn in outline only. It is there, it is real,
+       * and no signal from it has ever reached here — the ring says so without
+       * a word of explanation. */
+      if (n.beyond) {
+        ctx.strokeStyle = hsl(200, 0.5, 0.62, 0.28 + n.growth * 0.30);
+        ctx.lineWidth = Math.max(1, px(0.0025));
+        ctx.setLineDash([px(0.008), px(0.008)]);
+        ctx.beginPath(); ctx.arc(X, Y, size * 1.5, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      /* Assembling: a halo at peak growth rate. This is the tell. */
+      if (n.assembly > 0.25) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, size * 5);
+        g.addColorStop(0, hsl(46, 0.85, 0.62, 0.30 * n.assembly));
+        g.addColorStop(1, hsl(46, 0.85, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, size * 5, 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = n.formed
+        ? hsl(276 + n.amp * 40, 0.6, 0.52 + n.growth * 0.22, 0.35 + n.growth * 0.5)
+        : hsl(230, 0.3, 0.4, 0.10 + n.growth * 0.2);
+      ctx.beginPath(); ctx.arc(X, Y, size, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Quantum foam ────────────────────────────────────────────────────────
+   *
+   * Pairs, springing apart and annihilating. The one that does not close is
+   * drawn as a line rather than a pair of dots, because it is no longer a pair
+   * — it is the thing that got away, and it should be the only stable object
+   * on a screen where nothing else is.
+   */
+  function drawFoam(ctx, game, t) {
+    const f = game.scene.foam;
+    if (!f) return;
+    for (let i = 0; i < f.pairs.length; i++) {
+      const p = f.pairs[i];
+      if (p.presence < 0.02) continue;
+      const dx = Math.cos(p.ang + Math.PI / 2) * p.sep;
+      const dy = Math.sin(p.ang + Math.PI / 2) * p.sep;
+      const x1 = sx(p.x + dx), y1 = sy(p.y + dy);
+      const x2 = sx(p.x - dx), y2 = sy(p.y - dy);
+      const r = px(0.008) * (0.5 + p.presence);
+
+      if (p.survives) {
+        ctx.strokeStyle = hsl(46, 0.9, 0.68, 0.55 * p.presence);
+        ctx.lineWidth = Math.max(1, px(0.0035));
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+      /* Opposite hues, because the two halves of a pair are opposite in every
+       * quantum number they have. */
+      ctx.fillStyle = hsl(p.hue, 0.75, 0.66, 0.75 * p.presence);
+      ctx.beginPath(); ctx.arc(x1, y1, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = hsl(p.hue + 180, 0.75, 0.66, 0.75 * p.presence);
+      ctx.beginPath(); ctx.arc(x2, y2, r, 0, TAU); ctx.fill();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -10118,6 +10750,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
        * place is made of — a membrane instead of a rim, organelles instead of
        * empty space — and what your work there does to the world outside. */
       const inCell = kind === 'cellular';
+      const inWeb = kind === 'web';
+      const inFoam = kind === 'foam';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -10126,11 +10760,17 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (tb.b !== tb.a) drawBackdrop(ctx, game, tb.b.geometry, tb.b.hue, tb.t * 0.55 * upheavalFade, t);
 
       if (inCell) drawCell(ctx, game, t);
+      else if (inWeb) drawWeb(ctx, game, t);
+      else if (inFoam) drawFoam(ctx, game, t);
 
-      // rim — the membrane, in a cell
-      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
-      ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
-      ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
+      /* The rim. A membrane in a cell, the horizon in the web, and absent in
+       * the foam — there is no boundary at a scale where nothing persists long
+       * enough to have one. */
+      if (!inFoam) {
+        ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
+        ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
+        ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
+      }
 
       drawBeatRing(ctx, game, dt, t);
 
@@ -11711,6 +12351,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
         sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
       el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'web') {
+      const r = RS.web.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.tGyr.toFixed(2) + ' Gyr · ' + r.formed + '/' +
+        RS.web.NODE_COUNT + ' collapsed · largest void ' + r.voidGpc.toFixed(3) + ' Gpc' +
+        (r.disconnected ? ' · ' + r.disconnected + ' beyond the horizon' : '') +
+        (r.assembling > 0.25 ? ' · ASSEMBLING ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(276, 0.7, 0.72);
+    } else if (sc.kind === 'foam') {
+      const r = RS.foam.readout(game);
+      setText('layer-name', 'QUANTUM FOAM');
+      setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
+        (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(291, 0.7, 0.72);
     } else if (sc.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       setText('layer-name', r.title.toUpperCase());
@@ -11890,6 +12544,36 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           p.name + ' &mdash; ' + p.type.name +
           (p.biosphere ? ' &middot; ' + p.biosphere.stage.name : '') +
           (p.civ ? ' &middot; ' + p.civ.tier.name : '') + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'web') {
+      const r = RS.web.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(276, 0.8, 0.72) + '">&#8259;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">t = ' + r.tGyr.toFixed(2) +
+        ' Gyr &middot; ' + r.formed + ' collapsed &middot; void ' + r.voidGpc.toFixed(3) + ' Gpc</div>' +
+        (r.assembling > 0.25
+          ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.66) + '">assembling now &mdash; &times;' +
+            r.bonus.toFixed(2) + ' while it lasts</div>' : '') +
+        (r.disconnected
+          ? '<div class="ro-sub" style="color:' + hsl(200, 0.6, 0.68) + '">' + r.disconnected +
+            ' structures past the horizon &mdash; no signal has ever crossed</div>' : '');
+      return;
+    }
+    if (s.kind === 'foam') {
+      const r = RS.foam.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(291, 0.8, 0.72) + '">&#8756;</span>' +
+        '<span class="ro-title">Quantum Foam</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">mean lifetime ' + r.meanLife.toFixed(2) +
+        ' s &mdash; slow &tau; down or nothing will hold still</div>' +
+        (r.survivors
+          ? '<div class="ro-sub" style="color:' + hsl(46, 0.85, 0.68) + '">' + r.survivors +
+            ' fluctuation' + (r.survivors > 1 ? 's' : '') + ' never cancelled &mdash; &times;' +
+            r.bonus.toFixed(2) + '</div>' : '');
       return;
     }
     if (s.kind === 'cellular') {
@@ -12658,6 +13342,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         planet: { hue: 130, icon: '●',
           title: sc => sc.planet ? sc.planet.name : 'a world',
           body: () => 'Take a body to touch this world.' },
+        web: { hue: 276, icon: '⁂',
+          title: sc => (RS.cosmos.BY_ID[sc.web && sc.web.tierId] || { name: 'the cosmic web' }).name,
+          body: sc => sc.web
+            ? 'τ is the age of the universe here. Scrub it and watch the structure assemble.'
+            : 'Filaments and voids.' },
+        foam: { hue: 291, icon: '∴',
+          title: () => 'quantum foam',
+          body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
         cellular: { hue: 150, icon: '❋',
           title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
           body: sc => {
@@ -12674,6 +13366,18 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         kind: 'major', icon: a.icon, hue: a.hue, ms: 4200,
         title: String(a.title(scene)).toUpperCase(),
         body: a.body(scene)
+      });
+    });
+
+    /* Ejection is the Quantum Foam scope's entire introduction, so it gets a
+     * real one rather than a silent state change. */
+    bus.on('foam:eject', ({ arch }) => {
+      RS.audio.upheaval(1.8);
+      RS.feel.FX.upheaval(291, 1.6);
+      RS.ui.toast({
+        kind: 'major', icon: '·', hue: 291, ms: 5200, title: 'BODY LOST',
+        body: 'A ' + (arch ? arch.name.toLowerCase() : 'body') +
+          ' is a persistent arrangement of matter. There is no such thing here.'
       });
     });
 

@@ -195,6 +195,37 @@
       }
       return { text: 'Tap a world to select it.', kind: 'select' };
     }
+    if (s.kind === 'web') {
+      const w = s.web;
+      if (!w) return { text: 'Resolving the structure…', kind: 'wait' };
+      if (w.tGyr < 1) {
+        return { text: 'Almost nothing has collapsed yet. Turn τ forward and watch it assemble.',
+          kind: 'scrub' };
+      }
+      if (w.assembling > 0.25) {
+        return { text: 'A filament is at peak growth right now — ×' +
+          RS.web.bonusFor(game).toFixed(2) + ' while it lasts. Crystallise before it finishes.',
+          kind: 'express' };
+      }
+      return { text: 'Nothing is assembling at ' + w.tGyr.toFixed(1) +
+        ' Gyr. Scrub τ to find a collapse in progress.', kind: 'scrub' };
+    }
+    if (s.kind === 'foam') {
+      const f = s.foam;
+      if (!f) return { text: 'Resolving…', kind: 'wait' };
+      const r = RS.foam.readout(game);
+      if (r.meanLife < 1.2) {
+        return { text: 'Nothing here lasts ' + r.meanLife.toFixed(2) +
+          ' s. Bring τ down toward zero — slow time is the only way to hold anything.',
+          kind: 'scrub' };
+      }
+      if (f.survivors) {
+        return { text: f.survivors + ' fluctuation' + (f.survivors > 1 ? 's' : '') +
+          ' never cancelled — the bright, still one. Work that. ×' +
+          RS.foam.bonusFor(game).toFixed(2) + '.', kind: 'express' };
+      }
+      return { text: 'Every pair here closes. Sweep Σ for a slab where one did not.', kind: 'select' };
+    }
     if (s.kind === 'cellular') {
       const why = RS.cellular.reasonSterile(s.planet);
       if (why) {

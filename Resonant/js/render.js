@@ -313,6 +313,97 @@
     }
   }
 
+  /* ── The cosmic web ──────────────────────────────────────────────────────
+   *
+   * Drawn as a function of cosmic time, so scrubbing τ visibly assembles it:
+   * uncollapsed overdensities are faint smears, collapsed ones are bright, and
+   * filaments appear between them only once the growing mode has had time to
+   * bridge the gap. A node currently at peak growth rate gets a halo, because
+   * "assembling now" is the thing the scope pays for and a player has to be
+   * able to see it rather than infer it from a number.
+   */
+  function drawWeb(ctx, game, t) {
+    const w = game.scene.web;
+    if (!w) return;
+
+    /* Filaments first, under everything. */
+    ctx.lineCap = 'round';
+    for (let i = 0; i < w.links.length; i++) {
+      const L = w.links[i];
+      const a = w.nodes[L.a], b = w.nodes[L.b];
+      ctx.strokeStyle = hsl(276, 0.45, 0.55, 0.06 + L.strength * 0.30);
+      ctx.lineWidth = Math.max(0.6, px(0.002 + L.strength * 0.006));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < w.nodes.length; i++) {
+      const n = w.nodes[i];
+      const X = sx(n.x), Y = sy(n.y);
+      const size = px(0.012 + n.amp * 0.026) * (0.4 + n.growth * 0.9);
+
+      /* Beyond the horizon: drawn in outline only. It is there, it is real,
+       * and no signal from it has ever reached here — the ring says so without
+       * a word of explanation. */
+      if (n.beyond) {
+        ctx.strokeStyle = hsl(200, 0.5, 0.62, 0.28 + n.growth * 0.30);
+        ctx.lineWidth = Math.max(1, px(0.0025));
+        ctx.setLineDash([px(0.008), px(0.008)]);
+        ctx.beginPath(); ctx.arc(X, Y, size * 1.5, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      /* Assembling: a halo at peak growth rate. This is the tell. */
+      if (n.assembly > 0.25) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, size * 5);
+        g.addColorStop(0, hsl(46, 0.85, 0.62, 0.30 * n.assembly));
+        g.addColorStop(1, hsl(46, 0.85, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, size * 5, 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = n.formed
+        ? hsl(276 + n.amp * 40, 0.6, 0.52 + n.growth * 0.22, 0.35 + n.growth * 0.5)
+        : hsl(230, 0.3, 0.4, 0.10 + n.growth * 0.2);
+      ctx.beginPath(); ctx.arc(X, Y, size, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Quantum foam ────────────────────────────────────────────────────────
+   *
+   * Pairs, springing apart and annihilating. The one that does not close is
+   * drawn as a line rather than a pair of dots, because it is no longer a pair
+   * — it is the thing that got away, and it should be the only stable object
+   * on a screen where nothing else is.
+   */
+  function drawFoam(ctx, game, t) {
+    const f = game.scene.foam;
+    if (!f) return;
+    for (let i = 0; i < f.pairs.length; i++) {
+      const p = f.pairs[i];
+      if (p.presence < 0.02) continue;
+      const dx = Math.cos(p.ang + Math.PI / 2) * p.sep;
+      const dy = Math.sin(p.ang + Math.PI / 2) * p.sep;
+      const x1 = sx(p.x + dx), y1 = sy(p.y + dy);
+      const x2 = sx(p.x - dx), y2 = sy(p.y - dy);
+      const r = px(0.008) * (0.5 + p.presence);
+
+      if (p.survives) {
+        ctx.strokeStyle = hsl(46, 0.9, 0.68, 0.55 * p.presence);
+        ctx.lineWidth = Math.max(1, px(0.0035));
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+      /* Opposite hues, because the two halves of a pair are opposite in every
+       * quantum number they have. */
+      ctx.fillStyle = hsl(p.hue, 0.75, 0.66, 0.75 * p.presence);
+      ctx.beginPath(); ctx.arc(x1, y1, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = hsl(p.hue + 180, 0.75, 0.66, 0.75 * p.presence);
+      ctx.beginPath(); ctx.arc(x2, y2, r, 0, TAU); ctx.fill();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -619,6 +710,8 @@
        * place is made of — a membrane instead of a rim, organelles instead of
        * empty space — and what your work there does to the world outside. */
       const inCell = kind === 'cellular';
+      const inWeb = kind === 'web';
+      const inFoam = kind === 'foam';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -627,11 +720,17 @@
       if (tb.b !== tb.a) drawBackdrop(ctx, game, tb.b.geometry, tb.b.hue, tb.t * 0.55 * upheavalFade, t);
 
       if (inCell) drawCell(ctx, game, t);
+      else if (inWeb) drawWeb(ctx, game, t);
+      else if (inFoam) drawFoam(ctx, game, t);
 
-      // rim — the membrane, in a cell
-      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
-      ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
-      ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
+      /* The rim. A membrane in a cell, the horizon in the web, and absent in
+       * the foam — there is no boundary at a scale where nothing persists long
+       * enough to have one. */
+      if (!inFoam) {
+        ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
+        ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
+        ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
+      }
 
       drawBeatRing(ctx, game, dt, t);
 

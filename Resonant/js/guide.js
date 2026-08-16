@@ -133,7 +133,11 @@
       { name: 'Surface', range: 'planetary and within', what: 'Stand on a world. Needs a body.',
         active: sc.kind === 'planet', hue: 130 },
       { name: 'Cytoplasm', range: 'cellular', what: 'Inside one cell of a living world. Work here and its biosphere changes.',
-        active: sc.kind === 'cellular', hue: 150 }
+        active: sc.kind === 'cellular', hue: 150 },
+      { name: 'Quantum foam', range: 'planck · quantum', what: 'Nothing persists, including your body. Find the pair that never cancelled.',
+        active: sc.kind === 'foam', hue: 291 },
+      { name: 'Cosmic web', range: 'local group → hubble volume', what: 'τ is the age of the universe. Catch a filament while it assembles.',
+        active: sc.kind === 'web', hue: 276 }
     ];
     for (const r of rungs) {
       h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +
