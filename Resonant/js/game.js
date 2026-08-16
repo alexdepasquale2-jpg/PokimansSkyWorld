@@ -73,6 +73,10 @@
       fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
       senseBonus: 0,
 
+      strike: RS.strike.newState(),
+
+      strikeLevels: Object.create(null),
+
       stats: { blocksAdopted: 0, farthestBlock: 0, crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
 
       /* Transient, rebuilt every frame — never saved. */

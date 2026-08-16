@@ -240,7 +240,7 @@
       x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
       age: 0,
       effort: 0,
-      rawAlign: 0, observed: 0,
+      rawAlign: 0, observed: 0, struck: 0,
       life: 26 + hashF(h, 5) * 34,
       fade: 0,               // 0..1 presence, springs in and out
       align: 0, alignParts: null,
@@ -293,7 +293,7 @@
         spin: parent.spin * 1.3,
         bob: hashF(h, 4) * TAU,
         x: parent.x, y: parent.y,
-        age: 0, effort: 0, rawAlign: 0, observed: 0, life: 22 + hashF(h, 5) * 18,
+        age: 0, effort: 0, rawAlign: 0, observed: 0, struck: 0, life: 22 + hashF(h, 5) * 18,
         fade: 0, align: 0, alignParts: null, coherence: 0, resolved: 0.4,
         crystallised: false, dying: false,
         gate: 1, gatePhase: hashF(h, 6) * TAU,
@@ -487,6 +487,8 @@
      * Baryonic (one slow flow) is therefore the idle layer; Thermal, which
      * runs the same primitive at four times the drift, pays nothing at all. */
     game.insight += game.passiveRate * dt * passiveShareOf(RS.spectrum.BANDS[bandIndex]);
+
+    if (RS.strike) RS.strike.tick(game, bus, dt);
 
     updateDerived(game);
   }
@@ -693,8 +695,11 @@
      * horizon, the Quantum Foam pays for a fluctuation that never cancelled.
      * Absent anywhere without one, so no scope has to opt out. */
     const scopeMul = scopeBonus(game);
+    /* The combo. Logarithmic and capped, so it is genuinely cumulative and
+     * never runs away — see strike.js for why that shape and not another. */
+    const comboMul = RS.strike ? RS.strike.multiplier(game) : 1;
     const amount = man.potency * band.yield * gnosisMul * depthMul *
-      nestMul * orderMul * effortMul * frictionMul * scopeMul * game.yieldMul;
+      nestMul * orderMul * effortMul * frictionMul * scopeMul * comboMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;

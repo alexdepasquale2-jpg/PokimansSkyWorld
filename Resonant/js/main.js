@@ -72,6 +72,14 @@
     RS.reactions.wire(game, bus);
     RS.input.attach(hudCanvas, game, bus, {
       onPickNode(node) {
+        /* A tap in the field is a strike first. Striking the node you are
+         * already working is the common case and needs no aim, so an empty tap
+         * still strikes the focus node — the click mechanic must not require
+         * hitting a moving target with a finger. */
+        const target = node || game.focusNode;
+        const r = RS.strike.strike(game, bus, target);
+        if (r.verdict !== 'miss' && r.verdict !== 'early') return;
+
         if (!node) { RS.ui.closeDrawer(); return; }
         /* Tapping a node parks the frequency dial on its signature — a
          * "point at it and I'll get you close" affordance that removes the

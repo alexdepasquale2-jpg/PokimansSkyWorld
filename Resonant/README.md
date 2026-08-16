@@ -614,6 +614,59 @@ honest: rewind and you see what the world would have done without you.
 
 ---
 
+## Striking, and the combo
+
+The core loop is a **hold** — four dials on a node while coherence fills — and
+that is deliberately not a clicker. But a hold has one dead spot: once the dials
+are on, there is nothing to *do* for the two to six seconds it takes, and the
+hardest layers are the ones you sit in longest.
+
+A **strike** is a tap that pushes a lock you are already winning. Its quality is
+`alignment × gate` sampled at the instant you hit, which means it reads the same
+primitives as everything else:
+
+- In an ungated layer, strike when the lock is tight. Easy, and worth least.
+- In a gated one, strike **inside the open window** — whose rhythm is the
+  essence's `branching`, which you already know how to read. A Cascade gives you
+  five narrow chances a bar; a Lattice one wide one.
+- While a twin is uncollapsed, a strike is worth less, because you do not yet
+  know which one you hit.
+
+Three outcomes, not two: **clean** advances the combo, **held** keeps it,
+**broke** drops it. "You did not lose it" is the feedback that keeps someone
+playing a layer they have not mastered.
+
+### The combo is logarithmic on purpose
+
+    ×(1 + resonance · ln(1 + combo))
+
+×1.6 at ten, ×2.0 at fifty, ×2.4 at three hundred. Genuinely cumulative — more
+always helps — and it never runs away, because **doubling the combo adds a
+constant rather than a factor**, which the suite asserts by checking that each
+doubling adds the same amount. An exponential combo makes the first hour
+irrelevant and the fifth absurd; a linear one needs a cap, and a cap is a wall
+you can see. A log curve needs neither. It is capped anyway, because a curve
+with no ceiling is a promise nobody checked.
+
+### Striking can never replace holding
+
+Each strike on the *same node* is worth 72% of the last. Geometric, so the total
+a node can ever be pushed is bounded — about 85% of a lock with the upgrade
+maxed, a third of one at base. Two hundred perfect strikes on one node still do
+not finish it, which the suite verifies by actually doing it.
+
+That rule exists because the hold is the game, and it turns out to be the better
+mechanic anyway: without it the optimal play is to find one node and mash it,
+and with it you are pushed across the whole field — which is what the combo
+wanted from you in the first place.
+
+### Three upgrades
+
+**Strike** (how hard a hit pushes), **Tempo** (how long a combo survives between
+hits), **Resonance** (how steeply the multiplier climbs). They trade against each
+other, and they are priced on the same geometric curve the dials use so the whole
+economy has one shape.
+
 ## Two currencies
 
 - **Insight (Ψ)** is spent. Buys dial upgrades and research.
@@ -683,6 +736,7 @@ All audio is synthesised at runtime — there are no sound files.
 | `emergence.js` | the six primitives — every mechanic in the game is one of these |
 | `selfsimilar.js` | one recursive generator; `geometry` picks the stroke and nothing else |
 | `field.js` | the attunement loop: four-dial alignment, coherence, primitive dispatch |
+| `strike.js` | the click, the combo curve, and the fatigue rule that keeps holds load-bearing |
 | `orbital.js` | Kepler/Halley, Hill spheres, Roche limits, Hohmann transfers |
 | `stellar.js` | IMF, mass–luminosity, habitable zones, system architecture |
 | `planet.js` | Jeans escape, greenhouse, terrain fields, biomes, resources |

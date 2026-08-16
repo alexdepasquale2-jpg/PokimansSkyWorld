@@ -258,6 +258,51 @@
       });
     });
 
+    /* ── Striking ─────────────────────────────────────────────────────────
+     *
+     * A combo only feels like anything if every rung of it is *distinct*, so
+     * the pitch climbs a semitone per clean strike and resets on a break. That
+     * one detail is most of why a rising count feels like a rising count rather
+     * than like the same click repeated — the ear is what tracks a streak, and
+     * the number is only confirming it. */
+    bus.on('strike', ({ node, verdict, quality, combo }) => {
+      if (verdict === 'clean') {
+        /* Semitones, wrapping after two octaves so it never becomes a whistle.
+         * Louder and brighter with the combo, up to a point. */
+        const step = (combo - 1) % 24;
+        const pitch = Math.pow(2, step / 12);
+        RS.audio.click(0.42 + Math.min(0.3, combo * 0.012), 1.4 * pitch);
+        RS.feel.FX.strike(node, quality, combo);
+        RS.feel.shake(0.10 + Math.min(0.22, combo * 0.006));
+        RS.feel.buzz('step');
+      } else if (verdict === 'held') {
+        RS.audio.click(0.22, 0.85);
+        RS.feel.FX.strike(node, quality, 0);
+      } else if (verdict === 'broke') {
+        /* A break is a downward sound, not a buzzer. It has to read as "that
+         * one was loose" rather than as a penalty, or a player stops striking
+         * in exactly the layers where striking is worth most. */
+        RS.audio.click(0.30, 0.42);
+        RS.feel.FX.strikeBreak(node);
+        RS.feel.buzz('deny');
+      }
+    });
+
+    /* Letting a combo lapse is quieter than breaking one — you did not do
+     * anything wrong, you just stopped. */
+    bus.on('strike:lapse', ({ lost }) => {
+      if (lost >= 8) {
+        RS.audio.click(0.20, 0.5);
+        RS.ui.toast({ kind: 'info', icon: '◈', hue: 320, ms: 2200,
+          title: 'Combo lapsed at ' + lost });
+      }
+    });
+
+    bus.on('strike:upgrade', ({ id }) => {
+      RS.audio.purchase();
+      RS.feel.FX.discovery(320, 0.7);
+    });
+
     bus.on('discover:system', ({ system }) => {
       game.stats.systemsSeen++;
       RS.audio.discover(1.2);

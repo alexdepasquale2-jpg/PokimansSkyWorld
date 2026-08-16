@@ -21,7 +21,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
-  'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
+  'js/strike.js', 'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
   'js/neural.js', 'js/vessel.js', 'js/inhabitants.js', 'js/localtime.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
   'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js', 'js/audio.js', 'js/ui.js'
 ];
@@ -3619,6 +3619,159 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   const intricateVolatile = E.filter(e => e.complexity > 0.7 && e.branching < 0.35 && e.persistence < 0.3);
   assert(intricateVolatile.length > 0,
     'something is intricate, unbranched and fleeting: ' + intricateVolatile.map(e => e.id).join(', '));
+}
+
+
+// ── striking, and a combo that is cumulative without running away ────────
+{
+  const g = RS.game.newGame(50505);
+  const S = RS.strike;
+  assert(g.strike && g.strike.combo === 0, 'a new game starts with no combo');
+
+  /* The curve. This is the whole design claim — genuinely cumulative, so more
+   * always helps, and logarithmic, so it never runs away. An exponential combo
+   * makes the first hour irrelevant and the fifth absurd; a linear one needs a
+   * cap, and a cap is a wall you can see. */
+  const k = S.BASE_RESONANCE;
+  let prev = 0;
+  for (const c of [0, 1, 5, 10, 50, 200, 1000, 100000]) {
+    const m = S.mulFor(k, c);
+    assert(m >= prev, 'the multiplier never decreases (' + c + ' → ' + m.toFixed(3) + ')');
+    prev = m;
+  }
+  assert(S.mulFor(k, 10) > S.mulFor(k, 5), 'and more combo is always worth something');
+  assert(S.mulFor(k, 1e6) <= S.COMBO_MAX_MUL + 1e-9,
+    'and it is capped, because a curve with no ceiling is an unchecked promise');
+
+  /* "Not outrageous" made falsifiable: doubling the combo must add a roughly
+   * constant amount rather than multiplying, which is what logarithmic means. */
+  const d1 = S.mulFor(k, 20) - S.mulFor(k, 10);
+  const d2 = S.mulFor(k, 40) - S.mulFor(k, 20);
+  const d3 = S.mulFor(k, 80) - S.mulFor(k, 40);
+  assert(Math.abs(d1 - d2) < 0.02 && Math.abs(d2 - d3) < 0.02,
+    'each doubling adds the same amount (' + d1.toFixed(3) + ', ' + d2.toFixed(3) +
+    ', ' + d3.toFixed(3) + ') — that is what stops it running away');
+  assert(S.mulFor(k, 10) < 1.8 && S.mulFor(k, 100) < 2.6,
+    'and the numbers stay sane: ×' + S.mulFor(k, 10).toFixed(2) + ' at ten, ×' +
+    S.mulFor(k, 100).toFixed(2) + ' at a hundred');
+
+  /* A strike reads the primitives rather than inventing its own rule. */
+  function fakeNode(align, gate, extra) {
+    const n = {
+      man: RS.fractal.resolve(g.seed, 13, 0, 1, 1, 0),
+      rawAlign: align, gate, coherence: 0, effort: 0,
+      dying: false, crystallised: false, blocked: false,
+      twinInfo: null, collapsed: true, twinReal: true, depth: 0
+    };
+    if (extra) for (const key in extra) n[key] = extra[key];
+    return n;
+  }
+
+  g.strike = S.newState();
+  const clean = S.strike(g, nullBus, fakeNode(1, 1));
+  assert(clean.verdict === 'clean' && g.strike.combo === 1, 'a tight lock strikes clean');
+  assert(clean.pushed > 0, 'and pushes the hold');
+
+  /* A shut gate makes a strike worthless even at perfect alignment — which is
+   * what makes a rhythmic layer a rhythm rather than a hold with extra steps. */
+  g.strike = S.newState();
+  const shut = S.strike(g, nullBus, fakeNode(1, 0.05));
+  assert(shut.verdict === 'broke', 'striking through a shut gate breaks the combo');
+  assert(g.strike.combo === 0, 'and there is nothing left of it');
+
+  /* An unresolved twin is worth less, because you do not know what you hit. */
+  g.strike = S.newState();
+  const twin = S.strike(g, nullBus,
+    fakeNode(1, 1, { twinInfo: {}, collapsed: false, twinReal: false }));
+  assert(twin.quality < 0.6, 'striking an unresolved double is a guess (' + twin.quality.toFixed(2) + ')');
+
+  /* Mashing must be strictly worse than timing. */
+  g.strike = S.newState();
+  S.strike(g, nullBus, fakeNode(1, 1));
+  const mashed = S.strike(g, nullBus, fakeNode(1, 1));
+  assert(mashed.verdict === 'early', 'a second strike inside the cooldown does nothing');
+  assert(g.strike.combo === 1, 'and does not advance the combo');
+
+  /* Striking nothing is a miss, not a mistake — punishing an empty click
+   * teaches people not to explore. */
+  g.strike = S.newState();
+  g.strike.combo = 7;
+  const miss = S.strike(g, nullBus, null);
+  assert(miss.verdict === 'miss' && g.strike.combo === 7, 'striking nothing costs nothing');
+
+  /* The window drops the combo rather than eroding it. */
+  g.strike = S.newState();
+  S.strike(g, nullBus, fakeNode(1, 1));
+  assert(g.strike.combo === 1 && g.strike.window > 0, 'a clean strike opens the window');
+  for (let i = 0; i < 600; i++) S.tick(g, nullBus, 1 / 60);
+  assert(g.strike.combo === 0, 'and the combo lapses when it closes');
+
+  /* A strike must not make a node pay *less* by shortening the hold the payout
+   * reads — which it would, if effort were not credited. */
+  const n2 = fakeNode(1, 1);
+  g.strike = S.newState();
+  const before = n2.effort;
+  S.strike(g, nullBus, n2);
+  assert(n2.effort > before, 'a strike counts as effort, so pushing a node does not devalue it');
+
+  /* Upgrades: three, priced on a curve, all reachable, all monotone. */
+  assert(S.UPGRADES.length === 3, 'three strike upgrades');
+  for (const u of S.UPGRADES) {
+    const g2 = RS.game.newGame(1);
+    g2.insight = 1e12;
+    let last = -1;
+    for (let i = 0; i < u.max; i++) {
+      const c = S.costOf(g2, u.id);
+      assert(Number.isFinite(c) && c > last, u.id + ' gets more expensive each level');
+      last = c;
+      const r = S.buy(g2, nullBus, u.id);
+      assert(r.ok, u.id + ' level ' + (i + 1) + ' is buyable');
+    }
+    assert(!Number.isFinite(S.costOf(g2, u.id)), u.id + ' maxes out');
+    assert(S.buy(g2, nullBus, u.id).ok === false, 'and cannot be bought past its max');
+    assert(u.value(u.max) > u.value(0), u.id + ' is worth more at max than at zero');
+  }
+  /* And a fully-upgraded striker still cannot finish a node by striking alone,
+   * or the hold — which is the core of the game — becomes optional. */
+  const gm = RS.game.newGame(2);
+  gm.insight = 1e12;
+  for (let i = 0; i < 20; i++) S.buy(gm, nullBus, 'strike');
+  const push = S.valueOf(gm, 'strike');
+  /* The claim the whole design rests on: striking accelerates a hold and can
+   * never replace it. Strikes on one node fatigue geometrically, so the total
+   * a node can ever be pushed is bounded — and the bound is under a full lock
+   * even with the upgrade maxed. */
+  const ceiling = S.ceilingFor(push);
+  assert(ceiling < 1,
+    'a node can never be struck to completion, even maxed (ceiling ' +
+    (ceiling * 100).toFixed(0) + '% of a lock)');
+  assert(S.ceilingFor(S.BASE_PUSH) < 0.4,
+    'and at base a striker gets barely a third of the way (' +
+    (S.ceilingFor(S.BASE_PUSH) * 100).toFixed(0) + '%)');
+
+  /* Verified by actually doing it rather than by trusting the algebra. */
+  const gm2 = RS.game.newGame(3);
+  gm2.insight = 1e12;
+  for (let i = 0; i < 20; i++) S.buy(gm2, nullBus, 'strike');
+  gm2.strike = S.newState();
+  const victim = fakeNode(1, 1);
+  for (let i = 0; i < 200; i++) { gm2.strike.cooldown = 0; S.strike(gm2, nullBus, victim); }
+  assert(victim.coherence < 0.95,
+    'two hundred perfect strikes still do not finish a node (' +
+    (victim.coherence * 100).toFixed(0) + '%)');
+  assert(victim.coherence > 0.4, 'but they get you most of the way');
+
+  /* Upgrades survive a save; the live combo deliberately does not, because a
+   * streak you were not present for is not a streak. */
+  const gs = RS.game.newGame(808);
+  gs.insight = 1e9;
+  S.buy(gs, nullBus, 'tempo'); S.buy(gs, nullBus, 'tempo'); S.buy(gs, nullBus, 'resonance');
+  gs.strike.combo = 31; gs.strike.best = 44;
+  const round = RS.save.hydrate(JSON.parse(JSON.stringify(RS.save.serialise(gs))));
+  assert(S.levelOf(round, 'tempo') === 2 && S.levelOf(round, 'resonance') === 1,
+    'strike upgrades round-trip through a save');
+  assert(round.strike.best === 44, 'and so does the best combo');
+  assert(round.strike.combo === 0, 'but the live combo does not');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

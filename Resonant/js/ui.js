@@ -87,6 +87,13 @@
         renderDrawer(game, bus);
         return;
       }
+      const strk = ev.target.closest('[data-strike]');
+      if (strk) {
+        const r = RS.strike.buy(game, bus, strk.dataset.strike);
+        if (!r.ok) bus.emit('ui:deny', r);
+        renderDrawer(game, bus);
+        return;
+      }
       const res = ev.target.closest('[data-research]');
       if (res) {
         const r = RS.influence.tryResearch(game, bus, res.dataset.research);
@@ -763,7 +770,40 @@
   };
 
   function upgradesHTML(game) {
-    let h = '';
+    /* ── Strike upgrades ─────────────────────────────────────────────────
+     *
+     * A second economy alongside the dials, and deliberately a small one: the
+     * dials are what let you reach and hold a layer at all, and these only make
+     * the holding faster. Listed first anyway, because they are the ones a new
+     * player can afford. */
+    const st = game.strike;
+    let sh = '<section class="up-dial" style="--h:320">' +
+      '<header><span class="sym">✦</span><h3>Striking</h3></header>' +
+      '<p class="blurb">Tap the field while a lock is tight to push it. Time it inside a ' +
+      'layer\u2019s open window and the combo climbs \u2014 logarithmically, so it is always ' +
+      'worth more and never runs away.</p>' +
+      '<div class="stats">' +
+      '<div>Combo <b>' + (st ? st.combo : 0) + '</b></div>' +
+      '<div>Best <b>' + (st ? st.best : 0) + '</b></div>' +
+      '<div>Now paying <b>' + RS.strike.multiplier(game).toFixed(2) + '&times;</b></div>' +
+      '<div>Clean <b>' + (st && st.strikes ? Math.round(st.cleans / st.strikes * 100) : 0) + '%</b></div>' +
+      '</div><div class="up-rows">';
+    for (const u of RS.strike.UPGRADES) {
+      const lv = RS.strike.levelOf(game, u.id);
+      const cost = RS.strike.costOf(game, u.id);
+      const maxed = !Number.isFinite(cost);
+      const afford = game.insight >= cost;
+      sh += '<button class="up-row" data-strike="' + u.id + '"' +
+        (maxed || !afford ? ' disabled' : '') + ' style="--h:' + u.hue + '">' +
+        '<span class="k">' + u.glyph + ' ' + u.name.toUpperCase() + '</span>' +
+        '<span class="lv">' + lv + '/' + u.max + '</span>' +
+        '<span class="d">' + u.blurb + '<br><i style="opacity:.6">' + u.format(lv) +
+        (maxed ? '' : ' &rarr; ' + u.format(lv + 1)) + '</i></span>' +
+        '<span class="c">' + (maxed ? 'MAX' : fmt(cost)) + '</span></button>';
+    }
+    sh += '</div></section>';
+
+    let h = sh;
     for (const def of RS.dials.DEFS) {
       const d = game.dials[def.id];
       h += '<section class="up-dial" style="--h:' + def.hue + '">' +
