@@ -131,7 +131,9 @@
       { name: 'System', range: 'stellar · planetary system', what: 'Planets, moons, belts, trade, and anybody living there.',
         active: sc.kind === 'system', hue: 285 },
       { name: 'Surface', range: 'planetary and within', what: 'Stand on a world. Needs a body.',
-        active: sc.kind === 'planet', hue: 130 }
+        active: sc.kind === 'planet', hue: 130 },
+      { name: 'Cytoplasm', range: 'cellular', what: 'Inside one cell of a living world. Work here and its biosphere changes.',
+        active: sc.kind === 'cellular', hue: 150 }
     ];
     for (const r of rungs) {
       h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +

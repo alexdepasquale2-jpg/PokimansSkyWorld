@@ -168,6 +168,13 @@
         sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
         sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
       el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'cellular') {
+      const r = RS.cellular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sterile ? r.sub
+        : (r.sub + ' · ' + r.organelles + ' organelles · inside ' + r.host +
+           (r.expression > 0.005 ? ' · expression ' + Math.round(r.expression * 100) + '%' : '')));
+      el['layer-name'].style.color = hsl(150, 0.7, 0.72);
     } else if (sc.kind === 'planet' && sc.planet) {
       const p = sc.planet;
       setText('layer-name', p.name.toUpperCase());
@@ -340,6 +347,24 @@
           p.name + ' &mdash; ' + p.type.name +
           (p.biosphere ? ' &middot; ' + p.biosphere.stage.name : '') +
           (p.civ ? ' &middot; ' + p.civ.tier.name : '') + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'cellular') {
+      const r = RS.cellular.readout(game);
+      const c = s.cell;
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(150, 0.8, 0.7) + '">&#10059;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (c ? '<div class="ro-sub" style="margin-top:4px">' +
+          /* Naming the organelles is the point: these are the same essences the
+           * player has met at every other scale, wearing their cellular names. */
+          c.organelles.slice(0, 4).map(o => o.form).join(' &middot; ') +
+          (c.organelles.length > 4 ? ' &middot; +' + (c.organelles.length - 4) : '') + '</div>' : '') +
+        (r.expression > 0.005
+          ? '<div class="ro-sub" style="margin-top:4px;color:' + hsl(140, 0.7, 0.66) + '">' +
+            'expression ' + Math.round(r.expression * 100) + '% &mdash; ' + r.host +
+            ' is measurably more complex than its baseline</div>' : '');
       return;
     }
     if (s.kind === 'planet' && s.planet) {

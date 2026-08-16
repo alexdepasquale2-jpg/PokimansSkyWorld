@@ -23,7 +23,7 @@ const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
   'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
-  'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
+  'js/scene_cellular.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
 ];
 
 const sandbox = {
@@ -1864,6 +1864,41 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(first === SS.topology(buf) + ':' + buf.data[10].toFixed(6), 'generation is deterministic');
 }
 
+// ── a drawing that fits where it is put ──────────────────────────────────
+/* `draw` scales the skeleton by a radius, and how far the skeleton reaches
+ * depends entirely on the essence — so a constant radius makes a branching
+ * essence spill out of whatever is meant to contain it. `fit` is what stops a
+ * mitochondrion from being drawn through the cell wall. */
+{
+  const geoms = ['cell', 'chain', 'web', 'disc', 'body', 'foam', 'orbital', 'abstract'];
+  let worst = 0, worstId = '';
+  for (const e of RS.fractal.ESSENCES) {
+    const buf = RS.selfsimilar.build(e, 'cell', 99, RS.selfsimilar.newBuffer());
+    assert(Number.isFinite(buf.extent) && buf.extent > 0, e.id + ' has a measurable extent');
+    if (buf.extent > worst) { worst = buf.extent; worstId = e.id; }
+    /* The contract: scaled by `fit(buf, R)`, nothing reaches past R. */
+    const R = 0.4;
+    const k = RS.selfsimilar.fit(buf, R);
+    let over = 0;
+    for (let i = 0; i < buf.count; i++) {
+      const j = i * RS.selfsimilar.STRIDE;
+      const d = Math.hypot(buf.data[j + 2], buf.data[j + 3]) * k;
+      if (d > R + 1e-9) over++;
+    }
+    assert(over === 0, e.id + ' fits inside what it is told to fit inside');
+  }
+  assert(worst > 1.5,
+    'the widest essence really does reach far beyond its nominal size (' +
+    worstId + ' at ' + worst.toFixed(2) + '×) — which is why fit() has to exist');
+  /* Extent is geometry-independent, like every other topological property. */
+  for (const e of RS.fractal.ESSENCES.slice(0, 4)) {
+    const a = RS.selfsimilar.build(e, geoms[0], 5, RS.selfsimilar.newBuffer());
+    const b = RS.selfsimilar.build(e, geoms[3], 5, RS.selfsimilar.newBuffer());
+    assert(Math.abs(a.extent - b.extent) < 1e-9,
+      e.id + ' reaches equally far whatever it is drawn as');
+  }
+}
+
 // ── gnosis as foresight ──────────────────────────────────────────────────
 {
   const g = RS.game.newGame(31337);
@@ -2228,6 +2263,228 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   }
   assert(checked > 100, 'the branching claim is checked across the whole spectrum (' + checked + ' places)');
   assert(wrong.length === 0, 'Cascade branches everywhere it can: ' + (wrong.join(', ') || 'no exceptions'));
+}
+
+// ── the scene registry covers the ladder exactly once ────────────────────
+{
+  const covered = new Array(RS.cosmos.TIERS.length).fill(0);
+  for (const sc of RS.scenes.SCENES) {
+    assert(sc.first >= 0 && sc.last < RS.cosmos.TIERS.length && sc.first <= sc.last,
+      sc.id + ' claims a valid range of rungs');
+    for (let i = sc.first; i <= sc.last; i++) covered[i]++;
+  }
+  /* Overlap is legal — a specific scope sits inside a general one and wins by
+   * being listed first — but a gap is not: every rung must resolve to
+   * something, or turning Σ lands the player nowhere. */
+  const gaps = [];
+  for (let i = 0; i < covered.length; i++) if (!covered[i]) gaps.push(RS.cosmos.TIERS[i].id);
+  assert(gaps.length === 0, 'every rung of the ladder resolves to a scene: ' + (gaps.join(', ') || 'no gaps'));
+
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    const id = RS.scenes.sceneForTier(i);
+    assert(RS.scenes.SCENE_BY_ID[id], 'rung ' + i + ' resolves to a registered scene');
+  }
+  assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL) === 'cellular',
+    'the cellular rung shows the cellular scope, not a planet surface');
+  assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL - 1) === 'planet' &&
+         RS.scenes.sceneForTier(RS.scenes.TIER_CELL + 1) === 'planet',
+    'and its neighbours are unaffected');
+  assert(RS.scenes.tierForScene('cellular') === RS.scenes.TIER_CELL,
+    'a pathway can name the rung the cellular scope is entered at');
+}
+
+// ── the cellular scope ───────────────────────────────────────────────────
+{
+  /* Find a living world to be inside. Deriving one rather than fabricating it
+   * matters: if the galaxy cannot produce a cell to stand in, the scope is
+   * unreachable in real play and an assertion on a hand-built planet would
+   * hide that. */
+  const g = RS.game.newGame(60607);
+  let living = null;
+  outer:
+  for (let sx = -3; sx <= 3 && !living; sx++) {
+    for (let sy = -3; sy <= 3; sy++) {
+      const sys = RS.stellar.systemAt(g.seed, sx, sy, 0);
+      if (!sys) continue;
+      for (let i = 0; i < sys.bodies.length; i++) {
+        if (sys.bodies[i].kind !== 'planet') continue;
+        const p = RS.scenes.derivePlanet(g, sys, i);
+        if (p && p.biosphere && p.biosphere.complexity > 0.05) { living = { sys, i, p }; break outer; }
+      }
+    }
+  }
+  assert(living, 'the galaxy contains a world with cells in it');
+
+  if (living) {
+    const p = living.p;
+    assert(RS.cellular.reasonSterile(p) === null, 'a living world can be entered');
+
+    /* Derivation is pure — the same address is the same cell, always. Without
+     * this, returning to a cell you influenced would show you a different one. */
+    const a = RS.cellular.cellAt(g, p, 0.25, 3);
+    const b = RS.cellular.cellAt(g, p, 0.25, 3);
+    assert(a.organelles.length === b.organelles.length &&
+      a.organelles.every((o, i) => o.essence.id === b.organelles[i].essence.id &&
+        Math.abs(o.x - b.organelles[i].x) < 1e-12),
+      'a cell is a pure function of its address');
+    const c2 = RS.cellular.cellAt(g, p, 0.25, 4);
+    assert(c2.organelles.some((o, i) => !a.organelles[i] || o.essence.id !== a.organelles[i].essence.id) ||
+      c2.organelles.length !== a.organelles.length,
+      'and the cell next door is a different cell');
+
+    /* The cell type has to follow the host, or the scope is decoration. */
+    assert(RS.cellular.typeFor(0.01).id === 'protocell' &&
+           RS.cellular.typeFor(0.5).id === 'eukaryote' &&
+           RS.cellular.typeFor(0.95).id === 'neural',
+      'cell type follows the host biosphere');
+    let mono = true;
+    for (let i = 1; i < RS.cellular.TYPES.length; i++) {
+      if (RS.cellular.TYPES[i].organelles <= RS.cellular.TYPES[i - 1].organelles) mono = false;
+      if (RS.cellular.TYPES[i].minComplexity <= RS.cellular.TYPES[i - 1].minComplexity) mono = false;
+    }
+    assert(mono, 'more complex life means more machinery inside the cell');
+
+    /* A sterile world must refuse entry, and say why. */
+    const dead = { name: 'Dead', biosphere: null, surfaceTemp: 200, pressure: 0, gravity: 1, flux: 1 };
+    assert(typeof RS.cellular.reasonSterile(dead) === 'string',
+      'a sterile world explains itself rather than opening an empty cell');
+
+    /* The unreachable content is now reachable: every organelle names a `cell`
+     * form, which is exactly the 42-name pool that no geometry could show
+     * while every small rung rendered as a planet surface. */
+    const forms = new Set();
+    for (let i = 0; i < 40; i++) {
+      for (const o of RS.cellular.cellAt(g, p, i * 0.03, i).organelles) forms.add(o.form);
+    }
+    assert(forms.size >= 8, 'the cellular scope surfaces its own form names (' + forms.size + ' seen)');
+    for (const e of RS.fractal.ESSENCES) {
+      assert(e.forms && e.forms.cell, e.id + ' has a cellular form to show');
+    }
+  }
+}
+
+// ── expression: the only place you change a world from inside it ─────────
+{
+  const g = RS.game.newGame(414);
+  const bus = nullBus;
+  const sys = RS.stellar.systemAt(g.seed, 0, 0, 0);
+  let idx = -1, planet = null;
+  for (let i = 0; i < sys.bodies.length; i++) {
+    if (sys.bodies[i].kind !== 'planet') continue;
+    const p = RS.scenes.derivePlanet(g, sys, i);
+    if (p && p.biosphere) { idx = i; planet = p; break; }
+  }
+  if (!planet) {
+    assert(true, 'no biosphere in the home system this seed — expression tested elsewhere');
+  } else {
+    const base = planet.biosphere.complexity;
+    assert(RS.influence.expressionOn(g, planet) === 0, 'an untouched world has no expression');
+
+    for (let i = 0; i < 40; i++) RS.influence.express(g, bus, planet, 2);
+    const e1 = RS.influence.expressionOn(g, planet);
+    assert(e1 > 0 && e1 < 1, 'work inside a cell registers, and saturates (' + e1.toFixed(3) + ')');
+
+    /* One delta, not one per crystal — the save must not grow without bound. */
+    const list = g.deltas[RS.influence.planetKey(planet)];
+    assert(list.filter(d => d.id === RS.influence.EXPRESSION_ID).length === 1,
+      'a thousand crystals is still one delta');
+
+    /* And it must be visible from orbit: re-derive the world and the biosphere
+     * has moved. */
+    const after = RS.scenes.derivePlanet(g, sys, idx);
+    assert(after.biosphere.complexity > base,
+      'a world worked from inside is measurably more complex from outside (' +
+      base.toFixed(3) + ' → ' + after.biosphere.complexity.toFixed(3) + ')');
+    assert(after.biosphere.complexity <= 1, 'and never exceeds fully complex');
+
+    /* Saturating, not linear: the thousandth crystal must move it far less
+     * than the first, or a player could farm a world into anything. */
+    const mid = RS.influence.expressionOn(g, planet);
+    for (let i = 0; i < 400; i++) RS.influence.express(g, bus, planet, 2);
+    const far = RS.influence.expressionOn(g, planet);
+    assert(far - mid < mid, 'ten times the work is much less than ten times the effect');
+    assert(far < 1, 'expression never completes — you accelerate a world, you do not replace it');
+
+    /* Structures still work alongside it, and expression is not one. */
+    assert(RS.influence.structuresOn(g, planet).length === 0,
+      'expression does not masquerade as a structure');
+    assert(RS.influence.totalUpkeep(g) === 0, 'and carries no upkeep');
+  }
+}
+
+// ── a body that works there, and bodies that honestly do not ─────────────
+{
+  const cyto = {
+    medium: RS.vessel.MEDIUM.CYTOPLASM, gravity: 0, pressure: 1,
+    temperature: 300, flux: 1, roughness: 0.4, hasMinds: true, label: 'cytoplasm'
+  };
+  const ocean = {
+    medium: RS.vessel.MEDIUM.LIQUID, gravity: 1, pressure: 1,
+    temperature: 290, flux: 1, roughness: 0.2, hasMinds: true, label: 'ocean'
+  };
+  const ciliate = RS.vessel.ARCHETYPES.find(a => a.id === 'ciliate');
+  const swimmer = RS.vessel.ARCHETYPES.find(a => a.id === 'swimmer');
+  const mote = RS.vessel.ARCHETYPES.find(a => a.id === 'mote');
+  assert(ciliate && ciliate.needs(cyto) === null, 'a ciliate works in cytoplasm');
+  assert(typeof ciliate.needs(ocean) === 'string', 'and not in an ocean');
+  /* The teaching failure: a swimmer is not merely unsuited here, it is
+   * physically futile, and the refusal has to say so. */
+  const why = swimmer.needs(cyto);
+  assert(typeof why === 'string' && /inertia/.test(why),
+    'a swimmer refuses cytoplasm for the real reason: ' + why);
+  assert(swimmer.needs(ocean) === null, 'while still working in an ocean');
+  assert(mote.needs(cyto) === null, 'the bare mote goes anywhere, as always');
+
+  /* Reachable by research, like every other body. */
+  const g = RS.game.newGame(9);
+  g.insight = 1e9;
+  const path = ['locomotion', 'buoyancy', 'microscopy'];
+  for (const id of path) {
+    const r = RS.influence.tryResearch(g, nullBus, id);
+    assert(r.ok, 'research ' + id + ' is reachable (' + (r.reason || 'ok') + ')');
+  }
+  assert(g.vessels.unlocked.ciliate, 'microscopy unlocks the ciliate');
+}
+
+// ── the scope is stable, and its consequence only fires there ────────────
+{
+  const g = RS.game.newGame(2024);
+  const bus = nullBus;
+  /* Σ starts pinned at the root rung and its reach is *bought* — a fresh
+   * observer genuinely cannot see the cellular scale, which is the progression
+   * working. Buy the range so this test is about the scope rather than about
+   * whether the scope is unlocked yet. */
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_CELL);
+  assert(Math.round(g.dials.space.value) === RS.scenes.TIER_CELL,
+    'a fully-ranged Σ can reach the cellular rung');
+  let nan = false;
+  for (let i = 0; i < 60 * 30; i++) {
+    RS.scenes.tick(g, bus, 1 / 60);
+    RS.field.tick(g, bus, 1 / 60);
+    if (!Number.isFinite(g.insight) || !Number.isFinite(g.scene.cellT || 0)) { nan = true; break; }
+  }
+  assert(!nan, 'the cellular scope runs clean for thirty seconds');
+  assert(g.scene.kind === 'cellular', 'and stays in the scope while Σ is parked on it');
+
+  /* Sweep the whole ladder without leaving a scene in a broken state. */
+  let broke = null;
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g, g.dials.space, i);
+    for (let k = 0; k < 12; k++) { RS.scenes.tick(g, bus, 1 / 60); RS.field.tick(g, bus, 1 / 60); }
+    if (g.scene.kind !== RS.scenes.sceneForTier(i)) broke = RS.cosmos.TIERS[i].id;
+    if (!Number.isFinite(g.insight)) broke = RS.cosmos.TIERS[i].id + ' (NaN)';
+  }
+  assert(!broke, 'a full sweep of Σ lands correctly on every rung: ' + (broke || 'all 22'));
+
+  /* Expression must not fire outside the scope, or every crystal anywhere
+   * would quietly reshape whatever world happened to be selected. */
+  const g2 = RS.game.newGame(77);
+  RS.dials.setValue(g2, g2.dials.space, RS.cosmos.ROOT_INDEX);
+  RS.scenes.tick(g2, nullBus, 1 / 60);
+  const man = RS.fractal.resolve(g2.seed, 13, 0, 1, 1, 0);
+  assert(RS.cellular.expressFrom(g2, nullBus, man) === null,
+    'crystallising in the attunement field does not rewrite a distant biosphere');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

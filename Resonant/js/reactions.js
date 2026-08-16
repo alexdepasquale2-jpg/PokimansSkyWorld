@@ -180,19 +180,38 @@
     bus.on('scene:change', ({ kind, from, scene }) => {
       /* Arriving in a different world is the biggest transition the game has
        * after a first-contact discovery, so it gets a full upheaval. */
-      const hue = kind === 'system' ? 285 : kind === 'planet' ? 130 : 200;
+      /* One table rather than a chain of ternaries: there are five scopes now
+       * and more coming, and a scope that forgets to name itself here arrives
+       * announcing that it is the attunement field. */
+      const ARRIVAL = {
+        field: { hue: 200, icon: '◉',
+          title: () => 'the attunement field',
+          body: () => 'Tuning again. φ selects the layer.' },
+        galaxy: { hue: 190, icon: '✦',
+          title: () => 'the star map',
+          body: () => 'Tap a star to select it. Tap again to travel.' },
+        system: { hue: 285, icon: '◇',
+          title: sc => sc.system ? sc.system.name : 'a system',
+          body: () => 'Unembodied: τ scrubs this system’s history. Tap a world to select it.' },
+        planet: { hue: 130, icon: '●',
+          title: sc => sc.planet ? sc.planet.name : 'a world',
+          body: () => 'Take a body to touch this world.' },
+        cellular: { hue: 150, icon: '❋',
+          title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
+          body: sc => {
+            const why = RS.cellular.reasonSterile(sc.planet);
+            if (why) return 'Nothing to be inside here — ' + why + '.';
+            return 'Inside ' + sc.planet.name + '. What you crystallise here, it becomes.';
+          } }
+      };
+      const a = ARRIVAL[kind] || ARRIVAL.field;
       RS.audio.upheaval(1.4);
-      RS.feel.FX.upheaval(hue, 1.3);
+      RS.feel.FX.upheaval(a.hue, 1.3);
       RS.feel.vignette(0.5);
-      const label = kind === 'system' ? (scene.system ? scene.system.name : 'a system')
-        : kind === 'planet' ? (scene.planet ? scene.planet.name : 'a world')
-          : 'the attunement field';
       RS.ui.toast({
-        kind: 'major', icon: kind === 'system' ? '◇' : kind === 'planet' ? '●' : '◉',
-        hue, ms: 4200, title: label.toUpperCase(),
-        body: kind === 'field' ? 'Tuning again. φ selects the layer.'
-          : kind === 'system' ? 'Unembodied: τ scrubs this system’s history. Tap a world to select it.'
-            : 'Take a body to touch this world.'
+        kind: 'major', icon: a.icon, hue: a.hue, ms: 4200,
+        title: String(a.title(scene)).toUpperCase(),
+        body: a.body(scene)
       });
     });
 

@@ -253,6 +253,40 @@ generated from live state rather than written out:
   They feed each other, none is mandatory, and each one always states a concrete
   next step.
 
+## Scopes
+
+Turning Σ is how you travel, and each range of rungs is somewhere different.
+
+| Σ | scope | what it is |
+|---|---|---|
+| galactic → ensemble | **Attunement field** | tune layers, hold manifestations |
+| interstellar · cluster | **Star map** | the stars around you; where to go next |
+| stellar · system | **System** | one gravity well and everything bound to it |
+| planetary and within | **Surface** | stand on a world; needs a body |
+| cellular | **Cytoplasm** | inside one cell of a living world |
+
+**Cytoplasm** is the first scope built on the primitives, and it is deliberately
+a *place* rather than a rule set: the attunement loop runs exactly as it does
+anywhere else, so a player who learned to read a rhythm in the Electromagnetic
+layer reads one here on arrival. What is new is what the place is made of and
+what your work there does.
+
+- The cell is derived from the host planet's own biosphere. A sterile world has
+  no cell to enter and says so; a microbial one is a bare prokaryote; a
+  complex one is a tissue or neural cell full of machinery.
+- **Organelles are essences.** `essenceAt` excludes tier and band, so the same
+  essence that was a spiral arm at the galactic rung is a Coiled Flagellum
+  here — and its four axes are the same four axes.
+- **Expression.** Crystallising inside a cell writes a delta that raises that
+  biosphere's complexity. It is the only place you act on a world *from inside
+  it*, and the change is visible from orbit afterwards. Saturating, because a
+  biosphere is a logistic curve: you can accelerate a world, not replace it.
+- **A body that works there, and bodies that honestly do not.** At a few
+  microns the Reynolds number is ~1e-4, so inertia does not exist and a
+  reversible stroke returns you exactly where you started. The Swimmer that
+  works in an ocean refuses cytoplasm and says why; the Ciliate — almost no
+  mass, enormous drag — is the body for a place where nothing coasts.
+
 ## Six primitives
 
 There are no per-layer minigames. There are **six functions**, and every mechanic
@@ -442,7 +476,8 @@ All audio is synthesised at runtime — there are no sound files.
 | `neural.js` | derived recurrent minds; the influence channel |
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
-| `scenes.js` | scene stack, the modal split, agents |
+| `scenes.js` | the scene registry, the modal split, agents |
+| `scene_cellular.js` | the Cellular scope: derived cells, organelles as essences, expression |
 | `game.js` `save.js` | state, economy, objectives, persistence |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
 | `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
@@ -514,12 +549,14 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **A scene per rung.** Four of the twenty-two rungs have a distinct view; the
-  rest fall back to the planet surface or the attunement field. Each new scope
+- **A scene per rung.** Five of the twenty-two rungs have a distinct view; the
+  rest fall back to the planet surface or the attunement field. Scenes are a
+  registry now (`SCENES` in `scenes.js`) and the test suite asserts the ladder
+  is covered without gaps, so adding one is a row and a file. Each new scope
   gets all twelve layer behaviours free, because the primitives are already
-  scale-parameterised — the cost of a new scope is a scene file, not a rule set.
-  Cellular, molecular, orbital-shell, quantum-foam, cosmic-web and ensemble are
-  the obvious ones, and three backdrop geometries are already written for them.
+  scale-parameterised — the cost is a *place*, not a rule set. Molecular,
+  orbital-shell, quantum-foam, cosmic-web and ensemble are next, and their
+  backdrop geometries are already written.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

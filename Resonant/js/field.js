@@ -698,6 +698,11 @@
       node: n, amount, man, band, tier,
       recognition: rec, firstBand, firstTier
     });
+    /* Scope consequence. Guarded inside `expressFrom`, which returns
+     * immediately anywhere but the Cellular scope — the field does not need to
+     * know which scopes have hooks, only that it should offer the event. */
+    if (RS.cellular) RS.cellular.expressFrom(game, bus, man);
+
     if (firstBand) bus.emit('discover:band', { band });
     if (firstTier) bus.emit('discover:tier', { tier });
     if (rec.fresh) bus.emit('discover:gnosis', { essence: man.essence, level: rec.level, man });

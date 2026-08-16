@@ -259,8 +259,58 @@
     ctx.save();
     ctx.translate(sx(x), sy(y));
     ctx.rotate(t * 0.15 * man.twist);
-    RS.selfsimilar.draw(ctx, buf, 0, 0, px(r) * 1.25, hue, man.sat + 0.15, alpha, t);
+    /* Fitted rather than scaled, so a branching essence and a converging one
+     * occupy the same footprint on screen — otherwise a Cascade node reads as
+     * five times the size of an Attractor node of identical potency, and size
+     * is supposed to mean something. */
+    RS.selfsimilar.draw(ctx, buf, 0, 0, RS.selfsimilar.fit(buf, px(r) * 1.6),
+      hue, man.sat + 0.15, alpha, t);
     ctx.restore();
+  }
+
+  /* ── The cell ─────────────────────────────────────────────────────────────
+   *
+   * Organelles are essences, and they are drawn by the *same* generator that
+   * draws a galaxy — `selfsimilar` with geometry `cell`, which lays the same
+   * skeleton down as soft lobes instead of spiral arms. So a Cascade in here
+   * is visibly the Cascade you met at the galactic rung, and the four `cell`
+   * form names that were written and unreachable finally appear.
+   */
+  function drawCell(ctx, game, t) {
+    const c = game.scene.cell;
+    if (!c) return;
+    const ct = game.scene.cellT || 0;
+
+    /* Cytoplasmic streaming, drawn as a faint rotating wash so the interior is
+     * never still — a static cell reads as a diagram rather than a living
+     * thing. */
+    const g = ctx.createRadialGradient(view.cx, view.cy, 0, view.cx, view.cy, px(1.0));
+    g.addColorStop(0, hsl(c.type.hue, 0.4, 0.30, 0.20));
+    g.addColorStop(1, hsl(c.type.hue - 20, 0.4, 0.12, 0.06));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.fill();
+
+    for (let i = 0; i < c.organelles.length; i++) {
+      const o = c.organelles[i];
+      /* Each drifts on its own slow circle — streaming, not orbit. */
+      const a = Math.atan2(o.y, o.x) + ct * o.drift;
+      const r = Math.hypot(o.x, o.y) * (1 + Math.sin(ct * 0.8 + o.phase) * 0.05);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+
+      let buf = o.__ss;
+      if (!buf) buf = o.__ss = RS.selfsimilar.build(o.essence, 'cell', i * 7919 + 13, buf);
+      /* Kept inside the membrane. The generator's extent depends on the
+       * essence — a branching one reaches much further than a converging one
+       * from the same nominal size — so scale against the room actually left
+       * between here and the wall rather than against a constant. */
+      const room = Math.max(0.14, 0.95 - r);
+      ctx.save();
+      ctx.translate(sx(x), sy(y));
+      ctx.rotate(ct * 0.12 * (i % 2 ? 1 : -1));
+      RS.selfsimilar.draw(ctx, buf, 0, 0,
+        RS.selfsimilar.fit(buf, px(Math.min(o.size * 3.4, room))), o.hue, 0.75, 1.0, t);
+      ctx.restore();
+    }
   }
 
   function drawNode(ctx, game, n, t) {
@@ -563,15 +613,24 @@
     } else if (kind === 'planet') {
       RS.worldrender.drawPlanet(ctx, game, dt);
     } else {
+      /* The Cellular scope runs the same attunement loop as the field, because
+       * that is the whole argument for having six primitives: a new scope is a
+       * different *place*, not a different rule set. What changes is what the
+       * place is made of — a membrane instead of a rim, organelles instead of
+       * empty space — and what your work there does to the world outside. */
+      const inCell = kind === 'cellular';
+
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
       const upheavalFade = 1 - game.field.upheaval * 0.55;
       drawBackdrop(ctx, game, tb.a.geometry, tb.a.hue, (1 - tb.t) * 0.55 * upheavalFade, t);
       if (tb.b !== tb.a) drawBackdrop(ctx, game, tb.b.geometry, tb.b.hue, tb.t * 0.55 * upheavalFade, t);
 
-      // rim
-      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, 0.20);
-      ctx.lineWidth = Math.max(1, px(0.004));
+      if (inCell) drawCell(ctx, game, t);
+
+      // rim — the membrane, in a cell
+      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
+      ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
       ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
 
       drawBeatRing(ctx, game, dt, t);

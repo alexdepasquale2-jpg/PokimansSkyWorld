@@ -2377,7 +2377,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const STRIDE = 7;
 
   function newBuffer() {
-    return { data: new Float32Array(MAX_SEGMENTS * STRIDE), count: 0, depthMax: 0 };
+    return { data: new Float32Array(MAX_SEGMENTS * STRIDE), count: 0, depthMax: 0, extent: 1 };
   }
 
   /* Build the structure. Pure and deterministic: the same essence always
@@ -2401,8 +2401,25 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const jitter = (1 - a.s) * 0.8;
 
     grow(buf, 0, 0, -Math.PI / 2, 1, 0, depth, fanout, decay, spread, jitter, seed >>> 0);
+
+    /* How far the skeleton actually reaches from the origin. It varies a great
+     * deal by essence — a persistent branching one accumulates segment lengths
+     * outward and reaches several units, a converging one barely leaves 1 —
+     * so a caller that needs the drawing to fit inside something (a cell
+     * membrane, a node's glyph box) cannot use a constant. Measured once here
+     * rather than guessed at every call site. */
+    let ext = 1e-3;
+    for (let s = 0; s < buf.count; s++) {
+      const i = s * STRIDE;
+      const d = Math.hypot(buf.data[i + 2], buf.data[i + 3]);
+      if (d > ext) ext = d;
+    }
+    buf.extent = ext;
     return buf;
   }
+
+  /* The `radius` to pass to `draw` so the whole figure fits inside `want`. */
+  function fit(buf, want) { return want / (buf ? buf.extent : 1); }
 
   function grow(buf, x, y, ang, len, d, maxD, fanout, decay, spread, jitter, seed) {
     if (d >= maxD || buf.count >= MAX_SEGMENTS) return;
@@ -2540,7 +2557,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return buf.count + ':' + buf.depthMax;
   }
 
-  RS.selfsimilar = { MAX_SEGMENTS, STRIDE, newBuffer, build, draw, topology };
+  RS.selfsimilar = { MAX_SEGMENTS, STRIDE, newBuffer, build, draw, topology, fit };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -3245,6 +3262,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       node: n, amount, man, band, tier,
       recognition: rec, firstBand, firstTier
     });
+    /* Scope consequence. Guarded inside `expressFrom`, which returns
+     * immediately anywhere but the Cellular scope — the field does not need to
+     * know which scopes have hooks, only that it should offer the event. */
+    if (RS.cellular) RS.cellular.expressFrom(game, bus, man);
+
     if (firstBand) bus.emit('discover:band', { band });
     if (firstTier) bus.emit('discover:tier', { tier });
     if (rec.fresh) bus.emit('discover:gnosis', { essence: man.essence, level: rec.level, man });
@@ -5140,7 +5162,17 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const { clamp, clamp01, lerp, damp, TAU, hashF, hashN } = RS.core;
 
   /* Medium determines which force terms are live at all. */
-  const MEDIUM = { VACUUM: 'vacuum', GAS: 'gas', LIQUID: 'liquid', SURFACE: 'surface', ORBIT: 'orbit' };
+  /* CYTOPLASM is not just "liquid, but smaller". At a few microns the Reynolds
+   * number is about 1e-4, which means inertia does not exist: stop pushing and
+   * you stop, instantly, in less than your own diameter. A stroke that is the
+   * reverse of itself returns you exactly where you started (Purcell's scallop
+   * theorem), so the swimmer body that works in an ocean is genuinely useless
+   * in here. Giving it its own medium is what lets the vessel predicates say
+   * so honestly instead of pretending an ocean and a cell are the same place. */
+  const MEDIUM = {
+    VACUUM: 'vacuum', GAS: 'gas', LIQUID: 'liquid',
+    SURFACE: 'surface', ORBIT: 'orbit', CYTOPLASM: 'cytoplasm'
+  };
 
   /* ── Archetypes ───────────────────────────────────────────────────────────
    * `needs` is a predicate on the environment, and it is what makes vessel
@@ -5151,7 +5183,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'mote', name: 'Mote', glyph: '·', hue: 200,
       blurb: 'The bare point of consciousness. No body, no force, no cost.',
-      medium: [MEDIUM.VACUUM, MEDIUM.GAS, MEDIUM.LIQUID, MEDIUM.SURFACE, MEDIUM.ORBIT],
+      medium: [MEDIUM.VACUUM, MEDIUM.GAS, MEDIUM.LIQUID, MEDIUM.SURFACE, MEDIUM.ORBIT, MEDIUM.CYTOPLASM],
       mass: 0.02, thrust: 0.55, dragC: 0.9, liftC: 0, grip: 0,
       senseRadius: 0.55, senseBands: 3, capacity: 40, draw: 0.4, regen: 1.2,
       needs: () => null,
@@ -5187,8 +5219,25 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       medium: [MEDIUM.LIQUID],
       mass: 1.4, thrust: 1.8, dragC: 4.5, liftC: 0, grip: 0,
       senseRadius: 0.38, senseBands: 5, capacity: 180, draw: 0.8, regen: 0.9,
-      needs: env => env.medium !== MEDIUM.LIQUID ? 'needs liquid to displace' : null,
+      needs: env => env.medium === MEDIUM.CYTOPLASM
+        ? 'no inertia at this scale — a reversible stroke returns you where you started'
+        : env.medium !== MEDIUM.LIQUID ? 'needs liquid to displace' : null,
       dialMap: { time: 'stroke rate', space: 'buoyancy', phase: 'heading', frequency: 'sense band' },
+      tier: 2
+    },
+    {
+      id: 'ciliate', name: 'Ciliate', glyph: '❋', hue: 150,
+      blurb: 'A ring of beating cilia. The only stroke that gets anywhere where inertia does not exist.',
+      medium: [MEDIUM.CYTOPLASM],
+      /* Almost no mass, almost no thrust, and drag so high that it is the only
+       * force that matters — which is exactly right. A ciliate does not coast;
+       * it is dragged along by the fluid it is beating, and it stops dead the
+       * instant it stops beating. */
+      mass: 0.05, thrust: 0.9, dragC: 22.0, liftC: 0, grip: 0,
+      senseRadius: 0.30, senseBands: 6, capacity: 60, draw: 0.5, regen: 1.4,
+      needs: env => env.medium !== MEDIUM.CYTOPLASM
+        ? 'cilia need a crowded fluid to beat against' : null,
+      dialMap: { time: 'beat rate', space: 'depth in the cell', phase: 'heading', frequency: 'sense band' },
       tier: 2
     },
     {
@@ -5283,6 +5332,26 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         roughness: clamp01(p.tectonics * 0.8 + p.cratering * 0.5),
         hasMinds: !!(p.biosphere && p.biosphere.complexity > 0.5),
         label: p.name
+      };
+    }
+    if (scene.kind === 'cellular') {
+      const c = scene.cell;
+      const p = scene.planet;
+      return {
+        medium: MEDIUM.CYTOPLASM,
+        /* Gravity is real but irrelevant here: viscous drag on a micron-scale
+         * body exceeds its weight by orders of magnitude, so nothing at this
+         * scale falls. Reporting it as zero is the honest reading of what the
+         * body actually experiences. */
+        gravity: 0,
+        pressure: p ? p.pressure : 1,
+        temperature: c ? c.temperature : (p ? p.surfaceTemp : 288),
+        flux: p ? p.flux : 1,
+        /* Crowding, not terrain — but it fills the same role for a body that
+         * has to get through it. */
+        roughness: c ? clamp01((c.viscosity - 2) / 8) : 0.4,
+        hasMinds: true,
+        label: c ? c.type.name : 'cytoplasm'
       };
     }
     if (scene.kind === 'system') {
@@ -5696,6 +5765,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       blurb: 'Bodies that walk and roll.', unlocks: { vessels: ['walker', 'rover'] } },
     { id: 'buoyancy', name: 'Buoyancy', cost: 300, needs: ['locomotion'], hue: 195,
       blurb: 'Displacement hulls for liquid media.', unlocks: { vessels: ['swimmer'] } },
+    /* The INWARD branch. Deliberately hung off buoyancy rather than off
+     * locomotion: a body that works where inertia does not exist is a
+     * *departure* from swimming, not a refinement of walking, and the tree
+     * should say so. It is also the cheapest route to a scope of its own,
+     * which is what makes going inward a real alternative to going out. */
+    { id: 'microscopy', name: 'Microscopy', cost: 520, needs: ['buoyancy'], hue: 150,
+      blurb: 'Resolve, and inhabit, the scale a cell lives at.',
+      unlocks: { vessels: ['ciliate'], senseBands: 1 } },
     { id: 'aerodynamics', name: 'Aerodynamics', cost: 420, needs: ['locomotion'], hue: 175,
       blurb: 'Lifting bodies. Requires an atmosphere to be worth anything.', unlocks: { vessels: ['flier'] } },
     { id: 'extraction', name: 'Extraction', cost: 380, needs: ['locomotion'], hue: 40,
@@ -5774,6 +5851,50 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return { ok: true };
   }
 
+  /* ── Expression ───────────────────────────────────────────────────────────
+   *
+   * The Cellular scope's only-here consequence, and the only delta in the game
+   * that is not a structure: it costs no insight and has no upkeep, because
+   * what it costs is the attention you already spent crystallising inside the
+   * cell. It is stored as one accumulating number per world rather than a
+   * record per crystal — a player can hold a hundred nodes in there and the
+   * save must not grow by a hundred entries.
+   *
+   * `structuresOn` and `totalUpkeep` filter by STRUCT_BY_ID and so skip it
+   * without needing to know it exists.
+   */
+  const EXPRESSION_ID = '@expression';
+  /* What a lifetime of work inside cells is worth, as a fraction of the way
+   * from where the biosphere is to fully complex. Saturating, because a
+   * biosphere is a logistic curve and shoving it is not the same as replacing
+   * it: you can accelerate a world, not invent one. */
+  const EXPRESSION_CAP = 0.45;
+  const EXPRESSION_SCALE = 260;
+
+  function express(game, bus, planet, amount) {
+    if (!planet || !(amount > 0)) return null;
+    const key = planetKey(planet);
+    const list = game.deltas[key] || (game.deltas[key] = []);
+    let rec = null;
+    for (const d of list) if (d.id === EXPRESSION_ID) { rec = d; break; }
+    if (!rec) { rec = { id: EXPRESSION_ID, at: game.stats.playSeconds, work: 0 }; list.push(rec); }
+    rec.work += amount;
+    if (bus) bus.emit('cell:express', { planet, work: rec.work, added: amount });
+    return rec;
+  }
+
+  /* 0..1, how far this world has been pushed from inside. Saturating in the
+   * accumulated work, so early crystals move it visibly and the thousandth
+   * barely does — which is the honest shape for "nudging a logistic curve". */
+  function expressionOn(game, planet) {
+    const list = planet && game.deltas[planetKey(planet)];
+    if (!list) return 0;
+    for (const d of list) {
+      if (d.id === EXPRESSION_ID) return 1 - Math.exp(-d.work / EXPRESSION_SCALE);
+    }
+    return 0;
+  }
+
   function structuresOn(game, planet) {
     const list = game.deltas[planetKey(planet)];
     if (!list) return [];
@@ -5810,6 +5931,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (!list || !list.length) return planet;
 
     for (const d of list) {
+      if (d.id === EXPRESSION_ID) {
+        /* Work done inside the world's own cells, carried up to what the world
+         * looks like from orbit. It cannot start life where there is none —
+         * you have to have had a cell to stand in — but it can move a
+         * biosphere a long way along a curve it was already on. */
+        if (planet.biosphere) {
+          const push = (1 - Math.exp(-d.work / EXPRESSION_SCALE)) * EXPRESSION_CAP;
+          planet.biosphere.complexity = clamp01(
+            planet.biosphere.complexity + (1 - planet.biosphere.complexity) * push);
+          planet.biosphere.stage = RS.civ.stageOf(planet.biosphere.complexity);
+          planet.biosphere.expressed = push;
+          planet.influenced = true;
+        }
+        continue;
+      }
       const s = STRUCT_BY_ID[d.id];
       if (!s) continue;
       /* Maturity: saturating over roughly twenty minutes of play. */
@@ -5928,6 +6064,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     STRUCTURES, STRUCT_BY_ID, RESEARCH, RESEARCH_BY_ID,
     planetKey, isResearched, researchAvailable, tryResearch,
     canPlace, place, structuresOn, totalUpkeep, structureCount,
+    express, expressionOn, EXPRESSION_ID, EXPRESSION_CAP, EXPRESSION_SCALE,
     applyTo, passiveFrom, recomputeFields, reachRadius
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
@@ -6968,7 +7105,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       { name: 'System', range: 'stellar · planetary system', what: 'Planets, moons, belts, trade, and anybody living there.',
         active: sc.kind === 'system', hue: 285 },
       { name: 'Surface', range: 'planetary and within', what: 'Stand on a world. Needs a body.',
-        active: sc.kind === 'planet', hue: 130 }
+        active: sc.kind === 'planet', hue: 130 },
+      { name: 'Cytoplasm', range: 'cellular', what: 'Inside one cell of a living world. Work here and its biosphere changes.',
+        active: sc.kind === 'cellular', hue: 150 }
     ];
     for (const r of rungs) {
       h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +
@@ -7133,6 +7272,239 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — the Cellular scope. One cell of a living world, from inside.
+ *
+ * ── Why this scope exists ─────────────────────────────────────────────────
+ *
+ * Four of the twenty-two rungs had a view of their own. Rungs 0–8 all rendered
+ * the same planet surface, which meant that standing on a world and standing
+ * inside one of its cells looked identical — and that the `cell` backdrop and
+ * the four `cell` essence forms (Nucleus, Vacuole, Cytoskeleton, Spore) were
+ * written and unreachable.
+ *
+ * ── What is new here, and what deliberately is not ────────────────────────
+ *
+ * **Not new: the mechanics.** There is no bespoke cellular minigame. The
+ * attunement loop runs exactly as it does anywhere else, and what you do here
+ * is whatever the band you are tuned to says — a rhythm if you are in the
+ * Electromagnetic layer, a dependency graph if you are in the Causal one. That
+ * is the entire point of having six primitives: a new scope costs a file, not
+ * a rule set, and everything a player learned about Cascade elsewhere is true
+ * here on arrival.
+ *
+ * **New: what the scope is made of, and what it does to the world.** The cell
+ * is derived from the host planet's own biosphere — a sterile world has no
+ * cell to enter, a microbial one is a bare prokaryote, a complex one is full
+ * of machinery — and crystallising in here writes an *expression* delta that
+ * raises that biosphere's complexity. It is the only place in the game where
+ * you act on a world from inside it, and the change is visible from orbit
+ * afterwards.
+ *
+ * ── Derivation ────────────────────────────────────────────────────────────
+ *
+ * Nothing is stored. A cell is a pure function of (planet address, patch,
+ * index), so the same cell is the same cell every time you return to it, and
+ * the ten thousand you did not visit cost nothing.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  /* Cell type follows the host biosphere, because it should: you cannot find a
+   * nucleus on a world that has not evolved one. The thresholds match the
+   * stages `civ.stageOf` already uses, so the scope and the orbital readout
+   * never disagree about what lives there. */
+  const TYPES = [
+    {
+      id: 'protocell', name: 'Protocell', minComplexity: 0.0,
+      blurb: 'A bounded droplet running the first autocatalytic loops.',
+      organelles: 2, hue: 190
+    },
+    {
+      id: 'prokaryote', name: 'Prokaryote', minComplexity: 0.10,
+      blurb: 'No nucleus. Everything happens in one compartment, all at once.',
+      organelles: 4, hue: 150
+    },
+    {
+      id: 'eukaryote', name: 'Eukaryote', minComplexity: 0.34,
+      blurb: 'Compartmented. An ancestor swallowed another and kept it.',
+      organelles: 7, hue: 130
+    },
+    {
+      id: 'tissue', name: 'Tissue Cell', minComplexity: 0.62,
+      blurb: 'Specialised, and in constant conversation with its neighbours.',
+      organelles: 10, hue: 96
+    },
+    {
+      id: 'neural', name: 'Neural Cell', minComplexity: 0.86,
+      blurb: 'A cell whose whole business is carrying a difference.',
+      organelles: 12, hue: 60
+    }
+  ];
+
+  function typeFor(complexity) {
+    let best = TYPES[0];
+    for (const t of TYPES) if (complexity >= t.minComplexity) best = t;
+    return best;
+  }
+
+  /* Can this world be entered at all? A cell needs something to be a cell of.
+   * Returning the reason rather than a boolean lets the HUD say why, which is
+   * the difference between a locked door and a wall. */
+  function reasonSterile(planet) {
+    if (!planet) return 'no world selected';
+    if (!planet.biosphere) return 'no biosphere — nothing here is alive';
+    if (planet.biosphere.complexity < 0.02) return 'life here has not organised into cells yet';
+    return null;
+  }
+
+  /* ── The cell ─────────────────────────────────────────────────────────────
+   *
+   * Organelles are essences. That is not decoration: `essenceAt` deliberately
+   * excludes tier and band, so the *same* essence that showed up as a spiral
+   * arm at the galactic rung shows up here as a coiled flagellum, and a player
+   * who has read its axes already knows how it will behave. Local rules change
+   * the rendering; the information is the same information.
+   */
+  function cellAt(game, planet, patch, index) {
+    const bio = planet.biosphere;
+    const c = bio ? bio.complexity : 0;
+    const type = typeFor(c);
+    const seed = hashN(game.seed, Math.round(patch * 1e4), index, 0x0ce1);
+
+    const n = Math.max(1, Math.round(type.organelles * (0.6 + hashF(seed, 1) * 0.7)));
+    const organelles = [];
+    for (let i = 0; i < n; i++) {
+      const h = hashN(seed, i, 7);
+      /* Address the organelle the same way the field addresses a node, so the
+       * essence distribution here is drawn from the same well. */
+      const ess = RS.fractal.essenceAt(game.seed, index * 977 + i, Math.round(patch * 1e3));
+      const a = hashF(h, 1) * TAU;
+      /* Packed toward the rim, because the middle is where the nucleus goes
+       * and because a ring reads as "inside something" — but stopping well
+       * short of the membrane, so an organelle has room to be drawn at a size
+       * you can actually read. */
+      const r = 0.18 + Math.sqrt(hashF(h, 2)) * 0.52;
+      organelles.push({
+        essence: ess,
+        /* The `cell` geometry's form name for this essence — the content that
+         * was unreachable while every small rung rendered as a planet. */
+        form: (ess.forms && ess.forms.cell) || ess.name,
+        x: Math.cos(a) * r, y: Math.sin(a) * r,
+        size: 0.06 + hashF(h, 3) * 0.10,
+        /* Organelles drift on their own slow cycle. Cytoplasm streams. */
+        drift: (hashF(h, 4) * 2 - 1) * 0.22,
+        phase: hashF(h, 5) * TAU,
+        hue: type.hue + (hashF(h, 6) * 44 - 22)
+      });
+    }
+
+    /* Environment. Real numbers where real numbers exist: cytoplasm sits near
+     * the host's surface temperature for an ectotherm, and viscosity rises
+     * with organelle packing. */
+    const T = planet.surfaceTemp;
+    return {
+      type, patch, index, seed,
+      organelles,
+      /* Effective viscosity relative to water. Cytoplasm is famously
+       * non-Newtonian and crowded; a fuller cell is a thicker one. */
+      viscosity: 2.0 + n * 0.45,
+      temperature: T,
+      /* Reynolds number for something a few microns across moving at a few
+       * body-lengths a second. It is ~1e-4, and that is the whole reason a
+       * swimmer's stroke is useless in here: reverse the stroke and you go
+       * back exactly where you came from. Purcell's scallop theorem, and it is
+       * why this scope needs its own body. */
+      reynolds: 1e-4,
+      hostName: planet.name,
+      complexity: c
+    };
+  }
+
+  /* Which patch of the world we are inside a cell of. Derived from where the
+   * planet scene was last standing, so descending Σ from a surface puts you
+   * inside something that lives *there* — the continuity is the point. */
+  function patchOf(scene) {
+    return (scene.lat || 0) * 0.5 + (scene.lon || 0) * 0.125;
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    if (!s.planet) return null;
+    if (reasonSterile(s.planet)) { s.cell = null; return null; }
+    s.cellIndex = s.cellIndex || 0;
+    s.cell = cellAt(game, s.planet, patchOf(s), s.cellIndex);
+    bus.emit('cell:enter', { cell: s.cell, planet: s.planet });
+    return s.cell;
+  }
+
+  /* Move to a neighbouring cell. Tissue is a lattice of them, so this is how
+   * you look around at this scale — and each one is a different draw from the
+   * essence pool, which is the reason to bother. */
+  function nextCell(game, bus, dir) {
+    const s = game.scene;
+    if (!s.planet) return null;
+    s.cellIndex = Math.max(0, (s.cellIndex || 0) + (dir || 1));
+    s.cell = cellAt(game, s.planet, patchOf(s), s.cellIndex);
+    bus.emit('cell:enter', { cell: s.cell, planet: s.planet });
+    return s.cell;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    if (!s.planet) return;
+    if (!s.cell) { enter(game, bus); return; }
+    /* Cytoplasmic streaming. The cell is not still and should never look it —
+     * a static interior reads as a diagram rather than as a living thing. */
+    s.cellT = (s.cellT || 0) + dt * 0.6;
+  }
+
+  /* ── The only-here consequence ────────────────────────────────────────────
+   *
+   * Crystallising inside a cell does not just pay insight; it nudges what that
+   * cell expresses, and the host biosphere carries the change. This is the one
+   * place you can act on a world from inside it, and unlike a structure it
+   * costs nothing to place — it costs the attention you already spent.
+   *
+   * Deliberately small per crystal and saturating (see influence.js), because
+   * a biosphere is a logistic curve and shoving it is not the same as
+   * replacing it. Twenty minutes in a cell is a visible change from orbit; it
+   * is not a new kingdom of life.
+   */
+  function expressFrom(game, bus, man) {
+    const s = game.scene;
+    if (s.kind !== 'cellular' || !s.planet || !s.cell) return null;
+    /* An essence you understand pushes harder, because you know what you are
+     * pushing. The gnosis ledger is the multiplier everywhere else too. */
+    const gn = RS.fractal.gnosisOf(game, man.essence.id);
+    const amount = 0.5 + man.potency * 0.5 + gn * 0.15;
+    return RS.influence.express(game, bus, s.planet, amount);
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    if (!s.planet) return { title: 'Cytoplasm', sub: 'no world selected' };
+    const why = reasonSterile(s.planet);
+    if (why) return { title: 'Cytoplasm', sub: why, sterile: true };
+    const c = s.cell;
+    if (!c) return { title: 'Cytoplasm', sub: 'resolving…' };
+    return {
+      title: c.type.name,
+      sub: c.type.blurb,
+      host: s.planet.name,
+      organelles: c.organelles.length,
+      expression: RS.influence.expressionOn(game, s.planet)
+    };
+  }
+
+  RS.cellular = {
+    TYPES, typeFor, reasonSterile, cellAt, patchOf,
+    enter, nextCell, tick, expressFrom, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the scene stack: field → system → planet surface.
  *
  * ── The modal split, and why it is the best idea in this file ──────────────
@@ -7168,20 +7540,61 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;         // 10
   const TIER_CLUSTER = RS.cosmos.BY_ID.cluster.index;       // 12
 
-  /* Which scene a given rung of the scale ladder shows. The ladder *is* the
-   * navigation, so there is no separate "travel" mode to learn — and the four
-   * scenes line up with what you would actually perceive at each scale:
+  const TIER_CELL = RS.cosmos.BY_ID.cellular.index;          // 5
+
+  /* ── The scene registry ───────────────────────────────────────────────────
    *
-   *   ≤ planetary     a surface you can stand on
-   *   ≤ system        one gravity well and everything bound to it
-   *   ≤ cluster       neighbouring stars — the scale at which you choose
-   *   > cluster       the attunement field, where layers are tuned
+   * Which scene a given rung of the ladder shows. The ladder *is* the
+   * navigation, so there is no separate "travel" mode to learn, and each scene
+   * lines up with what you would actually perceive at that scale.
+   *
+   * A table rather than a cascade of ifs, because the ladder has twenty-two
+   * rungs and only five of them currently show something of their own — every
+   * remaining scope is a row here plus a file, and adding one must not mean
+   * editing a chain of comparisons in three modules. `first` and `last` are
+   * inclusive rung indices; **more specific entries come first**, because the
+   * first match wins and a scope like Cellular sits inside the range the
+   * surface scene would otherwise claim.
    */
+  const SCENES = [
+    {
+      id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
+      blurb: 'Inside one cell of a living world. The machinery, at its own scale.'
+    },
+    {
+      id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
+      blurb: 'A surface you can stand on.'
+    },
+    {
+      id: 'system', name: 'System', first: TIER_PLANET + 1, last: TIER_SYSTEM,
+      blurb: 'One gravity well and everything bound to it.'
+    },
+    {
+      id: 'galaxy', name: 'Star Map', first: TIER_SYSTEM + 1, last: TIER_CLUSTER,
+      blurb: 'Neighbouring stars — the scale at which you choose.'
+    },
+    {
+      id: 'field', name: 'Attunement Field', first: TIER_CLUSTER + 1,
+      last: RS.cosmos.TIERS.length - 1,
+      blurb: 'Where layers are tuned and manifestations are held.'
+    }
+  ];
+
+  const SCENE_BY_ID = Object.create(null);
+  for (const sc of SCENES) SCENE_BY_ID[sc.id] = sc;
+
   function sceneForTier(idx) {
-    if (idx <= TIER_PLANET) return 'planet';
-    if (idx <= TIER_SYSTEM) return 'system';
-    if (idx <= TIER_CLUSTER) return 'galaxy';
+    for (let i = 0; i < SCENES.length; i++) {
+      if (idx >= SCENES[i].first && idx <= SCENES[i].last) return SCENES[i].id;
+    }
     return 'field';
+  }
+
+  /* The rung a scene is entered at, so a pathway can say "turn Σ to here" and
+   * mean something precise. */
+  function tierForScene(id) {
+    const sc = SCENE_BY_ID[id];
+    return sc ? sc.first : RS.cosmos.ROOT_INDEX;
   }
 
   function newScene() {
@@ -7190,6 +7603,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       /* Where in the cosmos we are pointed. Addresses, not objects. */
       systemAddr: null,
       system: null,
+      /* Cellular scope. `cell` is derived on arrival and never persisted — only
+       * the index is, because the cell is a pure function of it. */
+      cell: null,
+      cellIndex: 0,
+      cellT: 0,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -7307,6 +7725,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
+    else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -7352,6 +7771,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       s.agents.length = 0;
       s.lon = 0; s.lat = 0;
       sampleSurface(game);
+    } else if (kind === 'cellular') {
+      /* You are always inside a cell *of somewhere*. Arriving without a world
+       * chosen picks the same one the surface scene would have — descending Σ
+       * from a surface should put you inside something that lives there rather
+       * than somewhere unrelated. */
+      if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
+      if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
+      s.agents.length = 0;
+      RS.cellular.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -7751,8 +8179,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM,
-    sceneForTier, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL,
+    SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
     TIER_CLUSTER, civAt, tickContact
@@ -7957,6 +8385,25 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         return { text: 'Turn Σ inward to descend to ' + s.planet.name + '. τ scrubs its history while you are unembodied.', kind: 'descend' };
       }
       return { text: 'Tap a world to select it.', kind: 'select' };
+    }
+    if (s.kind === 'cellular') {
+      const why = RS.cellular.reasonSterile(s.planet);
+      if (why) {
+        return { text: 'Nothing here to be inside: ' + why +
+          '. Turn Σ out and pick a world with life on it.', kind: 'select' };
+      }
+      if (!game.vessels.unlocked.ciliate && !game.inhabiting) {
+        return { text: 'Research MICROSCOPY for a body that works where inertia does not.',
+          kind: 'research' };
+      }
+      const ex = RS.influence.expressionOn(game, s.planet);
+      if (ex < 0.005) {
+        return { text: 'Crystallise in here and ' + s.planet.name +
+          "'s biosphere changes. It is the only place you can work a world from inside.",
+          kind: 'express' };
+      }
+      return { text: s.planet.name + ' is ' + Math.round(ex * 100) +
+        '% expressed. Turn Σ out to see the difference from orbit.', kind: 'express' };
     }
     if (s.kind === 'planet') {
       if (!game.inhabiting) {
@@ -9311,8 +9758,58 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     ctx.save();
     ctx.translate(sx(x), sy(y));
     ctx.rotate(t * 0.15 * man.twist);
-    RS.selfsimilar.draw(ctx, buf, 0, 0, px(r) * 1.25, hue, man.sat + 0.15, alpha, t);
+    /* Fitted rather than scaled, so a branching essence and a converging one
+     * occupy the same footprint on screen — otherwise a Cascade node reads as
+     * five times the size of an Attractor node of identical potency, and size
+     * is supposed to mean something. */
+    RS.selfsimilar.draw(ctx, buf, 0, 0, RS.selfsimilar.fit(buf, px(r) * 1.6),
+      hue, man.sat + 0.15, alpha, t);
     ctx.restore();
+  }
+
+  /* ── The cell ─────────────────────────────────────────────────────────────
+   *
+   * Organelles are essences, and they are drawn by the *same* generator that
+   * draws a galaxy — `selfsimilar` with geometry `cell`, which lays the same
+   * skeleton down as soft lobes instead of spiral arms. So a Cascade in here
+   * is visibly the Cascade you met at the galactic rung, and the four `cell`
+   * form names that were written and unreachable finally appear.
+   */
+  function drawCell(ctx, game, t) {
+    const c = game.scene.cell;
+    if (!c) return;
+    const ct = game.scene.cellT || 0;
+
+    /* Cytoplasmic streaming, drawn as a faint rotating wash so the interior is
+     * never still — a static cell reads as a diagram rather than a living
+     * thing. */
+    const g = ctx.createRadialGradient(view.cx, view.cy, 0, view.cx, view.cy, px(1.0));
+    g.addColorStop(0, hsl(c.type.hue, 0.4, 0.30, 0.20));
+    g.addColorStop(1, hsl(c.type.hue - 20, 0.4, 0.12, 0.06));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.fill();
+
+    for (let i = 0; i < c.organelles.length; i++) {
+      const o = c.organelles[i];
+      /* Each drifts on its own slow circle — streaming, not orbit. */
+      const a = Math.atan2(o.y, o.x) + ct * o.drift;
+      const r = Math.hypot(o.x, o.y) * (1 + Math.sin(ct * 0.8 + o.phase) * 0.05);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+
+      let buf = o.__ss;
+      if (!buf) buf = o.__ss = RS.selfsimilar.build(o.essence, 'cell', i * 7919 + 13, buf);
+      /* Kept inside the membrane. The generator's extent depends on the
+       * essence — a branching one reaches much further than a converging one
+       * from the same nominal size — so scale against the room actually left
+       * between here and the wall rather than against a constant. */
+      const room = Math.max(0.14, 0.95 - r);
+      ctx.save();
+      ctx.translate(sx(x), sy(y));
+      ctx.rotate(ct * 0.12 * (i % 2 ? 1 : -1));
+      RS.selfsimilar.draw(ctx, buf, 0, 0,
+        RS.selfsimilar.fit(buf, px(Math.min(o.size * 3.4, room))), o.hue, 0.75, 1.0, t);
+      ctx.restore();
+    }
   }
 
   function drawNode(ctx, game, n, t) {
@@ -9615,15 +10112,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     } else if (kind === 'planet') {
       RS.worldrender.drawPlanet(ctx, game, dt);
     } else {
+      /* The Cellular scope runs the same attunement loop as the field, because
+       * that is the whole argument for having six primitives: a new scope is a
+       * different *place*, not a different rule set. What changes is what the
+       * place is made of — a membrane instead of a rim, organelles instead of
+       * empty space — and what your work there does to the world outside. */
+      const inCell = kind === 'cellular';
+
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
       const upheavalFade = 1 - game.field.upheaval * 0.55;
       drawBackdrop(ctx, game, tb.a.geometry, tb.a.hue, (1 - tb.t) * 0.55 * upheavalFade, t);
       if (tb.b !== tb.a) drawBackdrop(ctx, game, tb.b.geometry, tb.b.hue, tb.t * 0.55 * upheavalFade, t);
 
-      // rim
-      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, 0.20);
-      ctx.lineWidth = Math.max(1, px(0.004));
+      if (inCell) drawCell(ctx, game, t);
+
+      // rim — the membrane, in a cell
+      ctx.strokeStyle = hsl(vis.hue.value, vis.sat.value, 0.4, inCell ? 0.34 : 0.20);
+      ctx.lineWidth = Math.max(1, px(inCell ? 0.010 : 0.004));
       ctx.beginPath(); ctx.arc(view.cx, view.cy, px(1.0), 0, TAU); ctx.stroke();
 
       drawBeatRing(ctx, game, dt, t);
@@ -11205,6 +11711,13 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
         sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
       el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'cellular') {
+      const r = RS.cellular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sterile ? r.sub
+        : (r.sub + ' · ' + r.organelles + ' organelles · inside ' + r.host +
+           (r.expression > 0.005 ? ' · expression ' + Math.round(r.expression * 100) + '%' : '')));
+      el['layer-name'].style.color = hsl(150, 0.7, 0.72);
     } else if (sc.kind === 'planet' && sc.planet) {
       const p = sc.planet;
       setText('layer-name', p.name.toUpperCase());
@@ -11377,6 +11890,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           p.name + ' &mdash; ' + p.type.name +
           (p.biosphere ? ' &middot; ' + p.biosphere.stage.name : '') +
           (p.civ ? ' &middot; ' + p.civ.tier.name : '') + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'cellular') {
+      const r = RS.cellular.readout(game);
+      const c = s.cell;
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(150, 0.8, 0.7) + '">&#10059;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (c ? '<div class="ro-sub" style="margin-top:4px">' +
+          /* Naming the organelles is the point: these are the same essences the
+           * player has met at every other scale, wearing their cellular names. */
+          c.organelles.slice(0, 4).map(o => o.form).join(' &middot; ') +
+          (c.organelles.length > 4 ? ' &middot; +' + (c.organelles.length - 4) : '') + '</div>' : '') +
+        (r.expression > 0.005
+          ? '<div class="ro-sub" style="margin-top:4px;color:' + hsl(140, 0.7, 0.66) + '">' +
+            'expression ' + Math.round(r.expression * 100) + '% &mdash; ' + r.host +
+            ' is measurably more complex than its baseline</div>' : '');
       return;
     }
     if (s.kind === 'planet' && s.planet) {
@@ -12111,19 +12642,38 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     bus.on('scene:change', ({ kind, from, scene }) => {
       /* Arriving in a different world is the biggest transition the game has
        * after a first-contact discovery, so it gets a full upheaval. */
-      const hue = kind === 'system' ? 285 : kind === 'planet' ? 130 : 200;
+      /* One table rather than a chain of ternaries: there are five scopes now
+       * and more coming, and a scope that forgets to name itself here arrives
+       * announcing that it is the attunement field. */
+      const ARRIVAL = {
+        field: { hue: 200, icon: '◉',
+          title: () => 'the attunement field',
+          body: () => 'Tuning again. φ selects the layer.' },
+        galaxy: { hue: 190, icon: '✦',
+          title: () => 'the star map',
+          body: () => 'Tap a star to select it. Tap again to travel.' },
+        system: { hue: 285, icon: '◇',
+          title: sc => sc.system ? sc.system.name : 'a system',
+          body: () => 'Unembodied: τ scrubs this system’s history. Tap a world to select it.' },
+        planet: { hue: 130, icon: '●',
+          title: sc => sc.planet ? sc.planet.name : 'a world',
+          body: () => 'Take a body to touch this world.' },
+        cellular: { hue: 150, icon: '❋',
+          title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
+          body: sc => {
+            const why = RS.cellular.reasonSterile(sc.planet);
+            if (why) return 'Nothing to be inside here — ' + why + '.';
+            return 'Inside ' + sc.planet.name + '. What you crystallise here, it becomes.';
+          } }
+      };
+      const a = ARRIVAL[kind] || ARRIVAL.field;
       RS.audio.upheaval(1.4);
-      RS.feel.FX.upheaval(hue, 1.3);
+      RS.feel.FX.upheaval(a.hue, 1.3);
       RS.feel.vignette(0.5);
-      const label = kind === 'system' ? (scene.system ? scene.system.name : 'a system')
-        : kind === 'planet' ? (scene.planet ? scene.planet.name : 'a world')
-          : 'the attunement field';
       RS.ui.toast({
-        kind: 'major', icon: kind === 'system' ? '◇' : kind === 'planet' ? '●' : '◉',
-        hue, ms: 4200, title: label.toUpperCase(),
-        body: kind === 'field' ? 'Tuning again. φ selects the layer.'
-          : kind === 'system' ? 'Unembodied: τ scrubs this system’s history. Tap a world to select it.'
-            : 'Take a body to touch this world.'
+        kind: 'major', icon: a.icon, hue: a.hue, ms: 4200,
+        title: String(a.title(scene)).toUpperCase(),
+        body: a.body(scene)
       });
     });
 

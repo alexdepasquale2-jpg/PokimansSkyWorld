@@ -195,6 +195,25 @@
       }
       return { text: 'Tap a world to select it.', kind: 'select' };
     }
+    if (s.kind === 'cellular') {
+      const why = RS.cellular.reasonSterile(s.planet);
+      if (why) {
+        return { text: 'Nothing here to be inside: ' + why +
+          '. Turn Σ out and pick a world with life on it.', kind: 'select' };
+      }
+      if (!game.vessels.unlocked.ciliate && !game.inhabiting) {
+        return { text: 'Research MICROSCOPY for a body that works where inertia does not.',
+          kind: 'research' };
+      }
+      const ex = RS.influence.expressionOn(game, s.planet);
+      if (ex < 0.005) {
+        return { text: 'Crystallise in here and ' + s.planet.name +
+          "'s biosphere changes. It is the only place you can work a world from inside.",
+          kind: 'express' };
+      }
+      return { text: s.planet.name + ' is ' + Math.round(ex * 100) +
+        '% expressed. Turn Σ out to see the difference from orbit.', kind: 'express' };
+    }
     if (s.kind === 'planet') {
       if (!game.inhabiting) {
         return { text: 'Take a body to touch this world. Unembodied, you can only watch it.', kind: 'embark' };

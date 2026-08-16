@@ -106,6 +106,14 @@
       blurb: 'Bodies that walk and roll.', unlocks: { vessels: ['walker', 'rover'] } },
     { id: 'buoyancy', name: 'Buoyancy', cost: 300, needs: ['locomotion'], hue: 195,
       blurb: 'Displacement hulls for liquid media.', unlocks: { vessels: ['swimmer'] } },
+    /* The INWARD branch. Deliberately hung off buoyancy rather than off
+     * locomotion: a body that works where inertia does not exist is a
+     * *departure* from swimming, not a refinement of walking, and the tree
+     * should say so. It is also the cheapest route to a scope of its own,
+     * which is what makes going inward a real alternative to going out. */
+    { id: 'microscopy', name: 'Microscopy', cost: 520, needs: ['buoyancy'], hue: 150,
+      blurb: 'Resolve, and inhabit, the scale a cell lives at.',
+      unlocks: { vessels: ['ciliate'], senseBands: 1 } },
     { id: 'aerodynamics', name: 'Aerodynamics', cost: 420, needs: ['locomotion'], hue: 175,
       blurb: 'Lifting bodies. Requires an atmosphere to be worth anything.', unlocks: { vessels: ['flier'] } },
     { id: 'extraction', name: 'Extraction', cost: 380, needs: ['locomotion'], hue: 40,
@@ -184,6 +192,50 @@
     return { ok: true };
   }
 
+  /* ── Expression ───────────────────────────────────────────────────────────
+   *
+   * The Cellular scope's only-here consequence, and the only delta in the game
+   * that is not a structure: it costs no insight and has no upkeep, because
+   * what it costs is the attention you already spent crystallising inside the
+   * cell. It is stored as one accumulating number per world rather than a
+   * record per crystal — a player can hold a hundred nodes in there and the
+   * save must not grow by a hundred entries.
+   *
+   * `structuresOn` and `totalUpkeep` filter by STRUCT_BY_ID and so skip it
+   * without needing to know it exists.
+   */
+  const EXPRESSION_ID = '@expression';
+  /* What a lifetime of work inside cells is worth, as a fraction of the way
+   * from where the biosphere is to fully complex. Saturating, because a
+   * biosphere is a logistic curve and shoving it is not the same as replacing
+   * it: you can accelerate a world, not invent one. */
+  const EXPRESSION_CAP = 0.45;
+  const EXPRESSION_SCALE = 260;
+
+  function express(game, bus, planet, amount) {
+    if (!planet || !(amount > 0)) return null;
+    const key = planetKey(planet);
+    const list = game.deltas[key] || (game.deltas[key] = []);
+    let rec = null;
+    for (const d of list) if (d.id === EXPRESSION_ID) { rec = d; break; }
+    if (!rec) { rec = { id: EXPRESSION_ID, at: game.stats.playSeconds, work: 0 }; list.push(rec); }
+    rec.work += amount;
+    if (bus) bus.emit('cell:express', { planet, work: rec.work, added: amount });
+    return rec;
+  }
+
+  /* 0..1, how far this world has been pushed from inside. Saturating in the
+   * accumulated work, so early crystals move it visibly and the thousandth
+   * barely does — which is the honest shape for "nudging a logistic curve". */
+  function expressionOn(game, planet) {
+    const list = planet && game.deltas[planetKey(planet)];
+    if (!list) return 0;
+    for (const d of list) {
+      if (d.id === EXPRESSION_ID) return 1 - Math.exp(-d.work / EXPRESSION_SCALE);
+    }
+    return 0;
+  }
+
   function structuresOn(game, planet) {
     const list = game.deltas[planetKey(planet)];
     if (!list) return [];
@@ -220,6 +272,21 @@
     if (!list || !list.length) return planet;
 
     for (const d of list) {
+      if (d.id === EXPRESSION_ID) {
+        /* Work done inside the world's own cells, carried up to what the world
+         * looks like from orbit. It cannot start life where there is none —
+         * you have to have had a cell to stand in — but it can move a
+         * biosphere a long way along a curve it was already on. */
+        if (planet.biosphere) {
+          const push = (1 - Math.exp(-d.work / EXPRESSION_SCALE)) * EXPRESSION_CAP;
+          planet.biosphere.complexity = clamp01(
+            planet.biosphere.complexity + (1 - planet.biosphere.complexity) * push);
+          planet.biosphere.stage = RS.civ.stageOf(planet.biosphere.complexity);
+          planet.biosphere.expressed = push;
+          planet.influenced = true;
+        }
+        continue;
+      }
       const s = STRUCT_BY_ID[d.id];
       if (!s) continue;
       /* Maturity: saturating over roughly twenty minutes of play. */
@@ -338,6 +405,7 @@
     STRUCTURES, STRUCT_BY_ID, RESEARCH, RESEARCH_BY_ID,
     planetKey, isResearched, researchAvailable, tryResearch,
     canPlace, place, structuresOn, totalUpkeep, structureCount,
+    express, expressionOn, EXPRESSION_ID, EXPRESSION_CAP, EXPRESSION_SCALE,
     applyTo, passiveFrom, recomputeFields, reachRadius
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

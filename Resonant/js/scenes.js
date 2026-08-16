@@ -33,20 +33,61 @@
   const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;         // 10
   const TIER_CLUSTER = RS.cosmos.BY_ID.cluster.index;       // 12
 
-  /* Which scene a given rung of the scale ladder shows. The ladder *is* the
-   * navigation, so there is no separate "travel" mode to learn — and the four
-   * scenes line up with what you would actually perceive at each scale:
+  const TIER_CELL = RS.cosmos.BY_ID.cellular.index;          // 5
+
+  /* ── The scene registry ───────────────────────────────────────────────────
    *
-   *   ≤ planetary     a surface you can stand on
-   *   ≤ system        one gravity well and everything bound to it
-   *   ≤ cluster       neighbouring stars — the scale at which you choose
-   *   > cluster       the attunement field, where layers are tuned
+   * Which scene a given rung of the ladder shows. The ladder *is* the
+   * navigation, so there is no separate "travel" mode to learn, and each scene
+   * lines up with what you would actually perceive at that scale.
+   *
+   * A table rather than a cascade of ifs, because the ladder has twenty-two
+   * rungs and only five of them currently show something of their own — every
+   * remaining scope is a row here plus a file, and adding one must not mean
+   * editing a chain of comparisons in three modules. `first` and `last` are
+   * inclusive rung indices; **more specific entries come first**, because the
+   * first match wins and a scope like Cellular sits inside the range the
+   * surface scene would otherwise claim.
    */
+  const SCENES = [
+    {
+      id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
+      blurb: 'Inside one cell of a living world. The machinery, at its own scale.'
+    },
+    {
+      id: 'planet', name: 'Surface', first: 0, last: TIER_PLANET,
+      blurb: 'A surface you can stand on.'
+    },
+    {
+      id: 'system', name: 'System', first: TIER_PLANET + 1, last: TIER_SYSTEM,
+      blurb: 'One gravity well and everything bound to it.'
+    },
+    {
+      id: 'galaxy', name: 'Star Map', first: TIER_SYSTEM + 1, last: TIER_CLUSTER,
+      blurb: 'Neighbouring stars — the scale at which you choose.'
+    },
+    {
+      id: 'field', name: 'Attunement Field', first: TIER_CLUSTER + 1,
+      last: RS.cosmos.TIERS.length - 1,
+      blurb: 'Where layers are tuned and manifestations are held.'
+    }
+  ];
+
+  const SCENE_BY_ID = Object.create(null);
+  for (const sc of SCENES) SCENE_BY_ID[sc.id] = sc;
+
   function sceneForTier(idx) {
-    if (idx <= TIER_PLANET) return 'planet';
-    if (idx <= TIER_SYSTEM) return 'system';
-    if (idx <= TIER_CLUSTER) return 'galaxy';
+    for (let i = 0; i < SCENES.length; i++) {
+      if (idx >= SCENES[i].first && idx <= SCENES[i].last) return SCENES[i].id;
+    }
     return 'field';
+  }
+
+  /* The rung a scene is entered at, so a pathway can say "turn Σ to here" and
+   * mean something precise. */
+  function tierForScene(id) {
+    const sc = SCENE_BY_ID[id];
+    return sc ? sc.first : RS.cosmos.ROOT_INDEX;
   }
 
   function newScene() {
@@ -55,6 +96,11 @@
       /* Where in the cosmos we are pointed. Addresses, not objects. */
       systemAddr: null,
       system: null,
+      /* Cellular scope. `cell` is derived on arrival and never persisted — only
+       * the index is, because the cell is a pure function of it. */
+      cell: null,
+      cellIndex: 0,
+      cellT: 0,
       bodyIndex: -1,
       planet: null,
       /* In-world time offset, in years, from the system's present. Driven by
@@ -172,6 +218,7 @@
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
     else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
+    else if (s.kind === 'cellular') RS.cellular.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -217,6 +264,15 @@
       s.agents.length = 0;
       s.lon = 0; s.lat = 0;
       sampleSurface(game);
+    } else if (kind === 'cellular') {
+      /* You are always inside a cell *of somewhere*. Arriving without a world
+       * chosen picks the same one the surface scene would have — descending Σ
+       * from a surface should put you inside something that lives there rather
+       * than somewhere unrelated. */
+      if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
+      if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
+      s.agents.length = 0;
+      RS.cellular.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -616,8 +672,8 @@
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM,
-    sceneForTier, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL,
+    SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
     TIER_CLUSTER, civAt, tickContact

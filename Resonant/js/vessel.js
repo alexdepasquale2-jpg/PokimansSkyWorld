@@ -41,7 +41,17 @@
   const { clamp, clamp01, lerp, damp, TAU, hashF, hashN } = RS.core;
 
   /* Medium determines which force terms are live at all. */
-  const MEDIUM = { VACUUM: 'vacuum', GAS: 'gas', LIQUID: 'liquid', SURFACE: 'surface', ORBIT: 'orbit' };
+  /* CYTOPLASM is not just "liquid, but smaller". At a few microns the Reynolds
+   * number is about 1e-4, which means inertia does not exist: stop pushing and
+   * you stop, instantly, in less than your own diameter. A stroke that is the
+   * reverse of itself returns you exactly where you started (Purcell's scallop
+   * theorem), so the swimmer body that works in an ocean is genuinely useless
+   * in here. Giving it its own medium is what lets the vessel predicates say
+   * so honestly instead of pretending an ocean and a cell are the same place. */
+  const MEDIUM = {
+    VACUUM: 'vacuum', GAS: 'gas', LIQUID: 'liquid',
+    SURFACE: 'surface', ORBIT: 'orbit', CYTOPLASM: 'cytoplasm'
+  };
 
   /* ── Archetypes ───────────────────────────────────────────────────────────
    * `needs` is a predicate on the environment, and it is what makes vessel
@@ -52,7 +62,7 @@
     {
       id: 'mote', name: 'Mote', glyph: '·', hue: 200,
       blurb: 'The bare point of consciousness. No body, no force, no cost.',
-      medium: [MEDIUM.VACUUM, MEDIUM.GAS, MEDIUM.LIQUID, MEDIUM.SURFACE, MEDIUM.ORBIT],
+      medium: [MEDIUM.VACUUM, MEDIUM.GAS, MEDIUM.LIQUID, MEDIUM.SURFACE, MEDIUM.ORBIT, MEDIUM.CYTOPLASM],
       mass: 0.02, thrust: 0.55, dragC: 0.9, liftC: 0, grip: 0,
       senseRadius: 0.55, senseBands: 3, capacity: 40, draw: 0.4, regen: 1.2,
       needs: () => null,
@@ -88,8 +98,25 @@
       medium: [MEDIUM.LIQUID],
       mass: 1.4, thrust: 1.8, dragC: 4.5, liftC: 0, grip: 0,
       senseRadius: 0.38, senseBands: 5, capacity: 180, draw: 0.8, regen: 0.9,
-      needs: env => env.medium !== MEDIUM.LIQUID ? 'needs liquid to displace' : null,
+      needs: env => env.medium === MEDIUM.CYTOPLASM
+        ? 'no inertia at this scale — a reversible stroke returns you where you started'
+        : env.medium !== MEDIUM.LIQUID ? 'needs liquid to displace' : null,
       dialMap: { time: 'stroke rate', space: 'buoyancy', phase: 'heading', frequency: 'sense band' },
+      tier: 2
+    },
+    {
+      id: 'ciliate', name: 'Ciliate', glyph: '❋', hue: 150,
+      blurb: 'A ring of beating cilia. The only stroke that gets anywhere where inertia does not exist.',
+      medium: [MEDIUM.CYTOPLASM],
+      /* Almost no mass, almost no thrust, and drag so high that it is the only
+       * force that matters — which is exactly right. A ciliate does not coast;
+       * it is dragged along by the fluid it is beating, and it stops dead the
+       * instant it stops beating. */
+      mass: 0.05, thrust: 0.9, dragC: 22.0, liftC: 0, grip: 0,
+      senseRadius: 0.30, senseBands: 6, capacity: 60, draw: 0.5, regen: 1.4,
+      needs: env => env.medium !== MEDIUM.CYTOPLASM
+        ? 'cilia need a crowded fluid to beat against' : null,
+      dialMap: { time: 'beat rate', space: 'depth in the cell', phase: 'heading', frequency: 'sense band' },
       tier: 2
     },
     {
@@ -184,6 +211,26 @@
         roughness: clamp01(p.tectonics * 0.8 + p.cratering * 0.5),
         hasMinds: !!(p.biosphere && p.biosphere.complexity > 0.5),
         label: p.name
+      };
+    }
+    if (scene.kind === 'cellular') {
+      const c = scene.cell;
+      const p = scene.planet;
+      return {
+        medium: MEDIUM.CYTOPLASM,
+        /* Gravity is real but irrelevant here: viscous drag on a micron-scale
+         * body exceeds its weight by orders of magnitude, so nothing at this
+         * scale falls. Reporting it as zero is the honest reading of what the
+         * body actually experiences. */
+        gravity: 0,
+        pressure: p ? p.pressure : 1,
+        temperature: c ? c.temperature : (p ? p.surfaceTemp : 288),
+        flux: p ? p.flux : 1,
+        /* Crowding, not terrain — but it fills the same role for a body that
+         * has to get through it. */
+        roughness: c ? clamp01((c.viscosity - 2) / 8) : 0.4,
+        hasMinds: true,
+        label: c ? c.type.name : 'cytoplasm'
       };
     }
     if (scene.kind === 'system') {
