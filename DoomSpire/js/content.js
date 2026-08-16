@@ -440,27 +440,28 @@
 
   // --- bestiary ---------------------------------------------------------------
   const BESTIARY = {
-    ash_imp: { name: 'Ash Imp', icon: '👹', level: [1, 3], hp: 22, dmg: 4, armor: 5, speed: 2.2, aggroRadius: 5, xp: 14, loot: 'trash_low', faction: 'ashenvigil_hostile' },
-    cinder_whelp: { name: 'Cinder Whelp', icon: '🦎', level: [2, 4], hp: 30, dmg: 5, armor: 8, speed: 2.0, aggroRadius: 5, xp: 20, loot: 'trash_low', faction: 'ashenvigil_hostile', dropItem: { id: 'sulfur_shard', chance: 0.5 } },
-    branded_cultist: { name: 'Branded Cultist', icon: '🗡️', level: [3, 6], hp: 46, dmg: 7, armor: 12, speed: 1.9, aggroRadius: 6, xp: 30, loot: 'trash_mid', faction: 'ashenvigil_hostile' },
-    grudge_branded: { name: 'Grudge, the Branded', icon: '🔥', level: [8, 8], hp: 260, dmg: 14, armor: 25, speed: 2.0, aggroRadius: 8, xp: 160, loot: 'elite_scar', faction: 'ashenvigil_hostile', elite: true, ability: { every: 6, name: 'Brand of Ash', radius: 3, dmg: 18 } },
+    ash_imp: { name: 'Ash Imp', icon: '👹', level: [1, 3], hp: 22, dmg: 4, armor: 5, speed: 2.2, aggroRadius: 5, xp: 14, loot: 'trash_low', faction: 'ashenvigil_hostile', sprites: ['👹', '😈'] },
+    cinder_whelp: { name: 'Cinder Whelp', icon: '🦎', level: [2, 4], hp: 30, dmg: 5, armor: 8, speed: 2.0, aggroRadius: 5, xp: 20, loot: 'trash_low', faction: 'ashenvigil_hostile', dropItem: { id: 'sulfur_shard', chance: 0.5 }, sprites: ['🦎', '🐉'] },
+    branded_cultist: { name: 'Branded Cultist', icon: '🗡️', level: [3, 6], hp: 46, dmg: 7, armor: 12, speed: 1.9, aggroRadius: 6, xp: 30, loot: 'trash_mid', faction: 'ashenvigil_hostile', sprites: ['🗡️', '⚔️'] },
+    grudge_branded: { name: 'Grudge, the Branded', icon: '🔥', level: [8, 8], hp: 260, dmg: 14, armor: 25, speed: 2.0, aggroRadius: 8, xp: 160, loot: 'elite_scar', faction: 'ashenvigil_hostile', elite: true, ability: { every: 6, name: 'Brand of Ash', radius: 3, dmg: 18 }, sprites: ['🔥', '🌪️'] },
 
-    withered_sapling: { name: 'Withered Sapling', icon: '🌱', level: [6, 8], hp: 60, dmg: 8, armor: 10, speed: 1.8, aggroRadius: 5, xp: 40, loot: 'trash_mid', faction: 'bloomreach_hostile' },
-    withered_treant: { name: 'Withered Treant', icon: '🌳', level: [8, 11], hp: 130, dmg: 12, armor: 30, speed: 1.3, aggroRadius: 5, xp: 65, loot: 'trash_mid', faction: 'bloomreach_hostile' },
-    blight_hound: { name: 'Blight Hound', icon: '🐺', level: [9, 12], hp: 85, dmg: 11, armor: 12, speed: 3.0, aggroRadius: 7, xp: 58, loot: 'trash_mid', faction: 'bloomreach_hostile' },
-    matriarch_withered: { name: 'The Withered Matriarch', icon: '🥀', level: [14, 14], hp: 520, dmg: 20, armor: 35, speed: 1.6, aggroRadius: 9, xp: 340, loot: 'elite_bloom', faction: 'bloomreach_hostile', elite: true, ability: { every: 8, name: 'Wilting Bloom', radius: 4, dmg: 26, dot: true } },
+    withered_sapling: { name: 'Withered Sapling', icon: '🌱', level: [6, 8], hp: 60, dmg: 8, armor: 10, speed: 1.8, aggroRadius: 5, xp: 40, loot: 'trash_mid', faction: 'bloomreach_hostile', sprites: ['🌱', '🍃'] },
+    withered_treant: { name: 'Withered Treant', icon: '🌳', level: [8, 11], hp: 130, dmg: 12, armor: 30, speed: 1.3, aggroRadius: 5, xp: 65, loot: 'trash_mid', faction: 'bloomreach_hostile', sprites: ['🌳', '🌲'] },
+    blight_hound: { name: 'Blight Hound', icon: '🐺', level: [9, 12], hp: 85, dmg: 11, armor: 12, speed: 3.0, aggroRadius: 7, xp: 58, loot: 'trash_mid', faction: 'bloomreach_hostile', sprites: ['🐺', '🐕'] },
+    matriarch_withered: { name: 'The Withered Matriarch', icon: '🥀', level: [14, 14], hp: 520, dmg: 20, armor: 35, speed: 1.6, aggroRadius: 9, xp: 340, loot: 'elite_bloom', faction: 'bloomreach_hostile', elite: true, ability: { every: 8, name: 'Wilting Bloom', radius: 4, dmg: 26, dot: true }, sprites: ['🥀', '🌹'] },
 
-    frost_wraith: { name: 'Frost Wraith', icon: '👻', level: [12, 15], hp: 150, dmg: 16, armor: 20, speed: 2.2, aggroRadius: 7, xp: 95, loot: 'trash_high', faction: 'frostmarch_hostile' },
-    rime_stalker: { name: 'Rime Stalker', icon: '🐾', level: [14, 17], hp: 190, dmg: 20, armor: 22, speed: 2.8, aggroRadius: 8, xp: 120, loot: 'trash_high', faction: 'frostmarch_hostile' },
-    warden_construct: { name: 'Warden Construct', icon: '🗿', level: [16, 19], hp: 320, dmg: 22, armor: 45, speed: 1.2, aggroRadius: 6, xp: 165, loot: 'trash_high', faction: 'frostmarch_hostile' },
-    sigil_keeper: { name: 'The Sigil Keeper', icon: '🔑', level: [20, 20], hp: 640, dmg: 28, armor: 40, speed: 1.8, aggroRadius: 9, xp: 420, loot: 'elite_frost', faction: 'frostmarch_hostile', elite: true, dropItem: { id: 'vault_sigil', chance: 1.0 }, ability: { every: 7, name: 'Rime Lock', radius: 5, dmg: 20, snare: true } },
+    frost_wraith: { name: 'Frost Wraith', icon: '👻', level: [12, 15], hp: 150, dmg: 16, armor: 20, speed: 2.2, aggroRadius: 7, xp: 95, loot: 'trash_high', faction: 'frostmarch_hostile', sprites: ['👻', '🎃'] },
+    rime_stalker: { name: 'Rime Stalker', icon: '🐾', level: [14, 17], hp: 190, dmg: 20, armor: 22, speed: 2.8, aggroRadius: 8, xp: 120, loot: 'trash_high', faction: 'frostmarch_hostile', sprites: ['🐾', '❄️'] },
+    warden_construct: { name: 'Warden Construct', icon: '🗿', level: [16, 19], hp: 320, dmg: 22, armor: 45, speed: 1.2, aggroRadius: 6, xp: 165, loot: 'trash_high', faction: 'frostmarch_hostile', sprites: ['🗿', '🛡️'] },
+    sigil_keeper: { name: 'The Sigil Keeper', icon: '🔑', level: [20, 20], hp: 640, dmg: 28, armor: 40, speed: 1.8, aggroRadius: 9, xp: 420, loot: 'elite_frost', faction: 'frostmarch_hostile', elite: true, dropItem: { id: 'vault_sigil', chance: 1.0 }, ability: { every: 7, name: 'Rime Lock', radius: 5, dmg: 20, snare: true }, sprites: ['🔑', '⚡'] },
 
-    vault_wraith: { name: 'Vault Wraith', icon: '👻', level: [20, 22], hp: 300, dmg: 26, armor: 30, speed: 2.4, aggroRadius: 7, xp: 220, loot: 'trash_dungeon', faction: 'hollow_hostile' },
-    bone_guard: { name: 'Bone Guard', icon: '💀', level: [21, 23], hp: 380, dmg: 30, armor: 50, speed: 1.6, aggroRadius: 6, xp: 260, loot: 'trash_dungeon', faction: 'hollow_hostile' },
+    vault_wraith: { name: 'Vault Wraith', icon: '👻', level: [20, 22], hp: 300, dmg: 26, armor: 30, speed: 2.4, aggroRadius: 7, xp: 220, loot: 'trash_dungeon', faction: 'hollow_hostile', sprites: ['👻', '🎃'] },
+    bone_guard: { name: 'Bone Guard', icon: '💀', level: [21, 23], hp: 380, dmg: 30, armor: 50, speed: 1.6, aggroRadius: 6, xp: 260, loot: 'trash_dungeon', faction: 'hollow_hostile', sprites: ['💀', '☠️'] },
     hollow_king: {
       name: 'The Hollow King', icon: '👑', level: [26, 26], hp: 3200, dmg: 40, armor: 60, speed: 1.6, aggroRadius: 12, xp: 2400, loot: 'boss_hollow', faction: 'hollow_hostile', elite: true, boss: true,
       ability: { every: 5, name: 'Despair', radius: 4, dmg: 34 },
-      enrageAt: 0.5, enrageAbility: { every: 4, name: 'Hollow Nova', radius: 6, dmg: 44 }
+      enrageAt: 0.5, enrageAbility: { every: 4, name: 'Hollow Nova', radius: 6, dmg: 44 },
+      sprites: ['👑', '💀']
     }
   };
 

@@ -143,10 +143,16 @@
     caster.cooldowns[ability.id] = cdFor(ability, cs);
     caster.cooldowns['_gcd'] = GCD;
     const castTime = (ability.castTime || 0) * (1 - cs.hastePct * 0.5);
+    const animColor = ability.kind === 'heal' ? 'rgba(100, 220, 120, 0.8)' :
+                     ability.kind === 'buff' ? 'rgba(150, 150, 255, 0.8)' :
+                     'rgba(255, 180, 50, 0.8)';
     if (castTime > 0.05) {
       caster.casting = { ability, target, remaining: castTime, total: castTime };
+      caster.anim = { kind: 'cast', frame: 0, scale: 1.0, color: animColor };
     } else {
       resolveAbility(caster, target, ability, log);
+      const animKind = ability.kind === 'heal' ? 'heal' : 'attack';
+      caster.anim = { kind: animKind, frame: 0, scale: 1.0, duration: 0.3, color: animColor };
     }
     return { ok: true };
   }
@@ -251,6 +257,7 @@
     const crit = rollCrit(cs.critChance);
     const dealt = applyDamage(target, crit ? dmg * 1.5 : dmg, {});
     log && log.push(`${caster.name || 'You'} swing at ${target.name || 'target'} for ${dealt}${crit ? ' (crit)' : ''}.`);
+    caster.anim = { kind: 'attack', frame: 0, scale: 1.0, duration: 0.25, color: crit ? 'rgba(255, 255, 100, 0.8)' : 'rgba(200, 100, 50, 0.8)' };
     if (caster.kind !== 'mob' && caster.resource && K.CLASSES[caster.cls].resource === 'rage') {
       caster.resource.current = Math.min(cs.maxResource, caster.resource.current + 4 + dealt * 0.05);
     }

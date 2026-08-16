@@ -101,7 +101,8 @@
   }
 
   /* Draws one billboard: a team-coloured disc with an emoji glyph on it,
-   * clipped by the wall depth buffer at its own screen column. */
+   * clipped by the wall depth buffer at its own screen column.
+   * Supports animation via opts.anim: { frame: 0-3, kind: 'attack'|'cast'|'heal'|'idle', scale: 1.0, color: '#...' } */
   function drawSprite(ctx, W, H, zbuffer, proj, opts) {
     if (!proj.visible) return;
     const col = C.clamp(Math.floor(proj.screenX), 0, W - 1);
@@ -110,17 +111,64 @@
     const cy = H / 2 + H / 2 - size * (opts.footOffset != null ? opts.footOffset : 0.5);
     const top = cy - size;
     if (proj.screenX < -size || proj.screenX > W + size) return;
+
+    const anim = opts.anim || {};
+    const animScale = anim.scale || 1.0;
+    const animKind = anim.kind || 'idle';
+
     ctx.save();
     ctx.globalAlpha = 0.92;
-    ctx.fillStyle = opts.ring || '#c0392b';
+
+    // Ring effect: pulse during cast, glow during attack, heal color
+    let ringColor = opts.ring || '#c0392b';
+    if (animKind === 'cast') {
+      const pulse = 0.5 + Math.sin(anim.frame * 0.8) * 0.5;
+      ctx.globalAlpha = 0.7 + pulse * 0.25;
+      ringColor = anim.color || `rgba(255, 180, 50, ${0.7 + pulse * 0.3})`;
+    } else if (animKind === 'heal') {
+      const pulse = 0.5 + Math.sin(anim.frame * 1.0) * 0.5;
+      ctx.globalAlpha = 0.75 + pulse * 0.2;
+      ringColor = anim.color || `rgba(100, 220, 120, ${0.75 + pulse * 0.25})`;
+    } else if (animKind === 'attack') {
+      ctx.globalAlpha = 0.92 + Math.sin(anim.frame * 1.2) * 0.08;
+    } else if (animKind === 'walk') {
+      ctx.globalAlpha = 0.88;
+    }
+
+    ctx.fillStyle = ringColor;
+    const ringScale = animKind === 'attack' ? animScale : 1.0;
     ctx.beginPath();
-    ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42, size * 0.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42 * ringScale, size * 0.5 * ringScale, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Draw expanding rings during cast/heal for effect
+    if ((animKind === 'cast' || animKind === 'heal') && anim.frame > 0) {
+      ctx.globalAlpha = 0.25;
+      const outerScale = 1.0 + anim.frame * 0.2;
+      ctx.strokeStyle = ringColor;
+      ctx.lineWidth = Math.max(0.5, size * 0.02);
+      ctx.beginPath();
+      ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42 * outerScale, size * 0.5 * outerScale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     ctx.globalAlpha = 1;
     ctx.font = `${Math.max(8, size * 0.62)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(opts.icon || '?', proj.screenX, cy - size * 0.52);
+
+    // Rotate emoji during attack animation
+    let icon = opts.icon || '?';
+    if (animKind === 'attack' && anim.frame > 0) {
+      ctx.save();
+      ctx.translate(proj.screenX, cy - size * 0.52);
+      ctx.rotate((anim.frame * 0.5) * Math.PI);
+      ctx.fillText(icon, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(icon, proj.screenX, cy - size * 0.52);
+    }
+
     ctx.restore();
     return { screenX: proj.screenX, top, size, cy };
   }

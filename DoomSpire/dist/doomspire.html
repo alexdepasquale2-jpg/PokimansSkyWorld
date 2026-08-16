@@ -843,27 +843,28 @@ p { margin: 4px 0; }
 
   // --- bestiary ---------------------------------------------------------------
   const BESTIARY = {
-    ash_imp: { name: 'Ash Imp', icon: '👹', level: [1, 3], hp: 22, dmg: 4, armor: 5, speed: 2.2, aggroRadius: 5, xp: 14, loot: 'trash_low', faction: 'ashenvigil_hostile' },
-    cinder_whelp: { name: 'Cinder Whelp', icon: '🦎', level: [2, 4], hp: 30, dmg: 5, armor: 8, speed: 2.0, aggroRadius: 5, xp: 20, loot: 'trash_low', faction: 'ashenvigil_hostile', dropItem: { id: 'sulfur_shard', chance: 0.5 } },
-    branded_cultist: { name: 'Branded Cultist', icon: '🗡️', level: [3, 6], hp: 46, dmg: 7, armor: 12, speed: 1.9, aggroRadius: 6, xp: 30, loot: 'trash_mid', faction: 'ashenvigil_hostile' },
-    grudge_branded: { name: 'Grudge, the Branded', icon: '🔥', level: [8, 8], hp: 260, dmg: 14, armor: 25, speed: 2.0, aggroRadius: 8, xp: 160, loot: 'elite_scar', faction: 'ashenvigil_hostile', elite: true, ability: { every: 6, name: 'Brand of Ash', radius: 3, dmg: 18 } },
+    ash_imp: { name: 'Ash Imp', icon: '👹', level: [1, 3], hp: 22, dmg: 4, armor: 5, speed: 2.2, aggroRadius: 5, xp: 14, loot: 'trash_low', faction: 'ashenvigil_hostile', sprites: ['👹', '😈'] },
+    cinder_whelp: { name: 'Cinder Whelp', icon: '🦎', level: [2, 4], hp: 30, dmg: 5, armor: 8, speed: 2.0, aggroRadius: 5, xp: 20, loot: 'trash_low', faction: 'ashenvigil_hostile', dropItem: { id: 'sulfur_shard', chance: 0.5 }, sprites: ['🦎', '🐉'] },
+    branded_cultist: { name: 'Branded Cultist', icon: '🗡️', level: [3, 6], hp: 46, dmg: 7, armor: 12, speed: 1.9, aggroRadius: 6, xp: 30, loot: 'trash_mid', faction: 'ashenvigil_hostile', sprites: ['🗡️', '⚔️'] },
+    grudge_branded: { name: 'Grudge, the Branded', icon: '🔥', level: [8, 8], hp: 260, dmg: 14, armor: 25, speed: 2.0, aggroRadius: 8, xp: 160, loot: 'elite_scar', faction: 'ashenvigil_hostile', elite: true, ability: { every: 6, name: 'Brand of Ash', radius: 3, dmg: 18 }, sprites: ['🔥', '🌪️'] },
 
-    withered_sapling: { name: 'Withered Sapling', icon: '🌱', level: [6, 8], hp: 60, dmg: 8, armor: 10, speed: 1.8, aggroRadius: 5, xp: 40, loot: 'trash_mid', faction: 'bloomreach_hostile' },
-    withered_treant: { name: 'Withered Treant', icon: '🌳', level: [8, 11], hp: 130, dmg: 12, armor: 30, speed: 1.3, aggroRadius: 5, xp: 65, loot: 'trash_mid', faction: 'bloomreach_hostile' },
-    blight_hound: { name: 'Blight Hound', icon: '🐺', level: [9, 12], hp: 85, dmg: 11, armor: 12, speed: 3.0, aggroRadius: 7, xp: 58, loot: 'trash_mid', faction: 'bloomreach_hostile' },
-    matriarch_withered: { name: 'The Withered Matriarch', icon: '🥀', level: [14, 14], hp: 520, dmg: 20, armor: 35, speed: 1.6, aggroRadius: 9, xp: 340, loot: 'elite_bloom', faction: 'bloomreach_hostile', elite: true, ability: { every: 8, name: 'Wilting Bloom', radius: 4, dmg: 26, dot: true } },
+    withered_sapling: { name: 'Withered Sapling', icon: '🌱', level: [6, 8], hp: 60, dmg: 8, armor: 10, speed: 1.8, aggroRadius: 5, xp: 40, loot: 'trash_mid', faction: 'bloomreach_hostile', sprites: ['🌱', '🍃'] },
+    withered_treant: { name: 'Withered Treant', icon: '🌳', level: [8, 11], hp: 130, dmg: 12, armor: 30, speed: 1.3, aggroRadius: 5, xp: 65, loot: 'trash_mid', faction: 'bloomreach_hostile', sprites: ['🌳', '🌲'] },
+    blight_hound: { name: 'Blight Hound', icon: '🐺', level: [9, 12], hp: 85, dmg: 11, armor: 12, speed: 3.0, aggroRadius: 7, xp: 58, loot: 'trash_mid', faction: 'bloomreach_hostile', sprites: ['🐺', '🐕'] },
+    matriarch_withered: { name: 'The Withered Matriarch', icon: '🥀', level: [14, 14], hp: 520, dmg: 20, armor: 35, speed: 1.6, aggroRadius: 9, xp: 340, loot: 'elite_bloom', faction: 'bloomreach_hostile', elite: true, ability: { every: 8, name: 'Wilting Bloom', radius: 4, dmg: 26, dot: true }, sprites: ['🥀', '🌹'] },
 
-    frost_wraith: { name: 'Frost Wraith', icon: '👻', level: [12, 15], hp: 150, dmg: 16, armor: 20, speed: 2.2, aggroRadius: 7, xp: 95, loot: 'trash_high', faction: 'frostmarch_hostile' },
-    rime_stalker: { name: 'Rime Stalker', icon: '🐾', level: [14, 17], hp: 190, dmg: 20, armor: 22, speed: 2.8, aggroRadius: 8, xp: 120, loot: 'trash_high', faction: 'frostmarch_hostile' },
-    warden_construct: { name: 'Warden Construct', icon: '🗿', level: [16, 19], hp: 320, dmg: 22, armor: 45, speed: 1.2, aggroRadius: 6, xp: 165, loot: 'trash_high', faction: 'frostmarch_hostile' },
-    sigil_keeper: { name: 'The Sigil Keeper', icon: '🔑', level: [20, 20], hp: 640, dmg: 28, armor: 40, speed: 1.8, aggroRadius: 9, xp: 420, loot: 'elite_frost', faction: 'frostmarch_hostile', elite: true, dropItem: { id: 'vault_sigil', chance: 1.0 }, ability: { every: 7, name: 'Rime Lock', radius: 5, dmg: 20, snare: true } },
+    frost_wraith: { name: 'Frost Wraith', icon: '👻', level: [12, 15], hp: 150, dmg: 16, armor: 20, speed: 2.2, aggroRadius: 7, xp: 95, loot: 'trash_high', faction: 'frostmarch_hostile', sprites: ['👻', '🎃'] },
+    rime_stalker: { name: 'Rime Stalker', icon: '🐾', level: [14, 17], hp: 190, dmg: 20, armor: 22, speed: 2.8, aggroRadius: 8, xp: 120, loot: 'trash_high', faction: 'frostmarch_hostile', sprites: ['🐾', '❄️'] },
+    warden_construct: { name: 'Warden Construct', icon: '🗿', level: [16, 19], hp: 320, dmg: 22, armor: 45, speed: 1.2, aggroRadius: 6, xp: 165, loot: 'trash_high', faction: 'frostmarch_hostile', sprites: ['🗿', '🛡️'] },
+    sigil_keeper: { name: 'The Sigil Keeper', icon: '🔑', level: [20, 20], hp: 640, dmg: 28, armor: 40, speed: 1.8, aggroRadius: 9, xp: 420, loot: 'elite_frost', faction: 'frostmarch_hostile', elite: true, dropItem: { id: 'vault_sigil', chance: 1.0 }, ability: { every: 7, name: 'Rime Lock', radius: 5, dmg: 20, snare: true }, sprites: ['🔑', '⚡'] },
 
-    vault_wraith: { name: 'Vault Wraith', icon: '👻', level: [20, 22], hp: 300, dmg: 26, armor: 30, speed: 2.4, aggroRadius: 7, xp: 220, loot: 'trash_dungeon', faction: 'hollow_hostile' },
-    bone_guard: { name: 'Bone Guard', icon: '💀', level: [21, 23], hp: 380, dmg: 30, armor: 50, speed: 1.6, aggroRadius: 6, xp: 260, loot: 'trash_dungeon', faction: 'hollow_hostile' },
+    vault_wraith: { name: 'Vault Wraith', icon: '👻', level: [20, 22], hp: 300, dmg: 26, armor: 30, speed: 2.4, aggroRadius: 7, xp: 220, loot: 'trash_dungeon', faction: 'hollow_hostile', sprites: ['👻', '🎃'] },
+    bone_guard: { name: 'Bone Guard', icon: '💀', level: [21, 23], hp: 380, dmg: 30, armor: 50, speed: 1.6, aggroRadius: 6, xp: 260, loot: 'trash_dungeon', faction: 'hollow_hostile', sprites: ['💀', '☠️'] },
     hollow_king: {
       name: 'The Hollow King', icon: '👑', level: [26, 26], hp: 3200, dmg: 40, armor: 60, speed: 1.6, aggroRadius: 12, xp: 2400, loot: 'boss_hollow', faction: 'hollow_hostile', elite: true, boss: true,
       ability: { every: 5, name: 'Despair', radius: 4, dmg: 34 },
-      enrageAt: 0.5, enrageAbility: { every: 4, name: 'Hollow Nova', radius: 6, dmg: 44 }
+      enrageAt: 0.5, enrageAbility: { every: 4, name: 'Hollow Nova', radius: 6, dmg: 44 },
+      sprites: ['👑', '💀']
     }
   };
 
@@ -1073,7 +1074,8 @@ p { margin: 4px 0; }
   }
 
   /* Draws one billboard: a team-coloured disc with an emoji glyph on it,
-   * clipped by the wall depth buffer at its own screen column. */
+   * clipped by the wall depth buffer at its own screen column.
+   * Supports animation via opts.anim: { frame: 0-3, kind: 'attack'|'cast'|'heal'|'idle', scale: 1.0, color: '#...' } */
   function drawSprite(ctx, W, H, zbuffer, proj, opts) {
     if (!proj.visible) return;
     const col = C.clamp(Math.floor(proj.screenX), 0, W - 1);
@@ -1082,17 +1084,64 @@ p { margin: 4px 0; }
     const cy = H / 2 + H / 2 - size * (opts.footOffset != null ? opts.footOffset : 0.5);
     const top = cy - size;
     if (proj.screenX < -size || proj.screenX > W + size) return;
+
+    const anim = opts.anim || {};
+    const animScale = anim.scale || 1.0;
+    const animKind = anim.kind || 'idle';
+
     ctx.save();
     ctx.globalAlpha = 0.92;
-    ctx.fillStyle = opts.ring || '#c0392b';
+
+    // Ring effect: pulse during cast, glow during attack, heal color
+    let ringColor = opts.ring || '#c0392b';
+    if (animKind === 'cast') {
+      const pulse = 0.5 + Math.sin(anim.frame * 0.8) * 0.5;
+      ctx.globalAlpha = 0.7 + pulse * 0.25;
+      ringColor = anim.color || `rgba(255, 180, 50, ${0.7 + pulse * 0.3})`;
+    } else if (animKind === 'heal') {
+      const pulse = 0.5 + Math.sin(anim.frame * 1.0) * 0.5;
+      ctx.globalAlpha = 0.75 + pulse * 0.2;
+      ringColor = anim.color || `rgba(100, 220, 120, ${0.75 + pulse * 0.25})`;
+    } else if (animKind === 'attack') {
+      ctx.globalAlpha = 0.92 + Math.sin(anim.frame * 1.2) * 0.08;
+    } else if (animKind === 'walk') {
+      ctx.globalAlpha = 0.88;
+    }
+
+    ctx.fillStyle = ringColor;
+    const ringScale = animKind === 'attack' ? animScale : 1.0;
     ctx.beginPath();
-    ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42, size * 0.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42 * ringScale, size * 0.5 * ringScale, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Draw expanding rings during cast/heal for effect
+    if ((animKind === 'cast' || animKind === 'heal') && anim.frame > 0) {
+      ctx.globalAlpha = 0.25;
+      const outerScale = 1.0 + anim.frame * 0.2;
+      ctx.strokeStyle = ringColor;
+      ctx.lineWidth = Math.max(0.5, size * 0.02);
+      ctx.beginPath();
+      ctx.ellipse(proj.screenX, cy - size * 0.5, size * 0.42 * outerScale, size * 0.5 * outerScale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     ctx.globalAlpha = 1;
     ctx.font = `${Math.max(8, size * 0.62)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(opts.icon || '?', proj.screenX, cy - size * 0.52);
+
+    // Rotate emoji during attack animation
+    let icon = opts.icon || '?';
+    if (animKind === 'attack' && anim.frame > 0) {
+      ctx.save();
+      ctx.translate(proj.screenX, cy - size * 0.52);
+      ctx.rotate((anim.frame * 0.5) * Math.PI);
+      ctx.fillText(icon, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(icon, proj.screenX, cy - size * 0.52);
+    }
+
     ctx.restore();
     return { screenX: proj.screenX, top, size, cy };
   }
@@ -1620,10 +1669,16 @@ p { margin: 4px 0; }
     caster.cooldowns[ability.id] = cdFor(ability, cs);
     caster.cooldowns['_gcd'] = GCD;
     const castTime = (ability.castTime || 0) * (1 - cs.hastePct * 0.5);
+    const animColor = ability.kind === 'heal' ? 'rgba(100, 220, 120, 0.8)' :
+                     ability.kind === 'buff' ? 'rgba(150, 150, 255, 0.8)' :
+                     'rgba(255, 180, 50, 0.8)';
     if (castTime > 0.05) {
       caster.casting = { ability, target, remaining: castTime, total: castTime };
+      caster.anim = { kind: 'cast', frame: 0, scale: 1.0, color: animColor };
     } else {
       resolveAbility(caster, target, ability, log);
+      const animKind = ability.kind === 'heal' ? 'heal' : 'attack';
+      caster.anim = { kind: animKind, frame: 0, scale: 1.0, duration: 0.3, color: animColor };
     }
     return { ok: true };
   }
@@ -1728,6 +1783,7 @@ p { margin: 4px 0; }
     const crit = rollCrit(cs.critChance);
     const dealt = applyDamage(target, crit ? dmg * 1.5 : dmg, {});
     log && log.push(`${caster.name || 'You'} swing at ${target.name || 'target'} for ${dealt}${crit ? ' (crit)' : ''}.`);
+    caster.anim = { kind: 'attack', frame: 0, scale: 1.0, duration: 0.25, color: crit ? 'rgba(255, 255, 100, 0.8)' : 'rgba(200, 100, 50, 0.8)' };
     if (caster.kind !== 'mob' && caster.resource && K.CLASSES[caster.cls].resource === 'rage') {
       caster.resource.current = Math.min(cs.maxResource, caster.resource.current + 4 + dealt * 0.05);
     }
@@ -1768,6 +1824,7 @@ p { margin: 4px 0; }
     const tpl = K.BESTIARY[tplId];
     const level = opts.level || C.rndInt(tpl.level[0], tpl.level[1]);
     const maxHealth = Math.round(tpl.hp);
+    const sprites = tpl.sprites || [tpl.icon];
     const mob = {
       id: 'm' + (nextId++), kind: 'mob', tplId, name: tpl.name, icon: tpl.icon,
       x, y, angle: Math.random() * Math.PI * 2, level, faction: tpl.faction,
@@ -1780,7 +1837,8 @@ p { margin: 4px 0; }
         critChance: tpl.boss ? 0.15 : tpl.elite ? 0.1 : 0.05, hastePct: 0, mods: {}
       },
       target: null, atkTimer: C.rnd(0.5, 1.4), abilityTimer: tpl.ability ? C.rnd(2, tpl.ability.every) : Infinity,
-      enraged: false, buffs: [], cooldowns: {}, alive: true
+      enraged: false, buffs: [], cooldowns: {}, alive: true,
+      sprites, spriteIdx: 0, walkAnimTime: 0
     };
     return mob;
   }
@@ -1793,6 +1851,17 @@ p { margin: 4px 0; }
       if (d < bestD) { bestD = d; best = c; }
     });
     return best;
+  }
+
+  function updateMobSprite(mob, moved) {
+    if (moved) {
+      mob.walkAnimTime = (mob.walkAnimTime || 0) + 0.15;
+      if (mob.walkAnimTime >= 0.5) {
+        mob.walkAnimTime = 0;
+        mob.spriteIdx = (mob.spriteIdx + 1) % mob.sprites.length;
+      }
+    }
+    mob.icon = mob.sprites[mob.spriteIdx];
   }
 
   function tickMob(mob, candidates, zone, dt, log) {
@@ -1814,11 +1883,11 @@ p { margin: 4px 0; }
       const dx = mob.leashX - mob.x, dy = mob.leashY - mob.y, d = Math.hypot(dx, dy) || 1;
       const step = mob.speed * dt * 1.6;
       const nx = mob.x + (dx / d) * step, ny = mob.y + (dy / d) * step;
-      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; }
+      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; updateMobSprite(mob, true); }
       mob.hp.current = Math.min(mob.hp.max, mob.hp.current + mob.hp.max * 0.15 * dt);
       return;
     }
-    if (!mob.target) return;
+    if (!mob.target) { updateMobSprite(mob, false); return; }
 
     const d = C.dist(mob.x, mob.y, mob.target.x, mob.target.y);
     mob.angle = Math.atan2(mob.target.y - mob.y, mob.target.x - mob.x);
@@ -1826,15 +1895,18 @@ p { margin: 4px 0; }
     if (d > meleeRange) {
       const step = mob.speed * dt;
       const nx = mob.x + Math.cos(mob.angle) * step, ny = mob.y + Math.sin(mob.angle) * step;
-      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; }
-      else if (!DS.world.blocked(zone, nx, mob.y)) mob.x = nx;
-      else if (!DS.world.blocked(zone, mob.x, ny)) mob.y = ny;
+      let moved = false;
+      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; moved = true; }
+      else if (!DS.world.blocked(zone, nx, mob.y)) { mob.x = nx; moved = true; }
+      else if (!DS.world.blocked(zone, mob.x, ny)) { mob.y = ny; moved = true; }
+      updateMobSprite(mob, moved);
     } else {
       mob.atkTimer -= dt;
       if (mob.atkTimer <= 0) {
         mob.atkTimer = 1.3 + Math.random() * 0.6;
         DS.combat.autoAttack(mob, mob.target, log);
       }
+      updateMobSprite(mob, false);
     }
     const ability = mob.enraged && mob.enrageAbilityTpl ? mob.enrageAbilityTpl : tpl.ability;
     if (ability) {
@@ -1860,7 +1932,8 @@ p { margin: 4px 0; }
       kind: 'companion', id: 'c_' + id, defId: id, name: def.name, icon: def.icon, cls: def.cls,
       level: player.level, x: player.x, y: player.y, angle: player.angle, zone: player.zone,
       equip: {}, talents: {}, hp: { current: 1, max: 1 }, resource: { current: null },
-      comboPoints: 0, buffs: [], cooldowns: {}, alive: true
+      comboPoints: 0, buffs: [], cooldowns: {}, alive: true,
+      sprites: [def.icon], spriteIdx: 0, walkAnimTime: 0
     };
     DS.player.refreshVitals(actor);
     actor.hp.current = actor.hp.max;
@@ -1917,13 +1990,15 @@ p { margin: 4px 0; }
     }
   }
   function moveTowardPoint(actor, tx, ty, zone, dt, speed) {
-    if (!speed) return;
+    if (!speed) { if (actor.sprites) updateMobSprite(actor, false); return; }
     const dx = tx - actor.x, dy = ty - actor.y, d = Math.hypot(dx, dy) || 1;
-    if (d < 0.3) return;
+    if (d < 0.3) { if (actor.sprites) updateMobSprite(actor, false); return; }
     actor.angle = Math.atan2(dy, dx);
     const step = speed * dt;
     const nx = actor.x + (dx / d) * step, ny = actor.y + (dy / d) * step;
-    if (!DS.world.blocked(zone, nx, ny)) { actor.x = nx; actor.y = ny; }
+    let moved = false;
+    if (!DS.world.blocked(zone, nx, ny)) { actor.x = nx; actor.y = ny; moved = true; }
+    if (actor.sprites) updateMobSprite(actor, moved);
   }
   function moveToward(comp, player, target, zone, dt, speed) {
     if (!target) return;
@@ -2309,6 +2384,20 @@ p { margin: 4px 0; }
     else if (!DS.world.blocked(zoneId, actor.x, ny)) actor.y = ny;
   }
 
+  function updateAnimation(actor, dt) {
+    if (!actor.anim) return;
+    actor.anim.duration = (actor.anim.duration || 0) - dt;
+    if (actor.anim.duration > 0) {
+      const elapsed = (0.4 - actor.anim.duration) / 0.4;
+      actor.anim.frame = Math.floor(elapsed * 3);
+      if (actor.anim.kind === 'attack') {
+        actor.anim.scale = 1.0 + Math.sin(elapsed * Math.PI) * 0.15;
+      }
+    } else {
+      actor.anim = null;
+    }
+  }
+
   function handleMobDeath(game, mob) {
     if (mob.deathProcessed) return;
     mob.deathProcessed = true;
@@ -2348,6 +2437,9 @@ p { margin: 4px 0; }
     const target = ability.self || ability.kind === 'buff' || ability.kind === 'heal' || ability.kind === 'utility' ? player : game.target;
     const res = CB.startCast(player, target, ability, game.combatLog);
     if (game.combatLog.length > LOG_MAX) game.combatLog.splice(0, game.combatLog.length - LOG_MAX);
+    if (res.ok && (ability.castTime || 0) < 0.05) {
+      player.anim = { kind: 'attack', frame: 0, scale: 1.0, duration: 0.4 };
+    }
     return res;
   }
 
@@ -2370,6 +2462,15 @@ p { margin: 4px 0; }
     CB.tickBuffs(player, dt);
     CB.tickCasting(player, dt, game.combatLog);
 
+    updateAnimation(player, dt);
+    if (player.casting) {
+      const ability = player.casting.ability;
+      const animColor = ability.kind === 'heal' ? 'rgba(100, 220, 120, 0.8)' :
+                       ability.kind === 'buff' ? 'rgba(150, 150, 255, 0.8)' :
+                       'rgba(255, 180, 50, 0.8)';
+      player.anim = { kind: 'cast', frame: Math.floor((game.clock * 4) % 4), scale: 1.0, color: animColor };
+    }
+
     const liveMobs = rt.mobs.filter(m => m.alive);
     const target = pickTarget(player, liveMobs);
     player.__targetId = target ? target.id : null;
@@ -2383,9 +2484,15 @@ p { margin: 4px 0; }
       if (player.autoAttackTimer <= 0) { player.autoAttackTimer = 1.9; CB.autoAttack(player, target, game.combatLog); }
     }
 
-    companions.forEach(c => DS.ai.tickCompanion(c, player, liveMobs, dt, player.zone, game.combatLog));
+    companions.forEach(c => {
+      DS.ai.tickCompanion(c, player, liveMobs, dt, player.zone, game.combatLog);
+      updateAnimation(c, dt);
+    });
     rt.mobs.forEach(m => {
-      if (m.alive) DS.ai.tickMob(m, [player].concat(companions), player.zone, dt, game.combatLog);
+      if (m.alive) {
+        DS.ai.tickMob(m, [player].concat(companions), player.zone, dt, game.combatLog);
+        updateAnimation(m, dt);
+      }
       else handleMobDeath(game, m);
     });
     DS.world.tickRespawns(rt, dt);
@@ -2489,7 +2596,9 @@ p { margin: 4px 0; }
     const withDepth = sprites.map(s => Object.assign(s, { proj: E.project(player, W, H, s.x, s.y) })).filter(s => s.proj.visible);
     withDepth.sort((a, b) => b.proj.depth - a.proj.depth);
     withDepth.forEach(s => {
-      const drawn = E.drawSprite(sceneCtx, W, H, zbuffer, s.proj, { icon: s.icon, ring: s.ring, height: s.height, footOffset: s.footOffset });
+      const spriteOpts = { icon: s.icon, ring: s.ring, height: s.height, footOffset: s.footOffset };
+      if (s.ref && s.ref.anim) spriteOpts.anim = s.ref.anim;
+      const drawn = E.drawSprite(sceneCtx, W, H, zbuffer, s.proj, spriteOpts);
       if (!drawn) return;
       if (s.kind === 'mob') {
         const m = s.ref;

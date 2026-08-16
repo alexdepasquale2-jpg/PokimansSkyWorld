@@ -81,7 +81,9 @@
     const withDepth = sprites.map(s => Object.assign(s, { proj: E.project(player, W, H, s.x, s.y) })).filter(s => s.proj.visible);
     withDepth.sort((a, b) => b.proj.depth - a.proj.depth);
     withDepth.forEach(s => {
-      const drawn = E.drawSprite(sceneCtx, W, H, zbuffer, s.proj, { icon: s.icon, ring: s.ring, height: s.height, footOffset: s.footOffset });
+      const spriteOpts = { icon: s.icon, ring: s.ring, height: s.height, footOffset: s.footOffset };
+      if (s.ref && s.ref.anim) spriteOpts.anim = s.ref.anim;
+      const drawn = E.drawSprite(sceneCtx, W, H, zbuffer, s.proj, spriteOpts);
       if (!drawn) return;
       if (s.kind === 'mob') {
         const m = s.ref;
