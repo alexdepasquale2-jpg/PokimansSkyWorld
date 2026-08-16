@@ -63,6 +63,10 @@
       structuresUnlocked: game.structuresUnlocked,
       deltas: game.deltas,
       senseBonus: game.senseBonus,
+      /* Relationships and galactic position. Both are addresses and small
+       * numbers — the civilisations and the stars themselves re-derive. */
+      contacts: game.contacts,
+      galaxy: { sx: game.galaxy.sx, sy: game.galaxy.sy },
       scene: {
         kind: game.scene.kind,
         systemAddr: game.scene.systemAddr,
@@ -133,6 +137,12 @@
     game.structuresUnlocked = data.structuresUnlocked || Object.create(null);
     game.deltas = data.deltas || Object.create(null);
     game.senseBonus = data.senseBonus || 0;
+    game.contacts = data.contacts || Object.create(null);
+    if (data.galaxy) {
+      game.galaxy.sx = data.galaxy.sx || 0;
+      game.galaxy.sy = data.galaxy.sy || 0;
+      game.galaxy.cacheKey = '';
+    }
     RS.influence.recomputeFields(game);
 
     if (data.scene) {

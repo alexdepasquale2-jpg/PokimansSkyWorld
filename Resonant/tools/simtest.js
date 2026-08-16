@@ -20,10 +20,10 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const FILES = [
-  'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js',
+  'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
-  'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/scenes.js',
-  'js/game.js', 'js/save.js'
+  'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
+  'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
 ];
 
 const sandbox = {
@@ -330,13 +330,38 @@ function busCollecting(store) {
 
 // ── difficulty ramps in the documented order ─────────────────────────────
 {
-  const d0 = RS.field.demandsFor(0);
-  const d5 = RS.field.demandsFor(5);
-  const d9 = RS.field.demandsFor(9);
+  const B = RS.spectrum.BY_ID;
+  const dem = id => RS.field.demandsFor(B[id].index);
+
+  /* Demand is derived from the band's primitive set, so it is *shaped* rather
+   * than sloped — each layer asks for the dial its own mechanics need. */
+  const d0 = dem('baryonic');
   assert(d0.phase === 0 && d0.rate === 0, 'the first layer demands only φ and Σ');
-  assert(d5.phase === 1 && d5.rate === 1, 'mid layers demand all four dials');
-  assert(d9.phase === 1 && d9.rate === 1, 'and so do the deep ones');
-  assert(RS.field.demandsFor(2).phase > RS.field.demandsFor(1).phase, 'phase ramps in gradually');
+  assert(dem('thermal').phase === 0 && dem('thermal').rate === 0,
+    'and so does the second, because it runs the same primitive');
+
+  /* Each dial arrives with the primitive that needs it, and arrives sharply. */
+  assert(dem('electromagnetic').rate > 0.8,
+    'τ becomes load-bearing the moment a layer gates (' + dem('electromagnetic').rate.toFixed(2) + ')');
+  assert(dem('probabilistic').phase > 0.7,
+    'Δ becomes load-bearing the moment a layer twins (' + dem('probabilistic').phase.toFixed(2) + ')');
+  assert(dem('causal').phase > 0.6, 'and ordering demands Δ too');
+  assert(dem('unity').phase > 0.9 && dem('unity').rate > 0.9,
+    'the last layer demands all four at once');
+
+  /* Every band demands the two dials the game is played with. */
+  for (const b of RS.spectrum.BANDS) {
+    const d = RS.field.demandsFor(b.index);
+    assert(d.freq === 1 && d.tier === 1, b.id + ' demands φ and Σ in full');
+    assert(d.phase >= 0 && d.phase <= 1 && d.rate >= 0 && d.rate <= 1,
+      b.id + ' demands are in range');
+  }
+
+  /* And it is *only* a function of the primitive set — same primitives, same
+   * demands, which is what makes it derived rather than tuned per band. */
+  assert(dem('mnemonic').phase === dem('archetypal').phase &&
+         dem('mnemonic').rate === dem('archetypal').rate,
+    'two bands running the same primitives demand identically');
 }
 
 // ── per-layer rules actually differ ──────────────────────────────────────
@@ -1230,5 +1255,932 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   const ms = Date.now() - tS;
   assert(ms < 3000, '2000 systems derive in ' + ms + 'ms');
 }
+
+// ── the galactic map ─────────────────────────────────────────────────────
+{
+  const g = RS.game.newGame(4100);
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.cluster.index) === 'galaxy',
+    'the cluster tier shows the galactic map');
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.interstellar.index) === 'galaxy',
+    'so does the interstellar tier');
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.galactic.index) === 'field',
+    'the galactic tier is still the attunement field');
+  assert(RS.scenes.sceneForTier(RS.cosmos.BY_ID.system.index) === 'system',
+    'the system tier is unchanged');
+
+  /* The map must actually be populated, and stars must be deterministic. */
+  const stars = RS.galaxy.refresh(g);
+  assert(stars.length > 20, 'the map window holds a real neighbourhood (' + stars.length + ' stars)');
+  const a1 = RS.galaxy.starsIn(g.seed, 3, 4);
+  const a2 = RS.galaxy.starsIn(g.seed, 3, 4);
+  assert(a1.length === a2.length && (a1.length === 0 || a1[0].jx === a2[0].jx),
+    'a sector always contains the same stars');
+
+  /* Sorted by distance, and distances agree with the sector geometry. */
+  let sorted = true;
+  for (let i = 1; i < stars.length; i++) if (stars[i].dist < stars[i - 1].dist) sorted = false;
+  assert(sorted, 'stars are ordered by distance');
+  assert(stars[0].dist < RS.galaxy.LY_PER_SECTOR * 2, 'something is nearby');
+
+  /* Reach is the exploration gate: far stars are visible and not selectable. */
+  const far = stars[stars.length - 1];
+  const near = stars[0];
+  assert(!far.inReach, 'the far edge of the window is beyond reach');
+  assert(!far.resolved, 'and therefore unresolved');
+  assert(RS.galaxy.surveyOf(g, far) === null, 'an unresolved star surveys to nothing');
+  assert(!RS.galaxy.selectStar(g, nullBus, far).ok, 'an out-of-reach star cannot be selected');
+  assert(RS.galaxy.selectStar(g, nullBus, near).ok, 'a near star can be');
+
+  /* Expanding the field must genuinely open the map up. */
+  const before = stars.filter(x => x.inReach).length;
+  for (const n of RS.influence.RESEARCH) g.research[n.id] = true;
+  g.gnosis.spiral = new Array(40).fill(0).map((_, i) => 'spiral@' + i + ':0');
+  RS.influence.recomputeFields(g);
+  g.galaxy.cacheKey = '';
+  const after = RS.galaxy.refresh(g).filter(x => x.inReach).length;
+  assert(after > before, 'expanding the consciousness field reaches more stars (' +
+    before + ' → ' + after + ')');
+
+  /* Travel re-centres the window, so the horizon moves with you. */
+  const target = RS.galaxy.refresh(g).find(x => x.inReach && x.dist > 1);
+  if (target) {
+    RS.galaxy.travelTo(g, nullBus, target);
+    assert(g.galaxy.sx === target.sx && g.galaxy.sy === target.sy, 'travel re-centres the map');
+    assert(g.scene.system && g.scene.systemAddr.sx === target.sx, 'and enters that system');
+    assert(g.known.systems[target.key], 'and records the visit');
+    const newStars = RS.galaxy.refresh(g);
+    assert(newStars.length > 20, 'the new neighbourhood is populated too');
+    assert(newStars[0].dist < RS.galaxy.LY_PER_SECTOR * 2, 'and has its own near neighbours');
+  }
+}
+
+// ── contact ──────────────────────────────────────────────────────────────
+{
+  /* Find a real civilisation in the galaxy, then run the whole relationship
+   * end to end. If this fails, the headline feature does not work. */
+  const g = RS.game.newGame(12345);
+  let found = null;
+  outer:
+  for (let sx = 0; sx < 40; sx++) {
+    for (let sy = 0; sy < 8; sy++) {
+      for (let ix = 0; ix < 3; ix++) {
+        const sys = RS.stellar.systemAt(g.seed, sx, sy, ix);
+        for (let j = 0; j < sys.bodies.length; j++) {
+          if (sys.bodies[j].kind !== 'planet') continue;
+          const p = RS.planet.planetAt(sys, j);
+          if (!p) continue;
+          const civ = RS.civ.civOf(p, 0);
+          if (civ) { found = { sys, j, p, civ, sx, sy, ix }; break outer; }
+        }
+      }
+    }
+  }
+  assert(found, 'a civilisation exists somewhere findable in the galaxy');
+
+  if (found) {
+    const { p, civ } = found;
+
+    /* The carrier must sit inside its declared band, so tuning to the band
+     * genuinely gets you into the neighbourhood of the signal. */
+    const carrier = RS.contact.carrierOf(g, p, civ);
+    assert(Math.abs(carrier.phi - carrier.band.centre) <= carrier.band.width,
+      'the carrier lies inside its own band');
+    /* And the band must climb with technology — talking to an advanced
+     * culture has to be an endgame act, not an early one. */
+    const low = RS.contact.carrierBandOf({ tech: 0.1 });
+    const high = RS.contact.carrierBandOf({ tech: 0.95 });
+    assert(RS.spectrum.BY_ID[low.band].centre < RS.spectrum.BY_ID[high.band].centre,
+      'advanced cultures broadcast on higher, harder bands');
+    assert(RS.spectrum.BY_ID[high.band].minFocus > RS.spectrum.BY_ID[low.band].minFocus,
+      'and therefore demand more focus');
+
+    /* Set the scene up as the game would. */
+    g.scene.systemAddr = { sx: found.sx, sy: found.sy, index: found.ix };
+    g.scene.system = found.sys;
+    RS.scenes.selectBody(g, nullBus, found.j);
+    g.scene.kind = 'system';
+
+    /* Untuned and unnoticed: no channel. */
+    let lock = RS.contact.lockOf(g, p, civ);
+    assert(RS.contact.stateOf(g, p, civ, lock) === RS.contact.STATES.unaware,
+      'an unnoticed, untuned civilisation is not contactable');
+
+    /* Reaching the carrier needs dial range — the gate is real. */
+    assert(!lock.inReach || carrier.phi <= g.dials.frequency.max,
+      'reachability is reported honestly');
+
+    /* Give the player the instrument, tune onto the carrier exactly. */
+    for (let i = 0; i < RS.dials.UPGRADE.range.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'range')) RS.dials.applyUpgrade(g.dials.frequency, 'range');
+    }
+    for (let i = 0; i < RS.dials.UPGRADE.focus.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'focus')) RS.dials.applyUpgrade(g.dials.frequency, 'focus');
+      if (RS.dials.canUpgrade(g.dials.phase, 'focus')) RS.dials.applyUpgrade(g.dials.phase, 'focus');
+    }
+    RS.dials.setValue(g, g.dials.frequency, carrier.phi);
+    RS.dials.setValue(g, g.dials.phase, carrier.phase);
+
+    lock = RS.contact.lockOf(g, p, civ);
+    assert(lock.total > 0.9, 'tuning exactly onto the carrier gives a near-perfect lock (' +
+      lock.total.toFixed(3) + ')');
+    assert(!lock.ghost, 'a fully-focused observer does not ghost the carrier band');
+
+    /* Still not open — they have to notice you too. That two-sided condition
+     * is the whole point of awareness. */
+    assert(RS.contact.stateOf(g, p, civ, lock) === RS.contact.STATES.reachable,
+      'a perfect lock alone does not open a channel — they must know you exist');
+
+    /* Awareness accrues with presence. */
+    const rec = RS.contact.recordOf(g, p);
+    let ticks = 0;
+    while (rec.awareness < 0.36 && ticks < 60 * 60 * 20) {
+      RS.contact.accrueAwareness(g, p, civ, 1 / 60);
+      ticks++;
+    }
+    assert(rec.awareness >= 0.35, 'awareness accrues while you are present');
+    assert(ticks < 60 * 60 * 20, 'and does so in a bounded amount of time (' +
+      (ticks / 60).toFixed(0) + 's)');
+
+    lock = RS.contact.lockOf(g, p, civ);
+    const st = RS.contact.stateOf(g, p, civ, lock);
+    assert(st === RS.contact.STATES.open || st === RS.contact.STATES.warm,
+      'lock + awareness opens the channel');
+    assert(RS.contact.isOpen(g, p, civ), 'and isOpen agrees');
+
+    /* Mistuning must close it again — the channel is held, not toggled. */
+    RS.dials.setValue(g, g.dials.frequency, carrier.phi + 40);
+    assert(!RS.contact.isOpen(g, p, civ), 'drifting off the carrier closes the channel');
+    RS.dials.setValue(g, g.dials.frequency, carrier.phi);
+    assert(RS.contact.isOpen(g, p, civ), 'and returning re-opens it');
+
+    /* They must have something to say, and it must reflect the situation. */
+    const lines = RS.contact.greeting(g, p, civ);
+    assert(lines.length > 0 && lines[0].length > 10, 'they say something');
+
+    /* Every offer must be well-formed. */
+    const offers = RS.contact.offersFor(g, p, civ);
+    assert(offers.length >= 4, 'there are things to do (' + offers.length + ')');
+    assert(offers.every(o => o.id && o.name && o.blurb && o.effect),
+      'every offer is fully described');
+    assert(offers.some(o => o.id === 'listen' && o.available), 'listening is always available');
+
+    // LISTEN
+    const insight0 = g.insight, gn0 = RS.fractal.totalGnosis(g), stand0 = rec.standing;
+    const rL = RS.contact.act(g, nullBus, p, civ, 'listen');
+    assert(rL.ok && g.insight > insight0, 'listening pays insight');
+    assert(RS.fractal.totalGnosis(g) >= gn0, 'and can pay gnosis');
+    assert(rec.standing > stand0, 'and warms them');
+    assert(rec.met, 'and marks them as met');
+
+    /* Regression: what the panel offers and what the action permits must
+     * agree. They did not — `offersFor` greyed out `survey` for a
+     * pre-industrial culture and `act` performed it anyway, so the UI was
+     * telling the player something false about the world. */
+    for (const o of RS.contact.offersFor(g, p, civ)) {
+      if (o.available) continue;
+      if (o.id === 'trade' || o.id === 'gift') continue;   // resource-gated, checked elsewhere
+      const r = RS.contact.act(g, nullBus, p, civ, o.id);
+      assert(!r.ok, 'an offer shown as unavailable ("' + o.id + '") is genuinely refused');
+    }
+
+    /* Regression: the opening line must survive until it is read. `met` is set
+     * when the channel opens, which happens before the player looks at the
+     * panel, so it cannot gate the greeting. */
+    {
+      const g2 = RS.game.newGame(12345);
+      const r2 = RS.contact.recordOf(g2, p);
+      r2.met = true;                     // as the channel-open event would leave it
+      const first = RS.contact.greeting(g2, p, civ);
+      const second = RS.contact.greeting(g2, p, civ);
+      assert(first[0] !== second[0],
+        'the first thing a culture says is distinct from what it says afterwards');
+      assert(first[0] === RS.contact.VOICE[civ.disposition.id].open,
+        'and it is their disposition\'s own opening line');
+    }
+
+    // SURVEY — the charts
+    const charted0 = Object.keys(g.known.charted).length;
+    const rS = RS.contact.act(g, nullBus, p, civ, 'survey');
+    if (civ.tier.reach >= 1) {
+      assert(rS.ok, 'a spacefaring culture will share charts');
+      assert(Object.keys(g.known.charted).length > charted0,
+        'and that actually reveals stars (' + rS.revealed + ')');
+      /* The charts must genuinely bypass the reach gate. */
+      g.galaxy.cacheKey = '';
+      const chartedStars = RS.galaxy.refresh(g).filter(x => x.charted && !x.inReach);
+      if (chartedStars.length) {
+        assert(chartedStars[0].resolved, 'a charted star is resolved despite being out of reach');
+        assert(RS.galaxy.selectStar(g, nullBus, chartedStars[0]).ok,
+          'and can be selected — charts are a real shortcut through the exploration gate');
+      }
+    }
+
+    // GIFT — buying standing, with diminishing returns
+    g.insight = 1e7;
+    const s1 = rec.standing;
+    assert(RS.contact.act(g, nullBus, p, civ, 'gift').ok, 'you can give freely');
+    const d1 = rec.standing - s1;
+    const s2 = rec.standing;
+    RS.contact.act(g, nullBus, p, civ, 'gift');
+    const d2 = rec.standing - s2;
+    assert(d1 > 0 && d2 > 0 && d2 < d1, 'gifts help, and help less each time');
+
+    // LEARN — gated on standing, then real
+    rec.standing = 0.2;
+    assert(!RS.contact.act(g, nullBus, p, civ, 'learn').ok, 'they will not teach a stranger');
+    rec.standing = 0.9;
+    const before = Object.keys(g.research).length;
+    const rT = RS.contact.act(g, nullBus, p, civ, 'learn');
+    if (rT.ok) {
+      assert(Object.keys(g.research).length === before + 1, 'being taught unlocks a research node');
+      assert(g.research[rT.node.id], 'the right one');
+      assert(rec.standing < 0.9, 'and teaching costs them standing');
+    }
+
+    // UPLIFT — gated on the lattice, and disposition-dependent
+    assert(!RS.contact.act(g, nullBus, p, civ, 'uplift').ok, 'uplift needs a lattice');
+    g.structuresUnlocked.lattice = true;
+    g.insight = 1e9; g.passiveRate = 1e6;
+    RS.influence.place(g, nullBus, p, 'lattice');
+    const tech0 = civ.tech;
+    const standBefore = rec.standing;
+    const rU = RS.contact.act(g, nullBus, p, civ, 'uplift');
+    assert(rU.ok, 'uplift works once a lattice is sited');
+    assert(rec.uplifted === 1, 'and is recorded');
+    /* Whether it was welcome depends on who they are — help is not neutral. */
+    const welcomingDisps = ['curious', 'distributed', 'contemplative'];
+    const expectWelcome = welcomingDisps.indexOf(civ.disposition.id) >= 0;
+    assert(rU.welcomed === expectWelcome, 'reception matches their disposition');
+    assert(expectWelcome ? rec.standing > standBefore : rec.standing < standBefore,
+      'and standing moves the right way');
+
+    /* Uplift must actually change the derived civilisation. */
+    const upCiv = RS.contact.applyTo(g, p, RS.civ.civOf(p, 0));
+    assert(upCiv.tech > tech0, 'an uplifted culture really is more advanced (' +
+      tech0.toFixed(3) + ' → ' + upCiv.tech.toFixed(3) + ')');
+
+    /* Hostility is reachable and closes the channel. */
+    rec.standing = -0.8;
+    assert(RS.contact.stateOf(g, p, civ, RS.contact.lockOf(g, p, civ)) === RS.contact.STATES.cold,
+      'a badly-treated culture refuses you');
+
+    /* And the whole relationship must survive a save. */
+    rec.standing = 0.62;
+    RS.save.writeNow(g);
+    const h = RS.save.hydrate(RS.save.readRaw());
+    const hk = RS.contact.contactKey(p);
+    assert(h.contacts[hk] && Math.abs(h.contacts[hk].standing - 0.62) < 1e-6,
+      'standing round-trips');
+    assert(h.contacts[hk].uplifted === 1, 'uplift round-trips');
+    assert(h.contacts[hk].met, 'having met them round-trips');
+    assert(Object.keys(h.known.charted).length === Object.keys(g.known.charted).length,
+      'given charts round-trip');
+    assert(h.galaxy.sx === g.galaxy.sx && h.galaxy.sy === g.galaxy.sy,
+      'galactic position round-trips');
+    assert(RS.contact.totalMet(h) >= 1, 'the roster survives');
+  }
+}
+
+// ── contact does not leak into worlds that have nobody ───────────────────
+{
+  const g = RS.game.newGame(555);
+  const sys = RS.stellar.systemAt(g.seed, 2, 2, 0);
+  let idx = -1;
+  for (let j = 0; j < sys.bodies.length; j++) {
+    if (sys.bodies[j].kind !== 'planet') continue;
+    const p = RS.planet.planetAt(sys, j);
+    if (p && !RS.civ.civOf(p, 0)) { idx = j; break; }
+  }
+  if (idx >= 0) {
+    g.scene.system = sys;
+    g.scene.systemAddr = { sx: 2, sy: 2, index: 0 };
+    RS.scenes.selectBody(g, nullBus, idx);
+    g.scene.kind = 'system';
+    for (let i = 0; i < 120; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+    assert(!g.scene.contact, 'an empty world produces no contact state');
+    assert(Object.keys(g.contacts).length === 0, 'and no relationship record');
+  }
+}
+
+
+// ── the guide must never break, in any state ─────────────────────────────
+{
+  /* The guide is generated from live state in every scene and both modes, so
+   * it touches more of the game than anything else in the UI. A crash here
+   * would hit exactly the player who is already confused enough to open it. */
+  const scenarios = [];
+
+  // fresh game, every scene
+  for (const tier of ['galactic', 'cluster', 'system', 'planetary']) {
+    const g = RS.game.newGame(9100 + tier.length);
+    for (let i = 0; i < 14; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+    RS.dials.setValue(g, g.dials.space, RS.cosmos.BY_ID[tier].index);
+    for (let i = 0; i < 90; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+    scenarios.push([tier + ' (observing)', g]);
+  }
+
+  // embodied
+  {
+    const g = RS.game.newGame(9200);
+    for (let i = 0; i < 14; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+    RS.dials.setValue(g, g.dials.space, RS.cosmos.BY_ID.planetary.index);
+    for (let i = 0; i < 90; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+    g.vessels.unlocked.walker = true;
+    RS.scenes.embark(g, nullBus, 'walker');
+    scenarios.push(['planet (piloting)', g]);
+  }
+
+  // fully progressed
+  {
+    const g = RS.game.newGame(9300);
+    g.insight = 1e9;
+    for (const n of RS.influence.RESEARCH) RS.influence.tryResearch(g, nullBus, n.id);
+    for (const b of RS.spectrum.BANDS) g.known.bands[b.id] = true;
+    for (const t of RS.cosmos.TIERS) g.known.tiers[t.id] = true;
+    for (let i = 0; i < RS.dials.UPGRADE.range.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'range')) RS.dials.applyUpgrade(g.dials.frequency, 'range');
+      if (RS.dials.canUpgrade(g.dials.space, 'range')) RS.dials.applyUpgrade(g.dials.space, 'range');
+    }
+    for (let i = 0; i < RS.dials.UPGRADE.focus.max; i++) {
+      if (RS.dials.canUpgrade(g.dials.frequency, 'focus')) RS.dials.applyUpgrade(g.dials.frequency, 'focus');
+    }
+    RS.influence.recomputeFields(g);
+    scenarios.push(['fully progressed', g]);
+  }
+
+  let broke = [];
+  for (const [label, g] of scenarios) {
+    for (const [name, fn] of [['guide', RS.guide.guideHTML], ['pathways', RS.guide.pathwaysHTML]]) {
+      try {
+        const html = fn(g);
+        if (typeof html !== 'string' || html.length < 200) broke.push(label + '/' + name + ' (too short)');
+        if (/undefined|NaN|\[object/.test(html)) broke.push(label + '/' + name + ' (leaked a raw value)');
+      } catch (e) {
+        broke.push(label + '/' + name + ': ' + e.message);
+      }
+    }
+    /* And the objective line, which the guide quotes. */
+    try {
+      const o = RS.game.sceneObjective(g);
+      if (!o || !o.text || o.text.length < 8) broke.push(label + '/objective');
+    } catch (e) { broke.push(label + '/objective: ' + e.message); }
+  }
+  assert(broke.length === 0, 'the guide renders in every scene and mode: ' + broke.join('; '));
+
+  /* The dial rows must describe the mode the player is actually in — that is
+   * the single most confusing thing about this game and the guide's main job. */
+  const gObs = RS.game.newGame(9400);
+  const obsRows = RS.guide.dialRows(gObs);
+  assert(obsRows.length === 4, 'all four dials are described');
+  assert(/scrub/i.test(obsRows[0].does), 'unembodied, τ is described as scrubbing time');
+  assert(/ladder/i.test(obsRows[1].does), 'and Σ as moving the ladder');
+
+  const gPil = RS.game.newGame(9401);
+  gPil.vessels.unlocked.walker = true;
+  gPil.body = RS.vessel.newBody('walker');
+  gPil.inhabiting = true;
+  const pilRows = RS.guide.dialRows(gPil);
+  assert(pilRows[0].does === RS.vessel.BY_ID.walker.dialMap.time,
+    'embodied, τ is described as the vessel says it is');
+  assert(pilRows[1].does !== obsRows[1].does,
+    'and Σ means something different from what it means unembodied');
+
+  /* Every pathway must always have a concrete next step — "you have finished"
+   * is not something this game should ever say by accident. */
+  for (const [label, g] of scenarios) {
+    const html = RS.guide.pathwaysHTML(g);
+    const arrows = (html.match(/→/g) || []).length;
+    assert(arrows >= 3, 'all three pathways state a next step in ' + label + ' (' + arrows + ')');
+  }
+}
+
+
+// ── the generative core: four axes ───────────────────────────────────────
+{
+  const E = RS.fractal.ESSENCES;
+  const AX = RS.fractal.AXES;
+  assert(AX.length === 4, 'there are exactly four axes');
+
+  let bad = [];
+  for (const e of E) {
+    for (const a of AX) {
+      if (typeof e[a] !== 'number' || e[a] < 0 || e[a] > 1) bad.push(e.id + '.' + a);
+    }
+  }
+  assert(bad.length === 0, 'every essence declares all four axes in 0..1: ' + bad.join(', '));
+
+  /* The essences must be *distinguishable*. If two sit on top of each other in
+   * all four axes they generate identical mechanics everywhere and the player
+   * can never tell them apart — which would quietly collapse 14 essences into
+   * fewer. */
+  let collisions = [];
+  for (let i = 0; i < E.length; i++) {
+    for (let j = i + 1; j < E.length; j++) {
+      let same = true;
+      for (const a of AX) if (Math.abs(E[i][a] - E[j][a]) > 0.1) same = false;
+      if (same) collisions.push(E[i].id + '/' + E[j].id);
+    }
+  }
+  assert(collisions.length === 0, 'no two essences are indistinguishable: ' + collisions.join(', '));
+
+  /* Each axis must actually be used across its range, or it is decoration. */
+  for (const a of AX) {
+    const vals = E.map(e => e[a]);
+    const spread = Math.max(...vals) - Math.min(...vals);
+    assert(spread > 0.6, 'axis "' + a + '" spans a real range (' + spread.toFixed(2) + ')');
+  }
+
+  /* Spot-check that the numbers agree with the prose they came from. These are
+   * the claims the trait strings already make, and if a number ever drifts
+   * away from its description the player's intuition breaks. */
+  const by = RS.fractal.ESSENCE_BY_ID;
+  assert(by.lattice.symmetry >= 0.95,
+    'Lattice — "order that repeats without a centre" — is maximally symmetric');
+  assert(by.attractor.complexity < by.lattice.complexity,
+    'an Attractor is one basin and a Lattice is a repeating structure, so the lattice carries more');
+  assert(by.cascade.branching >= 0.85 && by.cascade.persistence <= 0.25,
+    'Cascade — "spends itself buying a thousand others" — branches hard and does not persist');
+  assert(by.memory.persistence >= 0.95, 'Memory persists');
+  assert(by.void.complexity <= 0.2, 'Void carries almost no structure');
+  assert(by.emergence.complexity >= 0.95, 'Emergence carries the most');
+  assert(by.attractor.branching <= 0.05, 'Attractor converges rather than branches');
+  assert(by.seed.branching >= 0.8 && by.seed.persistence <= 0.15,
+    'Seed — "compressed instructions for something enormously larger" — sprays and does not last');
+}
+
+// ── the six primitives ───────────────────────────────────────────────────
+{
+  const EM = RS.emergence;
+  const E = RS.fractal.ESSENCES;
+  assert(EM.IDS.length === 6, 'there are exactly six primitives');
+
+  /* Finite for every essence at every scale — this is called per node per
+   * frame, and one NaN poisons a node's position for the rest of the session. */
+  let nan = [];
+  for (const e of E) {
+    for (let tier = 0; tier < RS.cosmos.TIERS.length; tier++) {
+      for (const t of [0, 0.37, 12.5, 1e4]) {
+        const g = EM.GATE(e, tier, t, {});
+        const f = EM.FLOW(e, 0.3, -0.7, t, {});
+        if (!Number.isFinite(g.open) || !Number.isFinite(g.period) || g.period <= 0) nan.push('GATE ' + e.id + '@' + tier);
+        if (!Number.isFinite(f.gx) || !Number.isFinite(f.gy)) nan.push('FLOW ' + e.id + '@' + tier);
+      }
+    }
+    const n = EM.NEST(e, {}), o = EM.ORDER(e, 1234, {}), w = EM.TWIN(e, 99, {}), v = EM.INVERT(e, {});
+    if (!Number.isFinite(n.depth) || n.depth < 1) nan.push('NEST ' + e.id);
+    if (!Number.isFinite(n.total) || n.total < 1) nan.push('NEST.total ' + e.id);
+    if (!o.prereqs.length) nan.push('ORDER ' + e.id);
+    if (!Number.isFinite(w.separation)) nan.push('TWIN ' + e.id);
+    if (!Number.isFinite(v.strength)) nan.push('INVERT ' + e.id);
+  }
+  assert(nan.length === 0, 'every primitive is finite for every essence at every scale: ' +
+    nan.slice(0, 4).join(', '));
+
+  /* Each primitive must actually respond to the axis it claims to read. */
+  const cascade = RS.fractal.ESSENCE_BY_ID.cascade;   // branching 0.90
+  const lattice = RS.fractal.ESSENCE_BY_ID.lattice;   // branching 0.00
+  assert(EM.GATE(cascade, 13, 0, {}).subdiv > EM.GATE(lattice, 13, 0, {}).subdiv,
+    'a branching essence subdivides its rhythm more than a regular one');
+  assert(EM.NEST(cascade, {}).fanout > EM.NEST(lattice, {}).fanout,
+    'and nests wider');
+  assert(EM.ORDER(cascade, 1, {}).fanout > EM.ORDER(lattice, 1, {}).fanout,
+    'and depends on more things');
+  assert(EM.FLOW(cascade, 1, 0, 0, {}).divergence > EM.FLOW(lattice, 1, 0, 0, {}).divergence,
+    'and its gradient diverges rather than converges');
+
+  const emergence = RS.fractal.ESSENCE_BY_ID.emergence;  // complexity 1.0
+  const voidE = RS.fractal.ESSENCE_BY_ID.void;           // complexity 0.15
+  assert(EM.NEST(emergence, {}).depth > EM.NEST(voidE, {}).depth,
+    'NEST depth is monotonic in complexity');
+
+  const duality = RS.fractal.ESSENCE_BY_ID.duality;      // symmetry 1.0
+  assert(EM.TWIN(duality, 1, {}).separation < EM.TWIN(cascade, 1, {}).separation,
+    'a symmetric essence twins close and confusingly; an asymmetric one throws its double wide');
+
+  const memory = RS.fractal.ESSENCE_BY_ID.memory;        // persistence 1.0
+  assert(EM.INVERT(memory, {}).strength < EM.INVERT(RS.fractal.ESSENCE_BY_ID.seed, {}).strength,
+    'persistence resists inversion');
+
+  /* The scale coupling — the thing that makes one band many places for free. */
+  const fast = EM.GATE(cascade, RS.cosmos.BY_ID.cellular.index, 0, {}).period;
+  const slow = EM.GATE(cascade, RS.cosmos.BY_ID.supercluster.index, 0, {}).period;
+  assert(slow > fast * 5,
+    'the same essence in the same band is far slower at a large scale (' +
+    fast.toFixed(2) + 's vs ' + slow.toFixed(2) + 's)');
+
+  /* GATE must actually open and close, or the rhythm layer is unplayable. */
+  let sawOpen = false, sawShut = false;
+  for (let t = 0; t < 20; t += 0.01) {
+    const g = EM.GATE(cascade, 13, t, {});
+    if (g.open > 0.95) sawOpen = true;
+    if (g.open < 0.05) sawShut = true;
+  }
+  assert(sawOpen && sawShut, 'a gate genuinely opens and shuts');
+
+  /* ORDER must be an ordering, not a cycle. */
+  let selfDep = [];
+  for (const e of E) {
+    if (EM.ORDER(e, 7, {}).prereqs.indexOf(e.id) >= 0) selfDep.push(e.id);
+  }
+  assert(selfDep.length === 0, 'nothing depends on itself: ' + selfDep.join(', '));
+
+  /* Purity: same inputs, same outputs. */
+  const a1 = EM.GATE(cascade, 13, 3.3, {}), a2 = EM.GATE(cascade, 13, 3.3, {});
+  assert(a1.open === a2.open && a1.period === a2.period, 'primitives are pure');
+}
+
+// ── bands compose primitives ─────────────────────────────────────────────
+{
+  const B = RS.spectrum.BANDS;
+  let noPrim = B.filter(b => !b.prim || !b.prim.length);
+  assert(noPrim.length === 0, 'every band declares at least one primitive');
+
+  let unknown = [];
+  for (const b of B) for (const p of b.prim) if (RS.emergence.IDS.indexOf(p) < 0) unknown.push(b.id + '/' + p);
+  assert(unknown.length === 0, 'every declared primitive exists: ' + unknown.join(', '));
+
+  /* Every primitive must be used by some band, or it is dead code. */
+  const used = new Set();
+  for (const b of B) for (const p of b.prim) used.add(p);
+  const unusedPrims = RS.emergence.IDS.filter(p => !used.has(p));
+  assert(unusedPrims.length === 0, 'every primitive is used by some band: ' + unusedPrims.join(', '));
+
+  /* Bands must differ from each other in what they demand. */
+  const sigs = new Set(B.map(b => b.prim.slice().sort().join('+')));
+  assert(sigs.size >= 8, 'the twelve bands present at least eight distinct primitive sets (' + sigs.size + ')');
+
+  assert(RS.spectrum.demandOf(RS.spectrum.BY_ID.unity) > RS.spectrum.demandOf(RS.spectrum.BY_ID.baryonic),
+    'Unity demands more than Baryonic, and difficulty is derived from that');
+}
+
+// ── one generator, every scale ───────────────────────────────────────────
+{
+  const SS = RS.selfsimilar;
+  const geoms = [...new Set(RS.cosmos.TIERS.map(t => t.geometry))];
+  const buf = SS.newBuffer();
+
+  let over = [], empty = [];
+  for (const e of RS.fractal.ESSENCES) {
+    for (const g of geoms) {
+      SS.build(e, g, 12345, buf);
+      if (buf.count > SS.MAX_SEGMENTS) over.push(e.id + '/' + g);
+      if (buf.count < 1) empty.push(e.id + '/' + g);
+      for (let i = 0; i < buf.count * SS.STRIDE; i++) {
+        if (!Number.isFinite(buf.data[i])) { over.push(e.id + '/' + g + ' NaN'); break; }
+      }
+    }
+  }
+  assert(over.length === 0, 'generated structure is bounded and finite: ' + over.slice(0, 3).join(', '));
+  assert(empty.length === 0, 'nothing generates an empty structure: ' + empty.slice(0, 3).join(', '));
+
+  /* THE SELF-SIMILARITY CLAIM. Geometry changes the ink and never the
+   * structure — the same essence must produce the identical topology at every
+   * geometry, or a spiral arm and a coiled flagellum are merely two drawings
+   * rather than one thing rendered by different local rules. */
+  let divergent = [];
+  for (const e of RS.fractal.ESSENCES) {
+    let ref = null;
+    for (const g of geoms) {
+      SS.build(e, g, 999, buf);
+      const topo = SS.topology(buf);
+      if (ref === null) ref = topo;
+      else if (topo !== ref) divergent.push(e.id + '/' + g + ' ' + topo + ' != ' + ref);
+    }
+  }
+  assert(divergent.length === 0,
+    'one essence has one topology at every geometry — geometry is only ink: ' +
+    divergent.slice(0, 3).join(', '));
+
+  /* But different essences must produce different structures, or the generator
+   * is not reading its inputs. */
+  const topos = new Set();
+  for (const e of RS.fractal.ESSENCES) { SS.build(e, 'body', 5, buf); topos.add(SS.topology(buf)); }
+  assert(topos.size >= 7, 'different essences generate genuinely different structures (' + topos.size + ')');
+
+  /* Determinism, as everywhere else in this codebase. */
+  SS.build(RS.fractal.ESSENCE_BY_ID.spiral, 'disc', 42, buf);
+  const first = SS.topology(buf) + ':' + buf.data[10].toFixed(6);
+  SS.build(RS.fractal.ESSENCE_BY_ID.spiral, 'disc', 42, buf);
+  assert(first === SS.topology(buf) + ':' + buf.data[10].toFixed(6), 'generation is deterministic');
+}
+
+// ── gnosis as foresight ──────────────────────────────────────────────────
+{
+  const g = RS.game.newGame(31337);
+  const eid = 'cascade';
+
+  let p = RS.fractal.predicted(g, eid, {});
+  assert(p.revealed === 0, 'an unknown essence reveals nothing');
+  assert(p.complexity === undefined && p.branching === undefined,
+    'and no axis leaks through');
+  assert(p.nextAt === 2, 'and it says what it would take to learn the first axis');
+
+  /* Recognise it in more and more contexts; axes must appear monotonically. */
+  const seen = [];
+  let prevRevealed = 0;
+  for (let i = 0; i < 10; i++) {
+    (g.gnosis[eid] || (g.gnosis[eid] = [])).push(eid + '@' + i + ':0');
+    p = RS.fractal.predicted(g, eid, {});
+    assert(p.revealed >= prevRevealed, 'revelation never goes backwards');
+    prevRevealed = p.revealed;
+    seen.push(p.revealed);
+  }
+  assert(prevRevealed === 4, 'enough contexts reveal all four axes (' + seen.join(',') + ')');
+
+  /* Revealed values must be the *true* ones — a prediction that lies is worse
+   * than no prediction. */
+  const truth = RS.fractal.ESSENCE_BY_ID[eid];
+  p = RS.fractal.predicted(g, eid, {});
+  for (const a of RS.fractal.AXES) {
+    assert(p[a] === truth[a], 'a revealed axis is the real value (' + a + ')');
+  }
+
+  /* And a predicted essence must drive the primitives to the same answer the
+   * real one does, once fully revealed — that is what makes foresight real. */
+  const pe = RS.fractal.predictedEssence(g, eid, {});
+  assert(pe.confidence === 1, 'a fully-known essence is fully confident');
+  const realGate = RS.emergence.GATE(truth, 13, 1.5, {});
+  const predGate = RS.emergence.GATE(pe, 13, 1.5, {});
+  assert(realGate.subdiv === predGate.subdiv && Math.abs(realGate.period - predGate.period) < 1e-9,
+    'a fully-revealed prediction matches what the world actually does');
+
+  /* A partially-known essence must still predict *something* usable rather
+   * than nonsense. */
+  const g2 = RS.game.newGame(31337);
+  g2.gnosis.spiral = ['spiral@1:0', 'spiral@2:0'];
+  const pe2 = RS.fractal.predictedEssence(g2, 'spiral', {});
+  assert(pe2.confidence === 0.25, 'two contexts is one axis of four');
+  const gate2 = RS.emergence.GATE(pe2, 13, 0, {});
+  assert(Number.isFinite(gate2.period) && gate2.period > 0,
+    'a partial prediction still produces a usable guess');
+
+  /* Different worlds must reveal in different orders, so two players build
+   * genuinely different intuitions about the same essence. */
+  const orders = new Set();
+  for (let s = 0; s < 40; s++) {
+    orders.add(RS.fractal.revealOrder(s * 7919, truth).join(','));
+  }
+  assert(orders.size > 3, 'reveal order varies by world (' + orders.size + ' orders seen)');
+}
+
+// ── every band is winnable, and no two play alike ────────────────────────
+/* This is the Phase 2 acceptance test. `applyMode`'s twelve hand-written cases
+ * are gone; behaviour now comes from each band's `prim[]` composed with each
+ * node's own four axes. Two things have to be true for that to be an
+ * improvement rather than a refactor: every layer must still be beatable, and
+ * the layers must still be genuinely different places. Both are measured here
+ * by actually playing them. */
+{
+  const nBands = RS.spectrum.BANDS.length;
+
+  /* A player that hill-climbs alignment instead of assuming "match the
+   * signature". That distinction matters: a band running INVERT scores
+   * backwards by an amount that depends on the *node's* persistence, so the
+   * optimal placement is a partial mistune that no fixed rule could guess. A
+   * tuner that only knew how to match would report the Null layer unwinnable
+   * when it is merely inside out. */
+  function bestPlacement(g, n) {
+    const D = g.dials;
+    const band = RS.spectrum.BANDS[n.man.bandIndex];
+    const on = {
+      frequency: n.man.signature,
+      phase: n.man.phase,
+      time: clampTo(D.time, n.man.rate),
+      space: n.man.tierIndex
+    };
+    /* "Off" placements stay inside the band and inside the rung — a mistune
+     * that changed which layer or which scale was being observed would just
+     * abandon the node rather than score it badly. */
+    const off = {
+      frequency: n.man.signature + band.width * 0.5,
+      phase: n.man.phase + Math.PI,
+      time: clampTo(D.time, n.man.rate + (n.man.rate > 0 ? -2.2 : 2.2)),
+      space: n.man.tierIndex + 0.45
+    };
+    const keys = ['frequency', 'phase', 'time', 'space'];
+    let best = null, bestScore = -1;
+    for (let mask = 0; mask < 16; mask++) {
+      for (let k = 0; k < 4; k++) {
+        RS.dials.setValue(g, D[keys[k]], (mask & (1 << k)) ? off[keys[k]] : on[keys[k]]);
+      }
+      const s = RS.field.alignmentOf(g, n).total;
+      if (s > bestScore) {
+        bestScore = s;
+        best = keys.map(k => D[k].value);
+      }
+    }
+    for (let k = 0; k < 4; k++) RS.dials.setValue(g, D[keys[k]], best[k]);
+    return bestScore;
+  }
+
+  function clampTo(dial, v) { return Math.max(dial.min, Math.min(dial.max, v)); }
+
+  /* A fully-upgraded observer, because the question here is whether a layer is
+   * *beatable*, not whether it is reachable — reachability is tested by the
+   * economy block above. */
+  function maxedGame(seed) {
+    const g = RS.game.newGame(seed);
+    for (const id of ['frequency', 'phase', 'time', 'space']) {
+      const d = g.dials[id];
+      for (const kind of ['range', 'precision', 'focus']) {
+        for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(d, kind);
+      }
+    }
+    return g;
+  }
+
+  /* Play one band for `secs` of simulated time and report what it felt like. */
+  function soak(band, secs, seed) {
+    const g = maxedGame(seed);
+    /* Antecedents you understand count as held (see field.js), so a soak of an
+     * ordering layer has to start from a player who has been somewhere else
+     * first — which is exactly the state any real player reaches it in. Half
+     * the ledger, not all of it: a player who understood everything would
+     * never see a dependency block, and blocking is the layer's mechanic. */
+    RS.fractal.ESSENCES.forEach((e, i) => { if (i % 2 === 0) g.gnosis[e.id] = [e.id + '@6:0']; });
+
+    RS.dials.setValue(g, g.dials.space, 13);
+    RS.dials.setValue(g, g.dials.frequency, band.centre);
+
+    let crystals = 0, gateSum = 0, gateN = 0, blockedFrames = 0, twinFrames = 0;
+    let deepest = 0, holdSum = 0, holdN = 0, insightStart = 0;
+    let moveSum = 0, invSum = 0, passiveSum = 0;
+    const lastRad = new Map();
+    const bus = { emit(k, p) { if (k === 'node:crystallise') { crystals++; holdSum += p.node.age; holdN++; } }, on() {} };
+
+    const steps = Math.round(secs * 60);
+    let target = null;
+    for (let i = 0; i < steps; i++) {
+      /* Re-pick a target when the old one is gone, then hold the dials on it. */
+      if (!target || target.dying || target.crystallised || g.field.nodes.indexOf(target) < 0) {
+        target = null;
+        for (const n of g.field.nodes) {
+          if (n.dying || n.crystallised) continue;
+          if (n.man.bandIndex !== band.index) continue;
+          if (!target || n.man.potency > target.man.potency) target = n;
+        }
+        if (target) bestPlacement(g, target);
+      } else if ((i % 8) === 0) {
+        bestPlacement(g, target);
+      }
+      if (i === 30) insightStart = g.insight;
+      RS.field.tick(g, bus, 1 / 60);
+      passiveSum += g.passiveRate * (1 / 60) * RS.field.passiveShareOf(band);
+      for (const n of g.field.nodes) {
+        if (n.man.bandIndex !== band.index) continue;
+        gateSum += n.gate; gateN++;
+        if (n.blocked) blockedFrames++;
+        if (n.twinInfo && !n.collapsed) twinFrames++;
+        if (n.depth > deepest) deepest = n.depth;
+        /* How much the layer *moves things about* — FLOW's signature, and
+         * invisible to every other primitive. */
+        const prev = lastRad.get(n.id);
+        if (prev !== undefined) moveSum += Math.abs(n.targetRad - prev);
+        lastRad.set(n.id, n.targetRad);
+        invSum += n.inv ? n.inv.strength : 0;
+      }
+    }
+    return {
+      crystals,
+      gate: gateN ? gateSum / gateN : 1,
+      blocked: gateN ? blockedFrames / gateN : 0,
+      twin: gateN ? twinFrames / gateN : 0,
+      deepest,
+      hold: holdN ? holdSum / holdN : 0,
+      passive: RS.field.passiveShareOf(band),
+      move: gateN ? moveSum / gateN * 60 : 0,
+      inverted: gateN ? invSum / gateN : 0,
+      passiveEarned: passiveSum,
+      income: g.insight - insightStart
+    };
+  }
+
+  const profiles = [];
+  for (const band of RS.spectrum.BANDS) {
+    const r = soak(band, 150, 4200 + band.index);
+    profiles.push(r);
+    assert(r.crystals > 0,
+      'the ' + band.name + ' layer is winnable (' + r.crystals + ' crystals in 150s)');
+  }
+
+  /* The gated layers must actually spend time shut, and the ungated ones must
+   * not — otherwise `prim` is decorative. */
+  for (let i = 0; i < nBands; i++) {
+    const band = RS.spectrum.BANDS[i], p = profiles[i];
+    if (RS.spectrum.usesPrim(band, 'gate')) {
+      assert(p.gate < 0.93, band.name + ' genuinely gates (mean openness ' + p.gate.toFixed(2) + ')');
+    } else {
+      assert(p.gate > 0.999, band.name + ' does not gate, so nothing there blinks');
+    }
+    if (RS.spectrum.usesPrim(band, 'twin')) {
+      assert(p.twin > 0.02, band.name + ' shows uncollapsed doubles');
+    } else {
+      assert(p.twin === 0, band.name + ' shows no doubles');
+    }
+    if (RS.spectrum.usesPrim(band, 'nest')) {
+      assert(p.deepest > 0, band.name + ' exposes children when a parent is held');
+    } else {
+      assert(p.deepest === 0, band.name + ' does not nest');
+    }
+    if (!RS.spectrum.usesPrim(band, 'order')) {
+      assert(p.blocked === 0, band.name + ' has no antecedents to wait on');
+    }
+  }
+
+  /* Idle income exists in exactly the layers a gradient can carry it through,
+   * and the first layer is the idle one. */
+  assert(profiles[0].passiveEarned > 0, 'the Baryonic layer pays while you are not looking');
+  assert(RS.field.passiveShareOf(RS.spectrum.BY_ID.thermal) === 0,
+    'the Thermal layer drifts too fast for anything to settle');
+  assert(RS.field.passiveShareOf(RS.spectrum.BY_ID.baryonic) >
+         RS.field.passiveShareOf(RS.spectrum.BY_ID.noetic),
+    'and the calm shallow layer out-idles the crowded deep one');
+
+  /* No two *primitive sets* may produce the same interaction profile. Bands
+   * that share a set (Mnemonic and Archetypal both run order+nest) are allowed
+   * to play alike — they differ in yield, width and drift, not in mechanics —
+   * but every distinct set must be a distinct experience or the composition is
+   * not buying anything. */
+  const byPrim = new Map();
+  for (let i = 0; i < nBands; i++) {
+    const key = RS.spectrum.BANDS[i].prim.slice().sort().join('+');
+    if (!byPrim.has(key)) byPrim.set(key, []);
+    byPrim.get(key).push(i);
+  }
+  const keys = [...byPrim.keys()];
+  assert(keys.length >= 8, 'the twelve layers span at least eight distinct mechanics (' + keys.length + ')');
+
+  function fingerprint(i) {
+    const p = profiles[i];
+    return [p.gate, p.twin, p.blocked, Math.min(1, p.deepest / 4),
+      RS.field.passiveShareOf(RS.spectrum.BANDS[i]),
+      Math.min(1, p.move * 4), p.inverted];
+  }
+  let collisions = [];
+  for (let a = 0; a < keys.length; a++) {
+    for (let b = a + 1; b < keys.length; b++) {
+      const fa = fingerprint(byPrim.get(keys[a])[0]);
+      const fb = fingerprint(byPrim.get(keys[b])[0]);
+      let far = false;
+      for (let k = 0; k < fa.length; k++) if (Math.abs(fa[k] - fb[k]) > 0.05) far = true;
+      if (!far) collisions.push(keys[a] + ' ≡ ' + keys[b]);
+    }
+  }
+  assert(collisions.length === 0,
+    'every distinct primitive set plays differently: ' + (collisions.join(', ') || 'none alike'));
+}
+
+// ── one essence, recognisable in all twelve layers ───────────────────────
+/* The thesis, stated as a test. Cascade's branching is 0.90 and Lattice's is
+ * 0.50; if that difference does not show up in every band that runs a
+ * branching-sensitive primitive, then knowledge does not transfer and the
+ * whole design is just twelve minigames wearing a costume. */
+{
+  const EM = RS.emergence;
+  const cascade = RS.fractal.ESSENCE_BY_ID.cascade;
+  const lattice = RS.fractal.ESSENCE_BY_ID.lattice;
+  const attractor = RS.fractal.ESSENCE_BY_ID.attractor;
+
+  let checked = 0, wrong = [];
+  for (const band of RS.spectrum.BANDS) {
+    for (const tier of [1, 5, 9, 13, 20]) {
+      if (RS.spectrum.usesPrim(band, 'gate')) {
+        checked++;
+        if (!(EM.GATE(cascade, tier, 0, {}).subdiv > EM.GATE(lattice, tier, 0, {}).subdiv)) {
+          wrong.push('gate/' + band.id + '@' + tier);
+        }
+      }
+      if (RS.spectrum.usesPrim(band, 'nest')) {
+        checked++;
+        if (!(EM.NEST(cascade, {}).fanout > EM.NEST(attractor, {}).fanout)) {
+          wrong.push('nest/' + band.id + '@' + tier);
+        }
+      }
+      if (RS.spectrum.usesPrim(band, 'order')) {
+        checked++;
+        if (!(EM.ORDER(cascade, 5, {}).fanout > EM.ORDER(attractor, 5, {}).fanout)) {
+          wrong.push('order/' + band.id + '@' + tier);
+        }
+      }
+      if (RS.spectrum.usesPrim(band, 'flow')) {
+        checked++;
+        if (!(EM.FLOW(cascade, 0.5, 0.3, 1, {}).divergence > EM.FLOW(attractor, 0.5, 0.3, 1, {}).divergence)) {
+          wrong.push('flow/' + band.id + '@' + tier);
+        }
+      }
+      if (RS.spectrum.usesPrim(band, 'twin')) {
+        checked++;
+        /* Cascade is asymmetric, so it throws its double further than the
+         * perfectly symmetric Lattice does. */
+        if (!(EM.TWIN(cascade, 3, {}).separation > EM.TWIN(lattice, 3, {}).separation)) {
+          wrong.push('twin/' + band.id + '@' + tier);
+        }
+      }
+    }
+  }
+  assert(checked > 100, 'the branching claim is checked across the whole spectrum (' + checked + ' places)');
+  assert(wrong.length === 0, 'Cascade branches everywhere it can: ' + (wrong.join(', ') || 'no exceptions'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

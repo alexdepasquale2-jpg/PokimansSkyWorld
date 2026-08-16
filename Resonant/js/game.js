@@ -42,12 +42,20 @@
          * worlds themselves re-derive, so this is a visited-list, not a
          * world-save. A thousand explored systems is a few kilobytes. */
         systems: Object.create(null),
-        planets: Object.create(null)
+        planets: Object.create(null),
+        /* Stars a civilisation has told you about. Distinct from `systems`
+         * (which you have been to) because a chart you were given is a real
+         * thing to have and a real reason to talk to anyone. */
+        charted: Object.create(null)
       },
       gnosis: Object.create(null),
 
       /* ── the embodied half ─────────────────────────────────────────────── */
       scene: RS.scenes.newScene(),
+      galaxy: RS.galaxy.newState(),
+      /* Per-civilisation relationship records. Four numbers per culture; the
+       * culture itself stays derived. */
+      contacts: Object.create(null),
       body: RS.vessel.newBody('mote'),
       inhabiting: false,
       vessels: { unlocked: { mote: true } },
@@ -59,7 +67,7 @@
       fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
       senseBonus: 0,
 
-      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0 },
+      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
 
       /* Transient, rebuilt every frame — never saved. */
       focusNode: null,
@@ -151,7 +159,31 @@
    * gets its own function rather than overloading the tuning one. */
   function sceneObjective(game) {
     const s = game.scene;
+    if (s.kind === 'galaxy') {
+      const reachLy = (RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR).toFixed(0);
+      if (!game.galaxy.target) {
+        return { text: 'Tap a star to select it. Dim stars are beyond your ' + reachLy +
+          ' ly field — amber rings are inhabited.', kind: 'select' };
+      }
+      const t = game.galaxy.target;
+      if (!t.inReach && !t.visited && !t.charted) {
+        return { text: t.name + ' is ' + t.dist.toFixed(1) + ' ly away, past your ' + reachLy +
+          ' ly reach. Expand the consciousness field, or ask a civilisation for charts.', kind: 'reach' };
+      }
+      return { text: 'Tap ' + t.name + ' again to travel, then turn Σ inward to enter it.', kind: 'travel' };
+    }
     if (s.kind === 'system') {
+      if (s.contact) {
+        const st = RS.contact.stateOf(game, s.contact.planet, s.contact.civ, s.contact.lock);
+        if (st === RS.contact.STATES.open || st === RS.contact.STATES.warm) {
+          return { text: 'Channel open with ' + s.contact.civ.name + '. Open the ◉ panel.', kind: 'contact' };
+        }
+        if (!s.contact.lock.inReach) {
+          return { text: s.contact.civ.name + ' broadcasts at φ' + s.contact.lock.carrier.phi.toFixed(1) +
+            ' — past your dial. Buy φ RANGE.', kind: 'contact' };
+        }
+        return { text: 'A carrier at φ' + s.contact.lock.carrier.phi.toFixed(1) + '. Tune φ and Δ onto it.', kind: 'contact' };
+      }
       if (!Object.keys(game.research).length) {
         return { text: 'Research LOCOMOTION to build a body you can land with.', kind: 'research' };
       }

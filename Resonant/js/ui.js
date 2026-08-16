@@ -25,7 +25,8 @@
       'tier-name', 'tier-sci', 'layer-name', 'layer-rules', 'objective',
       'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title',
       'btn-upgrades', 'btn-codex', 'btn-settings', 'btn-drawer-close', 'beat-hint',
-      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar']) {
+      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar', 'btn-contact', 'contact-hint',
+      'btn-guide', 'btn-paths']) {
       el[id] = $(id);
     }
 
@@ -34,6 +35,9 @@
     el['btn-settings'].addEventListener('click', () => toggleDrawer(game, bus, 'settings'));
     el['btn-world'].addEventListener('click', () => toggleDrawer(game, bus, 'world'));
     el['btn-vessels'].addEventListener('click', () => toggleDrawer(game, bus, 'vessels'));
+    el['btn-contact'].addEventListener('click', () => toggleDrawer(game, bus, 'contact'));
+    el['btn-guide'].addEventListener('click', () => toggleDrawer(game, bus, 'guide'));
+    el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
 
     /* Delegated, because the drawer body is rebuilt wholesale on every open and
@@ -74,6 +78,24 @@
       const st = ev.target.closest('[data-build]');
       if (st) {
         const r = RS.influence.place(game, bus, game.scene.planet, st.dataset.build);
+        if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+        renderDrawer(game, bus);
+        return;
+      }
+      const con = ev.target.closest('[data-contact]');
+      if (con) {
+        const c = game.scene.contact;
+        if (c) {
+          const r = RS.contact.act(game, bus, c.planet, c.civ, con.dataset.contact);
+          if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+          if (r.closed) closeDrawer(); else renderDrawer(game, bus);
+        }
+        return;
+      }
+      const trav = ev.target.closest('[data-travel]');
+      if (trav) {
+        const st = game.galaxy.stars.find(x => x.key === trav.dataset.travel);
+        const r = RS.galaxy.travelTo(game, bus, st);
         if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
         renderDrawer(game, bus);
         return;
@@ -124,14 +146,43 @@
       ? tier.sci
       : (tier.logM == null ? 'Tegmark Level ' + tier.level : RS.core.fmtMetres(tier.logM)));
 
+    /* The second context line describes whatever is actually in front of the
+     * player. Showing the reality layer's rules while looking at a star map
+     * was simply false information in the most prominent text slot on screen. */
     const focus = RS.dials.focusOf(D.frequency);
     const band = RS.spectrum.BANDS[game.field.bandIndex];
     const ghost = RS.spectrum.isGhost(band, focus);
-    setText('layer-name', band.name.toUpperCase() + (ghost ? ' · GHOST' : ''));
-    setText('layer-rules', ghost
-      ? 'Beyond your focus. Visible, not holdable. Buy φ FOCUS to make it cohere.'
-      : band.rules);
-    el['layer-name'].style.color = hsl(band.hue, ghost ? 0.15 : band.sat, 0.72);
+    const sc = game.scene;
+
+    if (sc.kind === 'galaxy') {
+      const inReach = game.galaxy.stars.filter(x => x.inReach).length;
+      const reachLy = (RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR).toFixed(0);
+      setText('layer-name', 'SECTOR ' + game.galaxy.sx + ', ' + game.galaxy.sy);
+      setText('layer-rules', game.galaxy.stars.length + ' stars in view · ' + inReach +
+        ' within your ' + reachLy + ' ly field · green ring = life, amber = inhabited');
+      el['layer-name'].style.color = hsl(190, 0.75, 0.72);
+    } else if (sc.kind === 'system' && sc.system) {
+      const st = sc.system.primary;
+      setText('layer-name', sc.system.name.toUpperCase());
+      setText('layer-rules', st.cls.c + st.sub + ' ' + st.cls.name + ' · ' +
+        sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
+        sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
+      el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'planet' && sc.planet) {
+      const p = sc.planet;
+      setText('layer-name', p.name.toUpperCase());
+      setText('layer-rules', p.type.name + ' · ' + Math.round(p.surfaceTemp) + ' K · ' +
+        p.gravity.toFixed(2) + ' g · ' +
+        (p.pressure < 0.01 ? 'no atmosphere' : p.pressure.toFixed(2) + ' bar') +
+        (p.biosphere ? ' · ' + p.biosphere.stage.name : ''));
+      el['layer-name'].style.color = hsl(p.type.hue, 0.75, 0.72);
+    } else {
+      setText('layer-name', band.name.toUpperCase() + (ghost ? ' · GHOST' : ''));
+      setText('layer-rules', ghost
+        ? 'Beyond your focus. Visible, not holdable. Buy φ FOCUS to make it cohere.'
+        : band.rules);
+      el['layer-name'].style.color = hsl(band.hue, ghost ? 0.15 : band.sat, 0.72);
+    }
 
     const obj = RS.game.sceneObjective(game);
     setText('objective', obj.text);
@@ -145,8 +196,35 @@
     el['scene-tag'].style.color = game.inhabiting ? '#fca5a5' : '#7dd3fc';
 
     renderBodyBar(game);
+    renderContactHint(game);
     renderReadout(game);
     renderBeatHint(game);
+  }
+
+  /* A civilisation in earshot is the rarest thing in the game, so it gets a
+   * permanent, unmissable line of its own the moment one is detectable —
+   * finding one and not realising it would be the worst failure this game
+   * could have. */
+  function renderContactHint(game) {
+    const c = game.scene.contact;
+    const btn = el['btn-contact'];
+    const hint = el['contact-hint'];
+    if (!c) {
+      if (btn.dataset.on !== '0') { btn.dataset.on = '0'; btn.classList.remove('live'); }
+      hint.style.opacity = '0';
+      return;
+    }
+    btn.dataset.on = '1';
+    btn.classList.add('live');
+    const state = RS.contact.stateOf(game, c.planet, c.civ, c.lock);
+    const open = state === RS.contact.STATES.open || state === RS.contact.STATES.warm;
+    btn.style.color = hsl(state.hue, 0.85, 0.7);
+    hint.style.opacity = '1';
+    hint.style.color = hsl(state.hue, 0.85, 0.72);
+    setText('contact-hint', open
+      ? '◉ ' + c.civ.name + ' — channel open'
+      : '◉ ' + c.civ.name + ' — carrier at φ' + c.lock.carrier.phi.toFixed(1) +
+        ' (' + (c.lock.total * 100).toFixed(0) + '% lock)');
   }
 
   /* The body bar only exists while embodied, and it shows the three things a
@@ -230,7 +308,12 @@
       ? man.essence.name + (gn ? ' · gnosis ' + gn : '') + (man.rarity ? ' · ' + '★'.repeat(man.rarity) : '')
       : 'Hold closer to resolve';
     const blocked = n.blocked && n.antecedent
-      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first</div>' : '';
+      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first' +
+        (n.orderNeed > 1 ? ' <small>(' + n.orderMet + '/' + n.orderNeed + ' antecedents held)</small>' : '') +
+        '</div>'
+      : (n.orderNeed > 1 && n.orderMet < n.orderNeed
+        ? '<div class="ro-block ok">' + n.orderMet + '/' + n.orderNeed + ' antecedents held · ×' +
+          n.orderBonus.toFixed(2) + '</div>' : '');
 
     node.innerHTML =
       '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(man.hue, 0.8, 0.7) + '">' +
@@ -244,6 +327,7 @@
   function renderSceneReadout(game, node) {
     const s = game.scene;
     node.dataset.empty = '0';
+    if (s.kind === 'galaxy') { renderGalaxyReadout(game, node); return; }
     if (s.kind === 'system' && s.system) {
       const p = s.planet;
       const prim = s.system.primary;
@@ -323,14 +407,18 @@
   function renderDrawer(game, bus) {
     if (!drawerOpen) return;
     const titles = { upgrades: 'DIALS', codex: 'CODEX', settings: 'SETTINGS',
-      world: 'WORLD', vessels: 'BODIES & RESEARCH' };
+      world: 'WORLD', vessels: 'BODIES & RESEARCH', contact: 'CONTACT',
+      guide: 'HOW THIS WORKS', paths: 'PATHWAYS' };
     el['drawer-title'].textContent = titles[drawerOpen] || '';
     el['drawer-body'].innerHTML =
       drawerOpen === 'upgrades' ? upgradesHTML(game)
         : drawerOpen === 'codex' ? codexHTML(game)
           : drawerOpen === 'world' ? worldHTML(game)
             : drawerOpen === 'vessels' ? vesselsHTML(game)
-              : settingsHTML(game);
+              : drawerOpen === 'contact' ? contactHTML(game, bus)
+                : drawerOpen === 'guide' ? RS.guide.guideHTML(game)
+                  : drawerOpen === 'paths' ? RS.guide.pathwaysHTML(game)
+                    : settingsHTML(game);
   }
 
   const KIND_BLURB = {
@@ -657,5 +745,147 @@
     return h;
   }
 
-  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, get drawerOpen() { return drawerOpen; } };
+
+  // --- contact drawer ------------------------------------------------------
+
+  /* The contact panel is the payoff for the whole tuning apparatus, so it
+   * shows the *tuning* first: how close the carrier lock is, in the same
+   * language the field uses, with the same arrows. A player who has learned to
+   * land a manifestation already knows how to read this. */
+  function contactHTML(game, bus) {
+    const c = game.scene.contact;
+    if (!c) {
+      return '<p class="blurb">No mind within reach. Civilisations are rare &mdash; ' +
+        'look for the pulsing amber rings on the galactic map, then descend into that system.</p>' +
+        contactRosterHTML(game);
+    }
+
+    const { civ, lock, planet } = c;
+    const rec = RS.contact.recordOf(game, planet);
+    const state = RS.contact.stateOf(game, planet, civ, lock);
+    const carrier = lock.carrier;
+    let h = '';
+
+    h += '<section><h3>' + civ.name + ' <em>' + planet.name + '</em></h3>' +
+      '<div class="stats">' +
+      '<div>Technology <b>' + civ.tier.name + '</b></div>' +
+      '<div>Population <b>' + fmt(civ.population) + '</b></div>' +
+      '<div>Disposition <b>' + civ.disposition.name + '</b></div>' +
+      '<div>Channel <b style="color:' + hsl(state.hue, 0.8, 0.7) + '">' + state.name + '</b></div>' +
+      '<div>They know of you <b>' + (rec.awareness * 100).toFixed(0) + '%</b></div>' +
+      '<div>Standing <b style="color:' + hsl(rec.standing >= 0 ? 135 : 0, 0.8, 0.68) + '">' +
+        (rec.standing >= 0 ? '+' : '') + rec.standing.toFixed(2) + '</b></div>' +
+      '</div>';
+
+    // ── the carrier ──
+    h += '<h3 style="margin-top:12px">Carrier</h3>' +
+      '<p class="blurb">They broadcast on the <b>' + carrier.band.name + '</b> layer &mdash; ' +
+      carrier.spec.note + '. Tune &phi; onto it and hold &Delta; to open the channel.</p>';
+
+    const dirF = Math.abs(lock.fd) < 0.25 ? 'on' : (lock.fd > 0 ? 'lower &phi;' : 'raise &phi;');
+    const dirP = Math.abs(lock.pd) < 0.25 ? 'on' : (lock.pd > 0 ? 'lower &Delta;' : 'raise &Delta;');
+    h += '<div class="ro-axes" style="margin:0 0 8px">' +
+      '<span class="ax' + (lock.f > 0.86 ? ' good' : '') + '" style="--h:187">&phi;' +
+        '<b style="width:' + (clamp01(lock.f) * 100).toFixed(0) + '%"></b><i>' + dirF + '</i></span>' +
+      '<span class="ax' + (lock.p > 0.86 ? ' good' : '') + '" style="--h:268">&Delta;' +
+        '<b style="width:' + (clamp01(lock.p) * 100).toFixed(0) + '%"></b><i>' + dirP + '</i></span>' +
+      '</div>';
+
+    if (!lock.inReach) {
+      h += '<p class="blurb" style="color:var(--warn)">Their carrier sits at &phi;' +
+        carrier.phi.toFixed(1) + ', past your dial\'s reach of &phi;' +
+        game.dials.frequency.max.toFixed(0) + '. Buy &phi; RANGE.</p>';
+    } else if (lock.ghost) {
+      h += '<p class="blurb" style="color:var(--warn)">You can hear that somebody is there and cannot make them out. ' +
+        'The ' + carrier.band.name + ' layer needs more &phi; FOCUS to cohere.</p>';
+    } else if (rec.awareness < 0.35) {
+      h += '<p class="blurb">They have not noticed you yet. Stay in their system, ' +
+        'raise your reality field, or build something they can see.</p>';
+    }
+
+    // ── what they say ──
+    if (state === RS.contact.STATES.open || state === RS.contact.STATES.warm) {
+      h += '<h3 style="margin-top:12px">They say</h3><div class="say">';
+      for (const line of RS.contact.greeting(game, planet, civ)) {
+        h += '<p>' + line + '</p>';
+      }
+      h += '</div>';
+
+      h += '<h3 style="margin-top:12px">Exchange</h3><div class="up-rows">';
+      for (const o of RS.contact.offersFor(game, planet, civ)) {
+        const dis = !o.available;
+        h += '<button class="up-row" data-contact="' + o.id + '"' + (dis ? ' disabled' : '') +
+          ' style="--h:' + civ.disposition.hue + '">' +
+          '<span class="k">' + o.name.toUpperCase().slice(0, 22) + '</span><span class="lv"></span>' +
+          '<span class="d">' + o.blurb + '<br><i style="opacity:.65">' +
+            (dis && o.why ? o.why : o.effect) + '</i></span>' +
+          '<span class="c">' + (o.cost ? fmt(o.cost) + ' &Psi;' : '') + '</span></button>';
+      }
+      h += '</div>';
+    } else if (state === RS.contact.STATES.cold) {
+      h += '<p class="blurb" style="color:var(--warn)">They are refusing you. ' +
+        'Standing must rise above &minus;0.45 before they will answer again.</p>';
+    }
+
+    return h + contactRosterHTML(game);
+  }
+
+  /* Everyone you have ever spoken to, so relationships persist visibly rather
+   * than existing only while you are standing in the right system. */
+  function contactRosterHTML(game) {
+    const keys = Object.keys(game.contacts).filter(k => game.contacts[k].met);
+    if (!keys.length) return '';
+    let h = '<section><h3>Known cultures <em>' + keys.length + '</em></h3><div class="list">';
+    for (const k of keys) {
+      const r = game.contacts[k];
+      const hue = r.standing > 0.45 ? 135 : r.standing < -0.2 ? 0 : 45;
+      h += '<div class="row" style="--h:' + hue + '"><span class="g">&#9673;</span>' +
+        '<span class="n">' + (r.name || 'Unnamed culture') +
+        (r.where ? ' <b style="color:var(--dimmer)">' + r.where + '</b>' : '') +
+        '<em>standing ' + (r.standing >= 0 ? '+' : '') +
+        r.standing.toFixed(2) + ' &middot; ' + r.exchanges + ' exchanges' +
+        (r.taught.length ? ' &middot; taught you ' + r.taught.length : '') +
+        (r.uplifted ? ' &middot; uplifted &times;' + r.uplifted : '') + '</em></span></div>';
+    }
+    return h + '</div></section>';
+  }
+
+  // --- galaxy readout ------------------------------------------------------
+
+  /* What the player is looking at on the map, and what it would cost to go
+   * there. Rendered into the same slot the node readout uses. */
+  function renderGalaxyReadout(game, node) {
+    const G = game.galaxy;
+    const tg = G.target;
+    const reachLy = RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR;
+    node.dataset.empty = '0';
+
+    if (!tg) {
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:#7dd3fc">&#9678;</span>' +
+        '<span class="ro-title">Sector ' + G.sx + ', ' + G.sy + '</span></div>' +
+        '<div class="ro-sub">' + G.stars.length + ' stars in view &middot; reach ' +
+        reachLy.toFixed(0) + ' ly</div>' +
+        '<div class="ro-sub" style="margin-top:4px">Tap a star to select it.</div>';
+      return;
+    }
+
+    const sv = RS.galaxy.surveyOf(game, tg);
+    const st = tg.star;
+    node.innerHTML =
+      '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(st.cls.hue, 0.8, 0.72) + '">&#9673;</span>' +
+      '<span class="ro-title">' + tg.name + '</span></div>' +
+      '<div class="ro-sub">' + st.cls.c + st.sub + ' ' + st.cls.name + ' &middot; ' +
+        st.mass.toFixed(2) + ' M&#9737; &middot; ' + tg.dist.toFixed(1) + ' ly</div>' +
+      (sv ? '<div class="ro-sub" style="margin-top:4px">' + sv.planets + ' planets' +
+        (sv.life ? ' &middot; <b style="color:#86efac">' + sv.life + ' living</b>' : '') +
+        (sv.civ ? ' &middot; <b style="color:#fcd34d">' + sv.civ + ' inhabited</b>' : '') + '</div>'
+        : '<div class="ro-sub" style="margin-top:4px;color:var(--warn)">Beyond your field &mdash; unresolved</div>') +
+      '<div class="ro-sub" style="margin-top:4px">' +
+        (tg.inReach || tg.visited || tg.charted
+          ? 'Turn &Sigma; inward to travel here.'
+          : 'Expand the consciousness field to reach it.') + '</div>';
+  }
+
+  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

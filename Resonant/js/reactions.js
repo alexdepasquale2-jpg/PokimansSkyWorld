@@ -307,6 +307,133 @@
 
     bus.on('scene:aim', () => { RS.audio.click(0.6, 0.4); RS.feel.buzz('tick'); });
 
+    // ── the galactic map ─────────────────────────────────────────────────
+    bus.on('galaxy:target', ({ star }) => {
+      RS.audio.seat(0.5);
+      const sv = RS.galaxy.surveyOf(game, star);
+      RS.ui.toast({
+        kind: 'info', icon: '◉', hue: star.star.cls.hue, ms: 3200,
+        title: star.name + ' — ' + star.dist.toFixed(1) + ' ly',
+        body: sv
+          ? star.star.cls.c + star.star.sub + ' · ' + sv.planets + ' planets' +
+            (sv.civ ? ' · INHABITED' : sv.life ? ' · life' : '') + '. Tap again to travel.'
+          : 'Unresolved at this distance. Tap again to travel.'
+      });
+    });
+
+    bus.on('galaxy:travel', ({ star }) => {
+      RS.audio.discover(1.0);
+      RS.feel.FX.discovery(star.star.cls.hue, 0.9);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: star.star.cls.hue, ms: 4200,
+        title: 'ARRIVED — ' + star.name,
+        body: 'Turn Σ inward to enter the system.'
+      });
+    });
+
+    // ── contact ──────────────────────────────────────────────────────────
+    bus.on('contact:detected', ({ planet, civ }) => {
+      /* They noticed you first. This is deliberately unsettling and it is the
+       * only event in the game where something else acts on you. */
+      RS.audio.discover(0.8);
+      RS.feel.FX.discovery(civ.disposition.hue, 0.7);
+      RS.feel.vignette(0.6);
+      const carrier = RS.contact.carrierOf(game, planet, civ);
+      RS.ui.toast({
+        kind: 'major', icon: '◉', hue: civ.disposition.hue, ms: 7000,
+        title: 'SOMETHING HAS NOTICED YOU',
+        body: civ.name + ' on ' + planet.name + ' is aware of you. They broadcast on the ' +
+          carrier.band.name + ' layer at φ' + carrier.phi.toFixed(1) + '. Tune to it.'
+      });
+    });
+
+    bus.on('contact:open', ({ planet, civ, first }) => {
+      game.stats.contacts = (game.stats.contacts || 0) + (first ? 1 : 0);
+      /* First contact is the biggest single moment the game has. */
+      RS.audio.discover(first ? 1.6 : 0.9);
+      RS.feel.FX.discovery(civ.disposition.hue, first ? 1.4 : 0.8);
+      if (first) { RS.feel.hitstop(0.08); RS.feel.vignette(0.85); }
+      RS.ui.toast({
+        kind: 'major', icon: '◉', hue: civ.disposition.hue, ms: first ? 9000 : 4000,
+        title: first ? 'FIRST CONTACT — ' + civ.name.toUpperCase() : 'CHANNEL OPEN — ' + civ.name,
+        body: first
+          ? civ.tier.name + ' · ' + civ.disposition.name + ' · ' + RS.core.fmt(civ.population) +
+            ' minds. Open the ◉ panel to speak with them.'
+          : 'Hold the carrier and open the ◉ panel.'
+      });
+    });
+
+    bus.on('contact:listen', ({ civ, essence, fresh, level, insight }) => {
+      RS.audio.crystal(RS.spectrum.BY_ID.noetic.index, fresh ? 2 : 0, 4);
+      RS.feel.FX.crystallise(0, 0, civ.disposition.hue, fresh ? 2 : 0, insight);
+      RS.ui.toast({
+        kind: fresh ? 'gnosis' : 'info', icon: essence.glyph, hue: civ.disposition.hue,
+        ms: fresh ? 5200 : 2800,
+        title: fresh ? essence.name.toUpperCase() + ' — through their eyes'
+          : 'They speak of ' + essence.name.toLowerCase(),
+        body: (fresh ? 'A mind that is not yours recognising the same essence. Gnosis ' + level + '. ' : '') +
+          '+' + RS.core.fmt(insight) + ' Ψ'
+      });
+    });
+
+    bus.on('contact:survey', ({ civ, revealed, radius }) => {
+      RS.audio.discover(1.2);
+      RS.feel.FX.discovery(45, 1.0);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: 45, ms: 6000,
+        title: 'THEY GAVE YOU THEIR CHARTS',
+        body: revealed + ' stars within ' + (radius * RS.galaxy.LY_PER_SECTOR) +
+          ' ly are now resolved on your map, regardless of your own field. ' +
+          'Turn Σ out to the cluster tier to see them.'
+      });
+    });
+
+    bus.on('contact:trade', ({ civ, total }) => {
+      RS.audio.purchase();
+      RS.feel.FX.crystallise(0, 0, 45, 1, total);
+      RS.ui.toast({ kind: 'buy', icon: 'Ψ', hue: 45, ms: 3000,
+        title: 'Traded with ' + civ.name, body: '+' + RS.core.fmt(total) + ' Ψ' });
+    });
+
+    bus.on('contact:gift', ({ civ, cost, standing }) => {
+      RS.audio.purchase();
+      RS.feel.FX.purchase(civ.disposition.hue);
+      RS.ui.toast({ kind: 'info', icon: '◇', hue: civ.disposition.hue, ms: 3200,
+        title: 'Given freely',
+        body: '−' + RS.core.fmt(cost) + ' Ψ. Standing now ' +
+          (standing >= 0 ? '+' : '') + standing.toFixed(2) + '.' });
+    });
+
+    bus.on('contact:taught', ({ civ, node }) => {
+      RS.audio.discover(1.4);
+      RS.feel.FX.discovery(node.hue, 1.2);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: node.hue, ms: 6500,
+        title: civ.name.toUpperCase() + ' TAUGHT YOU ' + node.name.toUpperCase(),
+        body: node.blurb + ' It cost them something to give, and their standing reflects that.'
+      });
+    });
+
+    bus.on('contact:uplift', ({ civ, welcomed, standing }) => {
+      RS.audio.discover(welcomed ? 1.3 : 0.5);
+      RS.feel.FX.discovery(welcomed ? 120 : 0, 1.1);
+      RS.ui.toast({
+        kind: welcomed ? 'major' : 'warn', icon: '⌘', hue: welcomed ? 120 : 0, ms: 6500,
+        title: welcomed ? 'THEY TOOK IT' : 'THEY RESENT IT',
+        body: welcomed
+          ? civ.disposition.name + ' — they absorbed the lattice and asked for more. Standing ' +
+            (standing >= 0 ? '+' : '') + standing.toFixed(2) + '.'
+          : civ.disposition.name + ' — they did not ask to be raised, and they know who did it. ' +
+            'Standing ' + standing.toFixed(2) + '.'
+      });
+    });
+
+    bus.on('contact:withdraw', ({ civ }) => {
+      RS.audio.seat(0.2);
+      RS.ui.toast({ kind: 'info', icon: '·', ms: 2400,
+        title: 'Channel closed', body: 'You broke the carrier on ' + civ.name + '.' });
+    });
+
     bus.on('settings', ({ key, value }) => {
       if (key === 'audio') RS.audio.setEnabled(value);
       if (key === 'haptics') RS.feel.setHaptics(value);

@@ -369,11 +369,15 @@
     const hue = man.hue;
     const r = 0.036 * man.size * (1 + n.align * 0.28);
 
-    /* Probabilistic layer: the uncollapsed twin renders as a real, equally
-     * convincing node. Half the time you tune the wrong one, which is the
-     * entire mechanic. */
-    if (n.band.mode === 'superposed' && !n.collapsed) {
-      const tx = Math.cos(n.twinAng) * n.rad, ty = Math.sin(n.twinAng) * n.rad;
+    /* TWIN: the uncollapsed double renders as a real, equally convincing node.
+     * Half the time you tune the wrong one, which is the entire mechanic —
+     * and how far off it sits is the essence's symmetry, so a Duality twins
+     * almost on top of itself and a Cascade throws its double clear across
+     * the field. */
+    if (n.twinInfo && !n.collapsed) {
+      const sep = 0.35 + n.twinSep * 1.3;
+      const ta = n.ang + Math.PI * sep;
+      const tx = Math.cos(ta) * n.rad, ty = Math.sin(ta) * n.rad;
       drawSmudge(ctx, tx, ty, r, hue, a * 0.5, t, man.seed);
       if (n.resolved > 0.3) drawEssence(ctx, man, tx, ty, r, hue, a * n.resolved * 0.45, t);
     }
@@ -651,7 +655,9 @@
      * like one game rather than three minigames. */
     const kind = game.scene ? game.scene.kind : 'field';
 
-    if (kind === 'system') {
+    if (kind === 'galaxy') {
+      RS.galaxy.draw(ctx, game, dt);
+    } else if (kind === 'system') {
       RS.worldrender.drawSystem(ctx, game, dt);
     } else if (kind === 'planet') {
       RS.worldrender.drawPlanet(ctx, game, dt);

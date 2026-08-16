@@ -42,6 +42,14 @@
        * worked. */
       streams: Object.create(null),
       t: 0,
+      /* Rhythm time. Advances with the τ dial but *not* with the rung's clock,
+       * because GATE derives its own period from the clock and would otherwise
+       * be scaled by it twice. */
+      rt: 0,
+      /* essenceId → field.t at which it was last crystallised. This is the
+       * state the ORDER primitive reads, and it is why the causal layers are a
+       * graph you work rather than a queue you drain. */
+      satisfied: Object.create(null),
       tierIndex: RS.cosmos.ROOT_INDEX,
       bandIndex: 0,
       /* Rises when the rendered reality changes out from under the player;
@@ -78,15 +86,51 @@
 
   // --- demands -------------------------------------------------------------
 
-  /* How much each dial matters in a given band. Ramps in deliberately: this is
-   * the mechanic-per-layer curve. */
+  /* ── How much each dial matters in a given band ──────────────────────────
+   *
+   * Derived from the band's primitive set, not hand-tuned. Each primitive
+   * genuinely leans on particular dials, and a band demands a dial to the
+   * extent that *any* of its live primitives wants it — a probabilistic OR, so
+   * two primitives that both want Δ compound rather than average.
+   *
+   *   gate   wants τ hardest: a rhythm is a thing in time.
+   *   flow   wants neither. A gradient is read off φ and Σ alone, which is
+   *          exactly why it is the primitive the game opens with — and why it
+   *          is also the one that pays out passively.
+   *   nest   wants Σ (already always 1) and a little of both others.
+   *   order  wants Δ: a sequence is a position in the fourth dimension.
+   *   twin   wants Δ: the two halves of a superposition differ by phase.
+   *   invert wants everything, moderately.
+   *
+   * φ and Σ are always fully demanded — they are which layer and which rung,
+   * and nothing is legible without them. The consequence is a curve that is
+   * *shaped* rather than sloped: Baryonic and Thermal ask for nothing beyond
+   * the two dials you start with, Electromagnetic makes τ matter the instant
+   * you arrive, Probabilistic does the same for Δ, and Unity asks for all four
+   * at once. Each layer introduces the dial its own mechanics need, which is a
+   * better tutorial than a ramp because the reason is visible.
+   */
+  const DIAL_LOAD = {
+    gate:   { phase: 0.15, rate: 0.90 },
+    flow:   { phase: 0.00, rate: 0.00 },
+    nest:   { phase: 0.30, rate: 0.15 },
+    order:  { phase: 0.70, rate: 0.35 },
+    twin:   { phase: 0.75, rate: 0.20 },
+    invert: { phase: 0.60, rate: 0.60 }
+  };
+
   function demandsFor(bandIndex) {
-    return {
-      freq: 1,
-      tier: 1,
-      phase: clamp01((bandIndex - 1) / 2.6),
-      rate: clamp01((bandIndex - 2) / 2.8)
-    };
+    const band = RS.spectrum.BANDS[bandIndex];
+    let pMiss = 1, rMiss = 1;
+    if (band) {
+      for (let i = 0; i < band.prim.length; i++) {
+        const load = DIAL_LOAD[band.prim[i]];
+        if (!load) continue;
+        pMiss *= 1 - load.phase;
+        rMiss *= 1 - load.rate;
+      }
+    }
+    return { freq: 1, tier: 1, phase: clamp01(1 - pMiss), rate: clamp01(1 - rMiss) };
   }
 
   function gauss(d) { return Math.exp(-d * d); }
@@ -129,12 +173,29 @@
 
     let total = af * ap * ar * as;
 
-    /* The null layer scores inverted — everything the player learned reads
-     * backwards, which is the entire joke of that band. */
-    if (band.mode === 'inverted') total = 1 - total;
-    /* Unity cannot be discriminated against: everything is partly aligned and
-     * nothing is ever fully so. */
-    if (band.mode === 'unity') total = 0.45 + total * 0.5;
+    /* Inversion is a *primitive*, not a band. The Null layer runs it on every
+     * node, so the layer reads backwards — but by how much is the node's own
+     * business: INVERT.strength is 1 - persistence, so a Memory manifesting in
+     * the Null layer barely inverts at all and a Seed inverts almost totally.
+     * That is the difference between "the null band is the backwards one" and
+     * "backwards is a thing essences do, and this band is where they all do
+     * it" — the second is learnable, and gnosis on an essence tells you which
+     * way its reading will run before you ever tune it. */
+    if (RS.spectrum.usesPrim(band, 'invert')) {
+      total = RS.emergence.applyInvert(
+        RS.emergence.INVERT(man.essence, node.inv || (node.inv = {})), total);
+    }
+
+    /* Discrimination degrades as a band runs more primitives at once. With one
+     * live you can read exactly what is wrong; with six there is always
+     * something partly right and nothing ever fully so, which is precisely
+     * what the Unity layer is supposed to feel like. Derived from the count,
+     * so it arrives on its own the moment a band gets crowded. */
+    const load = RS.spectrum.demandOf(band);
+    if (load > 3) {
+      const k = clamp01((load - 3) / 3);
+      total = lerp(total, 0.45 + total * 0.5, k);
+    }
 
     return { total: clamp01(total), f: af, p: ap, r: ar, s: as, fd, pd, rd, sd, dem };
   }
@@ -178,6 +239,7 @@
       bob: hashF(h, 4) * TAU,
       x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
       age: 0,
+      effort: 0,
       life: 26 + hashF(h, 5) * 34,
       fade: 0,               // 0..1 presence, springs in and out
       align: 0, alignParts: null,
@@ -185,16 +247,22 @@
       resolved: 0,           // 0..1 how much of its identity is legible
       crystallised: false,
       dying: false,
-      /* mode-specific live state */
-      gate: 1,               // electromagnetic: open/closed window
+      /* Live primitive state. Every one of these is filled in by
+       * `applyPrimitives` from the node's own essence; what is stored here is
+       * only the part that cannot be derived — the per-node phase offset that
+       * stops a field of gated nodes blinking in lockstep, and the seeds of
+       * the geometry. */
+      gate: 1,
       gatePhase: hashF(h, 6) * TAU,
-      twinAng: ang + Math.PI * (0.6 + hashF(h, 7) * 0.8), // probabilistic
-      twinReal: hashF(h, 8) < 0.5,
+      gateInfo: null, flowInfo: null, nestInfo: null,
+      orderInfo: null, twinInfo: null, inv: null,
+      twinAng: ang + Math.PI * (0.6 + hashF(h, 7) * 0.8),
+      twinReal: true, twinSep: 0.3,
       collapsed: false,
-      valence: hashF(h, 9) * 2 - 1,                        // emotive
-      depth: 0,                                            // recursive nesting
+      depth: 0,
       parent: null,
-      blocked: false                                       // causal
+      blocked: false,
+      orderMet: 0, orderNeed: 0, orderBonus: 1
     };
     field.nodes.push(node);
     return node;
@@ -203,7 +271,14 @@
   /* Recursive layers: crystallising a parent exposes its children, which are
    * resolved from the *same* cell one slot deeper. Descent is the payout. */
   function spawnChildren(game, field, parent) {
-    const n = 2 + (hashN(parent.man.seed, 41) % 2);
+    const nest = parent.nestInfo || RS.emergence.NEST(parent.man.essence, {});
+    /* Fanout and depth are the essence's, not the band's — so a Cascade nests
+     * wide and a Void does not nest at all, in every layer that nests. Capped
+     * because a fanout-4 essence at depth 5 is 341 nodes and the frame budget
+     * is not a suggestion. */
+    const n = clamp(nest.fanout, 1, 3);
+    const ratio = nest.ratio;
+    if (field.nodes.length + n > capacityOf(game) * 1.7) return;
     for (let i = 0; i < n; i++) {
       const man = RS.fractal.resolve(game.seed, parent.man.tierIndex, parent.man.bandIndex,
         parent.man.cellX, parent.man.cellY, parent.man.slot + 1 + i);
@@ -217,16 +292,20 @@
         spin: parent.spin * 1.3,
         bob: hashF(h, 4) * TAU,
         x: parent.x, y: parent.y,
-        age: 0, life: 22 + hashF(h, 5) * 18,
+        age: 0, effort: 0, life: 22 + hashF(h, 5) * 18,
         fade: 0, align: 0, alignParts: null, coherence: 0, resolved: 0.4,
         crystallised: false, dying: false,
         gate: 1, gatePhase: hashF(h, 6) * TAU,
-        twinAng: ang + Math.PI, twinReal: hashF(h, 8) < 0.5, collapsed: false,
-        valence: hashF(h, 9) * 2 - 1,
+        gateInfo: null, flowInfo: null, nestInfo: null,
+        orderInfo: null, twinInfo: null, inv: null,
+        twinAng: ang + Math.PI, twinReal: true, twinSep: 0.3, collapsed: false,
         depth: parent.depth + 1, parent: parent.id, blocked: false,
-        /* Children are worth more the deeper they are — that is the whole
-         * reason to chase the nesting. */
-        bonus: Math.pow(1.85, parent.depth + 1)
+        orderMet: 0, orderNeed: 0, orderBonus: 1,
+        /* Children are worth more the deeper they are, and *how much* more is
+         * the essence's shrink ratio: an asymmetric essence's children shrink
+         * away fast and pay correspondingly better for being caught. That is
+         * the whole reason to chase the nesting. */
+        bonus: Math.pow(1 / ratio, parent.depth + 1)
       });
     }
   }
@@ -243,6 +322,7 @@
     const tierClock = RS.cosmos.clockAt(D.space.value);
     const flow = D.time.value * tierClock;
     field.t += dt * Math.abs(flow);
+    field.rt += dt * Math.abs(D.time.value);
 
     const tierIndex = clamp(Math.round(D.space.value), 0, RS.cosmos.TIERS.length - 1);
     const focus = RS.dials.focusOf(D.frequency);
@@ -310,16 +390,23 @@
       n.x = Math.cos(n.ang) * n.rad + bx;
       n.y = Math.sin(n.ang) * n.rad + by;
 
-      // ── mode rules ────────────────────────────────────────────────────
-      applyMode(game, field, n, band, dt, sgn);
+      // ── primitives ────────────────────────────────────────────────────
+      applyPrimitives(game, field, n, band, dt, sgn);
 
       // ── alignment ─────────────────────────────────────────────────────
       const a = alignmentOf(game, n);
       n.alignParts = a;
       let eff = a.total * n.gate;
-      if (band.mode === 'superposed' && !n.collapsed && !n.twinReal) eff *= 0.35;
+      if (n.twinInfo && !n.collapsed && !n.twinReal) eff *= 0.35;
       if (n.blocked) eff *= 0.15;
       n.align = damp(n.align, eff, 12, dt);
+
+      /* Time actually spent working this node. Anything the band's primitives
+       * do to slow you down — a shut gate, a twin to resolve, a missing
+       * antecedent, a gradient carrying it away — shows up here, and the payout
+       * reads it. That is why no primitive needs a hand-written compensation
+       * factor: friction pays for itself by definition. */
+      if (n.align > 0.06) n.effort += dt;
 
       /* Resolution: a node you are anywhere near begins to become legible.
        * Below that it is an unresolved smudge with no name and no glyph — the
@@ -343,22 +430,34 @@
           }
           if (n.coherence >= 1) crystallise(game, bus, field, n);
         } else {
-          /* Accretion layers hold what they have gained; everything else
-           * bleeds. That single difference is what makes the baryonic layer
-           * feel like an idle game and the thermal layer feel like a chase. */
-          const decay = band.mode === 'accretion' ? 0.035 : 0.14 * (1 + band.drift);
+          /* Whether a partial hold survives being interrupted is the *node's*
+           * property, not the band's: persistence is exactly the axis that says
+           * "this stays". The band's drift only amplifies it. So a Memory in
+           * the Thermal layer holds on where a Seed in the Baryonic layer
+           * bleeds out, and the player who has read those two axes knows which
+           * nodes are worth stepping away from. */
+          const per = RS.emergence.axes(n.man.essence).p;
+          const decay = (0.03 + 0.17 * (1 - per)) * (0.5 + band.drift);
           n.coherence = Math.max(0, n.coherence - decay * dt);
         }
       }
     }
 
-    /* Passive accretion: the baryonic layer pays a trickle without attention,
-     * which is what makes leaving the game running mean something. */
-    if (RS.spectrum.BANDS[bandIndex].mode === 'accretion') {
-      game.insight += game.passiveRate * dt;
-    }
+    /* Passive accretion. FLOW is the one primitive that pays without
+     * attention — a gradient carries things to you whether or not you are
+     * watching — but only where the layer is calm enough for anything to
+     * settle, and split between however many primitives are competing for it.
+     * Baryonic (one slow flow) is therefore the idle layer; Thermal, which
+     * runs the same primitive at four times the drift, pays nothing at all. */
+    game.insight += game.passiveRate * dt * passiveShareOf(RS.spectrum.BANDS[bandIndex]);
 
     updateDerived(game);
+  }
+
+  /* What fraction of the idle floor a band pays out. See the call site. */
+  function passiveShareOf(band) {
+    if (!RS.spectrum.usesPrim(band, 'flow')) return 0;
+    return clamp01(1.25 - band.drift) / RS.spectrum.demandOf(band);
   }
 
   /* Hold time scales with what the node is worth. A common node is a beat; a
@@ -368,65 +467,123 @@
     return (1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9) / (1 + n.depth * 0.25);
   }
 
-  function applyMode(game, field, n, band, dt, sgn) {
-    switch (band.mode) {
-      case 'pulse': {
-        /* Rhythmic gating. The window is generous enough to be fair and tight
-         * enough that you play to the beat rather than around it. */
-        n.gatePhase += dt * 2.1 * sgn;
-        const s = (Math.sin(n.gatePhase) + 1) / 2;
-        n.gate = s > 0.42 ? 1 : clamp01((s - 0.16) / 0.26);
-        break;
-      }
-      case 'superposed': {
-        /* Two positions, one of them load-bearing. Sustained attention
-         * collapses the pair — observation is the mechanic, not a metaphor. */
-        n.twinAng += n.spin * dt * 0.6 * sgn;
-        if (!n.collapsed && n.coherence > 0.3) n.collapsed = true;
-        n.gate = 1;
-        break;
-      }
-      case 'valence': {
-        /* Emotional physics: like valences cluster, opposites push apart, and
-         * the resulting pattern *is* the layer's appearance. */
-        let fx = 0, fy = 0;
-        for (const o of field.nodes) {
-          if (o === n || o.band !== band) continue;
-          const dx = o.x - n.x, dy = o.y - n.y;
-          const d2 = dx * dx + dy * dy + 0.004;
-          const affinity = n.valence * o.valence;
-          const f = affinity * 0.0016 / d2;
-          fx += dx * f; fy += dy * f;
+  /* ── Node behaviour ───────────────────────────────────────────────────────
+   *
+   * There is no per-band code here, and that is the entire point. A band
+   * declares which primitives are live; each primitive is called with the
+   * *node's own essence* and the *current rung*, and applies its result. So a
+   * single band is already many different things — Electromagnetic is a
+   * five-stroke burst when the node is a Cascade and one even beat when it is
+   * a Lattice, brisk at the cellular rung and ponderous at the supercluster —
+   * and a player who learned Cascade in one band can predict it in every other
+   * before they have ever tuned there. Twelve hand-written modes could not do
+   * that, because nothing learned in one would say anything about the next.
+   */
+  function applyPrimitives(game, field, n, band, dt, sgn) {
+    const E = RS.emergence;
+    const ess = n.man.essence;
+    const scale = game.dials.space.value;
+    const prim = band.prim;
+
+    n.gate = 1;
+    n.blocked = false;
+
+    for (let i = 0; i < prim.length; i++) {
+      switch (prim[i]) {
+
+        case 'gate': {
+          /* `field.rt` rather than `field.t`: GATE derives its own period from
+           * the rung's clock, so feeding it a clock-scaled time would count the
+           * scale twice and freeze the deep tiers solid. The τ dial still
+           * drives it — pushing time makes the window flicker faster, which is
+           * the one place where a high throttle genuinely costs you. */
+          const g = E.GATE(ess, scale, field.rt + n.gatePhase, n.gateInfo || (n.gateInfo = {}));
+          n.gate *= g.open;
+          break;
         }
-        n.targetRad = clamp(n.targetRad + (fx * n.x + fy * n.y) * dt * 4, 0.16, 1.02);
-        n.spin += (fy * n.x - fx * n.y) * dt * 2.5;
-        n.spin = clamp(n.spin, -0.9, 0.9);
-        n.gate = 1;
-        break;
+
+        case 'flow': {
+          /* The gradient moves the node rather than the player: a divergent
+           * essence climbs away from you and a convergent one falls inward,
+           * so "follow the flow" is a real tracking problem whose difficulty
+           * is the essence's branching number. */
+          const f = E.FLOW(ess, n.x, n.y, field.t, n.flowInfo || (n.flowInfo = {}));
+          const d = Math.hypot(n.x, n.y) + 1e-4;
+          const radial = (f.gx * n.x + f.gy * n.y) / d;
+          const tangent = (f.gy * n.x - f.gx * n.y) / d;
+          n.targetRad = clamp(n.targetRad + radial * f.strength * dt * 0.30 * sgn, 0.16, 1.08);
+          n.spin = clamp(n.spin + tangent * dt * 0.55 * sgn, -0.95, 0.95);
+          break;
+        }
+
+        case 'nest': {
+          /* No motion of its own — it decides what crystallising this node
+           * exposes, and how much the descent is worth. */
+          n.nestInfo = E.NEST(ess, n.nestInfo || {});
+          break;
+        }
+
+        case 'order': {
+          /* A node cannot be held until its antecedents have been. They are
+           * other essences, derived from this one, so the layer is a
+           * dependency graph you read and satisfy — and because ORDER.holds is
+           * the essence's persistence, a persistent essence's chain stays
+           * satisfied while a volatile one's has to be kept alive. */
+          const o = E.ORDER(ess, n.man.seed, n.orderInfo || (n.orderInfo = {}));
+          let met = 0, firstMissing = null;
+          for (let k = 0; k < o.prereqs.length; k++) {
+            const id = o.prereqs[k];
+            const stamp = field.satisfied[id];
+            /* Two ways to hold an antecedent, and the second is the whole
+             * point of the game: you have crystallised it here, recently — or
+             * you *understand* it, from having met it anywhere else in the
+             * cosmos. Gnosis earned at the cellular scale in the Thermal layer
+             * unblocks a dependency in the Causal layer at the supercluster
+             * scale, because it is the same essence and the ledger knows it. */
+            const alive = (stamp !== undefined && (o.holds || field.t - stamp < ORDER_WINDOW)) ||
+              RS.fractal.gnosisOf(game, id) > 0;
+            if (alive) met++;
+            else if (!firstMissing) firstMissing = RS.fractal.ESSENCE_BY_ID[id];
+          }
+          n.orderMet = met;
+          n.orderNeed = o.prereqs.length;
+          n.antecedent = firstMissing || RS.fractal.ESSENCE_BY_ID[o.prereqs[0]];
+          /* One satisfied antecedent unblocks; satisfying the rest is worth
+           * paying for. A wall that needs all four at once would just be a
+           * wall. */
+          n.blocked = met === 0;
+          n.orderBonus = 1 + (met - 1) * 0.55;
+          break;
+        }
+
+        case 'twin': {
+          /* Two positions, one load-bearing. Symmetry decides how close the
+           * pair sits (a symmetric essence twins confusingly close),
+           * persistence decides how much of the time the real one gives itself
+           * away, and sustained attention collapses the pair — observation is
+           * the mechanic rather than a metaphor. */
+          const w = E.TWIN(ess, n.man.seed, n.twinInfo || (n.twinInfo = {}));
+          n.twinReal = w.realIsFirst;
+          n.twinAng += n.spin * dt * 0.6 * sgn;
+          n.twinSep = w.separation;
+          if (!n.collapsed && n.coherence > 0.30 * (1.4 - w.clarity * 0.6)) n.collapsed = true;
+          break;
+        }
+
+        case 'invert': {
+          /* Read by `alignmentOf`. Held on the node so the HUD can mirror the
+           * reticle for exactly the nodes whose scoring actually runs
+           * backwards, which is not all of them. */
+          n.inv = E.INVERT(ess, n.inv || {});
+          break;
+        }
       }
-      case 'causal': {
-        /* A node cannot be held before its antecedent has been. The antecedent
-         * is another essence, derived from this one — so the layer is a
-         * dependency graph you have to read and satisfy in order. */
-        const need = RS.fractal.ESSENCES[(n.man.essence.index + 3) % RS.fractal.ESSENCES.length];
-        n.antecedent = need;
-        n.blocked = !(field.lastCrystal && field.lastCrystal === need.id);
-        n.gate = 1;
-        break;
-      }
-      case 'flux':
-        /* Thermal nodes cool as they age — the longer you dither, the less
-         * they are worth, so the layer rewards decisiveness. */
-        n.targetRad = clamp(n.targetRad + dt * 0.02 * sgn, 0.16, 1.1);
-        n.gate = 1;
-        break;
-      case 'unity':
-        n.gate = 1;
-        break;
-      default:
-        n.gate = 1;
     }
   }
+
+  /* How long an unsatisfied-by-nature antecedent stays satisfied. Only applies
+   * to essences whose persistence is below half — everything else holds. */
+  const ORDER_WINDOW = 14;
 
   function crystallise(game, bus, field, n) {
     n.crystallised = true;
@@ -444,7 +601,19 @@
     const gnosisMul = RS.fractal.gnosisBonus(game, man.essence.id);
     const depthMul = 1 + RS.cosmos.depthFromRoot(man.tierIndex) * 0.09;
     const nestMul = n.bonus || 1;
-    const amount = man.potency * band.yield * gnosisMul * depthMul * nestMul * game.yieldMul;
+    /* Satisfying more antecedents than the one you needed pays for it. */
+    const orderMul = n.orderBonus > 1 ? n.orderBonus : 1;
+    /* Paid for the hold, not for the click. A node that took three times as
+     * long to bring in — because its layer gated, or its double had to be
+     * resolved first, or its antecedents were missing — is worth three times
+     * as much. This is the whole balance mechanism for the primitives: every
+     * friction they impose compensates itself, so a band can be made harder by
+     * composing more of them without anyone having to re-tune a yield table.
+     * Clamped at both ends so a node collected instantly still pays something
+     * and a node left simmering all session is not a farm. */
+    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 5);
+    const amount = man.potency * band.yield * gnosisMul * depthMul *
+      nestMul * orderMul * effortMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -458,6 +627,10 @@
 
     const rec = RS.fractal.recognise(game, man);
     field.lastCrystal = man.essence.id;
+    /* Stamped rather than replaced: ORDER reads the whole ledger, so a player
+     * who has recently worked several essences is holding several keys at once
+     * and can attack the dependency graph from wherever it is thinnest. */
+    field.satisfied[man.essence.id] = field.t;
 
     bus.emit('node:crystallise', {
       node: n, amount, man, band, tier,
@@ -467,7 +640,10 @@
     if (firstTier) bus.emit('discover:tier', { tier });
     if (rec.fresh) bus.emit('discover:gnosis', { essence: man.essence, level: rec.level, man });
 
-    if (band.mode === 'recursive' && n.depth < 4) spawnChildren(game, field, n);
+    if (RS.spectrum.usesPrim(band, 'nest') && n.nestInfo &&
+        n.depth + 1 < Math.min(n.nestInfo.depth, 5)) {
+      spawnChildren(game, field, n);
+    }
   }
 
   /* Aggregates the HUD and the economy read every frame. */
@@ -498,6 +674,7 @@
 
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
-    holdTimeOf, spawnNode, applyOffline, updateDerived
+    holdTimeOf, spawnNode, applyOffline, updateDerived,
+    applyPrimitives, passiveShareOf, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

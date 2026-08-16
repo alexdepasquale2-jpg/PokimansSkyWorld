@@ -25,61 +25,103 @@
   /* The irreducible set. These are not content; they are the alphabet every
    * tier and layer spells its content out of. `forms` gives the local noun for
    * each of cosmos.js's geometries — this table *is* the "local rules" idea in
-   * its most literal form. */
+   * its most literal form.
+   *
+   * ── The four axes: the entire authored seed of the game ──────────────────
+   *
+   * Fourteen essences × four numbers = 56 values, and every mechanic in the
+   * game is generated from them (see emergence.js). 12 bands × 14 essences ×
+   * 8 geometries = 1344 distinct situations, all traceable back to this table
+   * — which is what makes them *recognisable* rather than merely various.
+   *
+   *   complexity   how much structure it carries      → nesting depth, ordering depth
+   *   branching    how much it divides                → rhythm subdivision, fan-out, divergence
+   *   symmetry     how regular it is                  → duty cycle, angle regularity, twin closeness
+   *   persistence  how long it holds                  → period, gradient steadiness, inversion
+   *
+   * Each number must be a claim the essence's own `trait` string already makes
+   * in prose. Lattice is "order that repeats without a centre" → symmetry 1,
+   * branching 0. Cascade is "one event that spends itself buying a thousand
+   * others" → branching 0.9, persistence 0.2. If a number and its trait ever
+   * disagree, the trait is right and the number is a bug: the player learns
+   * these essences by their described character and then has to be able to
+   * predict their behaviour from it. */
   const ESSENCES = [
-    { id: 'boundary', name: 'Boundary', glyph: '⊂', hueShift: -18, complexity: 0.3,
+    { id: 'boundary', name: 'Boundary', glyph: '⊂', hueShift: -18, complexity: 0.35,
+      /* A closed surface: more structure than a point, no branching, regular,
+       * and it stays put — a boundary that moved would not be one. */
+      branching: 0.05, symmetry: 0.85, persistence: 0.95,
       trait: 'Separates an inside from an outside, and is neither.',
       forms: { foam: 'Horizon Quantum', orbital: 'Valence Shell', chain: 'Membrane Fold',
         cell: 'Cell Wall', body: 'Coastline', disc: 'Galactic Rim', web: 'Void Wall', abstract: 'Distinction' } },
     { id: 'flow', name: 'Flow', glyph: '≈', hueShift: 12, complexity: 0.4,
+      branching: 0.35, symmetry: 0.25, persistence: 0.30,
       trait: 'Transport down a gradient. Never the same twice, always the same shape.',
       forms: { foam: 'Probability Current', orbital: 'Electron Drift', chain: 'Solvent Channel',
         cell: 'Cytoplasmic Stream', body: 'River', disc: 'Density Wave', web: 'Filament Flow', abstract: 'Mapping' } },
     { id: 'recursion', name: 'Recursion', glyph: '⟳', hueShift: 34, complexity: 0.9,
+      branching: 0.60, symmetry: 0.80, persistence: 0.50,
       trait: 'Contains a smaller copy of itself, and is a smaller copy of something.',
       forms: { foam: 'Self-Similar Foam', orbital: 'Nested Shell', chain: 'Branched Polymer',
         cell: 'Organelle Lineage', body: 'Fern Canopy', disc: 'Sub-Spiral', web: 'Nested Void', abstract: 'Fixed Point' } },
-    { id: 'attractor', name: 'Attractor', glyph: '◎', hueShift: -34, complexity: 0.6,
+    { id: 'attractor', name: 'Attractor', glyph: '◎', hueShift: -34, complexity: 0.20,
+      /* One basin everything falls into: minimal structure, zero branching
+       * (its gradient converges hard), highly regular, and it does not move. */
+      branching: 0.00, symmetry: 0.95, persistence: 0.90,
       trait: 'Everything nearby ends up here regardless of where it started.',
       forms: { foam: 'Vacuum Minimum', orbital: 'Ground State', chain: 'Folded Core',
         cell: 'Nucleus', body: 'Basin', disc: 'Galactic Core', web: 'Great Attractor', abstract: 'Limit' } },
     { id: 'duality', name: 'Duality', glyph: '◐', hueShift: 96, complexity: 0.5,
+      branching: 0.10, symmetry: 1.00, persistence: 0.70,
       trait: 'One thing that must be described two incompatible ways at once.',
       forms: { foam: 'Virtual Pair', orbital: 'Spin Doublet', chain: 'Chirality',
         cell: 'Mitotic Pair', body: 'Binary', disc: 'Bar Mode', web: 'Filament Pair', abstract: 'Complement' } },
     { id: 'emergence', name: 'Emergence', glyph: '⁂', hueShift: 62, complexity: 1.0,
+      branching: 0.75, symmetry: 0.30, persistence: 0.25,
       trait: 'A property of the whole that none of the parts possess.',
       forms: { foam: 'Condensate', orbital: 'Molecular Bond', chain: 'Tertiary Fold',
         cell: 'Tissue', body: 'Swarm', disc: 'Spiral Pattern', web: 'Web Topology', abstract: 'Supervenience' } },
     { id: 'threshold', name: 'Threshold', glyph: '⌇', hueShift: 8, complexity: 0.45,
+      branching: 0.05, symmetry: 0.50, persistence: 0.15,
       trait: 'Below it nothing happens. Above it everything does.',
       forms: { foam: 'Symmetry Break', orbital: 'Ionisation Edge', chain: 'Melting Point',
         cell: 'Action Potential', body: 'Phase Change', disc: 'Star Formation Line', web: 'Collapse Density', abstract: 'Critical Value' } },
     { id: 'lattice', name: 'Lattice', glyph: '⧉', hueShift: -62, complexity: 0.55,
+      /* A lattice repeats *outward to its neighbours*, so it branches — evenly,
+       * which is the whole point. Zero branching would make it a chain; what
+       * distinguishes it is symmetry 1.0, a perfectly regular fan with no
+       * jitter and no centre. */
+      branching: 0.50, symmetry: 1.00, persistence: 0.95,
       trait: 'Order that repeats without a centre and without an edge.',
       forms: { foam: 'Spin Network', orbital: 'Crystal Cell', chain: 'Polymer Grid',
         cell: 'Cytoskeleton', body: 'Mineral Seam', disc: 'Resonance Ring', web: 'Sheet Structure', abstract: 'Group' } },
     { id: 'spiral', name: 'Spiral', glyph: '❋', hueShift: 22, complexity: 0.7,
+      branching: 0.10, symmetry: 0.40, persistence: 0.60,
       trait: 'Rotation that does not close. The compromise between orbit and escape.',
       forms: { foam: 'Vortex Quantum', orbital: 'Precessing Orbit', chain: 'Helix',
         cell: 'Coiled Flagellum', body: 'Cyclone', disc: 'Spiral Arm', web: 'Filament Curl', abstract: 'Iteration' } },
     { id: 'void', name: 'Void', glyph: '○', hueShift: 0, complexity: 0.15,
+      branching: 0.00, symmetry: 0.70, persistence: 1.00,
       trait: 'The absence that gives everything else its shape.',
       forms: { foam: 'False Vacuum', orbital: 'Forbidden Gap', chain: 'Vacancy',
         cell: 'Vacuole', body: 'Cavern', disc: 'Inter-arm Gap', web: 'Cosmic Void', abstract: 'Null Set' } },
     { id: 'seed', name: 'Seed', glyph: '✦', hueShift: 46, complexity: 0.35,
+      branching: 0.85, symmetry: 0.45, persistence: 0.10,
       trait: 'Compressed instructions for something enormously larger.',
       forms: { foam: 'Fluctuation', orbital: 'Nucleation Site', chain: 'Codon',
         cell: 'Spore', body: 'Germ', disc: 'Protostellar Core', web: 'Primordial Overdensity', abstract: 'Axiom' } },
     { id: 'weave', name: 'Weave', glyph: '⋈', hueShift: -8, complexity: 0.8,
+      branching: 0.40, symmetry: 0.90, persistence: 0.80,
       trait: 'Strength that exists only in the crossing, never in the strands.',
       forms: { foam: 'Entanglement', orbital: 'Hybrid Orbital', chain: 'Double Helix',
         cell: 'Mycelium', body: 'Root Mat', disc: 'Tidal Bridge', web: 'Filament Node', abstract: 'Relation' } },
     { id: 'cascade', name: 'Cascade', glyph: '⋔', hueShift: 74, complexity: 0.75,
+      branching: 0.90, symmetry: 0.15, persistence: 0.20,
       trait: 'One event that spends itself buying a thousand others.',
       forms: { foam: 'Decay Chain', orbital: 'Auger Cascade', chain: 'Reaction Cascade',
         cell: 'Signal Cascade', body: 'Avalanche', disc: 'Starburst', web: 'Merger Chain', abstract: 'Entailment' } },
     { id: 'memory', name: 'Memory', glyph: '⌸', hueShift: -46, complexity: 0.65,
+      branching: 0.20, symmetry: 0.60, persistence: 1.00,
       trait: 'The present shaped by something that has already stopped existing.',
       forms: { foam: 'Vacuum Imprint', orbital: 'Hysteresis', chain: 'Conformational State',
         cell: 'Methylation Mark', body: 'Strata', disc: 'Stellar Stream', web: 'Relic Structure', abstract: 'State' } }
@@ -218,6 +260,95 @@
     return 1 + gnosisOf(game, essenceId) * 0.085;
   }
 
+  /* ── Gnosis as foresight ───────────────────────────────────────────────────
+   *
+   * The yield bonus above is the small half of understanding. This is the real
+   * one: recognising an essence in enough contexts progressively reveals its
+   * four axes, and because every mechanic in the game is generated from those
+   * four numbers (emergence.js), a revealed axis is a *prediction*.
+   *
+   * Know that Cascade has branching 0.9 and you know — without being told, and
+   * without ever having played there — that its rhythm subdivides five ways in
+   * the Electromagnetic layer, that its dependency graph fans out four wide in
+   * the Causal layer, and that its nests are wide and shallow in the Vital
+   * layer. You can walk into a layer you have never opened and already know how
+   * it will behave.
+   *
+   * That is the difference between a game that *says* knowledge is fractal and
+   * one where it demonstrably is. It only works because the world really is
+   * generated from these numbers.
+   *
+   * Reveal order is hashed per essence, so two players learn the same essence
+   * along different axes first and their intuitions genuinely differ. */
+  const AXES = ['complexity', 'branching', 'symmetry', 'persistence'];
+
+  /* Contexts needed to reveal 1, 2, 3, 4 axes. */
+  const REVEAL_AT = [2, 4, 6, 8];
+
+  function revealCount(contexts) {
+    let n = 0;
+    for (const need of REVEAL_AT) if (contexts >= need) n++;
+    return n;
+  }
+
+  /* The order this particular essence gives itself up in. Stable per essence
+   * and per world, derived by a Fisher–Yates shuffle off the address hash. */
+  function revealOrder(worldSeed, essence) {
+    const order = AXES.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = hashN(worldSeed ^ 0x0AE5, essence.index, i) % (i + 1);
+      const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+    }
+    return order;
+  }
+
+  /* What the player currently knows about an essence's generative axes.
+   * Unrevealed axes are simply absent, so a HUD can render a blank rather than
+   * a wrong guess. */
+  function predicted(game, essenceId, out) {
+    const o = out || {};
+    const ess = ESSENCE_BY_ID[essenceId];
+    o.essence = ess || null;
+    o.contexts = gnosisOf(game, essenceId);
+    o.revealed = ess ? revealCount(o.contexts) : 0;
+    o.order = ess ? revealOrder(game.seed, ess) : [];
+    /* Clear any previously-revealed values so a reused buffer cannot leak
+     * knowledge the player has not earned in this call. */
+    for (const a of AXES) o[a] = undefined;
+    for (let i = 0; i < o.revealed; i++) o[o.order[i]] = ess[o.order[i]];
+    /* What it would take to learn the next one — the thing that makes hunting
+     * an essence across contexts a deliberate strategy. */
+    o.next = ess && o.revealed < AXES.length ? o.order[o.revealed] : null;
+    o.nextAt = o.revealed < REVEAL_AT.length ? REVEAL_AT[o.revealed] : null;
+    return o;
+  }
+
+  /* Is a specific axis known? Hot path for HUD modules deciding whether to
+   * ghost in a prediction. */
+  function knows(game, essenceId, axis) {
+    const ess = ESSENCE_BY_ID[essenceId];
+    if (!ess) return false;
+    const n = revealCount(gnosisOf(game, essenceId));
+    const order = revealOrder(game.seed, ess);
+    return order.indexOf(axis) < n;
+  }
+
+  /* An essence with only its known axes filled in, for feeding a primitive to
+   * produce a *predicted* behaviour to ghost behind the real one. Unknown axes
+   * fall back to the population mean so the ghost is a reasonable guess rather
+   * than nonsense. */
+  const MEAN = { complexity: 0.58, branching: 0.31, symmetry: 0.65, persistence: 0.62 };
+  function predictedEssence(game, essenceId, out) {
+    const o = out || {};
+    const ess = ESSENCE_BY_ID[essenceId];
+    if (!ess) return null;
+    const p = predicted(game, essenceId, o.__p || (o.__p = {}));
+    o.id = ess.id; o.index = ess.index; o.name = ess.name; o.glyph = ess.glyph;
+    for (const a of AXES) o[a] = p[a] === undefined ? MEAN[a] : p[a];
+    o.confidence = p.revealed / AXES.length;
+    return o;
+  }
+
   /* Total across the ledger, for the meta-progression readout. */
   function totalGnosis(game) {
     let n = 0;
@@ -227,6 +358,7 @@
 
   RS.fractal = {
     ESSENCES, ESSENCE_BY_ID, BAND_ADJ,
-    essenceAt, resolve, contextKey, gnosisOf, recognise, gnosisBonus, totalGnosis
+    essenceAt, resolve, contextKey, gnosisOf, recognise, gnosisBonus, totalGnosis,
+    AXES, REVEAL_AT, revealCount, revealOrder, predicted, knows, predictedEssence
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

@@ -138,7 +138,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.ctx-layer em { -webkit-line-clamp: 1; }
+.ctx-layer em { -webkit-line-clamp: 2; }
+/* Seven tool buttons on a 430px phone: let them shrink rather than clip. */
+#tools { flex-wrap: nowrap; }
+@media (max-width: 470px) { #tools .tool { width: 25px; height: 25px; font-size: 11px; } }
 
 /* ── node readout ─────────────────────────────────────────────────────── */
 
@@ -464,6 +467,50 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   .res .rate { display: none; }
 }
 
+/* ── contact ──────────────────────────────────────────────────────────────
+ *
+ * A civilisation in earshot is the rarest event in the game. The button
+ * announces itself rather than waiting to be found, and the hint line states
+ * the carrier frequency outright — a player who has found one and not noticed
+ * would be the worst failure this design could have.
+ */
+
+#btn-contact { display: none; }
+#btn-contact.live {
+  display: grid;
+  border-color: currentColor;
+  animation: contact-pulse 2.4s ease-in-out infinite;
+}
+@keyframes contact-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: .85; }
+  50% { box-shadow: 0 0 10px 0 currentColor; opacity: 1; }
+}
+
+#contact-hint {
+  align-self: flex-start;
+  margin-top: auto; margin-bottom: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  opacity: 0; transition: opacity .35s;
+  background: var(--panel);
+  border: 1px solid currentColor;
+  border-radius: 8px; padding: 4px 9px;
+}
+#contact-hint:empty { display: none; }
+/* Once the contact hint claims the auto margin, the blocks under it must not. */
+#contact-hint + #body-bar { margin-top: 0; }
+
+/* What they say, set apart from the instrument text — this is the only voice
+   in the game that is not the game describing itself. */
+.say {
+  border-left: 2px solid rgba(240, 171, 252, .45);
+  padding: 2px 0 2px 9px; margin: 4px 0 0;
+}
+.say p {
+  margin: 0 0 5px; font-size: 10px; line-height: 1.5;
+  color: #cdd9ec; font-style: italic;
+}
+.say p:last-child { margin-bottom: 0; }
+
 </style>
 </head>
 <body>
@@ -491,10 +538,13 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       <span id="progress-pct">0%</span>
     </div>
     <div id="tools">
+      <button id="btn-contact" class="tool" title="Contact" data-on="0">◉</button>
       <button id="btn-world" class="tool" title="World">🜨</button>
       <button id="btn-vessels" class="tool" title="Bodies &amp; research">⋀</button>
       <button id="btn-upgrades" class="tool" title="Dials">⚙</button>
-      <button id="btn-codex" class="tool" title="Codex">◈</button>
+      <button id="btn-codex" class="tool" title="Codex">☰</button>
+      <button id="btn-paths" class="tool" title="Pathways">◈</button>
+      <button id="btn-guide" class="tool" title="How this works">?</button>
       <button id="btn-settings" class="tool" title="Settings">⋯</button>
     </div>
   </header>
@@ -511,6 +561,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       <em id="layer-rules"></em>
     </div>
   </div>
+
+  <div id="contact-hint"></div>
 
   <div id="body-bar"></div>
 
@@ -989,10 +1041,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   'use strict';
   const { clamp, clamp01 } = RS.core;
 
-  /* `mode` names the mechanical character a layer imposes on the field. The
-   * field sim (field.js) reads these and genuinely plays differently under
-   * each — this is the "unique gameplay per layer" axis, and it composes with
-   * tier geometry so a layer feels different again at every scale.
+  /* ── `prim` is the layer's gameplay ───────────────────────────────────────
+   *
+   * A band does not have a hand-written mode. It declares which of the six
+   * primitives in emergence.js are live, and everything else follows: the
+   * primitive is parameterised by the *node's own essence* (its four axes) and
+   * scaled by the *tier's clock*. So one band is already many different things
+   * — Electromagnetic is a five-stroke burst when the node is a Cascade and a
+   * single even beat when it is a Lattice, fast at the cellular scale and vast
+   * at the supercluster one.
+   *
+   * Difficulty is derived from this rather than tuned: a band demanding six
+   * primitives is harder than one demanding one, which is why the list length
+   * drives `field.demandsFor()`.
+   *
+   * `mode` is kept alongside as a human-readable label and for the codex; it is
+   * no longer read by the simulation.
    *
    *   accretion   — incremental: dense, slow, passive yield, compounding
    *   flux        — tracking: nodes drift fast, alignment leaks constantly
@@ -1009,6 +1073,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'baryonic', name: 'Baryonic', glyph: '◉',
       centre: 8, width: 7.5, minFocus: 0, hue: 205, sat: 0.34, mode: 'accretion',
+      prim: ['flow'],
       blurb: 'Matter as it presents itself. The layer consciousness is issued with.',
       rules: 'Dense, slow, forgiving. Yield accrues without attention.',
       yield: 1.0, drift: 0.35, unlockedAtStart: true
@@ -1016,6 +1081,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'thermal', name: 'Thermal', glyph: '≋',
       centre: 44, width: 6.0, minFocus: 0, hue: 24, sat: 0.62, mode: 'flux',
+      prim: ['flow'],
       blurb: 'Disorder made visible. Everything here is on its way to equilibrium.',
       rules: 'Nodes drift and cool. Coherence leaks unless you keep tracking.',
       yield: 1.5, drift: 1.5
@@ -1023,6 +1089,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'electromagnetic', name: 'Electromagnetic', glyph: '⌇',
       centre: 97, width: 4.6, minFocus: 0.15, hue: 187, sat: 0.75, mode: 'pulse',
+      prim: ['gate'],
       blurb: 'The layer that carries every message the baryonic layer ever sends.',
       rules: 'Nodes gate on and off. Lock only counts inside the open window.',
       yield: 2.3, drift: 0.9
@@ -1030,6 +1097,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'probabilistic', name: 'Probabilistic', glyph: '⟡',
       centre: 168, width: 3.6, minFocus: 0.30, hue: 268, sat: 0.70, mode: 'superposed',
+      prim: ['twin'],
       blurb: 'Where outcomes have not yet been asked to choose.',
       rules: 'Each node manifests twice. Only one is load-bearing until observed.',
       yield: 3.4, drift: 1.1
@@ -1037,6 +1105,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'vital', name: 'Vital', glyph: '⚘',
       centre: 253, width: 3.0, minFocus: 0.42, hue: 142, sat: 0.66, mode: 'recursive',
+      prim: ['nest', 'flow'],
       blurb: 'Negative entropy, held against the gradient. What life looks like from outside.',
       rules: 'Nodes nest. Locking a parent exposes its children — depth is the payout.',
       yield: 5.0, drift: 0.7
@@ -1044,6 +1113,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'emotive', name: 'Emotional', glyph: '❥',
       centre: 341, width: 2.5, minFocus: 0.55, hue: 336, sat: 0.78, mode: 'valence',
+      prim: ['flow', 'twin'],
       blurb: 'The first layer that reacts to being observed. Its geometry is its mood.',
       rules: 'Valence attracts and repels. Patterns and colour bloom with feeling.',
       yield: 7.4, drift: 1.3
@@ -1051,6 +1121,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'mnemonic', name: 'Mnemonic', glyph: '⌘',
       centre: 437, width: 2.1, minFocus: 0.64, hue: 47, sat: 0.60, mode: 'symbolic',
+      prim: ['order', 'nest'],
       blurb: 'Everything that has been recorded, indexed by resemblance rather than time.',
       rules: 'Signatures must be read off the glyph. Sweeping blind will not find them.',
       yield: 11.0, drift: 0.5
@@ -1058,6 +1129,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'causal', name: 'Causal', glyph: '⇴',
       centre: 542, width: 1.75, minFocus: 0.72, hue: 12, sat: 0.72, mode: 'causal',
+      prim: ['order'],
       blurb: 'The dependency graph underneath events. Time is a projection of this.',
       rules: 'A node cannot be held before its antecedent. Order is the puzzle.',
       yield: 16.0, drift: 0.6
@@ -1065,6 +1137,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'archetypal', name: 'Archetypal', glyph: '☉',
       centre: 655, width: 1.45, minFocus: 0.78, hue: 279, sat: 0.82, mode: 'symbolic',
+      prim: ['nest', 'order'],
       blurb: 'The small set of shapes every other layer keeps rediscovering.',
       rules: 'Essences appear undisguised here. Recognition is worth more than yield.',
       yield: 23.0, drift: 0.4
@@ -1072,6 +1145,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'noetic', name: 'Noetic', glyph: '◈',
       centre: 771, width: 1.15, minFocus: 0.84, hue: 168, sat: 0.74, mode: 'recursive',
+      prim: ['nest', 'gate', 'flow'],
       blurb: 'Knowing without inference. The layer where the fractal store is legible.',
       rules: 'Nesting runs arbitrarily deep. Descend as far as focus will hold.',
       yield: 34.0, drift: 0.35
@@ -1079,6 +1153,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'null', name: 'Null', glyph: '○',
       centre: 883, width: 0.9, minFocus: 0.86, hue: 220, sat: 0.10, mode: 'inverted',
+      prim: ['invert'],
       blurb: 'The absence that the other layers are figure against.',
       rules: 'Alignment is scored inverted. Everything you learned reads backwards.',
       yield: 52.0, drift: 0.9
@@ -1086,6 +1161,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'unity', name: 'Unity', glyph: '✷',
       centre: 977, width: 0.65, minFocus: 0.90, hue: 0, sat: 0.0, mode: 'unity',
+      prim: ['gate', 'nest', 'flow', 'order', 'twin', 'invert'],
       blurb: 'One band containing all the others. Discrimination stops working here.',
       rules: 'Every layer manifests at once. There is nothing left to tune against.',
       yield: 88.0, drift: 0.25
@@ -1093,7 +1169,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   ];
 
   const BY_ID = Object.create(null);
-  BANDS.forEach((b, i) => { b.index = i; BY_ID[b.id] = b; });
+  BANDS.forEach((b, i) => {
+    b.index = i;
+    BY_ID[b.id] = b;
+    /* Every band must declare at least one primitive or it has no gameplay. */
+    if (!b.prim || !b.prim.length) b.prim = ['flow'];
+  });
+
+  /* Does this band run this primitive? Hot path — called per node per frame. */
+  function usesPrim(band, id) { return band.prim.indexOf(id) >= 0; }
+
+  /* How many axes a band asks of the player. Derived, not authored: it is
+   * simply how many primitives are live, which is also exactly how much there
+   * is to think about. */
+  function demandOf(band) { return band.prim.length; }
 
   const PHI_MIN = 0;
   const PHI_MAX = 1000;
@@ -1206,7 +1295,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.spectrum = {
     BANDS, BY_ID, PHI_MIN, PHI_MAX,
-    effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz
+    effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz,
+    usesPrim, demandOf
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -1604,61 +1694,103 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* The irreducible set. These are not content; they are the alphabet every
    * tier and layer spells its content out of. `forms` gives the local noun for
    * each of cosmos.js's geometries — this table *is* the "local rules" idea in
-   * its most literal form. */
+   * its most literal form.
+   *
+   * ── The four axes: the entire authored seed of the game ──────────────────
+   *
+   * Fourteen essences × four numbers = 56 values, and every mechanic in the
+   * game is generated from them (see emergence.js). 12 bands × 14 essences ×
+   * 8 geometries = 1344 distinct situations, all traceable back to this table
+   * — which is what makes them *recognisable* rather than merely various.
+   *
+   *   complexity   how much structure it carries      → nesting depth, ordering depth
+   *   branching    how much it divides                → rhythm subdivision, fan-out, divergence
+   *   symmetry     how regular it is                  → duty cycle, angle regularity, twin closeness
+   *   persistence  how long it holds                  → period, gradient steadiness, inversion
+   *
+   * Each number must be a claim the essence's own `trait` string already makes
+   * in prose. Lattice is "order that repeats without a centre" → symmetry 1,
+   * branching 0. Cascade is "one event that spends itself buying a thousand
+   * others" → branching 0.9, persistence 0.2. If a number and its trait ever
+   * disagree, the trait is right and the number is a bug: the player learns
+   * these essences by their described character and then has to be able to
+   * predict their behaviour from it. */
   const ESSENCES = [
-    { id: 'boundary', name: 'Boundary', glyph: '⊂', hueShift: -18, complexity: 0.3,
+    { id: 'boundary', name: 'Boundary', glyph: '⊂', hueShift: -18, complexity: 0.35,
+      /* A closed surface: more structure than a point, no branching, regular,
+       * and it stays put — a boundary that moved would not be one. */
+      branching: 0.05, symmetry: 0.85, persistence: 0.95,
       trait: 'Separates an inside from an outside, and is neither.',
       forms: { foam: 'Horizon Quantum', orbital: 'Valence Shell', chain: 'Membrane Fold',
         cell: 'Cell Wall', body: 'Coastline', disc: 'Galactic Rim', web: 'Void Wall', abstract: 'Distinction' } },
     { id: 'flow', name: 'Flow', glyph: '≈', hueShift: 12, complexity: 0.4,
+      branching: 0.35, symmetry: 0.25, persistence: 0.30,
       trait: 'Transport down a gradient. Never the same twice, always the same shape.',
       forms: { foam: 'Probability Current', orbital: 'Electron Drift', chain: 'Solvent Channel',
         cell: 'Cytoplasmic Stream', body: 'River', disc: 'Density Wave', web: 'Filament Flow', abstract: 'Mapping' } },
     { id: 'recursion', name: 'Recursion', glyph: '⟳', hueShift: 34, complexity: 0.9,
+      branching: 0.60, symmetry: 0.80, persistence: 0.50,
       trait: 'Contains a smaller copy of itself, and is a smaller copy of something.',
       forms: { foam: 'Self-Similar Foam', orbital: 'Nested Shell', chain: 'Branched Polymer',
         cell: 'Organelle Lineage', body: 'Fern Canopy', disc: 'Sub-Spiral', web: 'Nested Void', abstract: 'Fixed Point' } },
-    { id: 'attractor', name: 'Attractor', glyph: '◎', hueShift: -34, complexity: 0.6,
+    { id: 'attractor', name: 'Attractor', glyph: '◎', hueShift: -34, complexity: 0.20,
+      /* One basin everything falls into: minimal structure, zero branching
+       * (its gradient converges hard), highly regular, and it does not move. */
+      branching: 0.00, symmetry: 0.95, persistence: 0.90,
       trait: 'Everything nearby ends up here regardless of where it started.',
       forms: { foam: 'Vacuum Minimum', orbital: 'Ground State', chain: 'Folded Core',
         cell: 'Nucleus', body: 'Basin', disc: 'Galactic Core', web: 'Great Attractor', abstract: 'Limit' } },
     { id: 'duality', name: 'Duality', glyph: '◐', hueShift: 96, complexity: 0.5,
+      branching: 0.10, symmetry: 1.00, persistence: 0.70,
       trait: 'One thing that must be described two incompatible ways at once.',
       forms: { foam: 'Virtual Pair', orbital: 'Spin Doublet', chain: 'Chirality',
         cell: 'Mitotic Pair', body: 'Binary', disc: 'Bar Mode', web: 'Filament Pair', abstract: 'Complement' } },
     { id: 'emergence', name: 'Emergence', glyph: '⁂', hueShift: 62, complexity: 1.0,
+      branching: 0.75, symmetry: 0.30, persistence: 0.25,
       trait: 'A property of the whole that none of the parts possess.',
       forms: { foam: 'Condensate', orbital: 'Molecular Bond', chain: 'Tertiary Fold',
         cell: 'Tissue', body: 'Swarm', disc: 'Spiral Pattern', web: 'Web Topology', abstract: 'Supervenience' } },
     { id: 'threshold', name: 'Threshold', glyph: '⌇', hueShift: 8, complexity: 0.45,
+      branching: 0.05, symmetry: 0.50, persistence: 0.15,
       trait: 'Below it nothing happens. Above it everything does.',
       forms: { foam: 'Symmetry Break', orbital: 'Ionisation Edge', chain: 'Melting Point',
         cell: 'Action Potential', body: 'Phase Change', disc: 'Star Formation Line', web: 'Collapse Density', abstract: 'Critical Value' } },
     { id: 'lattice', name: 'Lattice', glyph: '⧉', hueShift: -62, complexity: 0.55,
+      /* A lattice repeats *outward to its neighbours*, so it branches — evenly,
+       * which is the whole point. Zero branching would make it a chain; what
+       * distinguishes it is symmetry 1.0, a perfectly regular fan with no
+       * jitter and no centre. */
+      branching: 0.50, symmetry: 1.00, persistence: 0.95,
       trait: 'Order that repeats without a centre and without an edge.',
       forms: { foam: 'Spin Network', orbital: 'Crystal Cell', chain: 'Polymer Grid',
         cell: 'Cytoskeleton', body: 'Mineral Seam', disc: 'Resonance Ring', web: 'Sheet Structure', abstract: 'Group' } },
     { id: 'spiral', name: 'Spiral', glyph: '❋', hueShift: 22, complexity: 0.7,
+      branching: 0.10, symmetry: 0.40, persistence: 0.60,
       trait: 'Rotation that does not close. The compromise between orbit and escape.',
       forms: { foam: 'Vortex Quantum', orbital: 'Precessing Orbit', chain: 'Helix',
         cell: 'Coiled Flagellum', body: 'Cyclone', disc: 'Spiral Arm', web: 'Filament Curl', abstract: 'Iteration' } },
     { id: 'void', name: 'Void', glyph: '○', hueShift: 0, complexity: 0.15,
+      branching: 0.00, symmetry: 0.70, persistence: 1.00,
       trait: 'The absence that gives everything else its shape.',
       forms: { foam: 'False Vacuum', orbital: 'Forbidden Gap', chain: 'Vacancy',
         cell: 'Vacuole', body: 'Cavern', disc: 'Inter-arm Gap', web: 'Cosmic Void', abstract: 'Null Set' } },
     { id: 'seed', name: 'Seed', glyph: '✦', hueShift: 46, complexity: 0.35,
+      branching: 0.85, symmetry: 0.45, persistence: 0.10,
       trait: 'Compressed instructions for something enormously larger.',
       forms: { foam: 'Fluctuation', orbital: 'Nucleation Site', chain: 'Codon',
         cell: 'Spore', body: 'Germ', disc: 'Protostellar Core', web: 'Primordial Overdensity', abstract: 'Axiom' } },
     { id: 'weave', name: 'Weave', glyph: '⋈', hueShift: -8, complexity: 0.8,
+      branching: 0.40, symmetry: 0.90, persistence: 0.80,
       trait: 'Strength that exists only in the crossing, never in the strands.',
       forms: { foam: 'Entanglement', orbital: 'Hybrid Orbital', chain: 'Double Helix',
         cell: 'Mycelium', body: 'Root Mat', disc: 'Tidal Bridge', web: 'Filament Node', abstract: 'Relation' } },
     { id: 'cascade', name: 'Cascade', glyph: '⋔', hueShift: 74, complexity: 0.75,
+      branching: 0.90, symmetry: 0.15, persistence: 0.20,
       trait: 'One event that spends itself buying a thousand others.',
       forms: { foam: 'Decay Chain', orbital: 'Auger Cascade', chain: 'Reaction Cascade',
         cell: 'Signal Cascade', body: 'Avalanche', disc: 'Starburst', web: 'Merger Chain', abstract: 'Entailment' } },
     { id: 'memory', name: 'Memory', glyph: '⌸', hueShift: -46, complexity: 0.65,
+      branching: 0.20, symmetry: 0.60, persistence: 1.00,
       trait: 'The present shaped by something that has already stopped existing.',
       forms: { foam: 'Vacuum Imprint', orbital: 'Hysteresis', chain: 'Conformational State',
         cell: 'Methylation Mark', body: 'Strata', disc: 'Stellar Stream', web: 'Relic Structure', abstract: 'State' } }
@@ -1797,6 +1929,95 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return 1 + gnosisOf(game, essenceId) * 0.085;
   }
 
+  /* ── Gnosis as foresight ───────────────────────────────────────────────────
+   *
+   * The yield bonus above is the small half of understanding. This is the real
+   * one: recognising an essence in enough contexts progressively reveals its
+   * four axes, and because every mechanic in the game is generated from those
+   * four numbers (emergence.js), a revealed axis is a *prediction*.
+   *
+   * Know that Cascade has branching 0.9 and you know — without being told, and
+   * without ever having played there — that its rhythm subdivides five ways in
+   * the Electromagnetic layer, that its dependency graph fans out four wide in
+   * the Causal layer, and that its nests are wide and shallow in the Vital
+   * layer. You can walk into a layer you have never opened and already know how
+   * it will behave.
+   *
+   * That is the difference between a game that *says* knowledge is fractal and
+   * one where it demonstrably is. It only works because the world really is
+   * generated from these numbers.
+   *
+   * Reveal order is hashed per essence, so two players learn the same essence
+   * along different axes first and their intuitions genuinely differ. */
+  const AXES = ['complexity', 'branching', 'symmetry', 'persistence'];
+
+  /* Contexts needed to reveal 1, 2, 3, 4 axes. */
+  const REVEAL_AT = [2, 4, 6, 8];
+
+  function revealCount(contexts) {
+    let n = 0;
+    for (const need of REVEAL_AT) if (contexts >= need) n++;
+    return n;
+  }
+
+  /* The order this particular essence gives itself up in. Stable per essence
+   * and per world, derived by a Fisher–Yates shuffle off the address hash. */
+  function revealOrder(worldSeed, essence) {
+    const order = AXES.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = hashN(worldSeed ^ 0x0AE5, essence.index, i) % (i + 1);
+      const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+    }
+    return order;
+  }
+
+  /* What the player currently knows about an essence's generative axes.
+   * Unrevealed axes are simply absent, so a HUD can render a blank rather than
+   * a wrong guess. */
+  function predicted(game, essenceId, out) {
+    const o = out || {};
+    const ess = ESSENCE_BY_ID[essenceId];
+    o.essence = ess || null;
+    o.contexts = gnosisOf(game, essenceId);
+    o.revealed = ess ? revealCount(o.contexts) : 0;
+    o.order = ess ? revealOrder(game.seed, ess) : [];
+    /* Clear any previously-revealed values so a reused buffer cannot leak
+     * knowledge the player has not earned in this call. */
+    for (const a of AXES) o[a] = undefined;
+    for (let i = 0; i < o.revealed; i++) o[o.order[i]] = ess[o.order[i]];
+    /* What it would take to learn the next one — the thing that makes hunting
+     * an essence across contexts a deliberate strategy. */
+    o.next = ess && o.revealed < AXES.length ? o.order[o.revealed] : null;
+    o.nextAt = o.revealed < REVEAL_AT.length ? REVEAL_AT[o.revealed] : null;
+    return o;
+  }
+
+  /* Is a specific axis known? Hot path for HUD modules deciding whether to
+   * ghost in a prediction. */
+  function knows(game, essenceId, axis) {
+    const ess = ESSENCE_BY_ID[essenceId];
+    if (!ess) return false;
+    const n = revealCount(gnosisOf(game, essenceId));
+    const order = revealOrder(game.seed, ess);
+    return order.indexOf(axis) < n;
+  }
+
+  /* An essence with only its known axes filled in, for feeding a primitive to
+   * produce a *predicted* behaviour to ghost behind the real one. Unknown axes
+   * fall back to the population mean so the ghost is a reasonable guess rather
+   * than nonsense. */
+  const MEAN = { complexity: 0.58, branching: 0.31, symmetry: 0.65, persistence: 0.62 };
+  function predictedEssence(game, essenceId, out) {
+    const o = out || {};
+    const ess = ESSENCE_BY_ID[essenceId];
+    if (!ess) return null;
+    const p = predicted(game, essenceId, o.__p || (o.__p = {}));
+    o.id = ess.id; o.index = ess.index; o.name = ess.name; o.glyph = ess.glyph;
+    for (const a of AXES) o[a] = p[a] === undefined ? MEAN[a] : p[a];
+    o.confidence = p.revealed / AXES.length;
+    return o;
+  }
+
   /* Total across the ledger, for the meta-progression readout. */
   function totalGnosis(game) {
     let n = 0;
@@ -1806,8 +2027,490 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.fractal = {
     ESSENCES, ESSENCE_BY_ID, BAND_ADJ,
-    essenceAt, resolve, contextKey, gnosisOf, recognise, gnosisBonus, totalGnosis
+    essenceAt, resolve, contextKey, gnosisOf, recognise, gnosisBonus, totalGnosis,
+    AXES, REVEAL_AT, revealCount, revealOrder, predicted, knows, predictedEssence
   };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the six primitives.
+ *
+ * ── The whole design in one paragraph ─────────────────────────────────────
+ *
+ * There are no per-layer minigames in this game. There are six functions, and
+ * every mechanic anywhere is one or more of them, parameterised by the four
+ * numbers an essence carries (fractal.js) and scaled by the local clock
+ * (cosmos.js). A band declares which primitives are live (spectrum.js). A tier
+ * declares how fast and how they are drawn.
+ *
+ *     56 authored numbers  ×  6 functions  =  1344 distinct situations
+ *
+ * ── Why this and not twelve hand-written modes ────────────────────────────
+ *
+ * Because the player has to be able to *transfer knowledge*, and that only
+ * works if the world is actually generated from a small seed. Once you learn
+ * that Cascade branches (branching 0.9), you know — without being told, and
+ * without ever having played there — that its rhythm subdivides five ways, its
+ * dependency graph fans out four wide, its nests are wide and shallow, and its
+ * gradient sprays rather than converges. In every layer. At every scale.
+ *
+ * That is the premise ("one body of information, rendered differently by local
+ * rules") stated as executable code rather than as flavour text. Hand-written
+ * modes cannot do it: twelve authored minigames have twelve unrelated rule
+ * sets, and nothing a player learns in one predicts anything in another.
+ *
+ * ── Contract ──────────────────────────────────────────────────────────────
+ *
+ * Every function here is pure, allocation-free (writes into a caller-owned
+ * `out`), finite for all 14 essences × 22 tiers, and reads *all four* axes so
+ * no essence is inert in any primitive. They are called per node per frame, so
+ * they must stay cheap — no trigonometry beyond one sin/cos, no allocation.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, TAU } = RS.core;
+
+  /* Guard: primitives are called with whatever essence a cell resolved to, and
+   * a missing axis must degrade rather than produce NaN and poison a node's
+   * position for the rest of the session. */
+  function axes(ess) {
+    return {
+      c: ess && typeof ess.complexity === 'number' ? clamp01(ess.complexity) : 0.5,
+      b: ess && typeof ess.branching === 'number' ? clamp01(ess.branching) : 0.3,
+      s: ess && typeof ess.symmetry === 'number' ? clamp01(ess.symmetry) : 0.5,
+      p: ess && typeof ess.persistence === 'number' ? clamp01(ess.persistence) : 0.5
+    };
+  }
+
+  // ── GATE ─────────────────────────────────────────────────────────────────
+  /* Something is available only sometimes.
+   *
+   * `persistence` sets how long a cycle lasts, `branching` how many times it
+   * subdivides inside that cycle, `symmetry` how much of it is open. Divided by
+   * the tier's clock, which spans three orders of magnitude — so the *same*
+   * essence in the *same* band is a fast tight pulse at the cellular scale and
+   * a slow vast one at the supercluster scale, for free.
+   *
+   * The subdivision is what makes this recognisable: Cascade (branching 0.9)
+   * gives a five-stroke burst, Lattice (branching 0) gives one even beat. A
+   * player hears the difference before they read the name. */
+  /* The tier clock spans 34.0 (Planck) to 0.02 (ensemble) — a factor of 1700.
+   * Used raw that is a 2 ms strobe at one end and a 160 s wait at the other,
+   * and neither is a game. Compressing it to the 0.45 power keeps the whole
+   * ordering (small is always faster than large) and the *feeling* of tempo
+   * while shrinking the span to ~28×, which is a range a player can actually
+   * live inside. The stroke clamp below closes the remainder. */
+  const TEMPO_EXP = 0.6;
+  /* No stroke is shorter than a sixth of a second (below that the gate is a
+   * flicker rather than a rhythm) or longer than four (above that waiting for
+   * the window stops being a decision). */
+  const STROKE_MIN = 0.16, STROKE_MAX = 4.0;
+
+  function GATE(ess, scale, t, out) {
+    const o = out || {};
+    const a = axes(ess);
+    const tempo = Math.pow(Math.max(1e-3, RS.cosmos.clockAt(scale)), TEMPO_EXP);
+
+    const subdiv = 1 + Math.round(a.b * 4);
+    const duty = lerp(0.25, 0.75, a.s);
+
+    /* Phase within the current subdivision. Each stroke is `period/subdiv`
+     * long and open for `duty` of it. */
+    const strokeLen = clamp(lerp(0.35, 3.2, a.p) / tempo / subdiv, STROKE_MIN, STROKE_MAX);
+    const period = strokeLen * subdiv;
+    const phase = ((t % strokeLen) + strokeLen) % strokeLen / strokeLen;
+
+    /* Soft edges rather than a square wave — a hard gate is unplayable because
+     * there is no warning, and the ramp is what makes the rhythm readable. */
+    const edge = 0.12;
+    let open;
+    if (phase < edge) open = phase / edge;
+    else if (phase < duty - edge) open = 1;
+    else if (phase < duty) open = (duty - phase) / edge;
+    else open = 0;
+
+    o.open = clamp01(open);
+    o.period = period;
+    o.subdiv = subdiv;
+    o.duty = duty;
+    o.strokeLen = strokeLen;
+    o.phase = phase;
+    /* Time until the next opening edge — what a rhythm HUD counts down. */
+    o.nextEdge = phase < duty ? (strokeLen - phase * strokeLen) : (1 - phase) * strokeLen;
+    /* Which stroke of the bar we are on, so a HUD can show the pattern. */
+    o.stroke = Math.floor((t % period) / strokeLen);
+    return o;
+  }
+
+  // ── NEST ─────────────────────────────────────────────────────────────────
+  /* Something contains a smaller version of itself.
+   *
+   * `complexity` sets how deep, `branching` how wide, `symmetry` how much
+   * smaller each level is. Emergence (complexity 1.0) nests five deep; Void
+   * (0.15) does not nest at all, which is exactly what "the absence that gives
+   * everything else its shape" should do. */
+  function NEST(ess, out) {
+    const o = out || {};
+    const a = axes(ess);
+    o.depth = 1 + Math.floor(a.c * 4);
+    o.fanout = 1 + Math.round(a.b * 3);
+    o.ratio = lerp(0.45, 0.80, a.s);
+    /* Total children if fully expanded — the payout ceiling for a descent, and
+     * why a wide shallow essence and a narrow deep one are worth different
+     * things. */
+    o.total = o.fanout === 1 ? o.depth
+      : Math.round((Math.pow(o.fanout, o.depth) - 1) / (o.fanout - 1));
+    /* How much smaller each level is, compounded — a descent into a symmetric
+     * essence stays legible, an asymmetric one shrinks away fast. */
+    o.floor = Math.pow(o.ratio, o.depth - 1);
+    return o;
+  }
+
+  // ── FLOW ─────────────────────────────────────────────────────────────────
+  /* Something has a direction to follow.
+   *
+   * `branching` sets divergence (Seed sprays outward, Attractor converges on a
+   * point), `persistence` sets steadiness (Memory holds a gradient still,
+   * Threshold flickers). The field is derived from position and time, so it is
+   * the same everywhere for the same essence — a gradient you learn to read. */
+  function FLOW(ess, x, y, t, out) {
+    const o = out || {};
+    const a = axes(ess);
+
+    /* Divergence: below 0.5 the field points inward, above it points outward.
+     * Attractor (0.0) converges hard; Seed (0.85) sprays. */
+    const div = a.b * 2 - 1;
+    const d = Math.hypot(x, y) + 1e-5;
+
+    /* A slow rotation whose rate falls with persistence, so a steady essence's
+     * gradient is nearly static and a volatile one's swims. */
+    const wobble = (1 - a.p) * 1.6;
+    const ang = Math.atan2(y, x) + Math.sin(t * wobble + d * 3) * (1 - a.s) * 0.9;
+
+    o.gx = Math.cos(ang) * div;
+    o.gy = Math.sin(ang) * div;
+    o.divergence = a.b;
+    o.steadiness = a.p;
+    /* Strength falls off with distance for a converging field and rises for a
+     * diverging one, so following it is a real navigation problem either way. */
+    o.strength = div < 0 ? clamp01(1 / (0.4 + d)) : clamp01(d * 1.2);
+    return o;
+  }
+
+  // ── ORDER ────────────────────────────────────────────────────────────────
+  /* Something requires another thing first.
+   *
+   * `branching` sets how many prerequisites, `complexity` how deep the chain
+   * runs. Prerequisites are other *essences*, chosen by hash, so the dependency
+   * graph is stable and learnable: Cascade always needs the same things, and a
+   * player who has satisfied it once knows the shape next time. */
+  function ORDER(ess, seed, out) {
+    const o = out || {};
+    const a = axes(ess);
+    const E = RS.fractal.ESSENCES;
+    o.fanout = 1 + Math.round(a.b * 3);
+    o.depth = 1 + Math.floor(a.c * 3);
+
+    const list = o.prereqs || (o.prereqs = []);
+    list.length = 0;
+    /* Offset from the essence's own index so nothing depends on itself, and so
+     * the graph is a genuine ordering rather than a cycle. */
+    for (let i = 0; i < o.fanout; i++) {
+      const step = 1 + (RS.core.hashN(seed >>> 0, ess.index, i) % (E.length - 1));
+      list.push(E[(ess.index + step) % E.length].id);
+    }
+    /* Persistence decides whether a satisfied prerequisite *stays* satisfied.
+     * A volatile essence's chain has to be re-satisfied; a persistent one's
+     * holds, which is the difference between a puzzle and a chore. */
+    o.holds = a.p > 0.5;
+    o.decay = (1 - a.p) * 0.4;
+    return o;
+  }
+
+  // ── TWIN ─────────────────────────────────────────────────────────────────
+  /* Something exists in two places; one is load-bearing.
+   *
+   * `symmetry` sets how close the twins sit — and a symmetric essence twins
+   * *close and confusingly*, which is the right way round: Duality (symmetry
+   * 1.0) is nearly impossible to tell apart, Cascade (0.15) throws its double a
+   * long way off. `persistence` sets the `tell`: how much of the time the real
+   * one gives itself away, so deduction is possible rather than a coin flip. */
+  function TWIN(ess, seed, out) {
+    const o = out || {};
+    const a = axes(ess);
+    o.separation = lerp(0.10, 0.60, 1 - a.s);
+    o.tell = a.p;
+    /* Which of the pair is real. Stable per address, so a player who works it
+     * out and comes back is rewarded rather than re-rolled. */
+    o.realIsFirst = (RS.core.hashN(seed >>> 0, 0x7217) & 1) === 0;
+    /* How strongly the tell shows. Complexity muddies it — an intricate essence
+     * is harder to read even when it is being honest. */
+    o.clarity = clamp01(a.p * (1 - a.c * 0.45));
+    o.bias = lerp(0.5, 0.85, a.b);
+    return o;
+  }
+
+  // ── INVERT ───────────────────────────────────────────────────────────────
+  /* A rule reads backwards.
+   *
+   * `persistence` is what resists inversion — Memory and Void (1.0) barely
+   * invert at all, Seed (0.10) inverts almost completely. Which axis gets
+   * inverted is derived from symmetry, so a given essence always inverts the
+   * same way. */
+  function INVERT(ess, out) {
+    const o = out || {};
+    const a = axes(ess);
+    o.strength = 1 - a.p;
+    /* Symmetric essences invert their *phase*; asymmetric ones invert their
+     * *magnitude*. Two genuinely different kinds of backwards. */
+    o.axis = a.s > 0.5 ? 'phase' : 'magnitude';
+    o.partial = a.c > 0.6;   // complex essences invert only partly — messier
+    return o;
+  }
+
+  /* Apply an inversion to a 0..1 alignment value. Kept here so every caller
+   * inverts the same way. */
+  function applyInvert(inv, value) {
+    if (!inv || inv.strength <= 0) return value;
+    const flipped = 1 - value;
+    return lerp(value, inv.partial ? (flipped * 0.7 + value * 0.3) : flipped, inv.strength);
+  }
+
+  const BY_ID = { gate: GATE, nest: NEST, flow: FLOW, order: ORDER, twin: TWIN, invert: INVERT };
+  const IDS = ['gate', 'nest', 'flow', 'order', 'twin', 'invert'];
+
+  /* Human-readable names, used by the HUD and the guide so a player can learn
+   * the vocabulary the game is actually built from. */
+  const LABELS = {
+    gate: { name: 'Gate', glyph: '⌷', blurb: 'Available only in windows. Learn the rhythm.' },
+    nest: { name: 'Nest', glyph: '⧉', blurb: 'Contains smaller copies. Descend for the payout.' },
+    flow: { name: 'Flow', glyph: '≈', blurb: 'Has a direction. Follow the gradient.' },
+    order: { name: 'Order', glyph: '⇴', blurb: 'Needs its antecedents first. Read the graph.' },
+    twin: { name: 'Twin', glyph: '◐', blurb: 'Exists twice. One is real — find the tell.' },
+    invert: { name: 'Invert', glyph: '○', blurb: 'Reads backwards. Unlearn what you know.' }
+  };
+
+  RS.emergence = { GATE, NEST, FLOW, ORDER, TWIN, INVERT, applyInvert, axes, BY_ID, IDS, LABELS };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — one generator, every scale.
+ *
+ * ── The visual statement of the thesis ────────────────────────────────────
+ *
+ * This file draws a molecule and a galaxy with the same function. Not
+ * similar functions — the same one, called with a different `geometry`.
+ *
+ * That is not a saving; it is the argument. The premise says one body of
+ * information is rendered differently by local rules, so a spiral arm and a
+ * coiled flagellum should come out of the same generator with the same
+ * parameters and differ only in how the strokes are laid down. If they came
+ * from two hand-drawn routines the game would merely *claim* they were the
+ * same essence. This way they demonstrably are, and a player can see the
+ * kinship before they can name it.
+ *
+ * ── How it is driven ──────────────────────────────────────────────────────
+ *
+ * Entirely by the four axes in fractal.js:
+ *
+ *   branching    → fanout at each node
+ *   symmetry     → how regular the angles are (1.0 = perfectly even fan)
+ *   persistence  → how slowly segments shorten with depth
+ *   complexity   → how many levels
+ *
+ * `geometry` (from cosmos.js) chooses the stroke, and nothing else. Topology is
+ * identical across geometries for the same essence — same segment count, same
+ * depth — which is exactly what makes it self-similarity rather than variety,
+ * and which simtest asserts.
+ *
+ * ── Cost ──────────────────────────────────────────────────────────────────
+ *
+ * Writes into a caller-owned flat array of segments and allocates nothing after
+ * the first call. Segment count is bounded by MAX_SEGMENTS regardless of the
+ * essence, so a maximally branching essence at full depth cannot blow the frame
+ * budget — the recursion is capped, not trusted.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, TAU, hashF, hashN } = RS.core;
+
+  /* Hard ceiling. Emergence at fanout 4 and depth 5 would be 341 nodes; capping
+   * at 160 keeps the worst case cheap and the difference is invisible because
+   * the deepest segments are sub-pixel anyway. */
+  const MAX_SEGMENTS = 160;
+
+  /* A segment is 7 flat numbers: x0, y0, x1, y1, depth, angle, scale.
+   * Flat rather than objects because this is rebuilt for every visible node
+   * every frame at some scales. */
+  const STRIDE = 7;
+
+  function newBuffer() {
+    return { data: new Float32Array(MAX_SEGMENTS * STRIDE), count: 0, depthMax: 0 };
+  }
+
+  /* Build the structure. Pure and deterministic: the same essence always
+   * produces the same skeleton, so a player recognises an essence by its shape
+   * before they read its name. */
+  function build(essence, geometry, seed, out) {
+    const buf = out || newBuffer();
+    buf.count = 0;
+    buf.depthMax = 0;
+    buf.geometry = geometry;
+    buf.essence = essence;
+
+    const a = RS.emergence.axes(essence);
+    const depth = 1 + Math.floor(a.c * 4);
+    const fanout = 1 + Math.round(a.b * 3);
+    const decay = lerp(0.48, 0.86, a.p);
+    /* Spread narrows as symmetry rises: a perfectly symmetric essence fans out
+     * evenly and tightly, an asymmetric one throws its branches wide. */
+    const spread = lerp(1.5, 0.55, a.s);
+    /* Jitter is the inverse of symmetry, hashed so it is stable per essence. */
+    const jitter = (1 - a.s) * 0.8;
+
+    grow(buf, 0, 0, -Math.PI / 2, 1, 0, depth, fanout, decay, spread, jitter, seed >>> 0);
+    return buf;
+  }
+
+  function grow(buf, x, y, ang, len, d, maxD, fanout, decay, spread, jitter, seed) {
+    if (d >= maxD || buf.count >= MAX_SEGMENTS) return;
+
+    const x1 = x + Math.cos(ang) * len;
+    const y1 = y + Math.sin(ang) * len;
+
+    const i = buf.count * STRIDE;
+    buf.data[i] = x; buf.data[i + 1] = y;
+    buf.data[i + 2] = x1; buf.data[i + 3] = y1;
+    buf.data[i + 4] = d;
+    buf.data[i + 5] = ang;
+    buf.data[i + 6] = len;
+    buf.count++;
+    if (d > buf.depthMax) buf.depthMax = d;
+
+    for (let k = 0; k < fanout; k++) {
+      if (buf.count >= MAX_SEGMENTS) return;
+      /* Even fan, then a stable per-branch jitter. */
+      const base = fanout === 1 ? 0 : (k / (fanout - 1) - 0.5) * spread;
+      const j = (hashF(hashN(seed, d, k), 3) * 2 - 1) * jitter;
+      grow(buf, x1, y1, ang + base + j, len * decay, d + 1, maxD,
+        fanout, decay, spread, jitter, seed);
+    }
+  }
+
+  /* ── Strokes ──────────────────────────────────────────────────────────────
+   *
+   * The only thing `geometry` changes. Same skeleton, eight ways of laying ink
+   * on it — which is precisely "local rules" rendered literally.
+   */
+  function draw(ctx, buf, cx, cy, radius, hue, sat, alpha, t) {
+    if (!buf || !buf.count) return;
+    const g = buf.geometry;
+    const n = buf.count;
+    const dm = Math.max(1, buf.depthMax);
+
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    for (let s = 0; s < n; s++) {
+      const i = s * STRIDE;
+      const x0 = cx + buf.data[i] * radius, y0 = cy + buf.data[i + 1] * radius;
+      const x1 = cx + buf.data[i + 2] * radius, y1 = cy + buf.data[i + 3] * radius;
+      const d = buf.data[i + 4];
+      const len = buf.data[i + 6];
+      /* Deeper segments fade — it reads as depth and it hides the cap. */
+      const fade = alpha * (1 - d / (dm + 1) * 0.55);
+      const w = Math.max(0.6, radius * len * 0.16);
+
+      switch (g) {
+        case 'chain':
+          /* Bonds: a line with a node at each end. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat, 0.62, fade);
+          ctx.lineWidth = w * 0.7;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.fillStyle = RS.core.hsl(hue + d * 6, sat, 0.72, fade);
+          ctx.beginPath(); ctx.arc(x1, y1, w * 0.9, 0, TAU); ctx.fill();
+          break;
+
+        case 'cell':
+          /* Lobes: soft blobs along the skeleton, membrane-ish. */
+          ctx.fillStyle = RS.core.hsl(hue + d * 4, sat * 0.9, 0.5, fade * 0.5);
+          ctx.beginPath();
+          ctx.ellipse((x0 + x1) / 2, (y0 + y1) / 2,
+            Math.hypot(x1 - x0, y1 - y0) * 0.55, w * 1.6,
+            Math.atan2(y1 - y0, x1 - x0), 0, TAU);
+          ctx.fill();
+          break;
+
+        case 'web':
+          /* Filaments: thin, long, with brighter intersections. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat * 0.8, 0.6, fade * 0.75);
+          ctx.lineWidth = Math.max(0.5, w * 0.4);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          if (d < 2) {
+            ctx.fillStyle = RS.core.hsl(hue, sat, 0.8, fade * 0.6);
+            ctx.beginPath(); ctx.arc(x0, y0, w * 0.6, 0, TAU); ctx.fill();
+          }
+          break;
+
+        case 'disc':
+          /* Arms: swept, thick at the root, trailing. */
+          ctx.strokeStyle = RS.core.hsl(hue + d * 8, sat, 0.6, fade * 0.85);
+          ctx.lineWidth = w * 1.3;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.quadraticCurveTo(x0 + (x1 - x0) * 0.5 - (y1 - y0) * 0.25,
+            y0 + (y1 - y0) * 0.5 + (x1 - x0) * 0.25, x1, y1);
+          ctx.stroke();
+          break;
+
+        case 'foam':
+          /* Flecks: no continuous structure survives at this scale, only the
+           * vertices, and they flicker. */
+          if (((s * 7 + Math.floor(t * 6)) % 3) === 0) break;
+          ctx.fillStyle = RS.core.hsl(hue + s * 3, sat, 0.7, fade * 0.9);
+          ctx.fillRect(x1 - w * 0.5, y1 - w * 0.5, w, w);
+          break;
+
+        case 'orbital':
+          /* Shells: arcs at each depth rather than lines between them. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat, 0.65, fade * 0.7);
+          ctx.lineWidth = Math.max(0.5, w * 0.45);
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.hypot(x1 - cx, y1 - cy),
+            buf.data[i + 5] - 0.5, buf.data[i + 5] + 0.5);
+          ctx.stroke();
+          break;
+
+        case 'abstract':
+          /* Relations: nodes and edges, no spatial pretence. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat * 0.5, 0.6, fade * 0.5);
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 3]);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = RS.core.hsl(hue, sat * 0.6, 0.75, fade);
+          ctx.beginPath(); ctx.arc(x1, y1, Math.max(1, w * 0.7), 0, TAU); ctx.fill();
+          break;
+
+        default: // 'body'
+          ctx.strokeStyle = RS.core.hsl(hue, sat, 0.62, fade);
+          ctx.lineWidth = w;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /* Topology fingerprint — two geometries of the same essence must agree on
+   * this exactly. simtest uses it to assert that geometry changes the ink and
+   * never the structure, which is the whole claim of this file. */
+  function topology(buf) {
+    return buf.count + ':' + buf.depthMax;
+  }
+
+  RS.selfsimilar = { MAX_SEGMENTS, STRIDE, newBuffer, build, draw, topology };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -1856,6 +2559,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
        * worked. */
       streams: Object.create(null),
       t: 0,
+      /* Rhythm time. Advances with the τ dial but *not* with the rung's clock,
+       * because GATE derives its own period from the clock and would otherwise
+       * be scaled by it twice. */
+      rt: 0,
+      /* essenceId → field.t at which it was last crystallised. This is the
+       * state the ORDER primitive reads, and it is why the causal layers are a
+       * graph you work rather than a queue you drain. */
+      satisfied: Object.create(null),
       tierIndex: RS.cosmos.ROOT_INDEX,
       bandIndex: 0,
       /* Rises when the rendered reality changes out from under the player;
@@ -1892,15 +2603,51 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // --- demands -------------------------------------------------------------
 
-  /* How much each dial matters in a given band. Ramps in deliberately: this is
-   * the mechanic-per-layer curve. */
+  /* ── How much each dial matters in a given band ──────────────────────────
+   *
+   * Derived from the band's primitive set, not hand-tuned. Each primitive
+   * genuinely leans on particular dials, and a band demands a dial to the
+   * extent that *any* of its live primitives wants it — a probabilistic OR, so
+   * two primitives that both want Δ compound rather than average.
+   *
+   *   gate   wants τ hardest: a rhythm is a thing in time.
+   *   flow   wants neither. A gradient is read off φ and Σ alone, which is
+   *          exactly why it is the primitive the game opens with — and why it
+   *          is also the one that pays out passively.
+   *   nest   wants Σ (already always 1) and a little of both others.
+   *   order  wants Δ: a sequence is a position in the fourth dimension.
+   *   twin   wants Δ: the two halves of a superposition differ by phase.
+   *   invert wants everything, moderately.
+   *
+   * φ and Σ are always fully demanded — they are which layer and which rung,
+   * and nothing is legible without them. The consequence is a curve that is
+   * *shaped* rather than sloped: Baryonic and Thermal ask for nothing beyond
+   * the two dials you start with, Electromagnetic makes τ matter the instant
+   * you arrive, Probabilistic does the same for Δ, and Unity asks for all four
+   * at once. Each layer introduces the dial its own mechanics need, which is a
+   * better tutorial than a ramp because the reason is visible.
+   */
+  const DIAL_LOAD = {
+    gate:   { phase: 0.15, rate: 0.90 },
+    flow:   { phase: 0.00, rate: 0.00 },
+    nest:   { phase: 0.30, rate: 0.15 },
+    order:  { phase: 0.70, rate: 0.35 },
+    twin:   { phase: 0.75, rate: 0.20 },
+    invert: { phase: 0.60, rate: 0.60 }
+  };
+
   function demandsFor(bandIndex) {
-    return {
-      freq: 1,
-      tier: 1,
-      phase: clamp01((bandIndex - 1) / 2.6),
-      rate: clamp01((bandIndex - 2) / 2.8)
-    };
+    const band = RS.spectrum.BANDS[bandIndex];
+    let pMiss = 1, rMiss = 1;
+    if (band) {
+      for (let i = 0; i < band.prim.length; i++) {
+        const load = DIAL_LOAD[band.prim[i]];
+        if (!load) continue;
+        pMiss *= 1 - load.phase;
+        rMiss *= 1 - load.rate;
+      }
+    }
+    return { freq: 1, tier: 1, phase: clamp01(1 - pMiss), rate: clamp01(1 - rMiss) };
   }
 
   function gauss(d) { return Math.exp(-d * d); }
@@ -1943,12 +2690,29 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     let total = af * ap * ar * as;
 
-    /* The null layer scores inverted — everything the player learned reads
-     * backwards, which is the entire joke of that band. */
-    if (band.mode === 'inverted') total = 1 - total;
-    /* Unity cannot be discriminated against: everything is partly aligned and
-     * nothing is ever fully so. */
-    if (band.mode === 'unity') total = 0.45 + total * 0.5;
+    /* Inversion is a *primitive*, not a band. The Null layer runs it on every
+     * node, so the layer reads backwards — but by how much is the node's own
+     * business: INVERT.strength is 1 - persistence, so a Memory manifesting in
+     * the Null layer barely inverts at all and a Seed inverts almost totally.
+     * That is the difference between "the null band is the backwards one" and
+     * "backwards is a thing essences do, and this band is where they all do
+     * it" — the second is learnable, and gnosis on an essence tells you which
+     * way its reading will run before you ever tune it. */
+    if (RS.spectrum.usesPrim(band, 'invert')) {
+      total = RS.emergence.applyInvert(
+        RS.emergence.INVERT(man.essence, node.inv || (node.inv = {})), total);
+    }
+
+    /* Discrimination degrades as a band runs more primitives at once. With one
+     * live you can read exactly what is wrong; with six there is always
+     * something partly right and nothing ever fully so, which is precisely
+     * what the Unity layer is supposed to feel like. Derived from the count,
+     * so it arrives on its own the moment a band gets crowded. */
+    const load = RS.spectrum.demandOf(band);
+    if (load > 3) {
+      const k = clamp01((load - 3) / 3);
+      total = lerp(total, 0.45 + total * 0.5, k);
+    }
 
     return { total: clamp01(total), f: af, p: ap, r: ar, s: as, fd, pd, rd, sd, dem };
   }
@@ -1992,6 +2756,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       bob: hashF(h, 4) * TAU,
       x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
       age: 0,
+      effort: 0,
       life: 26 + hashF(h, 5) * 34,
       fade: 0,               // 0..1 presence, springs in and out
       align: 0, alignParts: null,
@@ -1999,16 +2764,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       resolved: 0,           // 0..1 how much of its identity is legible
       crystallised: false,
       dying: false,
-      /* mode-specific live state */
-      gate: 1,               // electromagnetic: open/closed window
+      /* Live primitive state. Every one of these is filled in by
+       * `applyPrimitives` from the node's own essence; what is stored here is
+       * only the part that cannot be derived — the per-node phase offset that
+       * stops a field of gated nodes blinking in lockstep, and the seeds of
+       * the geometry. */
+      gate: 1,
       gatePhase: hashF(h, 6) * TAU,
-      twinAng: ang + Math.PI * (0.6 + hashF(h, 7) * 0.8), // probabilistic
-      twinReal: hashF(h, 8) < 0.5,
+      gateInfo: null, flowInfo: null, nestInfo: null,
+      orderInfo: null, twinInfo: null, inv: null,
+      twinAng: ang + Math.PI * (0.6 + hashF(h, 7) * 0.8),
+      twinReal: true, twinSep: 0.3,
       collapsed: false,
-      valence: hashF(h, 9) * 2 - 1,                        // emotive
-      depth: 0,                                            // recursive nesting
+      depth: 0,
       parent: null,
-      blocked: false                                       // causal
+      blocked: false,
+      orderMet: 0, orderNeed: 0, orderBonus: 1
     };
     field.nodes.push(node);
     return node;
@@ -2017,7 +2788,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* Recursive layers: crystallising a parent exposes its children, which are
    * resolved from the *same* cell one slot deeper. Descent is the payout. */
   function spawnChildren(game, field, parent) {
-    const n = 2 + (hashN(parent.man.seed, 41) % 2);
+    const nest = parent.nestInfo || RS.emergence.NEST(parent.man.essence, {});
+    /* Fanout and depth are the essence's, not the band's — so a Cascade nests
+     * wide and a Void does not nest at all, in every layer that nests. Capped
+     * because a fanout-4 essence at depth 5 is 341 nodes and the frame budget
+     * is not a suggestion. */
+    const n = clamp(nest.fanout, 1, 3);
+    const ratio = nest.ratio;
+    if (field.nodes.length + n > capacityOf(game) * 1.7) return;
     for (let i = 0; i < n; i++) {
       const man = RS.fractal.resolve(game.seed, parent.man.tierIndex, parent.man.bandIndex,
         parent.man.cellX, parent.man.cellY, parent.man.slot + 1 + i);
@@ -2031,16 +2809,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         spin: parent.spin * 1.3,
         bob: hashF(h, 4) * TAU,
         x: parent.x, y: parent.y,
-        age: 0, life: 22 + hashF(h, 5) * 18,
+        age: 0, effort: 0, life: 22 + hashF(h, 5) * 18,
         fade: 0, align: 0, alignParts: null, coherence: 0, resolved: 0.4,
         crystallised: false, dying: false,
         gate: 1, gatePhase: hashF(h, 6) * TAU,
-        twinAng: ang + Math.PI, twinReal: hashF(h, 8) < 0.5, collapsed: false,
-        valence: hashF(h, 9) * 2 - 1,
+        gateInfo: null, flowInfo: null, nestInfo: null,
+        orderInfo: null, twinInfo: null, inv: null,
+        twinAng: ang + Math.PI, twinReal: true, twinSep: 0.3, collapsed: false,
         depth: parent.depth + 1, parent: parent.id, blocked: false,
-        /* Children are worth more the deeper they are — that is the whole
-         * reason to chase the nesting. */
-        bonus: Math.pow(1.85, parent.depth + 1)
+        orderMet: 0, orderNeed: 0, orderBonus: 1,
+        /* Children are worth more the deeper they are, and *how much* more is
+         * the essence's shrink ratio: an asymmetric essence's children shrink
+         * away fast and pay correspondingly better for being caught. That is
+         * the whole reason to chase the nesting. */
+        bonus: Math.pow(1 / ratio, parent.depth + 1)
       });
     }
   }
@@ -2057,6 +2839,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const tierClock = RS.cosmos.clockAt(D.space.value);
     const flow = D.time.value * tierClock;
     field.t += dt * Math.abs(flow);
+    field.rt += dt * Math.abs(D.time.value);
 
     const tierIndex = clamp(Math.round(D.space.value), 0, RS.cosmos.TIERS.length - 1);
     const focus = RS.dials.focusOf(D.frequency);
@@ -2124,16 +2907,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       n.x = Math.cos(n.ang) * n.rad + bx;
       n.y = Math.sin(n.ang) * n.rad + by;
 
-      // ── mode rules ────────────────────────────────────────────────────
-      applyMode(game, field, n, band, dt, sgn);
+      // ── primitives ────────────────────────────────────────────────────
+      applyPrimitives(game, field, n, band, dt, sgn);
 
       // ── alignment ─────────────────────────────────────────────────────
       const a = alignmentOf(game, n);
       n.alignParts = a;
       let eff = a.total * n.gate;
-      if (band.mode === 'superposed' && !n.collapsed && !n.twinReal) eff *= 0.35;
+      if (n.twinInfo && !n.collapsed && !n.twinReal) eff *= 0.35;
       if (n.blocked) eff *= 0.15;
       n.align = damp(n.align, eff, 12, dt);
+
+      /* Time actually spent working this node. Anything the band's primitives
+       * do to slow you down — a shut gate, a twin to resolve, a missing
+       * antecedent, a gradient carrying it away — shows up here, and the payout
+       * reads it. That is why no primitive needs a hand-written compensation
+       * factor: friction pays for itself by definition. */
+      if (n.align > 0.06) n.effort += dt;
 
       /* Resolution: a node you are anywhere near begins to become legible.
        * Below that it is an unresolved smudge with no name and no glyph — the
@@ -2157,22 +2947,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           }
           if (n.coherence >= 1) crystallise(game, bus, field, n);
         } else {
-          /* Accretion layers hold what they have gained; everything else
-           * bleeds. That single difference is what makes the baryonic layer
-           * feel like an idle game and the thermal layer feel like a chase. */
-          const decay = band.mode === 'accretion' ? 0.035 : 0.14 * (1 + band.drift);
+          /* Whether a partial hold survives being interrupted is the *node's*
+           * property, not the band's: persistence is exactly the axis that says
+           * "this stays". The band's drift only amplifies it. So a Memory in
+           * the Thermal layer holds on where a Seed in the Baryonic layer
+           * bleeds out, and the player who has read those two axes knows which
+           * nodes are worth stepping away from. */
+          const per = RS.emergence.axes(n.man.essence).p;
+          const decay = (0.03 + 0.17 * (1 - per)) * (0.5 + band.drift);
           n.coherence = Math.max(0, n.coherence - decay * dt);
         }
       }
     }
 
-    /* Passive accretion: the baryonic layer pays a trickle without attention,
-     * which is what makes leaving the game running mean something. */
-    if (RS.spectrum.BANDS[bandIndex].mode === 'accretion') {
-      game.insight += game.passiveRate * dt;
-    }
+    /* Passive accretion. FLOW is the one primitive that pays without
+     * attention — a gradient carries things to you whether or not you are
+     * watching — but only where the layer is calm enough for anything to
+     * settle, and split between however many primitives are competing for it.
+     * Baryonic (one slow flow) is therefore the idle layer; Thermal, which
+     * runs the same primitive at four times the drift, pays nothing at all. */
+    game.insight += game.passiveRate * dt * passiveShareOf(RS.spectrum.BANDS[bandIndex]);
 
     updateDerived(game);
+  }
+
+  /* What fraction of the idle floor a band pays out. See the call site. */
+  function passiveShareOf(band) {
+    if (!RS.spectrum.usesPrim(band, 'flow')) return 0;
+    return clamp01(1.25 - band.drift) / RS.spectrum.demandOf(band);
   }
 
   /* Hold time scales with what the node is worth. A common node is a beat; a
@@ -2182,65 +2984,123 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return (1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9) / (1 + n.depth * 0.25);
   }
 
-  function applyMode(game, field, n, band, dt, sgn) {
-    switch (band.mode) {
-      case 'pulse': {
-        /* Rhythmic gating. The window is generous enough to be fair and tight
-         * enough that you play to the beat rather than around it. */
-        n.gatePhase += dt * 2.1 * sgn;
-        const s = (Math.sin(n.gatePhase) + 1) / 2;
-        n.gate = s > 0.42 ? 1 : clamp01((s - 0.16) / 0.26);
-        break;
-      }
-      case 'superposed': {
-        /* Two positions, one of them load-bearing. Sustained attention
-         * collapses the pair — observation is the mechanic, not a metaphor. */
-        n.twinAng += n.spin * dt * 0.6 * sgn;
-        if (!n.collapsed && n.coherence > 0.3) n.collapsed = true;
-        n.gate = 1;
-        break;
-      }
-      case 'valence': {
-        /* Emotional physics: like valences cluster, opposites push apart, and
-         * the resulting pattern *is* the layer's appearance. */
-        let fx = 0, fy = 0;
-        for (const o of field.nodes) {
-          if (o === n || o.band !== band) continue;
-          const dx = o.x - n.x, dy = o.y - n.y;
-          const d2 = dx * dx + dy * dy + 0.004;
-          const affinity = n.valence * o.valence;
-          const f = affinity * 0.0016 / d2;
-          fx += dx * f; fy += dy * f;
+  /* ── Node behaviour ───────────────────────────────────────────────────────
+   *
+   * There is no per-band code here, and that is the entire point. A band
+   * declares which primitives are live; each primitive is called with the
+   * *node's own essence* and the *current rung*, and applies its result. So a
+   * single band is already many different things — Electromagnetic is a
+   * five-stroke burst when the node is a Cascade and one even beat when it is
+   * a Lattice, brisk at the cellular rung and ponderous at the supercluster —
+   * and a player who learned Cascade in one band can predict it in every other
+   * before they have ever tuned there. Twelve hand-written modes could not do
+   * that, because nothing learned in one would say anything about the next.
+   */
+  function applyPrimitives(game, field, n, band, dt, sgn) {
+    const E = RS.emergence;
+    const ess = n.man.essence;
+    const scale = game.dials.space.value;
+    const prim = band.prim;
+
+    n.gate = 1;
+    n.blocked = false;
+
+    for (let i = 0; i < prim.length; i++) {
+      switch (prim[i]) {
+
+        case 'gate': {
+          /* `field.rt` rather than `field.t`: GATE derives its own period from
+           * the rung's clock, so feeding it a clock-scaled time would count the
+           * scale twice and freeze the deep tiers solid. The τ dial still
+           * drives it — pushing time makes the window flicker faster, which is
+           * the one place where a high throttle genuinely costs you. */
+          const g = E.GATE(ess, scale, field.rt + n.gatePhase, n.gateInfo || (n.gateInfo = {}));
+          n.gate *= g.open;
+          break;
         }
-        n.targetRad = clamp(n.targetRad + (fx * n.x + fy * n.y) * dt * 4, 0.16, 1.02);
-        n.spin += (fy * n.x - fx * n.y) * dt * 2.5;
-        n.spin = clamp(n.spin, -0.9, 0.9);
-        n.gate = 1;
-        break;
+
+        case 'flow': {
+          /* The gradient moves the node rather than the player: a divergent
+           * essence climbs away from you and a convergent one falls inward,
+           * so "follow the flow" is a real tracking problem whose difficulty
+           * is the essence's branching number. */
+          const f = E.FLOW(ess, n.x, n.y, field.t, n.flowInfo || (n.flowInfo = {}));
+          const d = Math.hypot(n.x, n.y) + 1e-4;
+          const radial = (f.gx * n.x + f.gy * n.y) / d;
+          const tangent = (f.gy * n.x - f.gx * n.y) / d;
+          n.targetRad = clamp(n.targetRad + radial * f.strength * dt * 0.30 * sgn, 0.16, 1.08);
+          n.spin = clamp(n.spin + tangent * dt * 0.55 * sgn, -0.95, 0.95);
+          break;
+        }
+
+        case 'nest': {
+          /* No motion of its own — it decides what crystallising this node
+           * exposes, and how much the descent is worth. */
+          n.nestInfo = E.NEST(ess, n.nestInfo || {});
+          break;
+        }
+
+        case 'order': {
+          /* A node cannot be held until its antecedents have been. They are
+           * other essences, derived from this one, so the layer is a
+           * dependency graph you read and satisfy — and because ORDER.holds is
+           * the essence's persistence, a persistent essence's chain stays
+           * satisfied while a volatile one's has to be kept alive. */
+          const o = E.ORDER(ess, n.man.seed, n.orderInfo || (n.orderInfo = {}));
+          let met = 0, firstMissing = null;
+          for (let k = 0; k < o.prereqs.length; k++) {
+            const id = o.prereqs[k];
+            const stamp = field.satisfied[id];
+            /* Two ways to hold an antecedent, and the second is the whole
+             * point of the game: you have crystallised it here, recently — or
+             * you *understand* it, from having met it anywhere else in the
+             * cosmos. Gnosis earned at the cellular scale in the Thermal layer
+             * unblocks a dependency in the Causal layer at the supercluster
+             * scale, because it is the same essence and the ledger knows it. */
+            const alive = (stamp !== undefined && (o.holds || field.t - stamp < ORDER_WINDOW)) ||
+              RS.fractal.gnosisOf(game, id) > 0;
+            if (alive) met++;
+            else if (!firstMissing) firstMissing = RS.fractal.ESSENCE_BY_ID[id];
+          }
+          n.orderMet = met;
+          n.orderNeed = o.prereqs.length;
+          n.antecedent = firstMissing || RS.fractal.ESSENCE_BY_ID[o.prereqs[0]];
+          /* One satisfied antecedent unblocks; satisfying the rest is worth
+           * paying for. A wall that needs all four at once would just be a
+           * wall. */
+          n.blocked = met === 0;
+          n.orderBonus = 1 + (met - 1) * 0.55;
+          break;
+        }
+
+        case 'twin': {
+          /* Two positions, one load-bearing. Symmetry decides how close the
+           * pair sits (a symmetric essence twins confusingly close),
+           * persistence decides how much of the time the real one gives itself
+           * away, and sustained attention collapses the pair — observation is
+           * the mechanic rather than a metaphor. */
+          const w = E.TWIN(ess, n.man.seed, n.twinInfo || (n.twinInfo = {}));
+          n.twinReal = w.realIsFirst;
+          n.twinAng += n.spin * dt * 0.6 * sgn;
+          n.twinSep = w.separation;
+          if (!n.collapsed && n.coherence > 0.30 * (1.4 - w.clarity * 0.6)) n.collapsed = true;
+          break;
+        }
+
+        case 'invert': {
+          /* Read by `alignmentOf`. Held on the node so the HUD can mirror the
+           * reticle for exactly the nodes whose scoring actually runs
+           * backwards, which is not all of them. */
+          n.inv = E.INVERT(ess, n.inv || {});
+          break;
+        }
       }
-      case 'causal': {
-        /* A node cannot be held before its antecedent has been. The antecedent
-         * is another essence, derived from this one — so the layer is a
-         * dependency graph you have to read and satisfy in order. */
-        const need = RS.fractal.ESSENCES[(n.man.essence.index + 3) % RS.fractal.ESSENCES.length];
-        n.antecedent = need;
-        n.blocked = !(field.lastCrystal && field.lastCrystal === need.id);
-        n.gate = 1;
-        break;
-      }
-      case 'flux':
-        /* Thermal nodes cool as they age — the longer you dither, the less
-         * they are worth, so the layer rewards decisiveness. */
-        n.targetRad = clamp(n.targetRad + dt * 0.02 * sgn, 0.16, 1.1);
-        n.gate = 1;
-        break;
-      case 'unity':
-        n.gate = 1;
-        break;
-      default:
-        n.gate = 1;
     }
   }
+
+  /* How long an unsatisfied-by-nature antecedent stays satisfied. Only applies
+   * to essences whose persistence is below half — everything else holds. */
+  const ORDER_WINDOW = 14;
 
   function crystallise(game, bus, field, n) {
     n.crystallised = true;
@@ -2258,7 +3118,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const gnosisMul = RS.fractal.gnosisBonus(game, man.essence.id);
     const depthMul = 1 + RS.cosmos.depthFromRoot(man.tierIndex) * 0.09;
     const nestMul = n.bonus || 1;
-    const amount = man.potency * band.yield * gnosisMul * depthMul * nestMul * game.yieldMul;
+    /* Satisfying more antecedents than the one you needed pays for it. */
+    const orderMul = n.orderBonus > 1 ? n.orderBonus : 1;
+    /* Paid for the hold, not for the click. A node that took three times as
+     * long to bring in — because its layer gated, or its double had to be
+     * resolved first, or its antecedents were missing — is worth three times
+     * as much. This is the whole balance mechanism for the primitives: every
+     * friction they impose compensates itself, so a band can be made harder by
+     * composing more of them without anyone having to re-tune a yield table.
+     * Clamped at both ends so a node collected instantly still pays something
+     * and a node left simmering all session is not a farm. */
+    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 5);
+    const amount = man.potency * band.yield * gnosisMul * depthMul *
+      nestMul * orderMul * effortMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -2272,6 +3144,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     const rec = RS.fractal.recognise(game, man);
     field.lastCrystal = man.essence.id;
+    /* Stamped rather than replaced: ORDER reads the whole ledger, so a player
+     * who has recently worked several essences is holding several keys at once
+     * and can attack the dependency graph from wherever it is thinnest. */
+    field.satisfied[man.essence.id] = field.t;
 
     bus.emit('node:crystallise', {
       node: n, amount, man, band, tier,
@@ -2281,7 +3157,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (firstTier) bus.emit('discover:tier', { tier });
     if (rec.fresh) bus.emit('discover:gnosis', { essence: man.essence, level: rec.level, man });
 
-    if (band.mode === 'recursive' && n.depth < 4) spawnChildren(game, field, n);
+    if (RS.spectrum.usesPrim(band, 'nest') && n.nestInfo &&
+        n.depth + 1 < Math.min(n.nestInfo.depth, 5)) {
+      spawnChildren(game, field, n);
+    }
   }
 
   /* Aggregates the HUD and the economy read every frame. */
@@ -2312,7 +3191,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
-    holdTimeOf, spawnNode, applyOffline, updateDerived
+    holdTimeOf, spawnNode, applyOffline, updateDerived,
+    applyPrimitives, passiveShareOf, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -4962,6 +5842,1205 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — the galactic map.
+ *
+ * ── Why this scene exists ─────────────────────────────────────────────────
+ *
+ * Before this, a system was reached by an opaque formula over the phase and
+ * frequency dials: you arrived *somewhere* and had no idea where, no sense of
+ * what else was out there, and no way to choose. The galaxy was technically
+ * infinite and experientially a single room.
+ *
+ * So the scale ladder gains a rung that is about *place* rather than scale.
+ * The full descent now reads:
+ *
+ *   galactic+   the attunement field   — tune which reality layer manifests
+ *   cluster     ┐
+ *   interstellar┘ THE MAP             — see the stars around you, choose one
+ *   stellar     ┐
+ *   system      ┘ the system          — planets, moons, belts, trade
+ *   planetary   the surface           — stand on it
+ *
+ * Which is physically exactly right: at interstellar and cluster scales what
+ * you can see *is* neighbouring stars, and that is precisely the scale at
+ * which choosing a destination is the meaningful act.
+ *
+ * ── Vastness on a budget ──────────────────────────────────────────────────
+ *
+ * The map is a window onto an unbounded sector grid. Every star in it is
+ * derived by `stellar.systemAt`, so the galaxy is not a list of places — it is
+ * a function, and panning simply asks it about different arguments. The window
+ * is cached and only rebuilt when it moves, so a screen of two hundred stars
+ * costs one derivation pass and then nothing.
+ *
+ * What makes it feel vast rather than merely large is that **you can see much
+ * further than you can reach.** Stars beyond the consciousness field render as
+ * dim, unnamed, unresolvable points. Expanding the field is what turns them
+ * into places. The horizon is always populated and always receding.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hsl, TAU, hashF, hashN, fmt } = RS.core;
+
+  /* Light years per sector cell. Sized so a sector is a plausible stellar
+   * neighbourhood and the numbers on screen are ones an astronomer would
+   * recognise — the nearest star to the Sun is 4.2 ly away. */
+  const LY_PER_SECTOR = 12;
+
+  /* How many sectors of the grid to derive around the player. The visible
+   * radius is larger than the reachable one on purpose. */
+  const WINDOW = 7;
+
+  function newState() {
+    return {
+      /* Which sector the player is centred on. This is their galactic
+       * position, and it is the only navigation state that persists. */
+      sx: 0, sy: 0,
+      /* Derived window, rebuilt when the centre or reach changes. */
+      stars: [],
+      cacheKey: '',
+      /* Currently highlighted star, and the one committed to as a target. */
+      hover: -1,
+      target: null,
+      /* Slow parallax drift so the map is never completely still. */
+      t: 0
+    };
+  }
+
+  /* Sector → screen offset, in normalised field units. A star's position
+   * within its sector is derived from the sector hash, so the field is
+   * irregular the way a real stellar neighbourhood is rather than a lattice. */
+  function starsIn(worldSeed, sx, sy) {
+    const h = hashN(worldSeed ^ 0x6A1A, sx, sy);
+    /* Stellar density falls off with galactocentric radius — the core is
+     * crowded, the rim is empty. Same gradient that sets metallicity in
+     * stellar.js, so a metal-rich neighbourhood is also a busy one. */
+    const galR = Math.hypot(sx, sy) / 64;
+    const density = clamp01(1.15 - galR * 0.9);
+    const n = Math.max(0, Math.round((0.6 + hashF(h, 1) * 2.6) * density));
+    const out = [];
+    for (let i = 0; i < n && i < 5; i++) {
+      out.push({
+        sx, sy, index: i,
+        /* Jitter inside the cell, so no star sits on a grid intersection. */
+        jx: hashF(h, 10 + i * 3) - 0.5,
+        jy: hashF(h, 11 + i * 3) - 0.5,
+        hash: hashN(h, 100 + i)
+      });
+    }
+    return out;
+  }
+
+  /* Distance in light years between two sector addresses, including the
+   * sub-cell jitter, so the readouts are consistent with the picture. */
+  function distanceLy(a, b) {
+    const dx = (b.sx + (b.jx || 0)) - (a.sx + (a.jx || 0));
+    const dy = (b.sy + (b.jy || 0)) - (a.sy + (a.jy || 0));
+    return Math.hypot(dx, dy) * LY_PER_SECTOR;
+  }
+
+  /* Rebuild the visible window. Derives each star's system only far enough to
+   * know its class and whether it holds anything — the full system is derived
+   * on arrival, not here, or panning the map would derive thousands of worlds. */
+  function refresh(game) {
+    const G = game.galaxy;
+    const reach = RS.influence.reachRadius(game);
+    const key = G.sx + ',' + G.sy + ',' + reach + ',' +
+      Object.keys(game.known.systems).length + ',' + Object.keys(game.known.charted).length;
+    if (G.cacheKey === key) return G.stars;
+
+    G.stars.length = 0;
+    const here = { sx: G.sx, sy: G.sy, jx: 0, jy: 0 };
+    for (let dy = -WINDOW; dy <= WINDOW; dy++) {
+      for (let dx = -WINDOW; dx <= WINDOW; dx++) {
+        const sx = G.sx + dx, sy = G.sy + dy;
+        for (const st of starsIn(game.seed, sx, sy)) {
+          const dist = distanceLy(here, st);
+          if (dist > WINDOW * LY_PER_SECTOR) continue;
+
+          /* Only the star itself is derived here — cheap, and enough to draw
+           * and to decide whether it is worth going to. */
+          const galR = clamp01(Math.hypot(sx, sy) / 64 + hashF(st.hash, 90) * 0.12);
+          const star = RS.stellar.makeStar(hashN(game.seed ^ 0x5711A5, sx, sy, st.index), galR, 0);
+
+          st.star = star;
+          st.dist = dist;
+          st.name = RS.stellar.nameSystem(hashN(game.seed ^ 0x5711A5, sx, sy, st.index));
+          st.key = sx + ',' + sy + ',' + st.index;
+          st.visited = !!game.known.systems[st.key];
+          st.charted = !!game.known.charted[st.key];
+          /* Within the consciousness field you can resolve what is there;
+           * outside it, a star is a light and nothing more — unless somebody
+           * who lives out there has told you about it. A chart given by a
+           * civilisation resolves stars your own field cannot yet reach, which
+           * is the concrete reward for the whole contact system. */
+          st.inReach = dist <= reach * LY_PER_SECTOR;
+          st.resolved = st.inReach || st.visited || st.charted;
+          G.stars.push(st);
+        }
+      }
+    }
+    G.stars.sort((a, b) => a.dist - b.dist);
+    G.cacheKey = key;
+    return G.stars;
+  }
+
+  /* A cheap "is there anything here" survey, run only for resolved stars and
+   * only when the player asks for it — deriving every system's biospheres to
+   * paint the map would defeat the point. Cached per address. */
+  const surveyCache = new Map();
+  function surveyOf(game, st) {
+    if (!st.resolved) return null;
+    let s = surveyCache.get(st.key);
+    if (s) return s;
+    const sys = RS.stellar.systemAt(game.seed, st.sx, st.sy, st.index);
+    let life = 0, civ = 0, worlds = 0, best = 0;
+    for (let j = 0; j < sys.bodies.length; j++) {
+      if (sys.bodies[j].kind !== 'planet') continue;
+      const p = RS.planet.planetAt(sys, j);
+      if (!p) continue;
+      worlds++;
+      best = Math.max(best, p.habitability);
+      if (p.biosphere) life++;
+      if (RS.civ.civOf(p, 0)) civ++;
+    }
+    s = { worlds, life, civ, best, planets: sys.bodies.filter(b => b.kind === 'planet').length };
+    if (surveyCache.size > 400) surveyCache.delete(surveyCache.keys().next().value);
+    surveyCache.set(st.key, s);
+    return s;
+  }
+
+  function clearSurveys() { surveyCache.clear(); }
+
+  /* Committing to a star. The reach check is the whole gate on exploration:
+   * expanding the consciousness field is what opens the galaxy. */
+  function selectStar(game, bus, st) {
+    if (!st) return { ok: false, reason: 'nothing there' };
+    if (!st.inReach && !st.visited && !st.charted) {
+      return { ok: false, reason: 'beyond your consciousness field (' +
+        st.dist.toFixed(1) + ' ly, reach ' + (RS.influence.reachRadius(game) * LY_PER_SECTOR).toFixed(0) + ' ly)' };
+    }
+    game.galaxy.target = st;
+    bus.emit('galaxy:target', { star: st });
+    return { ok: true };
+  }
+
+  /* Travelling re-centres the map on the chosen star, which is what makes the
+   * galaxy explorable: each hop becomes the origin of the next window, and the
+   * horizon moves with you. */
+  function travelTo(game, bus, st) {
+    const res = selectStar(game, bus, st);
+    if (!res.ok) return res;
+    game.galaxy.sx = st.sx;
+    game.galaxy.sy = st.sy;
+    game.galaxy.cacheKey = '';
+    game.stats.jumps = (game.stats.jumps || 0) + 1;
+    RS.scenes.enterSystem(game, bus, { sx: st.sx, sy: st.sy, index: st.index });
+    bus.emit('galaxy:travel', { star: st });
+    return { ok: true };
+  }
+
+  function tick(game, bus, dt) {
+    game.galaxy.t += dt;
+    refresh(game);
+  }
+
+  // ── rendering ────────────────────────────────────────────────────────────
+
+  const labelBoxes = [];
+
+  function draw(ctx, game, dt) {
+    const V = RS.render.view;
+    const G = game.galaxy;
+    const stars = refresh(game);
+    const reach = RS.influence.reachRadius(game);
+    const px = v => v * V.R;
+
+    /* Scale: the whole window maps to the field radius. */
+    const span = WINDOW * 0.85;
+
+    /* The reach ring — the single most important thing on this screen, because
+     * it is the boundary between "places" and "lights". */
+    const reachR = px(reach / span);
+    ctx.save();
+    const rg = ctx.createRadialGradient(V.cx, V.cy, reachR * 0.75, V.cx, V.cy, reachR);
+    rg.addColorStop(0, 'hsla(190,80%,60%,0)');
+    rg.addColorStop(1, 'hsla(190,80%,60%,0.07)');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(V.cx, V.cy, reachR, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'hsla(190,80%,65%,0.30)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 6]);
+    ctx.beginPath(); ctx.arc(V.cx, V.cy, reachR, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    /* Faint background haze that thickens toward the galactic core, so the map
+     * has a direction and the player can tell which way is "inward". */
+    const coreAng = Math.atan2(-G.sy, -G.sx);
+    const hg = ctx.createLinearGradient(
+      V.cx - Math.cos(coreAng) * px(1.2), V.cy - Math.sin(coreAng) * px(1.2),
+      V.cx + Math.cos(coreAng) * px(1.2), V.cy + Math.sin(coreAng) * px(1.2));
+    hg.addColorStop(0, 'hsla(40,50%,60%,0)');
+    hg.addColorStop(1, 'hsla(40,60%,62%,0.055)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, 0, V.w, V.h);
+
+    // ── stars ──
+    /* Placed label rectangles, so names can be skipped where they would
+     * collide. Reset every frame; never allocated per star. */
+    labelBoxes.length = 0;
+    for (let i = stars.length - 1; i >= 0; i--) {
+      const st = stars[i];
+      const dx = (st.sx + st.jx) - G.sx;
+      const dy = (st.sy + st.jy) - G.sy;
+      const X = V.cx + (dx / span) * V.R;
+      const Y = V.cy + (dy / span) * V.R * 0.86;
+      if (X < -20 || X > V.w + 20 || Y < -20 || Y > V.h + 20) continue;
+
+      const star = st.star;
+      /* Apparent size follows real luminosity, compressed so an O star does
+       * not swallow the screen but still visibly dominates. */
+      const mag = clamp(Math.log10(1 + star.luminosity) * 0.4 + 0.35, 0.25, 1.5);
+      const r = px(0.011) * mag;
+      const dim = st.resolved ? 1 : 0.34;
+
+      /* Glow. */
+      const g = ctx.createRadialGradient(X, Y, 0, X, Y, r * 6);
+      g.addColorStop(0, hsl(star.cls.hue, 0.6, 0.9, 0.85 * dim));
+      g.addColorStop(0.3, hsl(star.cls.hue, 0.9, 0.66, 0.30 * dim));
+      g.addColorStop(1, hsl(star.cls.hue, 0.9, 0.6, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(X, Y, r * 6, 0, TAU); ctx.fill();
+      ctx.fillStyle = hsl(star.cls.hue, 0.3, 0.97, dim);
+      ctx.beginPath(); ctx.arc(X, Y, r, 0, TAU); ctx.fill();
+
+      st.__x = X; st.__y = Y; st.__r = r;
+
+      if (!st.resolved) continue;
+
+      /* Survey markers, only for resolved stars. These are the reason to look
+       * at the map rather than pick the nearest thing. */
+      const sv = surveyOf(game, st);
+      if (sv) {
+        if (sv.civ > 0) {
+          /* A civilisation is the loudest thing on the map, and it pulses so
+           * the eye finds it without reading anything. */
+          const pulse = 0.6 + Math.sin(G.t * 2.4 + st.hash % 10) * 0.4;
+          ctx.strokeStyle = hsl(45, 0.95, 0.68, 0.5 + pulse * 0.4);
+          ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.arc(X, Y, r * 4.2 + pulse * 2, 0, TAU); ctx.stroke();
+        } else if (sv.life > 0) {
+          ctx.strokeStyle = 'hsla(135,80%,60%,0.75)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(X, Y, r * 3.4, 0, TAU); ctx.stroke();
+        }
+      }
+
+      if (st.visited) {
+        ctx.strokeStyle = 'rgba(230,240,255,0.42)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(X, Y, r * 2.4, 0, TAU); ctx.stroke();
+      } else if (st.charted && !st.inReach) {
+        /* Known only because somebody told you. Drawn as a dashed ring so the
+         * map visibly distinguishes "I can see this" from "I was told". */
+        ctx.strokeStyle = 'hsla(45,85%,68%,0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath(); ctx.arc(X, Y, r * 2.8, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      /* Names, only for the closest handful, and only where they do not collide
+       * with a name already placed. Ten overlapping labels is strictly worse
+       * than four readable ones — the first version of this piled four names
+       * on top of each other and none of them could be read. */
+      if (i < 12 && st.inReach) {
+        ctx.font = '600 9px ui-monospace, Menlo, monospace';
+        const w = ctx.measureText(st.name).width;
+        const lx = X - w / 2, ly = Y + r * 6 + 4;
+        let clear = true;
+        for (const b of labelBoxes) {
+          if (lx < b.x + b.w + 3 && lx + w + 3 > b.x && ly < b.y + b.h + 2 && ly + 11 + 2 > b.y) {
+            clear = false; break;
+          }
+        }
+        if (clear) {
+          labelBoxes.push({ x: lx, y: ly, w, h: 11 });
+          ctx.textAlign = 'center';
+          /* A dark backing plate, because a light label on a star field is
+           * unreadable wherever it crosses another star's glow. */
+          ctx.fillStyle = 'rgba(3,6,12,0.62)';
+          ctx.fillRect(lx - 2, ly, w + 4, 11);
+          ctx.fillStyle = 'rgba(214,228,248,0.78)';
+          ctx.fillText(st.name, X, ly + 8);
+        }
+      }
+    }
+
+    // ── the target ──
+    const tg = G.target;
+    if (tg && tg.__x != null) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1.5;
+      const rr = tg.__r * 6 + Math.sin(G.t * 3) * 2;
+      for (let k = 0; k < 4; k++) {
+        const a0 = k * TAU / 4 + G.t * 0.5;
+        ctx.beginPath(); ctx.arc(tg.__x, tg.__y, rr, a0, a0 + 0.5); ctx.stroke();
+      }
+      /* A line home, so the player always knows where they are relative to
+       * what they have chosen. */
+      ctx.strokeStyle = 'rgba(160,200,255,0.22)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.beginPath();
+      ctx.moveTo(V.cx, V.cy); ctx.lineTo(tg.__x, tg.__y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── you ──
+    const yg = ctx.createRadialGradient(V.cx, V.cy, 0, V.cx, V.cy, px(0.06));
+    yg.addColorStop(0, 'rgba(255,255,255,0.95)');
+    yg.addColorStop(0.3, 'hsla(190,90%,70%,0.35)');
+    yg.addColorStop(1, 'hsla(190,90%,70%,0)');
+    ctx.fillStyle = yg;
+    ctx.beginPath(); ctx.arc(V.cx, V.cy, px(0.06), 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(V.cx, V.cy, px(0.006), 0, TAU); ctx.fill();
+
+    /* Scale bar — without one, "vast" is just a word. */
+    const barLy = LY_PER_SECTOR;
+    const barPx = (1 / span) * V.R;
+    const bx = 16, by = V.cy + px(0.92);
+    ctx.strokeStyle = 'rgba(200,220,245,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx, by); ctx.lineTo(bx + barPx, by);
+    ctx.moveTo(bx, by - 3); ctx.lineTo(bx, by + 3);
+    ctx.moveTo(bx + barPx, by - 3); ctx.lineTo(bx + barPx, by + 3);
+    ctx.stroke();
+    ctx.font = '600 9px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(200,220,245,0.6)';
+    ctx.fillText(barLy + ' ly', bx, by - 6);
+  }
+
+  /* Hit test for taps. Generous, because stars are small targets. */
+  function pick(game, px, py) {
+    let best = null, bd = 30;
+    for (const st of game.galaxy.stars) {
+      if (st.__x == null) continue;
+      const d = Math.hypot(px - st.__x, py - st.__y);
+      if (d < bd) { bd = d; best = st; }
+    }
+    return best;
+  }
+
+  RS.galaxy = {
+    LY_PER_SECTOR, WINDOW, newState, starsIn, distanceLy, refresh,
+    surveyOf, clearSurveys, selectStar, travelTo, tick, draw, pick
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — first contact.
+ *
+ * ── How you talk to somebody ──────────────────────────────────────────────
+ *
+ * Not with a "hail" button. A civilisation broadcasts on a **carrier
+ * frequency**, and you reach them the same way you reach anything else in this
+ * game: by tuning φ onto it and holding. The whole apparatus the player has
+ * spent the game learning — range to reach a band, precision to land on it,
+ * focus to hold it, the acoustic beat that tells them how close they are — is
+ * exactly the apparatus for making contact. Nothing new to learn, and the most
+ * important content in the game sits behind the most developed skill.
+ *
+ * The carrier band is set by their technology, and it climbs:
+ *
+ *   pre-industrial / industrial   Mnemonic     φ437   — records, not signals
+ *   atomic / orbital              Causal       φ542   — they broadcast on purpose
+ *   interplanetary / system-wide  Archetypal   φ655
+ *   interstellar / post-material  Noetic       φ771   — thought without carrier
+ *
+ * Which means talking to a young culture is merely hard, and talking to an old
+ * one is an endgame act — you must be able to *hold the layer minds live in*
+ * before a mind will hold still for you. That is the progression gate and the
+ * premise agreeing with each other.
+ *
+ * ── Awareness runs the other way ──────────────────────────────────────────
+ *
+ * They also have to notice *you*. Awareness accrues from your reality field,
+ * from time spent in their system, and from anything you have built there. A
+ * culture that has never detected you will not answer a carrier lock; one that
+ * has been watching you terraform its neighbour will answer immediately, and
+ * its opening line will say so.
+ *
+ * ── Standing is the consequence layer ─────────────────────────────────────
+ *
+ * Everything the player does near a civilisation moves a single number, and
+ * that number changes what they will do for you, what they say, and whether
+ * uplifting them is welcomed or resented. It is stored per address — four
+ * numbers in the save — and everything else about them stays derived.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, fmt } = RS.core;
+
+  /* Which band a culture broadcasts on, by technology. */
+  const CARRIER_BANDS = [
+    { minTech: 0.00, band: 'mnemonic', note: 'unintentional — you are reading their records, not a signal' },
+    { minTech: 0.34, band: 'causal', note: 'deliberate broadcast; they are calling out' },
+    { minTech: 0.60, band: 'archetypal', note: 'structured, symbolic, patient' },
+    { minTech: 0.84, band: 'noetic', note: 'no carrier at all — thought, arriving already understood' }
+  ];
+
+  function carrierBandOf(civ) {
+    let b = CARRIER_BANDS[0];
+    for (const c of CARRIER_BANDS) if (civ.tech >= c.minTech) b = c;
+    return b;
+  }
+
+  /* Their exact carrier: inside their band, offset by their own hash, so every
+   * culture must be found individually even once you can reach the band. */
+  function carrierOf(game, planet, civ) {
+    const spec = carrierBandOf(civ);
+    const band = RS.spectrum.BY_ID[spec.band];
+    const h = hashN(planet.hash, 0xC0FFEE);
+    const offset = (hashF(h, 1) * 2 - 1) * band.width * 0.8;
+    return {
+      band, spec,
+      phi: band.centre + offset,
+      /* Phase matters too — a signal has a moment as well as a pitch. */
+      phase: hashF(h, 2) * Math.PI * 2
+    };
+  }
+
+  function contactKey(planet) { return RS.influence.planetKey(planet); }
+
+  function recordOf(game, planet) {
+    const k = contactKey(planet);
+    return game.contacts[k] || (game.contacts[k] = {
+      standing: 0,        // −1 hostile … +1 allied
+      awareness: 0,       // how much they know you exist
+      met: false,
+      greeted: false,   // have they actually said their opening line to you
+      /* Their name and where they live, cached on the record. Everything else
+       * about a culture re-derives, but the roster has to be readable without
+       * re-deriving every system you have ever visited — and "1,3,2,2" is not
+       * a name. */
+      name: '', where: '',
+      exchanges: 0,
+      taught: [],         // research ids they have given you
+      gifts: 0,
+      uplifted: 0
+    });
+  }
+
+  const STATES = {
+    unaware: { id: 'unaware', name: 'Unaware', hue: 220 },
+    detected: { id: 'detected', name: 'Detecting', hue: 45 },
+    reachable: { id: 'reachable', name: 'Carrier Found', hue: 190 },
+    open: { id: 'open', name: 'Channel Open', hue: 135 },
+    warm: { id: 'warm', name: 'Welcomed', hue: 120 },
+    cold: { id: 'cold', name: 'Refusing', hue: 0 }
+  };
+
+  /* Alignment onto their carrier, using exactly the same maths the field uses
+   * for a manifestation — so the reticle, the beat tone and the spectrum strip
+   * all mean the same thing here that they mean everywhere else. */
+  function lockOf(game, planet, civ) {
+    const c = carrierOf(game, planet, civ);
+    const D = game.dials;
+    const focus = RS.dials.focusOf(D.frequency);
+    const pFocus = RS.dials.focusOf(D.phase);
+
+    const fWin = c.band.width * 0.34 * (0.5 + 1.25 * focus);
+    const pWin = 0.62 * (0.42 + 1.30 * pFocus);
+    const fd = (D.frequency.value - c.phi) / fWin;
+    const pd = RS.core.angDelta(D.phase.value, c.phase) / pWin;
+
+    const af = Math.exp(-fd * fd);
+    const ap = Math.exp(-pd * pd);
+    /* A ghosted band cannot carry a conversation — you can hear that somebody
+     * is there and not make them out, which is its own kind of moment. */
+    const ghost = RS.spectrum.isGhost(c.band, focus);
+    return {
+      carrier: c,
+      total: clamp01(af * ap * (ghost ? 0.25 : 1)),
+      f: af, p: ap, fd, pd, ghost,
+      inReach: c.phi <= D.frequency.max
+    };
+  }
+
+  /* Awareness accrues while you are in their system. Reality field is the main
+   * driver — being *able to affect* a world is what makes you detectable in
+   * it — plus anything you have built, plus sheer time. */
+  function accrueAwareness(game, planet, civ, dt) {
+    const rec = recordOf(game, planet);
+    const rf = game.fields ? game.fields.reality : 0;
+    const built = RS.influence.structuresOn(game, planet).length;
+    const rate = (0.012 + rf * 0.05 + built * 0.03) * (0.5 + civ.tech) * civ.disposition.contact;
+    rec.awareness = clamp01(rec.awareness + rate * dt);
+    return rec.awareness;
+  }
+
+  function stateOf(game, planet, civ, lock) {
+    const rec = recordOf(game, planet);
+    if (rec.standing < -0.45) return STATES.cold;
+    if (lock && lock.total > 0.72 && rec.awareness > 0.35) {
+      return rec.standing > 0.4 ? STATES.warm : STATES.open;
+    }
+    if (rec.awareness > 0.35) return STATES.detected;
+    if (lock && lock.total > 0.4) return STATES.reachable;
+    return STATES.unaware;
+  }
+
+  /* Is the channel actually usable right now? */
+  function isOpen(game, planet, civ) {
+    const lock = lockOf(game, planet, civ);
+    const st = stateOf(game, planet, civ, lock);
+    return st === STATES.open || st === STATES.warm;
+  }
+
+  // ── what they say ────────────────────────────────────────────────────────
+
+  /* Dialogue is composed, not written out: disposition picks the voice,
+   * standing picks the warmth, and the situation supplies the subject. That
+   * keeps every culture in the galaxy able to say something specific about
+   * what you have actually done, without a script. */
+  const VOICE = {
+    curious: { open: 'You are a shape we do not have a word for. Say more.', reg: 'ask' },
+    mercantile: { open: 'A new party at the table. What do you carry?', reg: 'deal' },
+    insular: { open: 'We answered. We are not certain we should have.', reg: 'guard' },
+    expansionist: { open: 'We felt you before we heard you. State your reach.', reg: 'assert' },
+    contemplative: { open: 'We have been expecting something like you for a long while.', reg: 'muse' },
+    hierarchic: { open: 'You are addressing the Concord. Identify your order.', reg: 'formal' },
+    distributed: { open: 'Several of us are listening. Not all agree to.', reg: 'plural' }
+  };
+
+  const WARMTH = [
+    { min: -1.0, tone: 'They answer flatly, and only once.' },
+    { min: -0.4, tone: 'They answer with care, and watch what you do next.' },
+    { min: 0.15, tone: 'They answer readily.' },
+    { min: 0.5, tone: 'They answer as though you were expected.' },
+    { min: 0.8, tone: 'They answer the way you answer your own.' }
+  ];
+
+  function warmthOf(standing) {
+    let w = WARMTH[0];
+    for (const x of WARMTH) if (standing >= x.min) w = x;
+    return w;
+  }
+
+  /* An opening line that reflects the actual situation — what they have seen
+   * you do, what state their world is in, how far along they are. */
+  function greeting(game, planet, civ) {
+    const rec = recordOf(game, planet);
+    const v = VOICE[civ.disposition.id] || VOICE.curious;
+    const lines = [];
+
+    /* `met` is set the instant the channel opens, which is before the player
+     * has looked at the panel — so it cannot be the flag that decides whether
+     * they get their opening line. `greeted` is set here, when the words are
+     * actually read, so the distinctive first thing a culture says to you is
+     * never silently consumed by a state change you did not see. */
+    if (!rec.greeted) {
+      rec.greeted = true;
+      lines.push(v.open);
+    } else {
+      lines.push(warmthOf(rec.standing).tone);
+    }
+
+    const built = RS.influence.structuresOn(game, planet);
+    if (built.length) {
+      lines.push('They have seen what you put in their sky: ' +
+        built.map(b => b.struct.name.toLowerCase()).join(', ') + '.');
+    }
+    if (rec.uplifted > 0) {
+      lines.push(rec.standing > 0.2
+        ? 'They know something was given to them, and they have decided to be grateful.'
+        : 'They know something was given to them, and they have not decided how to feel.');
+    }
+    if (civ.collapsed) {
+      lines.push('This is what is left of them. They are candid about that.');
+    }
+    if (planet.biosphere && planet.biosphere.seeded) {
+      lines.push('Their oldest records describe a world that was sterile. They are aware the record is wrong.');
+    }
+    if (civ.tier.reach >= 4) {
+      lines.push('They are already interstellar. You are not telling them anything about size.');
+    }
+    return lines;
+  }
+
+  // ── what you can do ──────────────────────────────────────────────────────
+
+  /* Offers are derived from who they are and what state the relationship is
+   * in. Every one of them has a real mechanical effect and a real cost. */
+  function offersFor(game, planet, civ) {
+    const rec = recordOf(game, planet);
+    const out = [];
+    const disp = civ.disposition;
+
+    /* LISTEN — always available, and the first thing anyone should do. Pays
+     * gnosis, because understanding another mind's account of the world is
+     * literally recognising an essence in a new context. */
+    out.push({
+      id: 'listen', name: 'Listen',
+      blurb: 'Take in their account of the world. Costs nothing but attention.',
+      effect: 'Gnosis, and they warm slightly.',
+      cost: 0, available: true
+    });
+
+    /* SURVEY — they tell you where things are. This is the strongest reason to
+     * find a civilisation: they hand you the map. */
+    out.push({
+      id: 'survey', name: 'Ask what they know',
+      blurb: 'Their astronomers have been looking longer than you have.',
+      effect: 'Reveals nearby systems with life or civilisations on the galactic map.',
+      cost: 0,
+      available: rec.standing > -0.2 && civ.tier.reach >= 1,
+      why: civ.tier.reach < 1 ? 'they have never left their atmosphere' : 'they will not share while cold'
+    });
+
+    /* TRADE — better prices with standing. */
+    if (game.body && game.body.holdMass > 0) {
+      out.push({
+        id: 'trade', name: 'Trade your hold',
+        blurb: 'Sell at their prices, adjusted by how they feel about you.',
+        effect: 'Ψ from cargo × ' + (1 + rec.standing * 0.6).toFixed(2) + ' standing multiplier.',
+        cost: 0, available: true
+      });
+    }
+
+    /* GIFT — spend to buy standing. The honest, slow route. */
+    const giftCost = Math.ceil(200 * Math.pow(1.7, rec.gifts));
+    out.push({
+      id: 'gift', name: 'Give freely',
+      blurb: 'Hand over insight with nothing asked. They notice that.',
+      effect: '+standing. Costs more each time — generosity stops reading as generous.',
+      cost: giftCost,
+      available: game.insight >= giftCost
+    });
+
+    /* TEACH — they give you research. The payoff for the whole relationship. */
+    const teachable = RS.influence.RESEARCH.filter(n =>
+      !game.research[n.id] && rec.taught.indexOf(n.id) < 0 &&
+      /* They can only teach what they have themselves. */
+      n.cost <= 1200 * (1 + civ.tech * 6));
+    if (teachable.length) {
+      const node = teachable[hashN(planet.hash, rec.exchanges) % teachable.length];
+      out.push({
+        id: 'learn', name: 'Ask to be taught: ' + node.name,
+        blurb: 'They know how. Whether they will depends on where you stand.',
+        effect: 'Unlocks ' + node.name + ' outright.',
+        node,
+        cost: 0,
+        available: rec.standing > 0.45,
+        why: 'they will only teach an ally (standing ' + rec.standing.toFixed(2) + '/0.45)'
+      });
+    }
+
+    /* UPLIFT — the heaviest thing you can do, and it can go wrong. */
+    const hasLattice = RS.influence.structuresOn(game, planet).some(b => b.struct.id === 'lattice');
+    out.push({
+      id: 'uplift', name: 'Raise what they can reach',
+      blurb: 'Push their technology ceiling upward. They did not ask you to.',
+      effect: 'Permanent tech gain. An insular or hierarchic culture may resent it.',
+      cost: 0,
+      available: hasLattice,
+      why: 'needs a Cognition Lattice sited on this world'
+    });
+
+    /* WITHDRAW — closing a channel cleanly is a real choice for insular
+     * cultures, who prefer it. */
+    out.push({
+      id: 'withdraw', name: 'Withdraw',
+      blurb: 'Break the carrier and leave them alone.',
+      effect: disp.id === 'insular' ? 'They will think better of you for it.' : 'Neutral.',
+      cost: 0, available: true
+    });
+
+    return out;
+  }
+
+  /* Executing an offer. Everything that changes is either standing (stored) or
+   * a normal game resource — the civilisation itself stays derived. */
+  function act(game, bus, planet, civ, offerId) {
+    const rec = recordOf(game, planet);
+    const disp = civ.disposition;
+    rec.met = true;
+    rec.name = civ.name;
+    rec.where = planet.name;
+
+    switch (offerId) {
+      case 'listen': {
+        rec.exchanges++;
+        rec.standing = clamp(rec.standing + 0.06 * disp.contact, -1, 1);
+        /* Their account of reality is another context for an essence you may
+         * already know — which is exactly what gnosis measures. */
+        const ess = RS.fractal.ESSENCES[hashN(planet.hash, rec.exchanges) % RS.fractal.ESSENCES.length];
+        const fakeMan = {
+          essence: ess,
+          tierIndex: RS.cosmos.BY_ID.system.index,
+          bandIndex: carrierBandOf(civ).band === 'noetic' ? RS.spectrum.BY_ID.noetic.index
+            : RS.spectrum.BY_ID.mnemonic.index,
+          name: 'their account of ' + ess.name.toLowerCase(),
+          hue: disp.hue
+        };
+        const r = RS.fractal.recognise(game, fakeMan);
+        const insight = 40 * (1 + civ.tech * 8) * (1 + rec.standing);
+        game.insight += insight;
+        bus.emit('contact:listen', { planet, civ, essence: ess, fresh: r.fresh, level: r.level, insight });
+        return { ok: true, insight };
+      }
+
+      case 'survey': {
+        /* These two conditions must match `offersFor` exactly. They did not
+         * once — the panel greyed the option out for a pre-industrial culture
+         * and the action ran anyway, which is the kind of divergence that
+         * makes a UI feel like it is lying. Keeping the gate in one place
+         * would be cleaner still, but at minimum it has to agree. */
+        if (rec.standing <= -0.2) return { ok: false, reason: 'they will not share while cold' };
+        if (civ.tier.reach < 1) {
+          return { ok: false, reason: 'they have never left their atmosphere — they have no charts to give' };
+        }
+        rec.exchanges++;
+        /* They mark their neighbourhood on your map. Mechanically: every star
+         * within their technological reach becomes resolved regardless of your
+         * consciousness field, which is a genuine shortcut through the
+         * exploration gate and the best reason to talk to anyone. */
+        const radius = 2 + civ.tier.reach;
+        let revealed = 0;
+        const G = game.galaxy;
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            for (const st of RS.galaxy.starsIn(game.seed, G.sx + dx, G.sy + dy)) {
+              const key = st.sx + ',' + st.sy + ',' + st.index;
+              if (!game.known.charted[key]) { game.known.charted[key] = true; revealed++; }
+            }
+          }
+        }
+        G.cacheKey = '';
+        rec.standing = clamp(rec.standing + 0.03, -1, 1);
+        bus.emit('contact:survey', { planet, civ, revealed, radius });
+        return { ok: true, revealed };
+      }
+
+      case 'trade': {
+        if (!game.body || game.body.holdMass <= 0) return { ok: false, reason: 'your hold is empty' };
+        const market = RS.civ.marketOf(planet, civ);
+        const mul = (1 + rec.standing * 0.6) * disp.trade;
+        let total = 0;
+        for (const id in game.body.hold) {
+          const e = market.find(m => m.commodity.id === id);
+          if (!e) continue;
+          const amount = game.body.hold[id];
+          total += amount * e.price * 0.1 * mul;
+          RS.vessel.removeCargo(game.body, id, amount);
+        }
+        if (total <= 0) return { ok: false, reason: 'nothing they want' };
+        game.insight += total;
+        rec.exchanges++;
+        rec.standing = clamp(rec.standing + 0.04 * disp.trade, -1, 1);
+        bus.emit('contact:trade', { planet, civ, total });
+        return { ok: true, total };
+      }
+
+      case 'gift': {
+        const cost = Math.ceil(200 * Math.pow(1.7, rec.gifts));
+        if (game.insight < cost) return { ok: false, reason: 'needs ' + fmt(cost) + ' Ψ' };
+        game.insight -= cost;
+        rec.gifts++;
+        /* Diminishing, because the fifth unprompted gift reads differently
+         * from the first. */
+        rec.standing = clamp(rec.standing + 0.22 / (1 + rec.gifts * 0.4), -1, 1);
+        bus.emit('contact:gift', { planet, civ, cost, standing: rec.standing });
+        return { ok: true };
+      }
+
+      case 'learn': {
+        if (rec.standing <= 0.45) return { ok: false, reason: 'they will only teach an ally' };
+        const teachable = RS.influence.RESEARCH.filter(n =>
+          !game.research[n.id] && rec.taught.indexOf(n.id) < 0 &&
+          n.cost <= 1200 * (1 + civ.tech * 6));
+        if (!teachable.length) return { ok: false, reason: 'they have nothing left to teach you' };
+        const node = teachable[hashN(planet.hash, rec.exchanges) % teachable.length];
+        game.research[node.id] = true;
+        if (node.unlocks.vessels) for (const v of node.unlocks.vessels) game.vessels.unlocked[v] = true;
+        if (node.unlocks.structures) for (const s of node.unlocks.structures) game.structuresUnlocked[s] = true;
+        rec.taught.push(node.id);
+        rec.exchanges++;
+        /* Teaching costs them something, and they know it. */
+        rec.standing = clamp(rec.standing - 0.12, -1, 1);
+        RS.influence.recomputeFields(game);
+        bus.emit('contact:taught', { planet, civ, node });
+        return { ok: true, node };
+      }
+
+      case 'uplift': {
+        const hasLattice = RS.influence.structuresOn(game, planet).some(b => b.struct.id === 'lattice');
+        if (!hasLattice) return { ok: false, reason: 'needs a Cognition Lattice here' };
+        rec.uplifted++;
+        rec.exchanges++;
+        /* How they take it depends on who they are. An insular or hierarchic
+         * culture experiences uplift as an intrusion on their own terms —
+         * which is the point of the mechanic: help is not neutral. */
+        const welcomed = disp.id === 'curious' || disp.id === 'distributed' || disp.id === 'contemplative';
+        const delta = welcomed ? 0.18 : -0.26;
+        rec.standing = clamp(rec.standing + delta, -1, 1);
+        bus.emit('contact:uplift', { planet, civ, welcomed, standing: rec.standing });
+        return { ok: true, welcomed };
+      }
+
+      case 'withdraw': {
+        if (disp.id === 'insular') rec.standing = clamp(rec.standing + 0.08, -1, 1);
+        bus.emit('contact:withdraw', { planet, civ });
+        return { ok: true, closed: true };
+      }
+    }
+    return { ok: false, reason: 'unknown' };
+  }
+
+  /* Uplift is applied on top of the derived civilisation, the same way
+   * structures are applied on top of a derived planet. */
+  function applyTo(game, planet, civ) {
+    const k = contactKey(planet);
+    const rec = game.contacts[k];
+    if (!rec) return civ;
+    if (rec.uplifted > 0) {
+      civ.tech = clamp01(civ.tech + 0.09 * rec.uplifted);
+      civ.tier = RS.civ.techTierOf(civ.tech);
+      civ.uplifted = rec.uplifted;
+    }
+    civ.standing = rec.standing;
+    civ.awareness = rec.awareness;
+    civ.met = rec.met;
+    return civ;
+  }
+
+  function totalMet(game) {
+    let n = 0;
+    for (const k in game.contacts) if (game.contacts[k].met) n++;
+    return n;
+  }
+
+  function allies(game) {
+    let n = 0;
+    for (const k in game.contacts) if (game.contacts[k].standing > 0.45) n++;
+    return n;
+  }
+
+  RS.contact = {
+    CARRIER_BANDS, STATES, VOICE,
+    carrierBandOf, carrierOf, contactKey, recordOf, lockOf,
+    accrueAwareness, stateOf, isOpen, greeting, warmthOf, offersFor, act,
+    applyTo, totalMet, allies
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the guide, and the map of progression.
+ *
+ * ── Why this is generated rather than written ─────────────────────────────
+ *
+ * This game asks a player to understand four continuous dials, a 22-rung scale
+ * ladder, twelve reality layers, four scenes, ten vessel types and a contact
+ * protocol. A static manual for that would be long, and — worse — it would
+ * describe the game in general while the player is looking at a specific
+ * situation they do not understand.
+ *
+ * So every panel here is derived from live state. The dial section says what
+ * τ does *right now*, in this mode, in this body. The ladder shows which rungs
+ * are actually open and which one you are on. The pathways show what each
+ * route has cost you and what it has given you. A player who is confused can
+ * open this and read about the thing in front of them rather than about the
+ * game in the abstract.
+ *
+ * ── The three pathways ────────────────────────────────────────────────────
+ *
+ * The progression panel exists because this game has three genuinely different
+ * routes forward and no obvious way to tell that from the inside:
+ *
+ *   TUNE     spectrum bands → gnosis → yield everywhere. Pure skill; needs
+ *            nothing but dials. Always available, never mandatory.
+ *   REACH    research → vessels → worlds → structures. The material route.
+ *   CONTACT  find a culture → standing → charts and teaching. The shortcut
+ *            route: a civilisation can hand you research and reveal stars
+ *            your own field cannot reach.
+ *
+ * They feed each other — insight from any of them buys any of them — but a
+ * player can lead with whichever suits them, and the panel says so explicitly
+ * rather than leaving it to be inferred.
+ */
+(function (RS) {
+  'use strict';
+  const { fmt, clamp01, hsl } = RS.core;
+
+  /* Live meaning of each dial, in the mode the player is actually in. */
+  function dialRows(game) {
+    const embodied = game.inhabiting;
+    const arch = RS.vessel.archOf(game.body);
+    const D = game.dials;
+
+    if (embodied) {
+      const m = arch.dialMap;
+      return [
+        { sym: 'τ', hue: 43, name: 'Time', does: m.time,
+          now: D.time.value.toFixed(2) + '×',
+          note: 'While you have a body, τ is your throttle. Negative reverses.' },
+        { sym: 'Σ', hue: 338, name: 'Space', does: m.space,
+          now: (clamp01((D.space.value - D.space.min) / Math.max(1e-6, D.space.max - D.space.min)) * 100).toFixed(0) + '%',
+          note: 'Your vertical axis in this body — it does not move the scale ladder while embodied.' },
+        { sym: 'Δ', hue: 268, name: 'Phase', does: m.phase,
+          now: (D.phase.value * 57.3).toFixed(0) + '°',
+          note: 'A closed circle, which is exactly what a heading is.' },
+        { sym: 'φ', hue: 187, name: 'Frequency', does: m.frequency,
+          now: 'φ' + D.frequency.value.toFixed(1),
+          note: 'Which layer your senses are tuned to.' }
+      ];
+    }
+    return [
+      { sym: 'τ', hue: 43, name: 'Time', does: 'scrubs history',
+        now: D.time.value.toFixed(2) + '×',
+        note: 'Unembodied, τ moves through a world\'s past and future. Populations, ' +
+          'technologies and prices are closed-form, so this is exact at any distance.' },
+      { sym: 'Σ', hue: 338, name: 'Space', does: 'moves the scale ladder',
+        now: RS.cosmos.tierAt(D.space.value).name,
+        note: 'Turning Σ inward descends: map → system → surface. It is the only navigation.' },
+      { sym: 'Δ', hue: 268, name: 'Phase', does: 'the fourth dimension',
+        now: (D.phase.value * 57.3).toFixed(0) + '°',
+        note: 'Selects which slice of a worldline is present. Required by most layers, and by carriers.' },
+      { sym: 'φ', hue: 187, name: 'Frequency', does: 'selects the reality layer',
+        now: 'φ' + D.frequency.value.toFixed(1) + ' / ' + D.frequency.max.toFixed(0) + ' reach',
+        note: 'The axis everything else is read against. Civilisations broadcast on it too.' }
+    ];
+  }
+
+  const SYMBOLS = [
+    { g: 'Ψ', name: 'Insight', what: 'Spent. Buys dial upgrades, research and structures.' },
+    { g: '◈', name: 'Gnosis', what: 'Never spent. Counts contexts you have recognised an essence in. Pays out everywhere at once.' },
+    { g: '◉', name: 'Contact', what: 'A civilisation is within earshot. The button only appears when one is.' },
+    { g: '◎', name: 'Reach ring', what: 'On the map: the edge of your consciousness field. Inside it, stars are places; outside, lights.' },
+    { g: '○', name: 'Green ring', what: 'On the map: that system holds life.' },
+    { g: '◍', name: 'Amber pulse', what: 'On the map: that system is inhabited. This is the rarest marker in the game.' },
+    { g: '⌇', name: 'Ghost layer', what: 'A band you can see and cannot hold. Buy φ FOCUS.' },
+    { g: '⊘', name: 'Dashed ring', what: 'On a node: blocked. On the map: charted by somebody else, not by you.' }
+  ];
+
+  function guideHTML(game) {
+    const D = game.dials;
+    const sc = game.scene;
+    let h = '';
+
+    // ── where you are, right now ──
+    h += '<section><h3>Right now</h3>' +
+      '<p class="blurb">You are a point of consciousness. You cannot move. ' +
+      'You change what is <em>rendered</em> to you, and everything else follows.</p>' +
+      '<div class="stats">' +
+      '<div>Scene <b>' + sc.kind.toUpperCase() + '</b></div>' +
+      '<div>Mode <b style="color:' + (game.inhabiting ? '#fca5a5' : '#7dd3fc') + '">' +
+        (game.inhabiting ? 'PILOTING — ' + RS.vessel.archOf(game.body).name : 'OBSERVING') + '</b></div>' +
+      '<div>Scale <b>' + RS.cosmos.tierAt(D.space.value).name + '</b></div>' +
+      '<div>Next <b>' + RS.game.sceneObjective(game).text.slice(0, 46) + '</b></div>' +
+      '</div></section>';
+
+    // ── the dials, as they mean things right now ──
+    h += '<section><h3>Your four dials <em>' +
+      (game.inhabiting ? 'piloting' : 'observing') + '</em></h3>' +
+      '<p class="blurb">The dials are the whole interface. They mean different things ' +
+      'in different modes — that is the only thing you have to keep track of.</p><div class="list">';
+    for (const r of dialRows(game)) {
+      h += '<div class="row" style="--h:' + r.hue + '">' +
+        '<span class="g">' + r.sym + '</span>' +
+        '<span class="n">' + r.name + ' — ' + r.does + '<em>' + r.now + '</em></span>' +
+        '<span class="d">' + r.note + '</span></div>';
+    }
+    h += '</div>' +
+      '<p class="blurb">Drag a knob in a circle. <b>Swing your finger wide for fine control</b> — ' +
+      'sensitivity falls off with distance from the hub. Double-tap latches fine mode. ' +
+      'Two thumbs work two dials at once.</p></section>';
+
+    // ── the ladder ──
+    h += '<section><h3>The scale ladder <em>Σ</em></h3>' +
+      '<p class="blurb">Turning Σ is how you travel. Each range of rungs shows a different world.</p>' +
+      '<div class="list">';
+    const rungs = [
+      { name: 'Attunement field', range: 'galactic and beyond', what: 'Tune reality layers. Where insight and gnosis come from.',
+        active: sc.kind === 'field', hue: 338 },
+      { name: 'Galactic map', range: 'interstellar · cluster', what: 'The stars around you. Choose where to go.',
+        active: sc.kind === 'galaxy', hue: 190 },
+      { name: 'System', range: 'stellar · planetary system', what: 'Planets, moons, belts, trade, and anybody living there.',
+        active: sc.kind === 'system', hue: 285 },
+      { name: 'Surface', range: 'planetary and within', what: 'Stand on a world. Needs a body.',
+        active: sc.kind === 'planet', hue: 130 }
+    ];
+    for (const r of rungs) {
+      h += '<div class="row' + (r.active ? '' : ' dim') + '" style="--h:' + r.hue + '">' +
+        '<span class="g">' + (r.active ? '◉' : '○') + '</span>' +
+        '<span class="n">' + r.name + '<em>Σ ' + r.range + '</em></span>' +
+        '<span class="d">' + r.what + '</span></div>';
+    }
+    const reachLo = RS.cosmos.TIERS[Math.round(D.space.min)].short;
+    const reachHi = RS.cosmos.TIERS[Math.round(D.space.max)].short;
+    h += '</div><p class="blurb">Your Σ reaches <b>' + reachLo + '</b> to <b>' + reachHi +
+      '</b>. Buy Σ RANGE to open the ladder further in either direction.</p></section>';
+
+    // ── symbols ──
+    h += '<section><h3>What the symbols mean</h3><div class="list">';
+    for (const s of SYMBOLS) {
+      h += '<div class="row" style="--h:200"><span class="g">' + s.g + '</span>' +
+        '<span class="n">' + s.name + '</span><span class="d">' + s.what + '</span></div>';
+    }
+    h += '</div></section>';
+
+    // ── the beat ──
+    h += '<section><h3>Tuning by ear</h3>' +
+      '<p class="blurb">Two tones close in pitch beat against each other. Far off tune, a fast ' +
+      'warble; close, a slow throb; dead on, silence and a steady tone. The φ dial drives a real ' +
+      'detuned oscillator pair, so <b>you can find a layer with your eyes shut</b> — and the ring ' +
+      'around you pulses at the same rate if you are playing muted. This is the single most useful ' +
+      'thing to learn.</p></section>';
+
+    return h;
+  }
+
+  // ── progression ──────────────────────────────────────────────────────────
+
+  function pathwaysHTML(game) {
+    const D = game.dials;
+    const bands = Object.keys(game.known.bands).length;
+    const tiers = Object.keys(game.known.tiers).length;
+    const gn = RS.fractal.totalGnosis(game);
+    const res = Object.keys(game.research).length;
+    const worlds = Object.keys(game.known.planets).length;
+    const systems = Object.keys(game.known.systems).length;
+    const charted = Object.keys(game.known.charted).length;
+    const met = RS.contact.totalMet(game);
+    const allies = RS.contact.allies(game);
+
+    let h = '<section><h3>Three ways forward</h3>' +
+      '<p class="blurb">They feed each other — insight from any route buys any other — ' +
+      'but you can lead with whichever suits you. None of them is the main one.</p></section>';
+
+    const paths = [
+      {
+        name: 'TUNE', hue: 187,
+        premise: 'Skill with the dials. Needs nothing but the instrument you already have.',
+        rows: [
+          ['Layers held', bands + ' / ' + RS.spectrum.BANDS.length],
+          ['Scales visited', tiers + ' / ' + RS.cosmos.TIERS.length],
+          ['Gnosis', gn + ' contexts'],
+          ['φ reach', 'φ' + D.frequency.max.toFixed(0)],
+          ['φ focus', (RS.dials.focusOf(D.frequency) * 100).toFixed(0) + '%']
+        ],
+        next: nextTuning(game)
+      },
+      {
+        name: 'REACH', hue: 130,
+        premise: 'Research, bodies, worlds, structures. The material route.',
+        rows: [
+          ['Research', res + ' / ' + RS.influence.RESEARCH.length],
+          ['Bodies', Object.keys(game.vessels.unlocked).length + ' / ' + RS.vessel.ARCHETYPES.length],
+          ['Systems visited', systems],
+          ['Worlds surveyed', worlds],
+          ['Structures sited', RS.influence.structureCount(game)],
+          ['Consciousness field', game.fields.consciousness.toFixed(2) +
+            ' (' + (RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR).toFixed(0) + ' ly)']
+        ],
+        next: nextReach(game)
+      },
+      {
+        name: 'CONTACT', hue: 45,
+        premise: 'Find a culture and stay on good terms. They hand you charts and teach you research ' +
+          'you would otherwise have to buy.',
+        rows: [
+          ['Cultures met', met],
+          ['Allies', allies],
+          ['Stars charted by others', charted],
+          ['Reality field', game.fields.reality.toFixed(2)]
+        ],
+        next: nextContact(game)
+      }
+    ];
+
+    for (const p of paths) {
+      h += '<section class="up-dial" style="--h:' + p.hue + '">' +
+        '<header><span class="sym">◈</span><h3>' + p.name + '</h3></header>' +
+        '<p class="blurb">' + p.premise + '</p><div class="stats">';
+      for (const [k, v] of p.rows) h += '<div>' + k + ' <b>' + v + '</b></div>';
+      h += '</div><p class="blurb" style="color:hsl(' + p.hue + ',80%,70%)">→ ' + p.next + '</p></section>';
+    }
+
+    // overall
+    const prog = RS.game.progress(game);
+    h += '<section><h3>Overall</h3><div class="stats">' +
+      '<div>Progress <b>' + (prog * 100).toFixed(1) + '%</b></div>' +
+      '<div>Lifetime insight <b>' + fmt(game.lifetimeInsight) + ' Ψ</b></div>' +
+      '<div>Crystallised <b>' + fmt(game.stats.crystals) + '</b></div>' +
+      '<div>Jumps <b>' + (game.stats.jumps || 0) + '</b></div>' +
+      '<div>Played <b>' + fmt(Math.floor(game.stats.playSeconds / 60)) + ' min</b></div>' +
+      '</div></section>';
+    return h;
+  }
+
+  function nextTuning(game) {
+    const D = game.dials;
+    const foc = RS.dials.focusOf(D.frequency);
+    for (const b of RS.spectrum.BANDS) {
+      if (game.known.bands[b.id]) continue;
+      if (b.centre > D.frequency.max) continue;
+      if (RS.spectrum.isGhost(b, foc)) return 'Buy φ FOCUS — ' + b.name + ' is in reach but will not cohere.';
+      return 'Tune φ to ' + b.centre + ' and hold: the ' + b.name + ' layer is untouched.';
+    }
+    const nb = RS.spectrum.BANDS.find(b => b.centre > D.frequency.max);
+    return nb ? 'Buy φ RANGE to reach the ' + nb.name + ' layer at φ' + nb.centre + '.'
+      : 'Every layer is held. Deepen gnosis by finding the same essences at new scales.';
+  }
+
+  function nextReach(game) {
+    const open = RS.influence.RESEARCH.filter(n => RS.influence.researchAvailable(game, n));
+    if (open.length) {
+      const cheap = open.reduce((a, b) => (a.cost < b.cost ? a : b));
+      return 'Research ' + cheap.name + ' (' + fmt(cheap.cost) + ' Ψ) — ' + cheap.blurb;
+    }
+    if (!RS.influence.structureCount(game)) return 'Site your first structure on a world you care about.';
+    return 'Raise the consciousness field with beacons to reach further stars.';
+  }
+
+  function nextContact(game) {
+    const met = RS.contact.totalMet(game);
+    const c = game.scene.contact;
+    if (c) {
+      const st = RS.contact.stateOf(game, c.planet, c.civ, c.lock);
+      if (st === RS.contact.STATES.open || st === RS.contact.STATES.warm) {
+        return 'A channel is open with ' + c.civ.name + '. Listen first — it costs nothing.';
+      }
+      return 'Tune φ to ' + c.lock.carrier.phi.toFixed(1) + ' to reach ' + c.civ.name + '.';
+    }
+    if (!met) {
+      const foc = RS.dials.focusOf(game.dials.frequency);
+      const mn = RS.spectrum.BY_ID.mnemonic;
+      if (mn.centre > game.dials.frequency.max) {
+        return 'Nobody is reachable yet: the lowest carrier band sits at φ' + mn.centre +
+          ', past your dial. Buy φ RANGE.';
+      }
+      if (RS.spectrum.isGhost(mn, foc)) {
+        return 'You can reach the Mnemonic layer but not hold it. Buy φ FOCUS.';
+      }
+      return 'Look for amber pulsing rings on the galactic map, then descend into that system.';
+    }
+    return 'Raise standing above +0.45 with an ally and ask them to teach you.';
+  }
+
+  RS.guide = { guideHTML, pathwaysHTML, dialRows, SYMBOLS };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the scene stack: field → system → planet surface.
  *
  * ── The modal split, and why it is the best idea in this file ──────────────
@@ -4992,15 +7071,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   'use strict';
   const { clamp, clamp01, lerp, damp, TAU, hashF, hashN } = RS.core;
 
-  const TIER_PLANET = RS.cosmos.BY_ID.planetary.index;   // 8
-  const TIER_STELLAR = RS.cosmos.BY_ID.stellar.index;    // 9
-  const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;      // 10
+  const TIER_PLANET = RS.cosmos.BY_ID.planetary.index;      // 8
+  const TIER_STELLAR = RS.cosmos.BY_ID.stellar.index;       // 9
+  const TIER_SYSTEM = RS.cosmos.BY_ID.system.index;         // 10
+  const TIER_CLUSTER = RS.cosmos.BY_ID.cluster.index;       // 12
 
   /* Which scene a given rung of the scale ladder shows. The ladder *is* the
-   * navigation, so there is no separate "travel" mode to learn. */
+   * navigation, so there is no separate "travel" mode to learn — and the four
+   * scenes line up with what you would actually perceive at each scale:
+   *
+   *   ≤ planetary     a surface you can stand on
+   *   ≤ system        one gravity well and everything bound to it
+   *   ≤ cluster       neighbouring stars — the scale at which you choose
+   *   > cluster       the attunement field, where layers are tuned
+   */
   function sceneForTier(idx) {
     if (idx <= TIER_PLANET) return 'planet';
     if (idx <= TIER_SYSTEM) return 'system';
+    if (idx <= TIER_CLUSTER) return 'galaxy';
     return 'field';
   }
 
@@ -5126,6 +7214,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
+    else if (s.kind === 'galaxy') RS.galaxy.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -5140,9 +7229,27 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     s.kind = kind;
     s.transition = 1;
 
-    if (kind === 'system') {
+    if (kind === 'galaxy') {
+      /* The map centres on wherever the player currently is, so zooming out
+       * from a system always shows that system's own neighbourhood. */
+      if (s.systemAddr) {
+        game.galaxy.sx = s.systemAddr.sx;
+        game.galaxy.sy = s.systemAddr.sy;
+      }
+      game.galaxy.cacheKey = '';
+      RS.galaxy.refresh(game);
+    } else if (kind === 'system') {
       /* Entering the system layer with no system chosen derives one from where
-       * the player has tuned — there is always somewhere to arrive. */
+       * the player has tuned — there is always somewhere to arrive. Once the
+       * galactic map exists, a chosen target takes priority: picking a star and
+       * turning Σ inward is the normal way to travel. */
+      const tgt = game.galaxy && game.galaxy.target;
+      if (tgt && (!s.systemAddr || s.systemAddr.sx !== tgt.sx ||
+          s.systemAddr.sy !== tgt.sy || s.systemAddr.index !== tgt.index)) {
+        enterSystem(game, bus, { sx: tgt.sx, sy: tgt.sy, index: tgt.index });
+        game.galaxy.sx = tgt.sx; game.galaxy.sy = tgt.sy;
+        game.galaxy.cacheKey = '';
+      }
       if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
       /* Default the selection to the most interesting world present, which is
        * almost always what the player wants to look at first. */
@@ -5223,7 +7330,52 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (!s.planet || s.deriveAcc > 0.25) {
         s.deriveAcc = 0;
         s.planet = derivePlanet(game, s.system, s.bodyIndex);
-        if (s.planet) s.planet.civ = RS.civ.civOf(s.planet, s.tGyr);
+        if (s.planet) s.planet.civ = civAt(game, s.planet, s.tGyr);
+      }
+    }
+
+    /* Anyone in this system slowly becomes aware of you while you are in it.
+     * Awareness is what makes a carrier lock answerable, so simply being
+     * present is the first half of making contact. */
+    tickContact(game, bus, dt);
+  }
+
+  /* A civilisation with the player's influence applied — uplift, standing,
+   * awareness. Same pattern as derivePlanet: derive, then layer deltas. */
+  function civAt(game, planet, tGyr) {
+    const civ = RS.civ.civOf(planet, tGyr);
+    return civ ? RS.contact.applyTo(game, planet, civ) : null;
+  }
+
+  /* Contact bookkeeping, run in both the system and planet scenes. Emits the
+   * one-shot events that make first contact an occasion rather than a state
+   * change nobody noticed. */
+  function tickContact(game, bus, dt) {
+    const s = game.scene;
+    const p = s.planet;
+    if (!p) return;
+    const civ = p.civ || civAt(game, p, s.tGyr);
+    if (!civ) { s.contact = null; return; }
+
+    RS.contact.accrueAwareness(game, p, civ, dt);
+    const lock = RS.contact.lockOf(game, p, civ);
+    const state = RS.contact.stateOf(game, p, civ, lock);
+    const prev = s.contact && s.contact.state;
+
+    s.contact = { civ, lock, state, planet: p };
+
+    if (prev !== state) {
+      if (state === RS.contact.STATES.detected && prev !== RS.contact.STATES.open) {
+        bus.emit('contact:detected', { planet: p, civ });
+      }
+      if ((state === RS.contact.STATES.open || state === RS.contact.STATES.warm) &&
+          prev !== RS.contact.STATES.open && prev !== RS.contact.STATES.warm) {
+        const rec = RS.contact.recordOf(game, p);
+        const first = !rec.met;
+        rec.met = true;
+        rec.name = civ.name;
+        rec.where = p.name;
+        bus.emit('contact:open', { planet: p, civ, first, lock });
       }
     }
   }
@@ -5271,8 +7423,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (s.deriveAcc > 0.25 && s.bodyIndex >= 0) {
       s.deriveAcc = 0;
       const fresh = derivePlanet(game, s.system, s.bodyIndex);
-      if (fresh) { fresh.civ = RS.civ.civOf(fresh, s.tGyr); s.planet = fresh; }
+      if (fresh) { fresh.civ = civAt(game, fresh, s.tGyr); s.planet = fresh; }
     }
+    tickContact(game, bus, dt);
 
     /* Walking moves you along the planet's longitude. The body's x velocity is
      * in scene units; converting to radians uses the planet's actual radius,
@@ -5509,7 +7662,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     TIER_PLANET, TIER_STELLAR, TIER_SYSTEM,
     sceneForTier, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
-    sampleSurface, embark, disembark, extract, sell, PROFILE_N
+    sampleSurface, embark, disembark, extract, sell, PROFILE_N,
+    TIER_CLUSTER, civAt, tickContact
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -5559,12 +7713,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
          * worlds themselves re-derive, so this is a visited-list, not a
          * world-save. A thousand explored systems is a few kilobytes. */
         systems: Object.create(null),
-        planets: Object.create(null)
+        planets: Object.create(null),
+        /* Stars a civilisation has told you about. Distinct from `systems`
+         * (which you have been to) because a chart you were given is a real
+         * thing to have and a real reason to talk to anyone. */
+        charted: Object.create(null)
       },
       gnosis: Object.create(null),
 
       /* ── the embodied half ─────────────────────────────────────────────── */
       scene: RS.scenes.newScene(),
+      galaxy: RS.galaxy.newState(),
+      /* Per-civilisation relationship records. Four numbers per culture; the
+       * culture itself stays derived. */
+      contacts: Object.create(null),
       body: RS.vessel.newBody('mote'),
       inhabiting: false,
       vessels: { unlocked: { mote: true } },
@@ -5576,7 +7738,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
       senseBonus: 0,
 
-      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0 },
+      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
 
       /* Transient, rebuilt every frame — never saved. */
       focusNode: null,
@@ -5668,7 +7830,31 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * gets its own function rather than overloading the tuning one. */
   function sceneObjective(game) {
     const s = game.scene;
+    if (s.kind === 'galaxy') {
+      const reachLy = (RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR).toFixed(0);
+      if (!game.galaxy.target) {
+        return { text: 'Tap a star to select it. Dim stars are beyond your ' + reachLy +
+          ' ly field — amber rings are inhabited.', kind: 'select' };
+      }
+      const t = game.galaxy.target;
+      if (!t.inReach && !t.visited && !t.charted) {
+        return { text: t.name + ' is ' + t.dist.toFixed(1) + ' ly away, past your ' + reachLy +
+          ' ly reach. Expand the consciousness field, or ask a civilisation for charts.', kind: 'reach' };
+      }
+      return { text: 'Tap ' + t.name + ' again to travel, then turn Σ inward to enter it.', kind: 'travel' };
+    }
     if (s.kind === 'system') {
+      if (s.contact) {
+        const st = RS.contact.stateOf(game, s.contact.planet, s.contact.civ, s.contact.lock);
+        if (st === RS.contact.STATES.open || st === RS.contact.STATES.warm) {
+          return { text: 'Channel open with ' + s.contact.civ.name + '. Open the ◉ panel.', kind: 'contact' };
+        }
+        if (!s.contact.lock.inReach) {
+          return { text: s.contact.civ.name + ' broadcasts at φ' + s.contact.lock.carrier.phi.toFixed(1) +
+            ' — past your dial. Buy φ RANGE.', kind: 'contact' };
+        }
+        return { text: 'A carrier at φ' + s.contact.lock.carrier.phi.toFixed(1) + '. Tune φ and Δ onto it.', kind: 'contact' };
+      }
       if (!Object.keys(game.research).length) {
         return { text: 'Research LOCOMOTION to build a body you can land with.', kind: 'research' };
       }
@@ -6866,11 +9052,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const hue = man.hue;
     const r = 0.036 * man.size * (1 + n.align * 0.28);
 
-    /* Probabilistic layer: the uncollapsed twin renders as a real, equally
-     * convincing node. Half the time you tune the wrong one, which is the
-     * entire mechanic. */
-    if (n.band.mode === 'superposed' && !n.collapsed) {
-      const tx = Math.cos(n.twinAng) * n.rad, ty = Math.sin(n.twinAng) * n.rad;
+    /* TWIN: the uncollapsed double renders as a real, equally convincing node.
+     * Half the time you tune the wrong one, which is the entire mechanic —
+     * and how far off it sits is the essence's symmetry, so a Duality twins
+     * almost on top of itself and a Cascade throws its double clear across
+     * the field. */
+    if (n.twinInfo && !n.collapsed) {
+      const sep = 0.35 + n.twinSep * 1.3;
+      const ta = n.ang + Math.PI * sep;
+      const tx = Math.cos(ta) * n.rad, ty = Math.sin(ta) * n.rad;
       drawSmudge(ctx, tx, ty, r, hue, a * 0.5, t, man.seed);
       if (n.resolved > 0.3) drawEssence(ctx, man, tx, ty, r, hue, a * n.resolved * 0.45, t);
     }
@@ -7148,7 +9338,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
      * like one game rather than three minigames. */
     const kind = game.scene ? game.scene.kind : 'field';
 
-    if (kind === 'system') {
+    if (kind === 'galaxy') {
+      RS.galaxy.draw(ctx, game, dt);
+    } else if (kind === 'system') {
       RS.worldrender.drawSystem(ctx, game, dt);
     } else if (kind === 'planet') {
       RS.worldrender.drawPlanet(ctx, game, dt);
@@ -8446,7 +10638,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         /* What a tap on the world means depends on which world it is. Each
          * scene resolves it to something; none of them swallow it. */
         const scene = game.scene;
-        if (scene.kind === 'system') {
+        if (scene.kind === 'galaxy') {
+          const st = RS.galaxy.pick(game, a.startX, a.startY);
+          if (st && handlers && handlers.onPickStar) handlers.onPickStar(st);
+        } else if (scene.kind === 'system') {
           const idx = pickBody(game, a.startX, a.startY);
           if (idx >= 0 && handlers && handlers.onPickBody) handlers.onPickBody(idx);
         } else if (scene.kind === 'planet') {
@@ -8582,7 +10777,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       'tier-name', 'tier-sci', 'layer-name', 'layer-rules', 'objective',
       'toasts', 'readout', 'drawer', 'drawer-body', 'drawer-title',
       'btn-upgrades', 'btn-codex', 'btn-settings', 'btn-drawer-close', 'beat-hint',
-      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar']) {
+      'btn-world', 'btn-vessels', 'scene-tag', 'body-bar', 'btn-contact', 'contact-hint',
+      'btn-guide', 'btn-paths']) {
       el[id] = $(id);
     }
 
@@ -8591,6 +10787,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     el['btn-settings'].addEventListener('click', () => toggleDrawer(game, bus, 'settings'));
     el['btn-world'].addEventListener('click', () => toggleDrawer(game, bus, 'world'));
     el['btn-vessels'].addEventListener('click', () => toggleDrawer(game, bus, 'vessels'));
+    el['btn-contact'].addEventListener('click', () => toggleDrawer(game, bus, 'contact'));
+    el['btn-guide'].addEventListener('click', () => toggleDrawer(game, bus, 'guide'));
+    el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
 
     /* Delegated, because the drawer body is rebuilt wholesale on every open and
@@ -8631,6 +10830,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       const st = ev.target.closest('[data-build]');
       if (st) {
         const r = RS.influence.place(game, bus, game.scene.planet, st.dataset.build);
+        if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+        renderDrawer(game, bus);
+        return;
+      }
+      const con = ev.target.closest('[data-contact]');
+      if (con) {
+        const c = game.scene.contact;
+        if (c) {
+          const r = RS.contact.act(game, bus, c.planet, c.civ, con.dataset.contact);
+          if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+          if (r.closed) closeDrawer(); else renderDrawer(game, bus);
+        }
+        return;
+      }
+      const trav = ev.target.closest('[data-travel]');
+      if (trav) {
+        const st = game.galaxy.stars.find(x => x.key === trav.dataset.travel);
+        const r = RS.galaxy.travelTo(game, bus, st);
         if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
         renderDrawer(game, bus);
         return;
@@ -8681,14 +10898,43 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       ? tier.sci
       : (tier.logM == null ? 'Tegmark Level ' + tier.level : RS.core.fmtMetres(tier.logM)));
 
+    /* The second context line describes whatever is actually in front of the
+     * player. Showing the reality layer's rules while looking at a star map
+     * was simply false information in the most prominent text slot on screen. */
     const focus = RS.dials.focusOf(D.frequency);
     const band = RS.spectrum.BANDS[game.field.bandIndex];
     const ghost = RS.spectrum.isGhost(band, focus);
-    setText('layer-name', band.name.toUpperCase() + (ghost ? ' · GHOST' : ''));
-    setText('layer-rules', ghost
-      ? 'Beyond your focus. Visible, not holdable. Buy φ FOCUS to make it cohere.'
-      : band.rules);
-    el['layer-name'].style.color = hsl(band.hue, ghost ? 0.15 : band.sat, 0.72);
+    const sc = game.scene;
+
+    if (sc.kind === 'galaxy') {
+      const inReach = game.galaxy.stars.filter(x => x.inReach).length;
+      const reachLy = (RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR).toFixed(0);
+      setText('layer-name', 'SECTOR ' + game.galaxy.sx + ', ' + game.galaxy.sy);
+      setText('layer-rules', game.galaxy.stars.length + ' stars in view · ' + inReach +
+        ' within your ' + reachLy + ' ly field · green ring = life, amber = inhabited');
+      el['layer-name'].style.color = hsl(190, 0.75, 0.72);
+    } else if (sc.kind === 'system' && sc.system) {
+      const st = sc.system.primary;
+      setText('layer-name', sc.system.name.toUpperCase());
+      setText('layer-rules', st.cls.c + st.sub + ' ' + st.cls.name + ' · ' +
+        sc.system.bodies.filter(b => b.kind === 'planet').length + ' planets · habitable zone ' +
+        sc.system.hz.inner.toFixed(2) + '–' + sc.system.hz.outer.toFixed(2) + ' AU');
+      el['layer-name'].style.color = hsl(st.cls.hue, 0.8, 0.72);
+    } else if (sc.kind === 'planet' && sc.planet) {
+      const p = sc.planet;
+      setText('layer-name', p.name.toUpperCase());
+      setText('layer-rules', p.type.name + ' · ' + Math.round(p.surfaceTemp) + ' K · ' +
+        p.gravity.toFixed(2) + ' g · ' +
+        (p.pressure < 0.01 ? 'no atmosphere' : p.pressure.toFixed(2) + ' bar') +
+        (p.biosphere ? ' · ' + p.biosphere.stage.name : ''));
+      el['layer-name'].style.color = hsl(p.type.hue, 0.75, 0.72);
+    } else {
+      setText('layer-name', band.name.toUpperCase() + (ghost ? ' · GHOST' : ''));
+      setText('layer-rules', ghost
+        ? 'Beyond your focus. Visible, not holdable. Buy φ FOCUS to make it cohere.'
+        : band.rules);
+      el['layer-name'].style.color = hsl(band.hue, ghost ? 0.15 : band.sat, 0.72);
+    }
 
     const obj = RS.game.sceneObjective(game);
     setText('objective', obj.text);
@@ -8702,8 +10948,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     el['scene-tag'].style.color = game.inhabiting ? '#fca5a5' : '#7dd3fc';
 
     renderBodyBar(game);
+    renderContactHint(game);
     renderReadout(game);
     renderBeatHint(game);
+  }
+
+  /* A civilisation in earshot is the rarest thing in the game, so it gets a
+   * permanent, unmissable line of its own the moment one is detectable —
+   * finding one and not realising it would be the worst failure this game
+   * could have. */
+  function renderContactHint(game) {
+    const c = game.scene.contact;
+    const btn = el['btn-contact'];
+    const hint = el['contact-hint'];
+    if (!c) {
+      if (btn.dataset.on !== '0') { btn.dataset.on = '0'; btn.classList.remove('live'); }
+      hint.style.opacity = '0';
+      return;
+    }
+    btn.dataset.on = '1';
+    btn.classList.add('live');
+    const state = RS.contact.stateOf(game, c.planet, c.civ, c.lock);
+    const open = state === RS.contact.STATES.open || state === RS.contact.STATES.warm;
+    btn.style.color = hsl(state.hue, 0.85, 0.7);
+    hint.style.opacity = '1';
+    hint.style.color = hsl(state.hue, 0.85, 0.72);
+    setText('contact-hint', open
+      ? '◉ ' + c.civ.name + ' — channel open'
+      : '◉ ' + c.civ.name + ' — carrier at φ' + c.lock.carrier.phi.toFixed(1) +
+        ' (' + (c.lock.total * 100).toFixed(0) + '% lock)');
   }
 
   /* The body bar only exists while embodied, and it shows the three things a
@@ -8787,7 +11060,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       ? man.essence.name + (gn ? ' · gnosis ' + gn : '') + (man.rarity ? ' · ' + '★'.repeat(man.rarity) : '')
       : 'Hold closer to resolve';
     const blocked = n.blocked && n.antecedent
-      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first</div>' : '';
+      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first' +
+        (n.orderNeed > 1 ? ' <small>(' + n.orderMet + '/' + n.orderNeed + ' antecedents held)</small>' : '') +
+        '</div>'
+      : (n.orderNeed > 1 && n.orderMet < n.orderNeed
+        ? '<div class="ro-block ok">' + n.orderMet + '/' + n.orderNeed + ' antecedents held · ×' +
+          n.orderBonus.toFixed(2) + '</div>' : '');
 
     node.innerHTML =
       '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(man.hue, 0.8, 0.7) + '">' +
@@ -8801,6 +11079,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function renderSceneReadout(game, node) {
     const s = game.scene;
     node.dataset.empty = '0';
+    if (s.kind === 'galaxy') { renderGalaxyReadout(game, node); return; }
     if (s.kind === 'system' && s.system) {
       const p = s.planet;
       const prim = s.system.primary;
@@ -8880,14 +11159,18 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function renderDrawer(game, bus) {
     if (!drawerOpen) return;
     const titles = { upgrades: 'DIALS', codex: 'CODEX', settings: 'SETTINGS',
-      world: 'WORLD', vessels: 'BODIES & RESEARCH' };
+      world: 'WORLD', vessels: 'BODIES & RESEARCH', contact: 'CONTACT',
+      guide: 'HOW THIS WORKS', paths: 'PATHWAYS' };
     el['drawer-title'].textContent = titles[drawerOpen] || '';
     el['drawer-body'].innerHTML =
       drawerOpen === 'upgrades' ? upgradesHTML(game)
         : drawerOpen === 'codex' ? codexHTML(game)
           : drawerOpen === 'world' ? worldHTML(game)
             : drawerOpen === 'vessels' ? vesselsHTML(game)
-              : settingsHTML(game);
+              : drawerOpen === 'contact' ? contactHTML(game, bus)
+                : drawerOpen === 'guide' ? RS.guide.guideHTML(game)
+                  : drawerOpen === 'paths' ? RS.guide.pathwaysHTML(game)
+                    : settingsHTML(game);
   }
 
   const KIND_BLURB = {
@@ -9214,7 +11497,149 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return h;
   }
 
-  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, get drawerOpen() { return drawerOpen; } };
+
+  // --- contact drawer ------------------------------------------------------
+
+  /* The contact panel is the payoff for the whole tuning apparatus, so it
+   * shows the *tuning* first: how close the carrier lock is, in the same
+   * language the field uses, with the same arrows. A player who has learned to
+   * land a manifestation already knows how to read this. */
+  function contactHTML(game, bus) {
+    const c = game.scene.contact;
+    if (!c) {
+      return '<p class="blurb">No mind within reach. Civilisations are rare &mdash; ' +
+        'look for the pulsing amber rings on the galactic map, then descend into that system.</p>' +
+        contactRosterHTML(game);
+    }
+
+    const { civ, lock, planet } = c;
+    const rec = RS.contact.recordOf(game, planet);
+    const state = RS.contact.stateOf(game, planet, civ, lock);
+    const carrier = lock.carrier;
+    let h = '';
+
+    h += '<section><h3>' + civ.name + ' <em>' + planet.name + '</em></h3>' +
+      '<div class="stats">' +
+      '<div>Technology <b>' + civ.tier.name + '</b></div>' +
+      '<div>Population <b>' + fmt(civ.population) + '</b></div>' +
+      '<div>Disposition <b>' + civ.disposition.name + '</b></div>' +
+      '<div>Channel <b style="color:' + hsl(state.hue, 0.8, 0.7) + '">' + state.name + '</b></div>' +
+      '<div>They know of you <b>' + (rec.awareness * 100).toFixed(0) + '%</b></div>' +
+      '<div>Standing <b style="color:' + hsl(rec.standing >= 0 ? 135 : 0, 0.8, 0.68) + '">' +
+        (rec.standing >= 0 ? '+' : '') + rec.standing.toFixed(2) + '</b></div>' +
+      '</div>';
+
+    // ── the carrier ──
+    h += '<h3 style="margin-top:12px">Carrier</h3>' +
+      '<p class="blurb">They broadcast on the <b>' + carrier.band.name + '</b> layer &mdash; ' +
+      carrier.spec.note + '. Tune &phi; onto it and hold &Delta; to open the channel.</p>';
+
+    const dirF = Math.abs(lock.fd) < 0.25 ? 'on' : (lock.fd > 0 ? 'lower &phi;' : 'raise &phi;');
+    const dirP = Math.abs(lock.pd) < 0.25 ? 'on' : (lock.pd > 0 ? 'lower &Delta;' : 'raise &Delta;');
+    h += '<div class="ro-axes" style="margin:0 0 8px">' +
+      '<span class="ax' + (lock.f > 0.86 ? ' good' : '') + '" style="--h:187">&phi;' +
+        '<b style="width:' + (clamp01(lock.f) * 100).toFixed(0) + '%"></b><i>' + dirF + '</i></span>' +
+      '<span class="ax' + (lock.p > 0.86 ? ' good' : '') + '" style="--h:268">&Delta;' +
+        '<b style="width:' + (clamp01(lock.p) * 100).toFixed(0) + '%"></b><i>' + dirP + '</i></span>' +
+      '</div>';
+
+    if (!lock.inReach) {
+      h += '<p class="blurb" style="color:var(--warn)">Their carrier sits at &phi;' +
+        carrier.phi.toFixed(1) + ', past your dial\'s reach of &phi;' +
+        game.dials.frequency.max.toFixed(0) + '. Buy &phi; RANGE.</p>';
+    } else if (lock.ghost) {
+      h += '<p class="blurb" style="color:var(--warn)">You can hear that somebody is there and cannot make them out. ' +
+        'The ' + carrier.band.name + ' layer needs more &phi; FOCUS to cohere.</p>';
+    } else if (rec.awareness < 0.35) {
+      h += '<p class="blurb">They have not noticed you yet. Stay in their system, ' +
+        'raise your reality field, or build something they can see.</p>';
+    }
+
+    // ── what they say ──
+    if (state === RS.contact.STATES.open || state === RS.contact.STATES.warm) {
+      h += '<h3 style="margin-top:12px">They say</h3><div class="say">';
+      for (const line of RS.contact.greeting(game, planet, civ)) {
+        h += '<p>' + line + '</p>';
+      }
+      h += '</div>';
+
+      h += '<h3 style="margin-top:12px">Exchange</h3><div class="up-rows">';
+      for (const o of RS.contact.offersFor(game, planet, civ)) {
+        const dis = !o.available;
+        h += '<button class="up-row" data-contact="' + o.id + '"' + (dis ? ' disabled' : '') +
+          ' style="--h:' + civ.disposition.hue + '">' +
+          '<span class="k">' + o.name.toUpperCase().slice(0, 22) + '</span><span class="lv"></span>' +
+          '<span class="d">' + o.blurb + '<br><i style="opacity:.65">' +
+            (dis && o.why ? o.why : o.effect) + '</i></span>' +
+          '<span class="c">' + (o.cost ? fmt(o.cost) + ' &Psi;' : '') + '</span></button>';
+      }
+      h += '</div>';
+    } else if (state === RS.contact.STATES.cold) {
+      h += '<p class="blurb" style="color:var(--warn)">They are refusing you. ' +
+        'Standing must rise above &minus;0.45 before they will answer again.</p>';
+    }
+
+    return h + contactRosterHTML(game);
+  }
+
+  /* Everyone you have ever spoken to, so relationships persist visibly rather
+   * than existing only while you are standing in the right system. */
+  function contactRosterHTML(game) {
+    const keys = Object.keys(game.contacts).filter(k => game.contacts[k].met);
+    if (!keys.length) return '';
+    let h = '<section><h3>Known cultures <em>' + keys.length + '</em></h3><div class="list">';
+    for (const k of keys) {
+      const r = game.contacts[k];
+      const hue = r.standing > 0.45 ? 135 : r.standing < -0.2 ? 0 : 45;
+      h += '<div class="row" style="--h:' + hue + '"><span class="g">&#9673;</span>' +
+        '<span class="n">' + (r.name || 'Unnamed culture') +
+        (r.where ? ' <b style="color:var(--dimmer)">' + r.where + '</b>' : '') +
+        '<em>standing ' + (r.standing >= 0 ? '+' : '') +
+        r.standing.toFixed(2) + ' &middot; ' + r.exchanges + ' exchanges' +
+        (r.taught.length ? ' &middot; taught you ' + r.taught.length : '') +
+        (r.uplifted ? ' &middot; uplifted &times;' + r.uplifted : '') + '</em></span></div>';
+    }
+    return h + '</div></section>';
+  }
+
+  // --- galaxy readout ------------------------------------------------------
+
+  /* What the player is looking at on the map, and what it would cost to go
+   * there. Rendered into the same slot the node readout uses. */
+  function renderGalaxyReadout(game, node) {
+    const G = game.galaxy;
+    const tg = G.target;
+    const reachLy = RS.influence.reachRadius(game) * RS.galaxy.LY_PER_SECTOR;
+    node.dataset.empty = '0';
+
+    if (!tg) {
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:#7dd3fc">&#9678;</span>' +
+        '<span class="ro-title">Sector ' + G.sx + ', ' + G.sy + '</span></div>' +
+        '<div class="ro-sub">' + G.stars.length + ' stars in view &middot; reach ' +
+        reachLy.toFixed(0) + ' ly</div>' +
+        '<div class="ro-sub" style="margin-top:4px">Tap a star to select it.</div>';
+      return;
+    }
+
+    const sv = RS.galaxy.surveyOf(game, tg);
+    const st = tg.star;
+    node.innerHTML =
+      '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(st.cls.hue, 0.8, 0.72) + '">&#9673;</span>' +
+      '<span class="ro-title">' + tg.name + '</span></div>' +
+      '<div class="ro-sub">' + st.cls.c + st.sub + ' ' + st.cls.name + ' &middot; ' +
+        st.mass.toFixed(2) + ' M&#9737; &middot; ' + tg.dist.toFixed(1) + ' ly</div>' +
+      (sv ? '<div class="ro-sub" style="margin-top:4px">' + sv.planets + ' planets' +
+        (sv.life ? ' &middot; <b style="color:#86efac">' + sv.life + ' living</b>' : '') +
+        (sv.civ ? ' &middot; <b style="color:#fcd34d">' + sv.civ + ' inhabited</b>' : '') + '</div>'
+        : '<div class="ro-sub" style="margin-top:4px;color:var(--warn)">Beyond your field &mdash; unresolved</div>') +
+      '<div class="ro-sub" style="margin-top:4px">' +
+        (tg.inReach || tg.visited || tg.charted
+          ? 'Turn &Sigma; inward to travel here.'
+          : 'Expand the consciousness field to reach it.') + '</div>';
+  }
+
+  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -9528,6 +11953,133 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     bus.on('scene:aim', () => { RS.audio.click(0.6, 0.4); RS.feel.buzz('tick'); });
 
+    // ── the galactic map ─────────────────────────────────────────────────
+    bus.on('galaxy:target', ({ star }) => {
+      RS.audio.seat(0.5);
+      const sv = RS.galaxy.surveyOf(game, star);
+      RS.ui.toast({
+        kind: 'info', icon: '◉', hue: star.star.cls.hue, ms: 3200,
+        title: star.name + ' — ' + star.dist.toFixed(1) + ' ly',
+        body: sv
+          ? star.star.cls.c + star.star.sub + ' · ' + sv.planets + ' planets' +
+            (sv.civ ? ' · INHABITED' : sv.life ? ' · life' : '') + '. Tap again to travel.'
+          : 'Unresolved at this distance. Tap again to travel.'
+      });
+    });
+
+    bus.on('galaxy:travel', ({ star }) => {
+      RS.audio.discover(1.0);
+      RS.feel.FX.discovery(star.star.cls.hue, 0.9);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: star.star.cls.hue, ms: 4200,
+        title: 'ARRIVED — ' + star.name,
+        body: 'Turn Σ inward to enter the system.'
+      });
+    });
+
+    // ── contact ──────────────────────────────────────────────────────────
+    bus.on('contact:detected', ({ planet, civ }) => {
+      /* They noticed you first. This is deliberately unsettling and it is the
+       * only event in the game where something else acts on you. */
+      RS.audio.discover(0.8);
+      RS.feel.FX.discovery(civ.disposition.hue, 0.7);
+      RS.feel.vignette(0.6);
+      const carrier = RS.contact.carrierOf(game, planet, civ);
+      RS.ui.toast({
+        kind: 'major', icon: '◉', hue: civ.disposition.hue, ms: 7000,
+        title: 'SOMETHING HAS NOTICED YOU',
+        body: civ.name + ' on ' + planet.name + ' is aware of you. They broadcast on the ' +
+          carrier.band.name + ' layer at φ' + carrier.phi.toFixed(1) + '. Tune to it.'
+      });
+    });
+
+    bus.on('contact:open', ({ planet, civ, first }) => {
+      game.stats.contacts = (game.stats.contacts || 0) + (first ? 1 : 0);
+      /* First contact is the biggest single moment the game has. */
+      RS.audio.discover(first ? 1.6 : 0.9);
+      RS.feel.FX.discovery(civ.disposition.hue, first ? 1.4 : 0.8);
+      if (first) { RS.feel.hitstop(0.08); RS.feel.vignette(0.85); }
+      RS.ui.toast({
+        kind: 'major', icon: '◉', hue: civ.disposition.hue, ms: first ? 9000 : 4000,
+        title: first ? 'FIRST CONTACT — ' + civ.name.toUpperCase() : 'CHANNEL OPEN — ' + civ.name,
+        body: first
+          ? civ.tier.name + ' · ' + civ.disposition.name + ' · ' + RS.core.fmt(civ.population) +
+            ' minds. Open the ◉ panel to speak with them.'
+          : 'Hold the carrier and open the ◉ panel.'
+      });
+    });
+
+    bus.on('contact:listen', ({ civ, essence, fresh, level, insight }) => {
+      RS.audio.crystal(RS.spectrum.BY_ID.noetic.index, fresh ? 2 : 0, 4);
+      RS.feel.FX.crystallise(0, 0, civ.disposition.hue, fresh ? 2 : 0, insight);
+      RS.ui.toast({
+        kind: fresh ? 'gnosis' : 'info', icon: essence.glyph, hue: civ.disposition.hue,
+        ms: fresh ? 5200 : 2800,
+        title: fresh ? essence.name.toUpperCase() + ' — through their eyes'
+          : 'They speak of ' + essence.name.toLowerCase(),
+        body: (fresh ? 'A mind that is not yours recognising the same essence. Gnosis ' + level + '. ' : '') +
+          '+' + RS.core.fmt(insight) + ' Ψ'
+      });
+    });
+
+    bus.on('contact:survey', ({ civ, revealed, radius }) => {
+      RS.audio.discover(1.2);
+      RS.feel.FX.discovery(45, 1.0);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: 45, ms: 6000,
+        title: 'THEY GAVE YOU THEIR CHARTS',
+        body: revealed + ' stars within ' + (radius * RS.galaxy.LY_PER_SECTOR) +
+          ' ly are now resolved on your map, regardless of your own field. ' +
+          'Turn Σ out to the cluster tier to see them.'
+      });
+    });
+
+    bus.on('contact:trade', ({ civ, total }) => {
+      RS.audio.purchase();
+      RS.feel.FX.crystallise(0, 0, 45, 1, total);
+      RS.ui.toast({ kind: 'buy', icon: 'Ψ', hue: 45, ms: 3000,
+        title: 'Traded with ' + civ.name, body: '+' + RS.core.fmt(total) + ' Ψ' });
+    });
+
+    bus.on('contact:gift', ({ civ, cost, standing }) => {
+      RS.audio.purchase();
+      RS.feel.FX.purchase(civ.disposition.hue);
+      RS.ui.toast({ kind: 'info', icon: '◇', hue: civ.disposition.hue, ms: 3200,
+        title: 'Given freely',
+        body: '−' + RS.core.fmt(cost) + ' Ψ. Standing now ' +
+          (standing >= 0 ? '+' : '') + standing.toFixed(2) + '.' });
+    });
+
+    bus.on('contact:taught', ({ civ, node }) => {
+      RS.audio.discover(1.4);
+      RS.feel.FX.discovery(node.hue, 1.2);
+      RS.ui.toast({
+        kind: 'major', icon: '◈', hue: node.hue, ms: 6500,
+        title: civ.name.toUpperCase() + ' TAUGHT YOU ' + node.name.toUpperCase(),
+        body: node.blurb + ' It cost them something to give, and their standing reflects that.'
+      });
+    });
+
+    bus.on('contact:uplift', ({ civ, welcomed, standing }) => {
+      RS.audio.discover(welcomed ? 1.3 : 0.5);
+      RS.feel.FX.discovery(welcomed ? 120 : 0, 1.1);
+      RS.ui.toast({
+        kind: welcomed ? 'major' : 'warn', icon: '⌘', hue: welcomed ? 120 : 0, ms: 6500,
+        title: welcomed ? 'THEY TOOK IT' : 'THEY RESENT IT',
+        body: welcomed
+          ? civ.disposition.name + ' — they absorbed the lattice and asked for more. Standing ' +
+            (standing >= 0 ? '+' : '') + standing.toFixed(2) + '.'
+          : civ.disposition.name + ' — they did not ask to be raised, and they know who did it. ' +
+            'Standing ' + standing.toFixed(2) + '.'
+      });
+    });
+
+    bus.on('contact:withdraw', ({ civ }) => {
+      RS.audio.seat(0.2);
+      RS.ui.toast({ kind: 'info', icon: '·', ms: 2400,
+        title: 'Channel closed', body: 'You broke the carrier on ' + civ.name + '.' });
+    });
+
     bus.on('settings', ({ key, value }) => {
       if (key === 'audio') RS.audio.setEnabled(value);
       if (key === 'haptics') RS.feel.setHaptics(value);
@@ -9605,6 +12157,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       structuresUnlocked: game.structuresUnlocked,
       deltas: game.deltas,
       senseBonus: game.senseBonus,
+      /* Relationships and galactic position. Both are addresses and small
+       * numbers — the civilisations and the stars themselves re-derive. */
+      contacts: game.contacts,
+      galaxy: { sx: game.galaxy.sx, sy: game.galaxy.sy },
       scene: {
         kind: game.scene.kind,
         systemAddr: game.scene.systemAddr,
@@ -9675,6 +12231,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     game.structuresUnlocked = data.structuresUnlocked || Object.create(null);
     game.deltas = data.deltas || Object.create(null);
     game.senseBonus = data.senseBonus || 0;
+    game.contacts = data.contacts || Object.create(null);
+    if (data.galaxy) {
+      game.galaxy.sx = data.galaxy.sx || 0;
+      game.galaxy.sy = data.galaxy.sy || 0;
+      game.galaxy.cacheKey = '';
+    }
     RS.influence.recomputeFields(game);
 
     if (data.scene) {
@@ -9802,6 +12364,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           RS.feel.ripple(node.x, node.y, { r0: 0.02, r1: 0.14, life: 0.5, hue: node.man.hue });
         }
       },
+      /* Selecting a star on the galactic map. Tapping selects; tapping the
+       * already-selected star commits to travelling there, so one gesture
+       * covers both without a separate confirm button. */
+      onPickStar(st) {
+        const already = game.galaxy.target && game.galaxy.target.key === st.key;
+        const r = already ? RS.galaxy.travelTo(game, bus, st)
+          : RS.galaxy.selectStar(game, bus, st);
+        if (!r.ok) {
+          bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+        } else {
+          RS.audio.seat(0.6);
+          RS.feel.FX.dialSeat(st.star.cls.hue);
+        }
+      },
       /* Selecting a world in the system view. */
       onPickBody(index) {
         RS.scenes.selectBody(game, bus, index);
@@ -9852,6 +12428,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     setTimeout(() => RS.ui.toast({ kind: 'info', icon: '◈', hue: 43, ms: 7000,
       title: 'Hold the lock',
       body: 'Line up the arcs around yourself. Coherence fills while you hold.' }), 8400);
+    /* The game is genuinely deep and the guide is written against live state,
+     * so pointing at it is worth more than any amount of additional tutorial
+     * text here. */
+    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '?', hue: 200, ms: 9000,
+      title: 'Lost? Tap ? at any time',
+      body: 'The guide describes whatever is actually in front of you — this scene, these dials, this mode.' }), 12600);
   }
 
   function onResize() {

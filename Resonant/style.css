@@ -123,7 +123,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.ctx-layer em { -webkit-line-clamp: 1; }
+.ctx-layer em { -webkit-line-clamp: 2; }
+/* Seven tool buttons on a 430px phone: let them shrink rather than clip. */
+#tools { flex-wrap: nowrap; }
+@media (max-width: 470px) { #tools .tool { width: 25px; height: 25px; font-size: 11px; } }
 
 /* ── node readout ─────────────────────────────────────────────────────── */
 
@@ -448,3 +451,47 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   #progress-bar { display: none; }
   .res .rate { display: none; }
 }
+
+/* ── contact ──────────────────────────────────────────────────────────────
+ *
+ * A civilisation in earshot is the rarest event in the game. The button
+ * announces itself rather than waiting to be found, and the hint line states
+ * the carrier frequency outright — a player who has found one and not noticed
+ * would be the worst failure this design could have.
+ */
+
+#btn-contact { display: none; }
+#btn-contact.live {
+  display: grid;
+  border-color: currentColor;
+  animation: contact-pulse 2.4s ease-in-out infinite;
+}
+@keyframes contact-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: .85; }
+  50% { box-shadow: 0 0 10px 0 currentColor; opacity: 1; }
+}
+
+#contact-hint {
+  align-self: flex-start;
+  margin-top: auto; margin-bottom: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  opacity: 0; transition: opacity .35s;
+  background: var(--panel);
+  border: 1px solid currentColor;
+  border-radius: 8px; padding: 4px 9px;
+}
+#contact-hint:empty { display: none; }
+/* Once the contact hint claims the auto margin, the blocks under it must not. */
+#contact-hint + #body-bar { margin-top: 0; }
+
+/* What they say, set apart from the instrument text — this is the only voice
+   in the game that is not the game describing itself. */
+.say {
+  border-left: 2px solid rgba(240, 171, 252, .45);
+  padding: 2px 0 2px 9px; margin: 4px 0 0;
+}
+.say p {
+  margin: 0 0 5px; font-size: 10px; line-height: 1.5;
+  color: #cdd9ec; font-style: italic;
+}
+.say p:last-child { margin-bottom: 0; }
