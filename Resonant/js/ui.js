@@ -743,18 +743,90 @@
   function codexHTML(game) {
     let h = '<div class="codex-tabs">';
 
-    h += '<section><h3>Essences <em>' + RS.fractal.totalGnosis(game) + ' contexts recognised</em></h3>' +
+    /* ── The essence sheet ───────────────────────────────────────────────
+     *
+     * This is the player's map of the generative core, and it is the single
+     * most useful screen in the game: every mechanic anywhere is one of six
+     * primitives parameterised by the four numbers listed here, so a filled-in
+     * row is a prediction about twelve layers at twenty-two scales.
+     *
+     * Unrevealed axes are drawn as blanks rather than hidden, because the shape
+     * of what you do not know yet is itself information — you can see that
+     * Cascade has three axes left and go hunting it deliberately, which is the
+     * whole RECOGNITION pathway.
+     */
+    const AXIS_META = [
+      { key: 'complexity', sym: 'C', hue: 268, lo: 'simple', hi: 'intricate' },
+      { key: 'branching', sym: 'B', hue: 12, lo: 'single', hi: 'many' },
+      { key: 'symmetry', sym: 'S', hue: 150, lo: 'lopsided', hi: 'even' },
+      { key: 'persistence', sym: 'P', hue: 43, lo: 'fleeting', hi: 'lasting' }
+    ];
+    const totalAxes = RS.fractal.ESSENCES.length * 4;
+    let shown = 0;
+    for (const e of RS.fractal.ESSENCES) shown += RS.fractal.predicted(game, e.id, {}).revealed;
+
+    h += '<section><h3>Essences <em>' + shown + ' / ' + totalAxes + ' axes read</em></h3>' +
       '<p class="blurb">One alphabet, spelled differently by every layer and every scale. ' +
-      'Recognising an essence somewhere new deepens it everywhere.</p><div class="ess-grid">';
+      'Four numbers each, and every mechanic in the game is those numbers fed to one of six ' +
+      'primitives — so a filled row is a prediction about twelve layers at twenty-two scales. ' +
+      'Blanks are what you have not read yet.</p><div class="ess-sheet">';
+
     for (const e of RS.fractal.ESSENCES) {
-      const g = RS.fractal.gnosisOf(game, e.id);
-      h += '<div class="ess' + (g ? '' : ' unknown') + '">' +
-        '<span class="g">' + (g ? e.glyph : '·') + '</span>' +
-        '<span class="n">' + (g ? e.name : '—') + '</span>' +
-        '<span class="lv">' + (g ? '×' + g : '') + '</span>' +
-        (g ? '<span class="t">' + e.trait + '</span>' : '') +
-        (g ? '<span class="b">+' + ((RS.fractal.gnosisBonus(game, e.id) - 1) * 100).toFixed(0) + '% yield</span>' : '') +
+      const n = RS.fractal.gnosisOf(game, e.id);
+      const pr = RS.fractal.predicted(game, e.id, {});
+      const met = n > 0;
+      /* What is still to come, so a player can pick a target. */
+      const nextAt = RS.fractal.REVEAL_AT[pr.revealed];
+      const toGo = nextAt != null ? nextAt - n : 0;
+
+      let bars = '';
+      for (const a of AXIS_META) {
+        const v = pr[a.key];
+        const known = v !== undefined;
+        bars += '<span class="ax' + (known ? '' : ' blank') + '" style="--h:' + a.hue + '" ' +
+          'title="' + a.key + (known ? ': ' + v.toFixed(2) + ' — ' +
+            (v > 0.66 ? a.hi : v < 0.34 ? a.lo : 'middling') : ' — not read yet') + '">' +
+          '<b>' + a.sym + '</b>' +
+          (known ? '<i style="width:' + (v * 100).toFixed(0) + '%"></i>' : '') +
+          '</span>';
+      }
+
+      /* The forms this essence takes, which is the fractal claim made concrete:
+       * the same information wearing eight different local names. Only shown
+       * once met, because the point is recognising it, not reading it off. */
+      const forms = met && e.forms
+        ? Object.keys(e.forms).filter(k => e.forms[k]).map(k => e.forms[k]).slice(0, 4).join(' · ')
+        : '';
+
+      h += '<div class="ess-row' + (met ? '' : ' unknown') + '">' +
+        '<span class="eg">' + (met ? e.glyph : '·') + '</span>' +
+        '<span class="en">' + (met ? e.name : '—') +
+          '<em>' + (met ? e.trait : 'not yet met') + '</em></span>' +
+        '<span class="eax">' + bars + '</span>' +
+        '<span class="ect">' + (met ? '×' + n : '') +
+          (toGo > 0 && met ? '<em>+' + toGo + ' to read</em>' :
+            met ? '<em>complete</em>' : '') + '</span>' +
+        (forms ? '<span class="ef">' + forms + '</span>' : '') +
         '</div>';
+    }
+    h += '</div></section>';
+
+    /* ── The primitives ──────────────────────────────────────────────────
+     *
+     * The other half of the map. The axes above are the numbers; these are the
+     * six functions they are fed to, and which bands run which. Without this,
+     * the axes are a stat block; with it, they are a prediction.
+     */
+    h += '<section><h3>Primitives <em>every mechanic is one of these</em></h3><div class="list">';
+    for (const id of RS.emergence.IDS) {
+      const L = RS.emergence.LABELS[id];
+      const bands = RS.spectrum.BANDS.filter(b => RS.spectrum.usesPrim(b, id));
+      const held = bands.filter(b => game.known.bands[b.id]);
+      h += '<div class="row' + (held.length ? '' : ' dim') + '" style="--h:200">' +
+        '<span class="g">' + L.glyph + '</span>' +
+        '<span class="n">' + L.name + '<em>' + held.length + ' / ' + bands.length + ' layers held</em></span>' +
+        '<span class="d">' + L.blurb + '<br><i style="opacity:.55">' +
+        bands.map(b => b.name).join(', ') + '</i></span></div>';
     }
     h += '</div></section>';
 
@@ -1172,5 +1244,6 @@
   }
 
   RS.ui = {
-    setNotifyLevel, init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
+    setNotifyLevel, init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText,
+    worldHTML, vesselsHTML, contactHTML, codexHTML, upgradesHTML, settingsHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

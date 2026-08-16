@@ -23,7 +23,7 @@ const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
   'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
-  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
+  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js', 'js/ui.js'
 ];
 
 const sandbox = {
@@ -3163,6 +3163,85 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
 
   /* And CONTACT is the only one another party can advance for you. */
   assert(typeof RS.contact.act === 'function', 'contact has actions a culture performs');
+}
+
+
+// ── the codex is the essence sheet ───────────────────────────────────────
+/* The player's map of the generative core. It must show exactly what has been
+ * earned — no more, because that would give away foresight, and no less,
+ * because the blanks are how a player picks their next target. */
+{
+  const g = RS.game.newGame(80808);
+  const empty = RS.ui.codexHTML(g);
+  assert(typeof empty === 'string' && empty.length > 500, 'the codex renders from nothing');
+  assert(empty.indexOf('0 / ' + (RS.fractal.ESSENCES.length * 4) + ' axes read') >= 0,
+    'and an unread ledger reads as zero axes');
+  /* Nothing may leak before it is earned: no essence name, no trait, no number. */
+  let leaked = [];
+  for (const e of RS.fractal.ESSENCES) {
+    /* Scoped to the essence sheet's own name slot: the primitives section below
+     * it is vocabulary rather than a secret, and is meant to be readable from
+     * the first minute. */
+    if (empty.indexOf('class="en">' + e.name + '<') >= 0) leaked.push(e.name);
+    if (e.trait && empty.indexOf(e.trait) >= 0) leaked.push(e.id + ' trait');
+    if (e.forms && e.forms.cell && empty.indexOf(e.forms.cell) >= 0) leaked.push(e.id + ' form');
+  }
+  assert(leaked.length === 0, 'an unmet essence gives nothing away: ' + (leaked.slice(0,3).join(', ') || 'nothing'));
+
+  /* Meeting one reveals its name and trait but still not its numbers — two
+   * contexts is the first axis, and one is none. */
+  g.gnosis.cascade = ['cascade@1:0'];
+  const one = RS.ui.codexHTML(g);
+  assert(one.indexOf('class="en">Cascade<') >= 0, 'a met essence is named');
+  assert(one.indexOf('1 / ' + (RS.fractal.ESSENCES.length * 4)) < 0,
+    'but one context is not yet an axis');
+  assert(one.indexOf('0 / ' + (RS.fractal.ESSENCES.length * 4) + ' axes read') >= 0,
+    'the count agrees: still zero axes');
+
+  /* And the sheet must agree with `predicted` exactly, at every level. */
+  for (const n of [0, 2, 4, 6, 8, 12]) {
+    const g2 = RS.game.newGame(1234);
+    g2.gnosis.cascade = [];
+    for (let i = 0; i < n; i++) g2.gnosis.cascade.push('cascade@' + i + ':0');
+    const pr = RS.fractal.predicted(g2, 'cascade', {});
+    const html = RS.ui.codexHTML(g2);
+    let bars = 0;
+    for (const a of RS.fractal.AXES) if (pr[a] !== undefined) bars++;
+    assert(bars === pr.revealed, n + ' contexts reveals ' + pr.revealed + ' axes');
+    assert(html.indexOf(bars + ' / ' + (RS.fractal.ESSENCES.length * 4) + ' axes read') >= 0,
+      'and the sheet says so (' + n + ' contexts → ' + bars + ')');
+  }
+
+  /* A fully-read essence must offer nothing more to read, or the sheet would
+   * send a player hunting something they already have. */
+  const g3 = RS.game.newGame(55);
+  g3.gnosis.spiral = [];
+  for (let i = 0; i < 12; i++) g3.gnosis.spiral.push('spiral@' + i + ':0');
+  const full = RS.ui.codexHTML(g3);
+  assert(full.indexOf('complete') >= 0, 'a fully-read essence says it is complete');
+
+  /* No primitive may share a display name with an essence: the codex lists
+   * both, and a player reading "Flow" twice for two different things is a
+   * legibility failure rather than a coincidence. */
+  const essNames = new Set(RS.fractal.ESSENCES.map(e => e.name));
+  for (const id of RS.emergence.IDS) {
+    assert(!essNames.has(RS.emergence.LABELS[id].name),
+      'the ' + id + ' primitive does not collide with an essence name (' +
+      RS.emergence.LABELS[id].name + ')');
+  }
+
+  /* The primitives half. Without it the axes are a stat block rather than a
+   * prediction, so every one must be listed with the bands that run it. */
+  for (const id of RS.emergence.IDS) {
+    assert(full.indexOf(RS.emergence.LABELS[id].name) >= 0, id + ' is on the sheet');
+  }
+  for (const b of RS.spectrum.BANDS) {
+    let listed = false;
+    for (const id of b.prim) {
+      if (RS.spectrum.usesPrim(b, id)) listed = true;
+    }
+    assert(listed, b.id + ' runs at least one primitive the sheet can show it under');
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

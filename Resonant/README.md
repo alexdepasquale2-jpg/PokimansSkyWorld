@@ -430,6 +430,23 @@ you arrive because a rhythm is a thing in time; Probabilistic does the same for
 carries a friction number that pays back the throughput it costs, so composing a
 new band cannot silently create a layer that is a demotion to reach.
 
+### The codex is the essence sheet
+
+The player's map of the generative core, and the most useful screen in the game
+once you know what it is for. Every essence gets a row: its four axes as bars,
+its trait, how many contexts it has been met in, how many more until the next
+axis, and the names it wears at each geometry.
+
+Unrevealed axes are drawn as **blanks rather than hidden**, because the shape of
+what you do not know is itself information — you can see that an essence has
+three axes left and go hunting it deliberately, which is the whole RECOGNITION
+pathway. The sheet's count agrees with `fractal.predicted` exactly, and the test
+suite verifies that an unmet essence gives away nothing: not its name, not its
+trait, not one of its form names.
+
+Below it, the six primitives and which bands run each. Without that half the
+axes are a stat block; with it, they are a prediction.
+
 ### Understanding becomes foresight
 
 Recognising an essence in enough contexts reveals its axes one at a time, in an
@@ -664,9 +681,7 @@ to accommodate them:
   that show movement between scopes rather than a white flash.
 - **Interface.** Seven topbar buttons and growing. They want to be one tabbed
   drawer — World / Bodies / Codex / Pathways / Guide / Settings — with Contact
-  staying separate because it is event-driven and must remain unmissable. The
-  Codex in particular wants to become the essence sheet: four axes per essence,
-  blanks where not yet revealed, and the forms it takes at each geometry.
+  staying separate because it is event-driven and must remain unmissable.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

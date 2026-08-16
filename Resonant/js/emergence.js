@@ -253,7 +253,12 @@
   const LABELS = {
     gate: { name: 'Gate', glyph: '▮', blurb: 'Available only in windows. Learn the rhythm.' },
     nest: { name: 'Nest', glyph: '◇', blurb: 'Contains smaller copies. Descend for the payout.' },
-    flow: { name: 'Flow', glyph: '≈', blurb: 'Has a direction. Follow the gradient.' },
+    /* Displayed as "Gradient", not "Flow". There is an *essence* called Flow,
+     * and a codex listing the same word twice for two different things — one of
+     * fourteen essences, and one of six primitives — is a legibility problem
+     * rather than a coincidence. The id stays `flow` because that is what the
+     * band tables and every call site say. */
+    flow: { name: 'Gradient', glyph: '≈', blurb: 'Has a direction. Follow it.' },
     order: { name: 'Order', glyph: '→', blurb: 'Needs its antecedents first. Read the graph.' },
     twin: { name: 'Twin', glyph: '◐', blurb: 'Exists twice. One is real — find the tell.' },
     invert: { name: 'Invert', glyph: '○', blurb: 'Reads backwards. Unlearn what you know.' }
