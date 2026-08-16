@@ -184,30 +184,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 /* ── toasts ───────────────────────────────────────────────────────────── */
 
 #toasts {
-  /* Below the topbar, the scene tag and the context strip, so transient
-     messages never bury the two lines that say where you are and what mode
-     the dials are in. */
-  position: fixed; top: calc(var(--safe-t) + 150px); left: 50%;
-  transform: translateX(-50%);
-  display: flex; flex-direction: column; gap: 6px;
-  width: min(92vw, 400px); z-index: 5;
+  /* Top-right, out of the world entirely. They used to be centred and three
+     deep, which put a wall of cards directly over the thing they were about —
+     and a notification that hides what it is describing is worse than none.
+     Nothing here is load-bearing: every message restates something the
+     readout, the objective line or the guide also says. */
+  position: fixed; top: calc(var(--safe-t) + 46px); right: 10px;
+  display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
+  width: min(74vw, 264px); z-index: 5;
   pointer-events: none;
 }
 .toast {
   --h: 200;
-  display: flex; gap: 9px; align-items: flex-start;
-  background: rgba(7, 11, 19, 0.95);
-  border: 1px solid hsla(var(--h), 60%, 60%, .3);
-  border-left: 2px solid hsl(var(--h), 80%, 62%);
-  border-radius: 10px; padding: 8px 11px;
-  backdrop-filter: blur(11px); -webkit-backdrop-filter: blur(11px);
-  animation: toast-in .34s cubic-bezier(.2, 1.3, .35, 1);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  display: flex; gap: 7px; align-items: flex-start;
+  /* Translucent rather than near-opaque: the world should stay legible
+     *through* a notification, which is most of why these stopped feeling like
+     an interruption. */
+  background: rgba(7, 11, 19, 0.72);
+  border: 1px solid hsla(var(--h), 60%, 60%, .22);
+  border-left: 2px solid hsla(var(--h), 80%, 62%, .8);
+  border-radius: 8px; padding: 6px 9px;
+  max-width: 100%;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  animation: toast-in .28s cubic-bezier(.2, 1.3, .35, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .38);
 }
 .toast.out { animation: toast-out .4s ease forwards; }
-.toast i { font-style: normal; font-size: 15px; color: hsl(var(--h), 85%, 70%); line-height: 1.1; }
-.toast b { display: block; font-size: 10.5px; letter-spacing: .06em; }
-.toast em { display: block; font-style: normal; font-size: 9.5px; color: var(--dim); margin-top: 2px; line-height: 1.42; }
+.toast i { font-style: normal; font-size: 13px; color: hsl(var(--h), 85%, 70%); line-height: 1.1; }
+.toast b { display: block; font-size: 10px; letter-spacing: .05em; }
+.toast em { display: block; font-style: normal; font-size: 9px; color: var(--dim); margin-top: 2px; line-height: 1.38; }
 .toast.major { border-left-width: 3px; }
 .toast.major b { font-size: 11.5px; }
 .toast.gnosis { border-left-color: #f0abfc; }
@@ -215,12 +220,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .toast.seat { padding: 5px 10px; opacity: .9; }
 .toast.seat b { font-size: 9.5px; }
 
+/* Slide in from the edge they live on rather than dropping from above — a
+   card that moves toward the middle of the screen reads as demanding
+   attention, and one that slides in from the margin does not. */
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(-10px) scale(.96); }
+  from { opacity: 0; transform: translateX(14px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to { opacity: 0; transform: translateX(10px); }
 }
 
 /* ── drawer ───────────────────────────────────────────────────────────── */
@@ -327,6 +335,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .set-row .k { font-size: 10px; font-weight: 700; }
 .set-row .d { font-size: 8.5px; color: var(--dimmer); line-height: 1.35; }
+.set-row .cyc {
+  font-size: 9px; letter-spacing: .1em; padding: 3px 7px; border-radius: 5px;
+  border: 1px solid var(--line); color: var(--ink); opacity: .85; align-self: center;
+}
 .set-row .sw {
   width: 28px; height: 16px; border-radius: 8px;
   background: rgba(140, 175, 220, .2); position: relative;
@@ -410,7 +422,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 
 #body-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  pointer-events: auto;
   margin-top: auto; margin-bottom: 6px;
   align-self: flex-start;
   background: var(--panel);
@@ -431,7 +444,42 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .bb-meter b { position: absolute; inset: 0 auto 0 0; display: block; transition: width .2s linear; }
 .bb-tag { font-size: 9px; color: var(--dim); }
-.bb-warn { font-size: 9px; color: var(--warn); }
+.bb-warn {
+  font-size: 9px; color: var(--warn); flex-basis: 100%;
+  display: flex; align-items: center; gap: 5px;
+}
+.bb-fix {
+  font: inherit; font-size: 9px; letter-spacing: .04em;
+  background: hsla(40, 80%, 60%, .16); color: hsl(40, 85%, 72%);
+  border: 1px solid hsla(40, 80%, 60%, .4); border-radius: 5px;
+  padding: 2px 6px; cursor: pointer; pointer-events: auto;
+}
+.bb-fix:hover { background: hsla(40, 80%, 60%, .28); }
+
+.bb-head {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; pointer-events: auto;
+}
+.bb-head:hover .bb-name { color: #fff; }
+
+/* The dial map, live. Every body reinterprets the same four controls, and
+   until this existed the only place that mapping appeared was a drawer you had
+   to close in order to fly. */
+.bb-dials { display: flex; gap: 7px; flex-wrap: wrap; }
+.bb-dial {
+  --h: 200;
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-size: 8.5px; color: var(--dim); white-space: nowrap;
+}
+.bb-dial b {
+  font-size: 10px; font-weight: 400; color: hsl(var(--h), 70%, 70%);
+}
+@media (max-width: 560px) {
+  /* On a phone the bar is competing with the world for a narrow column, so the
+     dial map drops to the two controls that differ most between bodies. */
+  .bb-dial:nth-child(n+3) { display: none; }
+}
 
 /* The readout is the anchor for the bottom-left column; once the body bar
  * takes the auto margin, the readout must not also claim it. */

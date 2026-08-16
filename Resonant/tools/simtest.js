@@ -2854,5 +2854,80 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(RS.physics.isOurs(), 'and we are back in ours');
 }
 
+
+// ── notifications are filterable, and never load-bearing ─────────────────
+{
+  /* The rule that makes filtering safe: every notification restates something
+   * the readout, the objective line or the guide also says — so the default is
+   * to show only what a player would want interrupting them. */
+  const g = RS.game.newGame(1);
+  assert(g.settings.notify === 'key', 'a new game shows arrivals and discoveries, not chatter');
+}
+
+// ── the pilot has something to read ──────────────────────────────────────
+{
+  const g = RS.game.newGame(606);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  g.insight = 1e9;
+  RS.influence.tryResearch(g, nullBus, 'locomotion');
+  RS.dials.setValue(g, g.dials.space, RS.scenes.TIER_PLANET);
+  for (let i = 0; i < 30; i++) RS.scenes.tick(g, nullBus, 1 / 60);
+
+  assert(RS.vessel.statusOf(g) === null, 'unembodied, there is no pilot status to show');
+
+  /* Whichever body works where this seed happened to put us. A walker refusing
+   * because the sample point is underwater is the game working, not a failure —
+   * and the mote works everywhere, which is what it is for. */
+  let r = RS.scenes.embark(g, nullBus, 'walker');
+  if (!r.ok) r = RS.scenes.embark(g, nullBus, 'mote');
+  assert(r.ok, 'embarked (' + (r.reason || 'ok') + ')');
+  const st = RS.vessel.statusOf(g);
+  assert(st, 'embodied, there is');
+  for (const k of ['charge', 'capacity', 'chargeFrac', 'strain', 'speed', 'endurance']) {
+    assert(Number.isFinite(st[k]) || st[k] === Infinity, 'pilot status reports ' + k);
+  }
+  assert(st.chargeFrac > 0 && st.chargeFrac <= 1, 'charge reads as a fraction');
+  assert(st.arch.dialMap && st.arch.dialMap.time && st.arch.dialMap.space,
+    'and the body names what its dials do');
+
+  /* Endurance must be a real budget: a body burning more than it recovers has
+   * a finite time on it, and one that is recovering has none. */
+  const arch = st.arch;
+  const still = RS.vessel.enduranceOf(arch, { charge: 100, vx: 0, vy: 0 }, st.env);
+  const flat = RS.vessel.enduranceOf(arch, { charge: 100, vx: 3, vy: 3 }, st.env);
+  assert(flat <= still, 'working hard costs endurance');
+  assert(flat > 0, 'and there is always some left to spend');
+
+  /* The half of "this body cannot work here" that was missing: which one can. */
+  const ocean = { medium: RS.vessel.MEDIUM.LIQUID, gravity: 1, pressure: 1,
+    temperature: 290, flux: 1, roughness: 0.2, hasMinds: false, label: 'ocean' };
+  assert(RS.vessel.canOperate(RS.vessel.BY_ID.walker, ocean), 'a walker cannot swim');
+  const alt = RS.vessel.BY_ID.swimmer;
+  assert(alt && !RS.vessel.canOperate(alt, ocean), 'but a swimmer can');
+
+  /* `bestHere` must never suggest the body you are already wearing, or the fix
+   * button on the pilot bar would do nothing. */
+  const here = RS.vessel.bestHere(g, st.arch.id);
+  assert(!here || here.id !== st.arch.id, 'the suggested alternative is an alternative');
+
+  /* And when a body genuinely cannot work, the status must carry the fix
+   * rather than only the complaint. Cytoplasm is the cleanest case: nothing but
+   * the ciliate and the mote function there. */
+  const g2 = RS.game.newGame(88);
+  g2.vessels.unlocked.walker = true;
+  g2.vessels.unlocked.ciliate = true;
+  g2.scene.kind = 'cellular';
+  g2.scene.planet = { name: 'X', surfaceTemp: 290, pressure: 1, gravity: 1, flux: 1,
+    biosphere: { complexity: 0.5, stage: { name: 'Complex' } } };
+  g2.scene.cell = RS.cellular.cellAt(g2, g2.scene.planet, 0, 0);
+  g2.body = RS.vessel.newBody('walker');
+  g2.inhabiting = true;
+  const bad = RS.vessel.statusOf(g2);
+  assert(bad.blocked, 'a walker in cytoplasm is blocked');
+  assert(bad.alternative && bad.alternative.id === 'ciliate',
+    'and the status names the body that would work: ' +
+    (bad.alternative ? bad.alternative.name : 'none'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

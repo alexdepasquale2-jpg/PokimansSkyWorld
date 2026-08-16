@@ -79,7 +79,14 @@
       focusNode: null,
       __spec: null,
 
-      settings: { audio: true, haptics: true, reduceMotion: false, showSci: true },
+      settings: {
+        audio: true, haptics: true, reduceMotion: false, showSci: true,
+        /* 'all' | 'key' | 'off'. Default 'key': arrivals, discoveries and
+         * warnings, but not routine chatter. Every notification restates
+         * something the readout or the objective line also says, so filtering
+         * them costs nothing but noise. */
+        notify: 'key'
+      },
       flags: Object.create(null)
     };
     RS.dials.refreshReach(game.dials);
@@ -266,10 +273,33 @@
       if (!game.inhabiting) {
         return { text: 'Take a body to touch this world. Unembodied, you can only watch it.', kind: 'embark' };
       }
-      const env = RS.vessel.environmentFor(game);
-      const blocked = RS.vessel.canOperate(RS.vessel.archOf(game.body), env);
-      if (blocked) return { text: 'This body cannot work here: ' + blocked + '.', kind: 'blocked' };
-      return { text: 'τ throttle · Σ vertical · Δ heading · φ senses.', kind: 'pilot' };
+      const st = RS.vessel.statusOf(game);
+      if (st && st.blocked) {
+        return { text: 'This body cannot work here: ' + st.blocked +
+          (st.alternative ? '. Take the ' + st.alternative.name + ' instead.' : '. Nothing you have works here.'),
+          kind: 'blocked' };
+      }
+      /* The dial map lives on the pilot bar now and is permanently visible, so
+       * repeating it here would spend the one line that could say something
+       * about *this* world on something the player can already read. */
+      if (st && st.strain > 0.6) {
+        return { text: 'Strain at ' + Math.round(st.strain * 100) +
+          '%. Leave the body before it fails, or the hold goes with it.', kind: 'blocked' };
+      }
+      if (st && st.endurance !== Infinity && st.endurance < 45) {
+        return { text: Math.round(st.endurance) + 's of charge at this pace. Ease off τ or turn back.',
+          kind: 'blocked' };
+      }
+      const p = s.planet;
+      if (p && p.biosphere && p.biosphere.complexity > 0.34) {
+        return { text: 'Life here. Ride a mind with the symbiont, or turn Σ inward to enter a cell.',
+          kind: 'explore' };
+      }
+      if (p && p.resources && p.resources.length) {
+        return { text: 'Seams below. Extract with the harvester, or build from the world panel.',
+          kind: 'explore' };
+      }
+      return { text: 'Walk it. Δ steers, and φ changes what you can sense.', kind: 'pilot' };
     }
     return nextObjective(game);
   }

@@ -490,6 +490,7 @@
       if (key === 'audio') RS.audio.setEnabled(value);
       if (key === 'haptics') RS.feel.setHaptics(value);
       if (key === 'reduceMotion') RS.feel.setReduceMotion(value);
+      if (key === 'notify') RS.ui.setNotifyLevel(value);
     });
   }
 

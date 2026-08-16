@@ -269,6 +269,61 @@
     }));
   }
 
+  /* The body that would actually work where you are standing, preferring the
+   * most capable one you have unlocked. "This body cannot work here" is only
+   * half a message; the other half is which one can, and the player should not
+   * have to open a drawer and read six predicates to find out. */
+  function bestHere(game, exclude) {
+    const env = environmentFor(game);
+    let best = null;
+    for (const a of ARCHETYPES) {
+      if (!game.vessels.unlocked[a.id]) continue;
+      if (exclude && a.id === exclude) continue;
+      if (canOperate(a, env)) continue;
+      /* `tier` is the archetype's own sense of how much body it is, so the
+       * most capable working body wins rather than whichever is listed first. */
+      if (!best || a.tier > best.tier) best = a;
+    }
+    return best;
+  }
+
+  /* Everything a pilot needs to see at a glance, in one call, so the HUD does
+   * not have to know the shape of a body. */
+  function statusOf(game) {
+    if (!game.inhabiting || !game.body) return null;
+    const b = game.body;
+    const a = archOf(b);
+    const env = environmentFor(game);
+    const blocked = canOperate(a, env);
+    return {
+      arch: a, body: b, env, blocked,
+      charge: b.charge, capacity: a.capacity,
+      chargeFrac: clamp01(b.charge / Math.max(1, a.capacity)),
+      /* Strain is simulated and was never shown, so the one number that says
+       * "change body soon" was invisible. */
+      strain: clamp01(b.strain || 0),
+      speed: Math.hypot(b.vx || 0, b.vy || 0),
+      elevation: b.elevation || 0,
+      holdMass: b.holdMass || 0,
+      possession: b.mindState ? b.mindState.possession : null,
+      /* Seconds of charge left at the current draw, which is the number that
+       * actually tells you whether to turn back. Infinite while regenerating. */
+      endurance: enduranceOf(a, b, env),
+      alternative: blocked ? bestHere(game, a.id) : null
+    };
+  }
+
+  /* Net charge budget: draw scales with exertion and with how hostile the
+   * medium is; regen is the archetype's own recovery. Positive net means the
+   * body is charging and endurance is unbounded. */
+  function enduranceOf(arch, body, env) {
+    const exertion = 0.35 + Math.hypot(body.vx || 0, body.vy || 0) * 1.6;
+    const hostile = 1 + clamp01(Math.abs(env.temperature - 288) / 220);
+    const net = arch.regen - arch.draw * exertion * hostile;
+    if (net >= 0) return Infinity;
+    return body.charge / -net;
+  }
+
   // ── the inhabited body ───────────────────────────────────────────────────
 
   function newBody(archId) {
@@ -527,7 +582,7 @@
 
   RS.vessel = {
     MEDIUM, ARCHETYPES, BY_ID,
-    environmentFor, canOperate, availability,
+    environmentFor, canOperate, availability, bestHere, statusOf, enduranceOf,
     newBody, archOf, controlsFrom, integrate,
     ride, unride, stepMind, senseRadius, canSenseBand,
     addCargo, removeCargo, effectiveMass

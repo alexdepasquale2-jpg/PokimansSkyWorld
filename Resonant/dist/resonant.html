@@ -199,30 +199,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 /* ── toasts ───────────────────────────────────────────────────────────── */
 
 #toasts {
-  /* Below the topbar, the scene tag and the context strip, so transient
-     messages never bury the two lines that say where you are and what mode
-     the dials are in. */
-  position: fixed; top: calc(var(--safe-t) + 150px); left: 50%;
-  transform: translateX(-50%);
-  display: flex; flex-direction: column; gap: 6px;
-  width: min(92vw, 400px); z-index: 5;
+  /* Top-right, out of the world entirely. They used to be centred and three
+     deep, which put a wall of cards directly over the thing they were about —
+     and a notification that hides what it is describing is worse than none.
+     Nothing here is load-bearing: every message restates something the
+     readout, the objective line or the guide also says. */
+  position: fixed; top: calc(var(--safe-t) + 46px); right: 10px;
+  display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
+  width: min(74vw, 264px); z-index: 5;
   pointer-events: none;
 }
 .toast {
   --h: 200;
-  display: flex; gap: 9px; align-items: flex-start;
-  background: rgba(7, 11, 19, 0.95);
-  border: 1px solid hsla(var(--h), 60%, 60%, .3);
-  border-left: 2px solid hsl(var(--h), 80%, 62%);
-  border-radius: 10px; padding: 8px 11px;
-  backdrop-filter: blur(11px); -webkit-backdrop-filter: blur(11px);
-  animation: toast-in .34s cubic-bezier(.2, 1.3, .35, 1);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  display: flex; gap: 7px; align-items: flex-start;
+  /* Translucent rather than near-opaque: the world should stay legible
+     *through* a notification, which is most of why these stopped feeling like
+     an interruption. */
+  background: rgba(7, 11, 19, 0.72);
+  border: 1px solid hsla(var(--h), 60%, 60%, .22);
+  border-left: 2px solid hsla(var(--h), 80%, 62%, .8);
+  border-radius: 8px; padding: 6px 9px;
+  max-width: 100%;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  animation: toast-in .28s cubic-bezier(.2, 1.3, .35, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .38);
 }
 .toast.out { animation: toast-out .4s ease forwards; }
-.toast i { font-style: normal; font-size: 15px; color: hsl(var(--h), 85%, 70%); line-height: 1.1; }
-.toast b { display: block; font-size: 10.5px; letter-spacing: .06em; }
-.toast em { display: block; font-style: normal; font-size: 9.5px; color: var(--dim); margin-top: 2px; line-height: 1.42; }
+.toast i { font-style: normal; font-size: 13px; color: hsl(var(--h), 85%, 70%); line-height: 1.1; }
+.toast b { display: block; font-size: 10px; letter-spacing: .05em; }
+.toast em { display: block; font-style: normal; font-size: 9px; color: var(--dim); margin-top: 2px; line-height: 1.38; }
 .toast.major { border-left-width: 3px; }
 .toast.major b { font-size: 11.5px; }
 .toast.gnosis { border-left-color: #f0abfc; }
@@ -230,12 +235,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .toast.seat { padding: 5px 10px; opacity: .9; }
 .toast.seat b { font-size: 9.5px; }
 
+/* Slide in from the edge they live on rather than dropping from above — a
+   card that moves toward the middle of the screen reads as demanding
+   attention, and one that slides in from the margin does not. */
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(-10px) scale(.96); }
+  from { opacity: 0; transform: translateX(14px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to { opacity: 0; transform: translateX(10px); }
 }
 
 /* ── drawer ───────────────────────────────────────────────────────────── */
@@ -342,6 +350,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .set-row .k { font-size: 10px; font-weight: 700; }
 .set-row .d { font-size: 8.5px; color: var(--dimmer); line-height: 1.35; }
+.set-row .cyc {
+  font-size: 9px; letter-spacing: .1em; padding: 3px 7px; border-radius: 5px;
+  border: 1px solid var(--line); color: var(--ink); opacity: .85; align-self: center;
+}
 .set-row .sw {
   width: 28px; height: 16px; border-radius: 8px;
   background: rgba(140, 175, 220, .2); position: relative;
@@ -425,7 +437,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 
 #body-bar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  pointer-events: auto;
   margin-top: auto; margin-bottom: 6px;
   align-self: flex-start;
   background: var(--panel);
@@ -446,7 +459,42 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 .bb-meter b { position: absolute; inset: 0 auto 0 0; display: block; transition: width .2s linear; }
 .bb-tag { font-size: 9px; color: var(--dim); }
-.bb-warn { font-size: 9px; color: var(--warn); }
+.bb-warn {
+  font-size: 9px; color: var(--warn); flex-basis: 100%;
+  display: flex; align-items: center; gap: 5px;
+}
+.bb-fix {
+  font: inherit; font-size: 9px; letter-spacing: .04em;
+  background: hsla(40, 80%, 60%, .16); color: hsl(40, 85%, 72%);
+  border: 1px solid hsla(40, 80%, 60%, .4); border-radius: 5px;
+  padding: 2px 6px; cursor: pointer; pointer-events: auto;
+}
+.bb-fix:hover { background: hsla(40, 80%, 60%, .28); }
+
+.bb-head {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; pointer-events: auto;
+}
+.bb-head:hover .bb-name { color: #fff; }
+
+/* The dial map, live. Every body reinterprets the same four controls, and
+   until this existed the only place that mapping appeared was a drawer you had
+   to close in order to fly. */
+.bb-dials { display: flex; gap: 7px; flex-wrap: wrap; }
+.bb-dial {
+  --h: 200;
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-size: 8.5px; color: var(--dim); white-space: nowrap;
+}
+.bb-dial b {
+  font-size: 10px; font-weight: 400; color: hsl(var(--h), 70%, 70%);
+}
+@media (max-width: 560px) {
+  /* On a phone the bar is competing with the world for a narrow column, so the
+     dial map drops to the two controls that differ most between bodies. */
+  .bb-dial:nth-child(n+3) { display: none; }
+}
 
 /* The readout is the anchor for the bottom-left column; once the body bar
  * takes the auto margin, the readout must not also claim it. */
@@ -5632,6 +5680,61 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }));
   }
 
+  /* The body that would actually work where you are standing, preferring the
+   * most capable one you have unlocked. "This body cannot work here" is only
+   * half a message; the other half is which one can, and the player should not
+   * have to open a drawer and read six predicates to find out. */
+  function bestHere(game, exclude) {
+    const env = environmentFor(game);
+    let best = null;
+    for (const a of ARCHETYPES) {
+      if (!game.vessels.unlocked[a.id]) continue;
+      if (exclude && a.id === exclude) continue;
+      if (canOperate(a, env)) continue;
+      /* `tier` is the archetype's own sense of how much body it is, so the
+       * most capable working body wins rather than whichever is listed first. */
+      if (!best || a.tier > best.tier) best = a;
+    }
+    return best;
+  }
+
+  /* Everything a pilot needs to see at a glance, in one call, so the HUD does
+   * not have to know the shape of a body. */
+  function statusOf(game) {
+    if (!game.inhabiting || !game.body) return null;
+    const b = game.body;
+    const a = archOf(b);
+    const env = environmentFor(game);
+    const blocked = canOperate(a, env);
+    return {
+      arch: a, body: b, env, blocked,
+      charge: b.charge, capacity: a.capacity,
+      chargeFrac: clamp01(b.charge / Math.max(1, a.capacity)),
+      /* Strain is simulated and was never shown, so the one number that says
+       * "change body soon" was invisible. */
+      strain: clamp01(b.strain || 0),
+      speed: Math.hypot(b.vx || 0, b.vy || 0),
+      elevation: b.elevation || 0,
+      holdMass: b.holdMass || 0,
+      possession: b.mindState ? b.mindState.possession : null,
+      /* Seconds of charge left at the current draw, which is the number that
+       * actually tells you whether to turn back. Infinite while regenerating. */
+      endurance: enduranceOf(a, b, env),
+      alternative: blocked ? bestHere(game, a.id) : null
+    };
+  }
+
+  /* Net charge budget: draw scales with exertion and with how hostile the
+   * medium is; regen is the archetype's own recovery. Positive net means the
+   * body is charging and endurance is unbounded. */
+  function enduranceOf(arch, body, env) {
+    const exertion = 0.35 + Math.hypot(body.vx || 0, body.vy || 0) * 1.6;
+    const hostile = 1 + clamp01(Math.abs(env.temperature - 288) / 220);
+    const net = arch.regen - arch.draw * exertion * hostile;
+    if (net >= 0) return Infinity;
+    return body.charge / -net;
+  }
+
   // ── the inhabited body ───────────────────────────────────────────────────
 
   function newBody(archId) {
@@ -5890,7 +5993,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.vessel = {
     MEDIUM, ARCHETYPES, BY_ID,
-    environmentFor, canOperate, availability,
+    environmentFor, canOperate, availability, bestHere, statusOf, enduranceOf,
     newBody, archOf, controlsFrom, integrate,
     ride, unride, stepMind, senseRadius, canSenseBand,
     addCargo, removeCargo, effectiveMass
@@ -9278,7 +9381,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       focusNode: null,
       __spec: null,
 
-      settings: { audio: true, haptics: true, reduceMotion: false, showSci: true },
+      settings: {
+        audio: true, haptics: true, reduceMotion: false, showSci: true,
+        /* 'all' | 'key' | 'off'. Default 'key': arrivals, discoveries and
+         * warnings, but not routine chatter. Every notification restates
+         * something the readout or the objective line also says, so filtering
+         * them costs nothing but noise. */
+        notify: 'key'
+      },
       flags: Object.create(null)
     };
     RS.dials.refreshReach(game.dials);
@@ -9465,10 +9575,33 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (!game.inhabiting) {
         return { text: 'Take a body to touch this world. Unembodied, you can only watch it.', kind: 'embark' };
       }
-      const env = RS.vessel.environmentFor(game);
-      const blocked = RS.vessel.canOperate(RS.vessel.archOf(game.body), env);
-      if (blocked) return { text: 'This body cannot work here: ' + blocked + '.', kind: 'blocked' };
-      return { text: 'τ throttle · Σ vertical · Δ heading · φ senses.', kind: 'pilot' };
+      const st = RS.vessel.statusOf(game);
+      if (st && st.blocked) {
+        return { text: 'This body cannot work here: ' + st.blocked +
+          (st.alternative ? '. Take the ' + st.alternative.name + ' instead.' : '. Nothing you have works here.'),
+          kind: 'blocked' };
+      }
+      /* The dial map lives on the pilot bar now and is permanently visible, so
+       * repeating it here would spend the one line that could say something
+       * about *this* world on something the player can already read. */
+      if (st && st.strain > 0.6) {
+        return { text: 'Strain at ' + Math.round(st.strain * 100) +
+          '%. Leave the body before it fails, or the hold goes with it.', kind: 'blocked' };
+      }
+      if (st && st.endurance !== Infinity && st.endurance < 45) {
+        return { text: Math.round(st.endurance) + 's of charge at this pace. Ease off τ or turn back.',
+          kind: 'blocked' };
+      }
+      const p = s.planet;
+      if (p && p.biosphere && p.biosphere.complexity > 0.34) {
+        return { text: 'Life here. Ride a mind with the symbiont, or turn Σ inward to enter a cell.',
+          kind: 'explore' };
+      }
+      if (p && p.resources && p.resources.length) {
+        return { text: 'Seams below. Extract with the harvester, or build from the world panel.',
+          kind: 'explore' };
+      }
+      return { text: 'Walk it. Δ steers, and φ changes what you can sense.', kind: 'pilot' };
     }
     return nextObjective(game);
   }
@@ -12836,6 +12969,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
 
+    /* The pilot bar is rebuilt every frame, so its two controls are delegated
+     * too. Both exist so that changing body — the thing you most often want to
+     * do the instant a body stops working — does not require opening a drawer,
+     * scrolling past research, and closing it again. */
+    el['body-bar'].addEventListener('click', ev => {
+      const open = ev.target.closest('[data-open]');
+      if (open) { toggleDrawer(game, bus, open.dataset.open); return; }
+      const emb = ev.target.closest('[data-embark]');
+      if (emb) {
+        const r = RS.scenes.embark(game, bus, emb.dataset.embark);
+        if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+      }
+    });
+
     /* Delegated, because the drawer body is rebuilt wholesale on every open and
      * per-node listeners would leak. */
     el['drawer-body'].addEventListener('click', ev => {
@@ -12844,6 +12991,16 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         const [dialId, kind] = btn.dataset.buy.split(':');
         const res = RS.game.tryUpgrade(game, bus, dialId, kind);
         if (!res.ok) bus.emit('ui:deny', res);
+        renderDrawer(game, bus);
+        return;
+      }
+      const cyc = ev.target.closest('[data-cycle]');
+      if (cyc) {
+        const k = cyc.dataset.cycle;
+        const order = ['all', 'key', 'off'];
+        const i = order.indexOf(game.settings[k]);
+        game.settings[k] = order[(i + 1) % order.length];
+        bus.emit('settings', { key: k, value: game.settings[k] });
         renderDrawer(game, bus);
         return;
       }
@@ -13051,33 +13208,68 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         ' (' + (c.lock.total * 100).toFixed(0) + '% lock)');
   }
 
-  /* The body bar only exists while embodied, and it shows the three things a
-   * pilot actually needs: charge, hold, and — when riding a mind — how much of
-   * that creature is currently you. */
+  /* ── The pilot bar ───────────────────────────────────────────────────────
+   *
+   * Visible only while embodied, and it answers the four questions a pilot
+   * actually has, in the order they matter:
+   *
+   *   what am I flying          glyph and name
+   *   what do the dials do      the archetype's own dialMap, live
+   *   how long have I got       charge, and endurance in seconds at this draw
+   *   is anything wrong         strain, and the blocked reason plus the fix
+   *
+   * The dial map is the important addition. Every body reinterprets the same
+   * four controls, which is the whole ergonomic idea — and until now the only
+   * place that mapping appeared was a drawer you had to close to fly.
+   */
   function renderBodyBar(game) {
     const bar = el['body-bar'];
-    if (!game.inhabiting) {
+    const st = RS.vessel.statusOf(game);
+    if (!st) {
       if (bar.dataset.on !== '0') { bar.dataset.on = '0'; bar.innerHTML = ''; bar.style.opacity = '0'; }
       return;
     }
     bar.dataset.on = '1';
     bar.style.opacity = '1';
-    const b = game.body;
-    const arch = RS.vessel.archOf(b);
-    const cf = clamp01(b.charge / arch.capacity);
-    const env = RS.vessel.environmentFor(game);
-    const blocked = RS.vessel.canOperate(arch, env);
-    const poss = b.mindState ? b.mindState.possession : null;
+
+    const a = st.arch, dm = a.dialMap;
+    const chargeHue = st.chargeFrac > 0.25 ? 160 : 0;
+    /* Endurance is the number that says whether to turn back, so it is stated
+     * in seconds rather than as a bar the player has to integrate by eye. */
+    const end = st.endurance === Infinity ? '∞'
+      : st.endurance > 90 ? Math.round(st.endurance / 60) + 'm'
+        : Math.round(st.endurance) + 's';
+
+    const dial = (sym, hue, what) =>
+      '<span class="bb-dial" style="--h:' + hue + '"><b>' + sym + '</b>' + what + '</span>';
 
     bar.innerHTML =
-      '<span class="bb-glyph" style="color:' + hsl(arch.hue, 0.8, 0.7) + '">' + arch.glyph + '</span>' +
-      '<span class="bb-name">' + arch.name + '</span>' +
-      '<span class="bb-meter" title="charge"><b style="width:' + (cf * 100).toFixed(0) +
-        '%;background:' + hsl(cf > 0.25 ? 160 : 0, 0.85, 0.6) + '"></b></span>' +
-      (b.holdMass > 0 ? '<span class="bb-tag">' + fmt(b.holdMass) + 'u</span>' : '') +
-      (poss != null ? '<span class="bb-tag" style="color:#f0abfc" title="how much of this mind is you">' +
-        (poss * 100).toFixed(0) + '% you</span>' : '') +
-      (blocked ? '<span class="bb-warn">' + blocked + '</span>' : '');
+      '<button class="bb-head" data-open="vessels" title="Change body">' +
+        '<span class="bb-glyph" style="color:' + hsl(a.hue, 0.8, 0.7) + '">' + a.glyph + '</span>' +
+        '<span class="bb-name">' + a.name + '</span>' +
+      '</button>' +
+      '<span class="bb-meter" title="charge ' + Math.round(st.charge) + '/' + st.capacity + '">' +
+        '<b style="width:' + (st.chargeFrac * 100).toFixed(0) + '%;background:' +
+        hsl(chargeHue, 0.85, 0.6) + '"></b></span>' +
+      '<span class="bb-tag" title="endurance at this draw">' + end + '</span>' +
+      (st.strain > 0.12
+        ? '<span class="bb-tag" style="color:' + hsl(st.strain > 0.7 ? 8 : 40, 0.8, 0.66) +
+          '" title="wear — change body before this reaches 100%">strain ' +
+          Math.round(st.strain * 100) + '%</span>' : '') +
+      (st.holdMass > 0 ? '<span class="bb-tag">' + fmt(st.holdMass) + 'u</span>' : '') +
+      (st.possession != null ? '<span class="bb-tag" style="color:#f0abfc" ' +
+        'title="how much of this mind is you">' + (st.possession * 100).toFixed(0) + '% you</span>' : '') +
+      '<span class="bb-dials">' +
+        dial('τ', 43, dm.time) + dial('Σ', 338, dm.space) +
+        dial('Δ', 268, dm.phase) + dial('φ', 187, dm.frequency) +
+      '</span>' +
+      (st.blocked
+        ? '<span class="bb-warn">' + st.blocked +
+          (st.alternative
+            ? ' — <button class="bb-fix" data-embark="' + st.alternative.id + '">take ' +
+              st.alternative.name + '</button>'
+            : ' — no body you have works here') + '</span>'
+        : '');
   }
 
   /* The node readout. Names the thing, names its essence, and — the part that
@@ -13279,19 +13471,86 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // --- toasts --------------------------------------------------------------
 
+  /* ── Notifications ────────────────────────────────────────────────────────
+   *
+   * These used to be centred, three deep, and long-lived, which meant that
+   * during the parts of the game that generate the most events — arriving
+   * somewhere, a run of discoveries — a wall of cards sat directly over the
+   * thing the cards were about. A notification that hides the world it is
+   * describing is worse than no notification.
+   *
+   * Four changes, in order of how much they matter:
+   *
+   *   1. They live in the top-right corner, out of the world entirely.
+   *   2. There are at most two, and a third replaces the oldest immediately
+   *      rather than queueing behind it.
+   *   3. Repeats coalesce. Sweeping Δ across the ensemble used to fire one
+   *      card per universe; now the card updates in place and shows a count.
+   *   4. Chatter is filtered by a setting, and the default is to show only
+   *      what a player would want interrupting them.
+   *
+   * Nothing here is load-bearing: every notification restates something that
+   * is also visible in the readout, the objective line or the guide. That is
+   * the property that makes filtering them safe.
+   */
+  const PRIORITY = { warn: 3, major: 3, gnosis: 2, buy: 1, info: 1, seat: 0 };
+  /* 'all' shows everything; 'key' drops routine chatter and dial seating;
+   * 'off' shows nothing but warnings, because a warning is the one kind that
+   * exists to stop you wasting your time. */
+  const LEVELS = { all: 0, key: 1, off: 3 };
+  let notifyLevel = 'key';
+
+  const MAX_TOASTS = 2;
+  /* title → { node, at, n, timer } — one entry per distinct message, so a
+   * repeat updates rather than stacks. */
+  const liveToasts = new Map();
+
+  function setNotifyLevel(v) { notifyLevel = LEVELS[v] != null ? v : 'key'; }
+
   function toast(opts) {
+    const kind = opts.kind || 'info';
+    if ((PRIORITY[kind] != null ? PRIORITY[kind] : 1) < LEVELS[notifyLevel]) return;
+
+    const key = opts.title;
+    const existing = liveToasts.get(key);
+    if (existing) {
+      /* Coalesce. The card stays where it is and gains a count, so a burst
+       * reads as "this happened four times" rather than as four cards. */
+      existing.n++;
+      const c = existing.node.querySelector('u');
+      if (c) c.textContent = '×' + existing.n;
+      else existing.node.querySelector('b').insertAdjacentHTML('beforeend',
+        ' <u style="font-style:normal;text-decoration:none;opacity:.55">×' + existing.n + '</u>');
+      clearTimeout(existing.timer);
+      existing.timer = setTimeout(() => retire(key), opts.ms || 3000);
+      return;
+    }
+
     const t = document.createElement('div');
-    t.className = 'toast ' + (opts.kind || 'info');
+    t.className = 'toast ' + kind;
     if (opts.hue != null) t.style.setProperty('--h', opts.hue);
+    /* Only the loudest kinds get a second line. Everything else is a title,
+     * because a title is readable at a glance and a paragraph is not. */
+    const wantBody = opts.body && (PRIORITY[kind] >= 2);
     t.innerHTML = '<i>' + (opts.icon || '◈') + '</i><span><b>' + opts.title + '</b>' +
-      (opts.body ? '<em>' + opts.body + '</em>' : '') + '</span>';
+      (wantBody ? '<em>' + opts.body + '</em>' : '') + '</span>';
     el['toasts'].appendChild(t);
-    /* Cap the stack — a burst of discoveries otherwise walls off the field. */
-    while (el['toasts'].children.length > 3) el['toasts'].removeChild(el['toasts'].firstChild);
-    setTimeout(() => {
-      t.classList.add('out');
-      setTimeout(() => t.remove(), 420);
-    }, opts.ms || 3400);
+
+    const rec = { node: t, n: 1, timer: null };
+    liveToasts.set(key, rec);
+    /* Retire the oldest immediately rather than letting a burst queue up —
+     * a card the player never had time to read is just flicker. */
+    while (liveToasts.size > MAX_TOASTS) retire(liveToasts.keys().next().value);
+    rec.timer = setTimeout(() => retire(key), opts.ms || 3000);
+  }
+
+  function retire(key) {
+    const rec = liveToasts.get(key);
+    if (!rec) return;
+    liveToasts.delete(key);
+    clearTimeout(rec.timer);
+    rec.node.classList.add('out');
+    setTimeout(() => rec.node.remove(), 380);
   }
 
   // --- drawers -------------------------------------------------------------
@@ -13426,6 +13685,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       row('haptics', 'Haptics', 'Detent ticks and impacts through the vibration motor.') +
       row('reduceMotion', 'Reduce motion', 'Disables screen shake and thins particle bursts.') +
       row('showSci', 'Scientific notes', 'Show the physical definition of each scale.') +
+      /* A cycle rather than a toggle, because three states is the right number:
+       * everything, only what would be worth interrupting you, and nothing but
+       * warnings. */
+      '<button class="set-row" data-cycle="notify"><span class="k">Notifications</span>' +
+      '<span class="d">' +
+        (s.notify === 'all' ? 'Everything, including routine chatter.'
+          : s.notify === 'off' ? 'Warnings only. Everything else is in the readout anyway.'
+            : 'Arrivals, discoveries and warnings. Not chatter.') +
+      '</span><span class="cyc">' + (s.notify || 'key').toUpperCase() + '</span></button>' +
       '<div class="stats"><h3>Session</h3>' +
       '<div>Crystallised <b>' + fmt(game.stats.crystals) + '</b></div>' +
       '<div>Best single <b>' + fmt(game.stats.bestSingle) + ' Ψ</b></div>' +
@@ -13791,7 +14059,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           : 'Expand the consciousness field to reach it.') + '</div>';
   }
 
-  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
+  RS.ui = {
+    setNotifyLevel, init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -14288,6 +14557,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (key === 'audio') RS.audio.setEnabled(value);
       if (key === 'haptics') RS.feel.setHaptics(value);
       if (key === 'reduceMotion') RS.feel.setReduceMotion(value);
+      if (key === 'notify') RS.ui.setNotifyLevel(value);
     });
   }
 
@@ -14554,6 +14824,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     RS.feel.init({ reduceMotion: game.settings.reduceMotion, haptics: game.settings.haptics });
     RS.audio.setEnabled(game.settings.audio);
+    RS.ui.setNotifyLevel(game.settings.notify);
     RS.ui.init(game, bus);
     RS.reactions.wire(game, bus);
     RS.input.attach(hudCanvas, game, bus, {
@@ -14621,25 +14892,31 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     rafId = requestAnimationFrame(loop);
   }
 
-  /* Three staggered lines instead of a modal. The game is genuinely not
-   * obvious and pretending otherwise costs players; a wall of text costs
-   * more. */
+  /* First run. Four staggered cards used to overlap each other and the world
+   * they were describing; now they arrive one at a time, well spaced, and each
+   * has retired before the next appears. Deliberately shown at `major` so the
+   * notification setting cannot hide the only tutorial the game has — and
+   * deliberately only four, because the guide is written against live state and
+   * pointing at it is worth more than any amount of text here. */
+  const FIRST_RUN = [
+    { at: 0, icon: '◉', hue: 205, title: 'You are a point of consciousness',
+      body: 'You cannot move. You can only change what is rendered to you.' },
+    { at: 6500, icon: 'φ', hue: 187, title: 'Turn the φ dial',
+      body: 'Drag it in a circle. Swing wide for fine control, and listen for the beat.' },
+    { at: 13000, icon: '◈', hue: 43, title: 'Hold the lock',
+      body: 'Line up the arcs around yourself. Coherence fills while you hold.' },
+    { at: 19500, icon: '?', hue: 200, title: 'Lost? Tap ? at any time',
+      body: 'The guide describes whatever is in front of you right now.' }
+  ];
+
   function firstRunHints() {
-    RS.ui.toast({ kind: 'major', icon: '◉', ms: 7000,
-      title: 'You are a point of consciousness',
-      body: 'You cannot move. You can only change what is rendered to you.' });
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: 'φ', hue: 187, ms: 7000,
-      title: 'Turn the φ dial',
-      body: 'Drag it in a circle. Swing your finger wide for fine control. Listen for the beat.' }), 4200);
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '◈', hue: 43, ms: 7000,
-      title: 'Hold the lock',
-      body: 'Line up the arcs around yourself. Coherence fills while you hold.' }), 8400);
-    /* The game is genuinely deep and the guide is written against live state,
-     * so pointing at it is worth more than any amount of additional tutorial
-     * text here. */
-    setTimeout(() => RS.ui.toast({ kind: 'info', icon: '?', hue: 200, ms: 9000,
-      title: 'Lost? Tap ? at any time',
-      body: 'The guide describes whatever is actually in front of you — this scene, these dials, this mode.' }), 12600);
+    for (const h of FIRST_RUN) {
+      const fire = () => RS.ui.toast({
+        kind: 'major', icon: h.icon, hue: h.hue, ms: 5200,
+        title: h.title, body: h.body
+      });
+      if (h.at === 0) fire(); else setTimeout(fire, h.at);
+    }
   }
 
   function onResize() {

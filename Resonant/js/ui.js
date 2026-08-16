@@ -40,6 +40,20 @@
     el['btn-paths'].addEventListener('click', () => toggleDrawer(game, bus, 'paths'));
     el['btn-drawer-close'].addEventListener('click', () => closeDrawer());
 
+    /* The pilot bar is rebuilt every frame, so its two controls are delegated
+     * too. Both exist so that changing body — the thing you most often want to
+     * do the instant a body stops working — does not require opening a drawer,
+     * scrolling past research, and closing it again. */
+    el['body-bar'].addEventListener('click', ev => {
+      const open = ev.target.closest('[data-open]');
+      if (open) { toggleDrawer(game, bus, open.dataset.open); return; }
+      const emb = ev.target.closest('[data-embark]');
+      if (emb) {
+        const r = RS.scenes.embark(game, bus, emb.dataset.embark);
+        if (!r.ok) bus.emit('ui:deny', { reason: 'blocked', message: r.reason });
+      }
+    });
+
     /* Delegated, because the drawer body is rebuilt wholesale on every open and
      * per-node listeners would leak. */
     el['drawer-body'].addEventListener('click', ev => {
@@ -48,6 +62,16 @@
         const [dialId, kind] = btn.dataset.buy.split(':');
         const res = RS.game.tryUpgrade(game, bus, dialId, kind);
         if (!res.ok) bus.emit('ui:deny', res);
+        renderDrawer(game, bus);
+        return;
+      }
+      const cyc = ev.target.closest('[data-cycle]');
+      if (cyc) {
+        const k = cyc.dataset.cycle;
+        const order = ['all', 'key', 'off'];
+        const i = order.indexOf(game.settings[k]);
+        game.settings[k] = order[(i + 1) % order.length];
+        bus.emit('settings', { key: k, value: game.settings[k] });
         renderDrawer(game, bus);
         return;
       }
@@ -255,33 +279,68 @@
         ' (' + (c.lock.total * 100).toFixed(0) + '% lock)');
   }
 
-  /* The body bar only exists while embodied, and it shows the three things a
-   * pilot actually needs: charge, hold, and — when riding a mind — how much of
-   * that creature is currently you. */
+  /* ── The pilot bar ───────────────────────────────────────────────────────
+   *
+   * Visible only while embodied, and it answers the four questions a pilot
+   * actually has, in the order they matter:
+   *
+   *   what am I flying          glyph and name
+   *   what do the dials do      the archetype's own dialMap, live
+   *   how long have I got       charge, and endurance in seconds at this draw
+   *   is anything wrong         strain, and the blocked reason plus the fix
+   *
+   * The dial map is the important addition. Every body reinterprets the same
+   * four controls, which is the whole ergonomic idea — and until now the only
+   * place that mapping appeared was a drawer you had to close to fly.
+   */
   function renderBodyBar(game) {
     const bar = el['body-bar'];
-    if (!game.inhabiting) {
+    const st = RS.vessel.statusOf(game);
+    if (!st) {
       if (bar.dataset.on !== '0') { bar.dataset.on = '0'; bar.innerHTML = ''; bar.style.opacity = '0'; }
       return;
     }
     bar.dataset.on = '1';
     bar.style.opacity = '1';
-    const b = game.body;
-    const arch = RS.vessel.archOf(b);
-    const cf = clamp01(b.charge / arch.capacity);
-    const env = RS.vessel.environmentFor(game);
-    const blocked = RS.vessel.canOperate(arch, env);
-    const poss = b.mindState ? b.mindState.possession : null;
+
+    const a = st.arch, dm = a.dialMap;
+    const chargeHue = st.chargeFrac > 0.25 ? 160 : 0;
+    /* Endurance is the number that says whether to turn back, so it is stated
+     * in seconds rather than as a bar the player has to integrate by eye. */
+    const end = st.endurance === Infinity ? '∞'
+      : st.endurance > 90 ? Math.round(st.endurance / 60) + 'm'
+        : Math.round(st.endurance) + 's';
+
+    const dial = (sym, hue, what) =>
+      '<span class="bb-dial" style="--h:' + hue + '"><b>' + sym + '</b>' + what + '</span>';
 
     bar.innerHTML =
-      '<span class="bb-glyph" style="color:' + hsl(arch.hue, 0.8, 0.7) + '">' + arch.glyph + '</span>' +
-      '<span class="bb-name">' + arch.name + '</span>' +
-      '<span class="bb-meter" title="charge"><b style="width:' + (cf * 100).toFixed(0) +
-        '%;background:' + hsl(cf > 0.25 ? 160 : 0, 0.85, 0.6) + '"></b></span>' +
-      (b.holdMass > 0 ? '<span class="bb-tag">' + fmt(b.holdMass) + 'u</span>' : '') +
-      (poss != null ? '<span class="bb-tag" style="color:#f0abfc" title="how much of this mind is you">' +
-        (poss * 100).toFixed(0) + '% you</span>' : '') +
-      (blocked ? '<span class="bb-warn">' + blocked + '</span>' : '');
+      '<button class="bb-head" data-open="vessels" title="Change body">' +
+        '<span class="bb-glyph" style="color:' + hsl(a.hue, 0.8, 0.7) + '">' + a.glyph + '</span>' +
+        '<span class="bb-name">' + a.name + '</span>' +
+      '</button>' +
+      '<span class="bb-meter" title="charge ' + Math.round(st.charge) + '/' + st.capacity + '">' +
+        '<b style="width:' + (st.chargeFrac * 100).toFixed(0) + '%;background:' +
+        hsl(chargeHue, 0.85, 0.6) + '"></b></span>' +
+      '<span class="bb-tag" title="endurance at this draw">' + end + '</span>' +
+      (st.strain > 0.12
+        ? '<span class="bb-tag" style="color:' + hsl(st.strain > 0.7 ? 8 : 40, 0.8, 0.66) +
+          '" title="wear — change body before this reaches 100%">strain ' +
+          Math.round(st.strain * 100) + '%</span>' : '') +
+      (st.holdMass > 0 ? '<span class="bb-tag">' + fmt(st.holdMass) + 'u</span>' : '') +
+      (st.possession != null ? '<span class="bb-tag" style="color:#f0abfc" ' +
+        'title="how much of this mind is you">' + (st.possession * 100).toFixed(0) + '% you</span>' : '') +
+      '<span class="bb-dials">' +
+        dial('τ', 43, dm.time) + dial('Σ', 338, dm.space) +
+        dial('Δ', 268, dm.phase) + dial('φ', 187, dm.frequency) +
+      '</span>' +
+      (st.blocked
+        ? '<span class="bb-warn">' + st.blocked +
+          (st.alternative
+            ? ' — <button class="bb-fix" data-embark="' + st.alternative.id + '">take ' +
+              st.alternative.name + '</button>'
+            : ' — no body you have works here') + '</span>'
+        : '');
   }
 
   /* The node readout. Names the thing, names its essence, and — the part that
@@ -483,19 +542,86 @@
 
   // --- toasts --------------------------------------------------------------
 
+  /* ── Notifications ────────────────────────────────────────────────────────
+   *
+   * These used to be centred, three deep, and long-lived, which meant that
+   * during the parts of the game that generate the most events — arriving
+   * somewhere, a run of discoveries — a wall of cards sat directly over the
+   * thing the cards were about. A notification that hides the world it is
+   * describing is worse than no notification.
+   *
+   * Four changes, in order of how much they matter:
+   *
+   *   1. They live in the top-right corner, out of the world entirely.
+   *   2. There are at most two, and a third replaces the oldest immediately
+   *      rather than queueing behind it.
+   *   3. Repeats coalesce. Sweeping Δ across the ensemble used to fire one
+   *      card per universe; now the card updates in place and shows a count.
+   *   4. Chatter is filtered by a setting, and the default is to show only
+   *      what a player would want interrupting them.
+   *
+   * Nothing here is load-bearing: every notification restates something that
+   * is also visible in the readout, the objective line or the guide. That is
+   * the property that makes filtering them safe.
+   */
+  const PRIORITY = { warn: 3, major: 3, gnosis: 2, buy: 1, info: 1, seat: 0 };
+  /* 'all' shows everything; 'key' drops routine chatter and dial seating;
+   * 'off' shows nothing but warnings, because a warning is the one kind that
+   * exists to stop you wasting your time. */
+  const LEVELS = { all: 0, key: 1, off: 3 };
+  let notifyLevel = 'key';
+
+  const MAX_TOASTS = 2;
+  /* title → { node, at, n, timer } — one entry per distinct message, so a
+   * repeat updates rather than stacks. */
+  const liveToasts = new Map();
+
+  function setNotifyLevel(v) { notifyLevel = LEVELS[v] != null ? v : 'key'; }
+
   function toast(opts) {
+    const kind = opts.kind || 'info';
+    if ((PRIORITY[kind] != null ? PRIORITY[kind] : 1) < LEVELS[notifyLevel]) return;
+
+    const key = opts.title;
+    const existing = liveToasts.get(key);
+    if (existing) {
+      /* Coalesce. The card stays where it is and gains a count, so a burst
+       * reads as "this happened four times" rather than as four cards. */
+      existing.n++;
+      const c = existing.node.querySelector('u');
+      if (c) c.textContent = '×' + existing.n;
+      else existing.node.querySelector('b').insertAdjacentHTML('beforeend',
+        ' <u style="font-style:normal;text-decoration:none;opacity:.55">×' + existing.n + '</u>');
+      clearTimeout(existing.timer);
+      existing.timer = setTimeout(() => retire(key), opts.ms || 3000);
+      return;
+    }
+
     const t = document.createElement('div');
-    t.className = 'toast ' + (opts.kind || 'info');
+    t.className = 'toast ' + kind;
     if (opts.hue != null) t.style.setProperty('--h', opts.hue);
+    /* Only the loudest kinds get a second line. Everything else is a title,
+     * because a title is readable at a glance and a paragraph is not. */
+    const wantBody = opts.body && (PRIORITY[kind] >= 2);
     t.innerHTML = '<i>' + (opts.icon || '◈') + '</i><span><b>' + opts.title + '</b>' +
-      (opts.body ? '<em>' + opts.body + '</em>' : '') + '</span>';
+      (wantBody ? '<em>' + opts.body + '</em>' : '') + '</span>';
     el['toasts'].appendChild(t);
-    /* Cap the stack — a burst of discoveries otherwise walls off the field. */
-    while (el['toasts'].children.length > 3) el['toasts'].removeChild(el['toasts'].firstChild);
-    setTimeout(() => {
-      t.classList.add('out');
-      setTimeout(() => t.remove(), 420);
-    }, opts.ms || 3400);
+
+    const rec = { node: t, n: 1, timer: null };
+    liveToasts.set(key, rec);
+    /* Retire the oldest immediately rather than letting a burst queue up —
+     * a card the player never had time to read is just flicker. */
+    while (liveToasts.size > MAX_TOASTS) retire(liveToasts.keys().next().value);
+    rec.timer = setTimeout(() => retire(key), opts.ms || 3000);
+  }
+
+  function retire(key) {
+    const rec = liveToasts.get(key);
+    if (!rec) return;
+    liveToasts.delete(key);
+    clearTimeout(rec.timer);
+    rec.node.classList.add('out');
+    setTimeout(() => rec.node.remove(), 380);
   }
 
   // --- drawers -------------------------------------------------------------
@@ -630,6 +756,15 @@
       row('haptics', 'Haptics', 'Detent ticks and impacts through the vibration motor.') +
       row('reduceMotion', 'Reduce motion', 'Disables screen shake and thins particle bursts.') +
       row('showSci', 'Scientific notes', 'Show the physical definition of each scale.') +
+      /* A cycle rather than a toggle, because three states is the right number:
+       * everything, only what would be worth interrupting you, and nothing but
+       * warnings. */
+      '<button class="set-row" data-cycle="notify"><span class="k">Notifications</span>' +
+      '<span class="d">' +
+        (s.notify === 'all' ? 'Everything, including routine chatter.'
+          : s.notify === 'off' ? 'Warnings only. Everything else is in the readout anyway.'
+            : 'Arrivals, discoveries and warnings. Not chatter.') +
+      '</span><span class="cyc">' + (s.notify || 'key').toUpperCase() + '</span></button>' +
       '<div class="stats"><h3>Session</h3>' +
       '<div>Crystallised <b>' + fmt(game.stats.crystals) + '</b></div>' +
       '<div>Best single <b>' + fmt(game.stats.bestSingle) + ' Ψ</b></div>' +
@@ -995,5 +1130,6 @@
           : 'Expand the consciousness field to reach it.') + '</div>';
   }
 
-  RS.ui = { init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
+  RS.ui = {
+    setNotifyLevel, init, render, toast, toggleDrawer, closeDrawer, renderDrawer, setText, worldHTML, vesselsHTML, contactHTML, get drawerOpen() { return drawerOpen; } };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
