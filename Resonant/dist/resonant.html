@@ -7338,15 +7338,28 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
  *
  * ── The three pathways ────────────────────────────────────────────────────
  *
- * The progression panel exists because this game has three genuinely different
+ * The progression panel exists because this game has six genuinely different
  * routes forward and no obvious way to tell that from the inside:
  *
- *   TUNE     spectrum bands → gnosis → yield everywhere. Pure skill; needs
- *            nothing but dials. Always available, never mandatory.
- *   REACH    research → vessels → worlds → structures. The material route.
- *   CONTACT  find a culture → standing → charts and teaching. The shortcut
- *            route: a civilisation can hand you research and reveal stars
- *            your own field cannot reach.
+ *   TUNE        spectrum bands → gnosis → yield everywhere. Pure skill; needs
+ *               nothing but dials. Always available, never mandatory.
+ *   REACH       research → vessels → worlds → structures. The material route.
+ *   CONTACT     find a culture → standing → charts and teaching. The shortcut
+ *               route: a civilisation can hand you research and reveal stars
+ *               your own field cannot reach.
+ *   INWARD      Σ range downward → microscopy → the four small scopes. The only
+ *               route that reaches the one place you change a world from
+ *               inside it.
+ *   BEYOND      Σ range upward → the cosmic web → the ensemble. Ends in the
+ *               game's final statement about its own premise: the same
+ *               essences, under different laws.
+ *   RECOGNITION hunt one essence across contexts until you can predict it.
+ *               Only a real strategy since gnosis became foresight — before
+ *               that, understanding was a yield multiplier and nothing else.
+ *
+ * The first three are about the spectrum, the material world and other people.
+ * The last three are about the ladder and about knowledge, and a player can
+ * finish the game having barely touched any given three of the six.
  *
  * They feed each other — insight from any of them buys any of them — but a
  * player can lead with whichever suits them, and the panel says so explicitly
@@ -7510,9 +7523,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const met = RS.contact.totalMet(game);
     const allies = RS.contact.allies(game);
 
-    let h = '<section><h3>Three ways forward</h3>' +
+    /* Scope coverage: how much of the ladder this player has actually stood on,
+     * which is what the two new routes are about. */
+    const scopesSeen = {};
+    for (const id in game.known.tiers) {
+      const t = RS.cosmos.BY_ID[id];
+      if (t) scopesSeen[RS.scenes.sceneForTier(t.index)] = true;
+    }
+    const scopeCount = Object.keys(scopesSeen).length;
+    const inwardScopes = ['foam', 'shells', 'molecular', 'cellular'].filter(k => scopesSeen[k]).length;
+    const beyondScopes = ['web', 'ensemble'].filter(k => scopesSeen[k]).length;
+    const expressed = expressionTotal(game);
+    const fore = foresight(game);
+
+    let h = '<section><h3>Six ways forward</h3>' +
       '<p class="blurb">They feed each other — insight from any route buys any other — ' +
-      'but you can lead with whichever suits you. None of them is the main one.</p></section>';
+      'but you can lead with whichever suits you. None of them is the main one, and ' +
+      'the game can be finished having barely touched three of them.</p></section>';
 
     const paths = [
       {
@@ -7552,6 +7579,51 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           ['Reality field', game.fields.reality.toFixed(2)]
         ],
         next: nextContact(game)
+      },
+      {
+        /* INWARD. The ladder runs both ways and the small end was, until the
+         * scopes existed, somewhere you could only look rather than work. */
+        name: 'INWARD', hue: 150,
+        premise: 'Down the ladder rather than out. Four scopes below the surface, each with ' +
+          'something findable nowhere else — and the only place you change a world from inside it.',
+        rows: [
+          ['Small scopes entered', inwardScopes + ' / 4'],
+          ['Microscopy', RS.influence.isResearched(game, 'microscopy') ? 'researched' : 'not yet'],
+          ['Bodies for small places', (game.vessels.unlocked.ciliate ? 1 : 0) + ' / 1'],
+          ['Worlds expressed', expressed.worlds],
+          ['Deepest expression', (expressed.best * 100).toFixed(0) + '%'],
+          ['Σ inward reach', RS.cosmos.TIERS[Math.round(game.dials.space.min)].short]
+        ],
+        next: nextInward(game, scopesSeen, expressed)
+      },
+      {
+        /* BEYOND. The other end of the same ladder, and the one that ends in
+         * the game's final statement about its own premise. */
+        name: 'BEYOND', hue: 276,
+        premise: 'Up the ladder past the galaxy. Structure that assembles over thirteen billion ' +
+          'years, and then the laws themselves as a place you can stand in.',
+        rows: [
+          ['Vast scopes entered', beyondScopes + ' / 2'],
+          ['Σ outward reach', RS.cosmos.TIERS[Math.round(game.dials.space.max)].short],
+          ['Blocks adopted', game.stats.blocksAdopted || 0],
+          ['Furthest from ours', ((game.stats.farthestBlock || 0) * 100).toFixed(0) + '%']
+        ],
+        next: nextBeyond(game, scopesSeen)
+      },
+      {
+        /* RECOGNITION. Only a real strategy since gnosis became foresight —
+         * before that, hunting a particular essence bought a yield multiplier
+         * and nothing else. */
+        name: 'RECOGNITION', hue: 320,
+        premise: 'Hunt one essence across contexts until you can predict it. Understanding ' +
+          'is not a multiplier any more — it draws the behaviour before you measure it.',
+        rows: [
+          ['Essences met', fore.met + ' / ' + RS.fractal.ESSENCES.length],
+          ['Axes revealed', fore.axes + ' / ' + (RS.fractal.ESSENCES.length * 4)],
+          ['Fully read', fore.complete],
+          ['Closest to a reveal', fore.nearest ? fore.nearest.name + ' (' + fore.gap + ' more)' : '—']
+        ],
+        next: nextRecognition(game, fore)
       }
     ];
 
@@ -7597,6 +7669,127 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
     if (!RS.influence.structureCount(game)) return 'Site your first structure on a world you care about.';
     return 'Raise the consciousness field with beacons to reach further stars.';
+  }
+
+  /* ── The three new routes ─────────────────────────────────────────────────
+   *
+   * Each answers the same question the first three do — "what is the single
+   * most useful thing I could do next, given where I actually am" — against a
+   * different axis of the game. They are computed from live state rather than
+   * scripted, so a route that is already finished says so instead of repeating
+   * its first step forever.
+   */
+
+  /* How much of the game's worlds this player has reshaped from inside. */
+  function expressionTotal(game) {
+    let worlds = 0, best = 0;
+    for (const k in game.deltas) {
+      for (const d of game.deltas[k]) {
+        if (d.id !== RS.influence.EXPRESSION_ID) continue;
+        worlds++;
+        const v = 1 - Math.exp(-d.work / RS.influence.EXPRESSION_SCALE);
+        if (v > best) best = v;
+      }
+    }
+    return { worlds, best };
+  }
+
+  /* The state of the gnosis ledger as *foresight* rather than as a score:
+   * how many axes are actually revealed, and which essence is closest to
+   * giving up its next one. */
+  function foresight(game) {
+    let met = 0, axes = 0, complete = 0;
+    let nearest = null, gap = Infinity;
+    for (const e of RS.fractal.ESSENCES) {
+      const n = RS.fractal.gnosisOf(game, e.id);
+      if (n > 0) met++;
+      const revealed = RS.fractal.revealCount(n);
+      axes += revealed;
+      if (revealed >= 4) { complete++; continue; }
+      /* Distance to the next reveal threshold. Ties break toward the essence
+       * you have already met most often: "two more contexts of Cascade, which
+       * you have already seen four times" is a hunt worth continuing, whereas
+       * "two more contexts of something you have never met" is just a
+       * restatement of the reveal rule. */
+      const need = RS.fractal.REVEAL_AT[revealed];
+      const d = need - n;
+      if (d > 0 && (d < gap || (d === gap && nearest &&
+          n > RS.fractal.gnosisOf(game, nearest.id)))) {
+        gap = d; nearest = e;
+      }
+    }
+    return { met, axes, complete, nearest, gap: gap === Infinity ? 0 : gap };
+  }
+
+  function nextInward(game, seen, expressed) {
+    const D = game.dials;
+    /* Reach first: the small rungs are literally unreachable until Σ range is
+     * bought, so telling a player to visit them would be nonsense. */
+    for (const id of ['cellular', 'molecular', 'shells', 'foam']) {
+      const rung = RS.scenes.tierForScene(id);
+      if (rung < Math.round(D.space.min)) {
+        return 'Buy Σ RANGE to reach the ' + RS.cosmos.TIERS[rung].name + ' rung — ' +
+          'four scopes sit below where your dial currently stops.';
+      }
+      if (!seen[id]) {
+        return 'Turn Σ to ' + RS.cosmos.TIERS[rung].name + '. ' +
+          RS.scenes.SCENE_BY_ID[id].blurb;
+      }
+    }
+    if (!RS.influence.isResearched(game, 'microscopy')) {
+      return 'Research MICROSCOPY — the ciliate is the only body that works where inertia does not.';
+    }
+    if (!expressed.worlds) {
+      return 'Crystallise inside a cell. It is the only place you change a world from inside it, ' +
+        'and the change shows from orbit afterwards.';
+    }
+    if (expressed.best < 0.5) {
+      return 'Keep working cells on the same world — expression saturates, so the early ' +
+        'crystals move a biosphere furthest.';
+    }
+    return 'The small end is yours. Hunt a wrong-handed molecule on a homochiral world, ' +
+      'or a degeneracy in the shells.';
+  }
+
+  function nextBeyond(game, seen) {
+    const D = game.dials;
+    for (const id of ['web', 'ensemble']) {
+      const rung = RS.scenes.tierForScene(id);
+      if (rung > Math.round(D.space.max)) {
+        return 'Buy Σ RANGE to reach the ' + RS.cosmos.TIERS[rung].name + ' rung.';
+      }
+      if (!seen[id]) {
+        return 'Turn Σ out to ' + RS.cosmos.TIERS[rung].name + '. ' +
+          RS.scenes.SCENE_BY_ID[id].blurb;
+      }
+    }
+    if (!game.stats.blocksAdopted) {
+      return 'In the Ensemble, turn Δ onto a block and stand in it. The constants change under you ' +
+        'and every world re-derives.';
+    }
+    if ((game.stats.farthestBlock || 0) < 0.5) {
+      return 'Find a block further from ours — the payout scales with how unlike ours it is, ' +
+        'and a universe 3% off proves nothing.';
+    }
+    return 'Recognise an essence under laws unlike ours. That is the strongest claim the game makes.';
+  }
+
+  function nextRecognition(game, fore) {
+    if (!fore.met) {
+      return 'Crystallise anything. Every manifestation is an essence, and meeting one in a new ' +
+        'context is what reveals its axes.';
+    }
+    if (fore.nearest) {
+      const known = RS.fractal.predicted(game, fore.nearest.id, {});
+      const which = RS.fractal.AXES.find(a => known[a] === undefined);
+      return 'Find ' + fore.nearest.name + ' in ' + fore.gap + ' more context' +
+        (fore.gap > 1 ? 's' : '') + ' — a different layer or a different rung — and its ' +
+        (which || 'next axis') + ' is revealed. The HUD will draw it before you measure it.';
+    }
+    if (fore.complete < RS.fractal.ESSENCES.length) {
+      return fore.complete + ' essences fully read. Keep meeting the rest in new places.';
+    }
+    return 'Every essence is fully read. You can predict any layer at any scale before you tune it.';
   }
 
   function nextContact(game) {
@@ -9786,7 +9979,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       fields: { consciousness: 0.1, reality: 0.05, beacons: 0, resonators: 0 },
       senseBonus: 0,
 
-      stats: { crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
+      stats: { blocksAdopted: 0, farthestBlock: 0, crystals: 0, bestSingle: 0, playSeconds: 0, ticks: 0, systemsSeen: 0, worldsSeen: 0, jumps: 0, contacts: 0 },
 
       /* Transient, rebuilt every frame — never saved. */
       focusNode: null,
@@ -14901,6 +15094,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     });
 
     bus.on('ensemble:adopt', ({ block, distance }) => {
+      game.stats.blocksAdopted = (game.stats.blocksAdopted || 0) + 1;
+      game.stats.farthestBlock = Math.max(game.stats.farthestBlock || 0, distance);
       RS.audio.upheaval(1.2 + distance);
       RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
       RS.ui.toast({

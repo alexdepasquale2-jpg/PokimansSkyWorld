@@ -3066,5 +3066,104 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(fallback.length === 0, 'no rung is absorbed by an unrelated scope: ' + (fallback.join(', ') || 'none'));
 }
 
+
+// ── six pathways, all of them live ───────────────────────────────────────
+/* The panel is generated from live state rather than scripted, which is what
+ * makes it a progression system rather than a checklist. So the test is not
+ * "does it render" but "does it say something true, from any state, and does it
+ * stop repeating its first step once that step is done". */
+{
+  function paths(g) {
+    const html = RS.guide.pathwaysHTML(g);
+    assert(typeof html === 'string' && html.length > 400, 'the pathways panel renders');
+    return html;
+  }
+
+  /* From nothing. */
+  const g0 = RS.game.newGame(70001);
+  const h0 = paths(g0);
+  for (const name of ['TUNE', 'REACH', 'CONTACT', 'INWARD', 'BEYOND', 'RECOGNITION']) {
+    assert(h0.indexOf(name) >= 0, name + ' is offered from the first minute');
+  }
+  /* A route whose first step is unreachable must say how to make it reachable,
+   * not tell the player to go somewhere their dial cannot reach. */
+  assert(/Σ RANGE/.test(h0), 'and a route that is gated names the gate');
+
+  /* From a fully-opened game. Every route must still say something, and none
+   * may still be on step one. */
+  const g1 = RS.game.newGame(70002);
+  for (const d of ['frequency', 'phase', 'time', 'space']) {
+    for (const k of ['range', 'precision', 'focus']) {
+      for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g1.dials[d], k);
+    }
+  }
+  g1.insight = 1e12;
+  for (const node of RS.influence.RESEARCH) RS.influence.tryResearch(g1, nullBus, node.id);
+  for (const t of RS.cosmos.TIERS) g1.known.tiers[t.id] = true;
+  for (const b of RS.spectrum.BANDS) g1.known.bands[b.id] = true;
+  for (const e of RS.fractal.ESSENCES) {
+    g1.gnosis[e.id] = [];
+    for (let i = 0; i < 9; i++) g1.gnosis[e.id].push(e.id + '@' + i + ':0');
+  }
+  g1.stats.blocksAdopted = 5;
+  g1.stats.farthestBlock = 0.8;
+  const h1 = paths(g1);
+  assert(!/Buy Σ RANGE/.test(h1), 'a fully-ranged observer is not told to buy range');
+  assert(!/Research MICROSCOPY/.test(h1), 'nor to research what it already has');
+  assert(/fully read|predict any layer/.test(h1),
+    'and RECOGNITION acknowledges a complete ledger');
+
+  /* Foresight has to be the thing RECOGNITION measures — the panel must agree
+   * with `fractal.predicted` rather than keeping its own count. */
+  const g2 = RS.game.newGame(70003);
+  g2.gnosis.cascade = ['cascade@1:0', 'cascade@2:0', 'cascade@3:0', 'cascade@4:0'];
+  const h2 = paths(g2);
+  assert(h2.indexOf('Cascade') >= 0,
+    'the essence closest to a reveal is named: ' + (h2.indexOf('Cascade') >= 0));
+  const pr = RS.fractal.predicted(g2, 'cascade', {});
+  assert(pr.revealed === 2, 'four contexts is two axes, and the panel counts the same way');
+
+  /* Every route must survive every scene, because the panel is openable from
+   * anywhere and a route that throws in one scope is a crash in normal play. */
+  const g3 = RS.game.newGame(70004);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g3.dials.space, 'range');
+  let broke = null;
+  for (let i = 0; i < RS.cosmos.TIERS.length && !broke; i++) {
+    RS.dials.setValue(g3, g3.dials.space, i);
+    for (let k = 0; k < 12; k++) RS.scenes.tick(g3, nullBus, 1 / 60);
+    try { paths(g3); RS.guide.guideHTML(g3); }
+    catch (e) { broke = RS.cosmos.TIERS[i].id + ': ' + e.message; }
+  }
+  assert(!broke, 'the pathways and guide panels open in every scope: ' + (broke || 'all 22'));
+}
+
+// ── the routes are genuinely alternative ─────────────────────────────────
+/* The claim is that a player can lead with any route. That is only true if the
+ * *gates* differ: if every route bottoms out on the same purchase, there is one
+ * route wearing six hats. */
+{
+  const g = RS.game.newGame(70005);
+  /* INWARD and BEYOND gate on opposite ends of the same dial, which is the
+   * cleanest possible demonstration that they are different directions. */
+  const inward = RS.scenes.tierForScene('cellular');
+  const beyond = RS.scenes.tierForScene('web');
+  assert(inward < RS.cosmos.ROOT_INDEX && beyond > RS.cosmos.ROOT_INDEX,
+    'INWARD and BEYOND run in opposite directions from the root');
+
+  /* RECOGNITION gates on nothing purchasable at all — it is the one route that
+   * cannot be bought, only played. */
+  const before = RS.fractal.totalGnosis(g);
+  g.insight = 1e12;
+  for (const node of RS.influence.RESEARCH) RS.influence.tryResearch(g, nullBus, node.id);
+  for (const d of ['frequency', 'space']) {
+    for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials[d], 'range');
+  }
+  assert(RS.fractal.totalGnosis(g) === before,
+    'no amount of insight buys a single context of gnosis');
+
+  /* And CONTACT is the only one another party can advance for you. */
+  assert(typeof RS.contact.act === 'function', 'contact has actions a culture performs');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

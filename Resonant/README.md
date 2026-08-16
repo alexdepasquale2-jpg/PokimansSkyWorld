@@ -246,12 +246,18 @@ generated from live state rather than written out:
   means *in this mode, in this body*, which rungs of the ladder are open, what
   each symbol on screen is, and how the beat works. A player who is confused
   reads about their situation, not about the game in the abstract.
-- **◈ — Pathways.** The game has three genuinely different routes forward and no
-  way to tell from the inside. **TUNE** is pure dial skill and needs nothing.
-  **REACH** is research, bodies, worlds and structures. **CONTACT** is the
-  shortcut — a culture hands you charts and research you would otherwise buy.
-  They feed each other, none is mandatory, and each one always states a concrete
-  next step.
+- **&#9672; Pathways.** Six genuinely different routes forward, and no way to tell
+  that from the inside. **TUNE** is pure dial skill and needs nothing. **REACH**
+  is research, bodies, worlds and structures. **CONTACT** is the shortcut — a
+  culture hands you charts and research you would otherwise buy. **INWARD** runs
+  down the ladder through the four small scopes to the one place you change a
+  world from inside it. **BEYOND** runs up it, through structure formation to
+  the laws themselves. **RECOGNITION** is hunting one essence across contexts
+  until you can predict it — only a real strategy since gnosis became foresight.
+  They feed each other, none is mandatory, and each always states a concrete
+  next step computed from live state. The gates genuinely differ: INWARD and
+  BEYOND run in opposite directions from the root, and RECOGNITION is the one
+  route no amount of insight can buy.
 
 ## Scopes
 
@@ -651,14 +657,16 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **Pathways.** The ladder is complete — all twenty-two rungs have a scope, and
-  the suite asserts every one is reachable by turning Σ and that no rung is
-  absorbed by a scope that is not about it. What is missing is the *routes*
-  through it: **INWARD** (microscopy → cellular → molecular synthesis) and
-  **BEYOND** (causal mapping → ensemble transit) as first-class pathways
-  alongside TUNE, REACH and CONTACT, plus a **RECOGNITION** pathway now that
-  gnosis is foresight and deliberately hunting an essence across contexts is a
-  real strategy. `MICROSCOPY` is already INWARD's first node.
+- **Immersion.** The ladder and the routes through it are both complete. What
+  is thin is the *texture*: ambient beds per scope, inhabitants everywhere
+  (`neural.mindAt` works at any address and almost nothing calls it), local time
+  you can feel from real `dayHours` and tidal locking, and arrival transitions
+  that show movement between scopes rather than a white flash.
+- **Interface.** Seven topbar buttons and growing. They want to be one tabbed
+  drawer — World / Bodies / Codex / Pathways / Guide / Settings — with Contact
+  staying separate because it is event-driven and must remain unmissable. The
+  Codex in particular wants to become the essence sheet: four axes per essence,
+  blanks where not yet revealed, and the forms it takes at each geometry.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

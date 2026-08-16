@@ -247,6 +247,8 @@
     });
 
     bus.on('ensemble:adopt', ({ block, distance }) => {
+      game.stats.blocksAdopted = (game.stats.blocksAdopted || 0) + 1;
+      game.stats.farthestBlock = Math.max(game.stats.farthestBlock || 0, distance);
       RS.audio.upheaval(1.2 + distance);
       RS.feel.FX.upheaval(186 + distance * 120, 1.0 + distance);
       RS.ui.toast({
