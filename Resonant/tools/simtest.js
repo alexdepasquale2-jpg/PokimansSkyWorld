@@ -2055,12 +2055,28 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
     };
   }
 
+  /* Averaged over three worlds, and the *same* three for every band. A single
+   * soak swings by 3× on the seed alone — enough to make two layers that are
+   * provably identical in every derived parameter look like a balance problem,
+   * which is a good way to spend an afternoon tuning noise. */
+  const SEEDS = [4201, 77003, 918277];
+  function soakAvg(band) {
+    const runs = SEEDS.map(sd => soak(band, 90, sd));
+    const out = {};
+    for (const k of Object.keys(runs[0])) {
+      out[k] = k === 'deepest'
+        ? Math.max(...runs.map(r => r[k]))
+        : runs.reduce((a, r) => a + r[k], 0) / runs.length;
+    }
+    return out;
+  }
+
   const profiles = [];
   for (const band of RS.spectrum.BANDS) {
-    const r = soak(band, 150, 4200 + band.index);
+    const r = soakAvg(band);
     profiles.push(r);
     assert(r.crystals > 0,
-      'the ' + band.name + ' layer is winnable (' + r.crystals + ' crystals in 150s)');
+      'the ' + band.name + ' layer is winnable (' + r.crystals.toFixed(0) + ' crystals in 90s)');
   }
 
   /* The gated layers must actually spend time shut, and the ungated ones must
@@ -2095,6 +2111,38 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(RS.field.passiveShareOf(RS.spectrum.BY_ID.baryonic) >
          RS.field.passiveShareOf(RS.spectrum.BY_ID.noetic),
     'and the calm shallow layer out-idles the crowded deep one');
+
+  /* ── The economy has to reward going deeper ─────────────────────────────
+   *
+   * Yields climb 1.0 → 88 up the spectrum, but a yield table is a promise, not
+   * a result: what a layer actually pays is yield × throughput, and the
+   * primitives move throughput by an order of magnitude. Measure the promise
+   * being kept.
+   *
+   * The standard is deliberately not "strictly monotone". The nesting layers
+   * are burst earners — a chain hands you crystals without a search — so they
+   * out-pay their immediate successors, and that is a real strategic choice
+   * rather than a defect: farm Vital for volume or work Emotional for value.
+   * What must hold is that progress is never punished. */
+  const earned = profiles.map(p => p.income);
+  for (let i = 2; i < nBands; i++) {
+    assert(earned[i] > earned[i - 2],
+      RS.spectrum.BANDS[i].name + ' out-earns the layer you came up through (' +
+      earned[i].toFixed(0) + ' vs ' + earned[i - 2].toFixed(0) + ')');
+  }
+  for (let i = 1; i < nBands; i++) {
+    assert(earned[i] > earned[i - 1] * 0.5,
+      RS.spectrum.BANDS[i].name + ' is not a cliff after ' + RS.spectrum.BANDS[i - 1].name +
+      ' (' + (earned[i] / earned[i - 1]).toFixed(2) + '×)');
+  }
+  for (let i = 1; i < nBands; i++) {
+    assert(earned[i] < earned[i - 1] * 30,
+      RS.spectrum.BANDS[i].name + ' is a step and not a lottery win (' +
+      (earned[i] / earned[i - 1]).toFixed(1) + '×)');
+  }
+  assert(earned[nBands - 1] > earned[0] * 50,
+    'the far end of the spectrum is worth reaching (' +
+    (earned[nBands - 1] / earned[0]).toFixed(0) + '× the first layer)');
 
   /* No two *primitive sets* may produce the same interaction profile. Bands
    * that share a set (Mnemonic and Archetypal both run order+nest) are allowed

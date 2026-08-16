@@ -17,6 +17,8 @@
 (function (RS) {
   'use strict';
 
+  const lastStroke = { node: null, i: -1 };
+
   const SIM_DT = 1 / 60;
   const MAX_STEPS = 5;
 
@@ -179,6 +181,8 @@
       steps++;
     }
     if (steps === MAX_STEPS) acc = 0;
+  /* Which gate stroke last fired a click, so the track ticks once per stroke
+   * rather than once per frame. */
 
     // audio follows the dials every frame, not every sim step
     if (game.settings.audio && RS.audio.isReady()) {
@@ -193,7 +197,24 @@
         RS.spectrum.resonanceOf(band, D.value, focus) * (inField ? 1 : 0.22),
         RS.spectrum.isGhost(band, focus));
       const n = inField ? game.focusNode : null;
-      RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index);
+      RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index, n);
+
+      /* The click track is GATE's, not a metronome's. One tick per stroke of
+       * whatever you are currently holding, so the rhythm you have to play to
+       * is audible before you have worked out what it is — and its pattern is
+       * the essence's `branching`, which means the beat is a tell. */
+      if (n && n.gateInfo && n.resolved > 0.25) {
+        if (lastStroke.node !== n.id || lastStroke.i !== n.gateInfo.stroke) {
+          if (lastStroke.node === n.id) {
+            RS.audio.click(n.gateInfo.stroke === 0 ? 0.5 : 0.26,
+              n.gateInfo.stroke === 0 ? 1.5 : 1.0);
+          }
+          lastStroke.node = n.id;
+          lastStroke.i = n.gateInfo.stroke;
+        }
+      } else if (lastStroke.node) {
+        lastStroke.node = null;
+      }
     }
 
     /* Fields depend on research, gnosis and structure maturity, all of which

@@ -253,6 +253,69 @@ generated from live state rather than written out:
   They feed each other, none is mandatory, and each one always states a concrete
   next step.
 
+## Six primitives
+
+There are no per-layer minigames. There are **six functions**, and every mechanic
+anywhere is one or more of them, parameterised by the **four numbers** each
+essence carries and scaled by the rung's clock.
+
+| | |
+|---|---|
+| **Gate** ▮ | available only in windows. `persistence` sets the period, `branching` the subdivision, `symmetry` the duty |
+| **Nest** ◇ | contains smaller copies. `complexity` sets the depth, `branching` the fanout, `symmetry` the shrink |
+| **Flow** ≈ | has a direction. `branching` sets divergence, `persistence` steadiness |
+| **Order** → | needs its antecedents first. `branching` sets how many, `complexity` how deep the chain |
+| **Twin** ◐ | exists twice, one load-bearing. `symmetry` sets how close, `persistence` the tell |
+| **Invert** ○ | reads backwards. `persistence` is what resists it |
+
+A band declares which are live. That is the whole of its gameplay:
+
+```
+baryonic ▸ flow            causal     ▸ order
+thermal  ▸ flow            archetypal ▸ nest order
+em       ▸ gate            noetic     ▸ nest gate flow
+probab.  ▸ twin            null       ▸ invert
+vital    ▸ nest flow       unity      ▸ all six
+emotive  ▸ flow twin       mnemonic   ▸ order nest
+```
+
+**14 essences × 4 axes = 56 authored numbers**, and everything else is composed
+from them. The point is not economy of code — it is that knowledge *transfers*.
+Once you learn that `Cascade` branches (0.90), you know its rhythm subdivides
+five ways, its dependency graph fans out four wide, its nests are wide and
+shallow and its gradient sprays rather than converges — **in every layer, at
+every scale, before you have ever played it there.** Twelve hand-written modes
+cannot do that, because nothing learned in one predicts anything in another.
+
+Difficulty and payout are derived from the same place. Which dials a layer
+demands comes from its primitives — Electromagnetic makes τ matter the instant
+you arrive because a rhythm is a thing in time; Probabilistic does the same for
+Δ because the halves of a superposition differ by phase. And each primitive
+carries a friction number that pays back the throughput it costs, so composing a
+new band cannot silently create a layer that is a demotion to reach.
+
+### Understanding becomes foresight
+
+Recognising an essence in enough contexts reveals its axes one at a time, in an
+order seeded per world, so two players build different intuitions about the same
+essence. Once an axis is revealed the HUD **draws the expected behaviour behind
+the measured one** — the rhythm bar ghosts the predicted subdivision, the depth
+gauge ghosts the predicted descent.
+
+Early on the ghost is absent and you play by looking. Later it lands exactly on
+the real thing before it happens, and you are playing by knowing. That gap
+closing is the reward the gnosis ledger builds toward, and it is something you
+see rather than a percentage in a menu.
+
+### One generator
+
+`selfsimilar.js` draws a molecule and a galaxy with the *same* function, driven
+by the same four axes. `geometry` picks the stroke — `chain` draws bonds, `cell`
+draws lobes, `web` draws filaments, `disc` draws arms — and nothing else. The
+topology is identical across geometries for the same essence, and the test suite
+asserts it, because two shapes drawn by two unrelated routines are alike only
+because someone said so.
+
 ## Why it is all formulae
 
 **Nothing in this game is stored.** There is no array of world objects anywhere
@@ -365,8 +428,10 @@ All audio is synthesised at runtime — there are no sound files.
 | `cosmos.js` | the 22-rung scale ladder, real scales + Tegmark levels |
 | `spectrum.js` | 12 reality layers as Gaussian bands, resonance, focus gating |
 | `dials.js` | dial physics, detents, encoder ticks, upgrade economics |
-| `fractal.js` | essences, address→manifestation, the gnosis ledger |
-| `field.js` | the attunement loop: four-dial alignment, coherence, per-layer rules |
+| `fractal.js` | essences and their four axes, address→manifestation, gnosis as foresight |
+| `emergence.js` | the six primitives — every mechanic in the game is one of these |
+| `selfsimilar.js` | one recursive generator; `geometry` picks the stroke and nothing else |
+| `field.js` | the attunement loop: four-dial alignment, coherence, primitive dispatch |
 | `orbital.js` | Kepler/Halley, Hill spheres, Roche limits, Hohmann transfers |
 | `stellar.js` | IMF, mass–luminosity, habitable zones, system architecture |
 | `planet.js` | Jeans escape, greenhouse, terrain fields, biomes, resources |
@@ -380,6 +445,7 @@ All audio is synthesised at runtime — there are no sound files.
 | `scenes.js` | scene stack, the modal split, agents |
 | `game.js` `save.js` | state, economy, objectives, persistence |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
+| `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
 | `render.js` `worldrender.js` `hud.js` `ui.js` `input.js` `reactions.js` | presentation |
 
 `reactions.js` is the single place where "something happened" becomes "the
@@ -448,9 +514,12 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **Per-layer gameplay modes as full scenes.** The twelve `mode` rules currently
-  vary the attunement field; the framework is there for each to become its own
-  view the way the solar and galactic layers did.
+- **A scene per rung.** Four of the twenty-two rungs have a distinct view; the
+  rest fall back to the planet surface or the attunement field. Each new scope
+  gets all twelve layer behaviours free, because the primitives are already
+  scale-parameterised — the cost of a new scope is a scene file, not a rule set.
+  Cellular, molecular, orbital-shell, quantum-foam, cosmic-web and ensemble are
+  the obvious ones, and three backdrop geometries are already written for them.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

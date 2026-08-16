@@ -232,133 +232,34 @@
   /* The essence glyphs. Each is drawn from the manifestation's own derived
    * parameters, so two instances of the same essence are recognisably the same
    * shape without being identical drawings. */
+  /* ── One generator, every essence ────────────────────────────────────────
+   *
+   * This used to be fourteen hand-drawn cases — a spiral routine, a lattice
+   * routine, a cascade routine. They looked fine and they proved nothing: two
+   * shapes drawn by two unrelated functions are alike only because someone
+   * said so. Now every essence comes out of `selfsimilar.build()`, driven by
+   * the same four axes that drive its behaviour, and `geometry` decides only
+   * how the ink is laid down.
+   *
+   * So a Cascade in a molecular tier and a Cascade in a filament tier are the
+   * same skeleton rendered as bonds and as filaments — demonstrably the same
+   * essence rather than nominally so — and a player can see the kinship before
+   * they can name it. It also reaches the 42 form names that were previously
+   * unreachable, because a geometry is no longer tied to a hand-written case.
+   */
   function drawEssence(ctx, man, x, y, r, hue, alpha, t) {
-    const cx = sx(x), cy = sy(y), R = px(r);
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(t * 0.15 * man.twist);
-    ctx.strokeStyle = hsl(hue, man.sat + 0.15, 0.68, alpha);
-    ctx.fillStyle = hsl(hue, man.sat + 0.15, 0.62, alpha * 0.55);
-    ctx.lineWidth = Math.max(1, R * 0.09);
-    ctx.lineCap = 'round';
-    const arms = man.arms;
-
-    switch (man.essence.id) {
-      case 'boundary':
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.arc(0, 0, R * (0.5 + i * 0.26), 0.4 + i * 0.5, Math.PI * 1.6 + i * 0.5);
-          ctx.stroke();
-        }
-        break;
-      case 'flow':
-        for (let s = 0; s < 3; s++) {
-          ctx.beginPath();
-          for (let i = 0; i <= 22; i++) {
-            const u = i / 22;
-            const px2 = (u - 0.5) * R * 2.2;
-            const py2 = Math.sin(u * 7 + t * 2.2 + s * 1.5) * R * 0.34 + (s - 1) * R * 0.34;
-            i === 0 ? ctx.moveTo(px2, py2) : ctx.lineTo(px2, py2);
-          }
-          ctx.stroke();
-        }
-        break;
-      case 'recursion':
-        for (let i = 0; i < 4; i++) {
-          const rr = R * Math.pow(0.62, i);
-          ctx.beginPath();
-          ctx.arc(R * (1 - Math.pow(0.62, i)) * 0.5, 0, rr, 0, TAU);
-          ctx.stroke();
-        }
-        break;
-      case 'attractor':
-        for (let i = 4; i >= 1; i--) {
-          ctx.globalAlpha = alpha * (0.2 + i * 0.16);
-          ctx.beginPath(); ctx.arc(0, 0, R * i * 0.27, 0, TAU); ctx.fill();
-        }
-        ctx.globalAlpha = alpha;
-        break;
-      case 'duality':
-        ctx.beginPath(); ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, R, Math.PI / 2, -Math.PI / 2); ctx.stroke();
-        break;
-      case 'emergence':
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * TAU + t * 0.4;
-          const rr = R * (0.55 + Math.sin(t * 1.6 + i * 0.9) * 0.42);
-          ctx.beginPath();
-          ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, R * 0.11, 0, TAU);
-          ctx.fill();
-        }
-        break;
-      case 'threshold':
-        ctx.beginPath();
-        ctx.moveTo(-R, R * 0.5); ctx.lineTo(0, R * 0.5);
-        ctx.lineTo(0, -R * 0.5); ctx.lineTo(R, -R * 0.5);
-        ctx.stroke();
-        break;
-      case 'lattice':
-        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-          ctx.beginPath();
-          ctx.arc(i * R * 0.62, j * R * 0.62, R * 0.13, 0, TAU);
-          ctx.fill();
-        }
-        break;
-      case 'spiral':
-        ctx.beginPath();
-        for (let i = 0; i <= 46; i++) {
-          const u = i / 46;
-          const a = u * TAU * 1.9 * (man.twist > 0 ? 1 : -1);
-          const rr = u * R * 1.15;
-          i === 0 ? ctx.moveTo(0, 0) : ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-        }
-        ctx.stroke();
-        break;
-      case 'void':
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, TAU); ctx.stroke();
-        break;
-      case 'seed':
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.3, 0, TAU); ctx.fill();
-        for (let i = 0; i < arms; i++) {
-          const a = (i / arms) * TAU + t * 0.3;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a) * R * 0.45, Math.sin(a) * R * 0.45);
-          ctx.lineTo(Math.cos(a) * R * 1.05, Math.sin(a) * R * 1.05);
-          ctx.stroke();
-        }
-        break;
-      case 'weave':
-        for (let i = 0; i < 3; i++) {
-          const a = (i / 3) * Math.PI + t * 0.1;
-          ctx.beginPath();
-          ctx.moveTo(-Math.cos(a) * R, -Math.sin(a) * R);
-          ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R);
-          ctx.stroke();
-        }
-        break;
-      case 'cascade': {
-        const branch = (x0, y0, a, len, d) => {
-          if (d <= 0) return;
-          const x1 = x0 + Math.cos(a) * len, y1 = y0 + Math.sin(a) * len;
-          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          branch(x1, y1, a - 0.5, len * 0.62, d - 1);
-          branch(x1, y1, a + 0.5, len * 0.62, d - 1);
-        };
-        branch(0, R, -Math.PI / 2, R * 0.72, 3);
-        break;
-      }
-      case 'memory':
-        for (let i = 0; i < 5; i++) {
-          ctx.globalAlpha = alpha * (1 - i * 0.17);
-          ctx.beginPath();
-          ctx.arc(0, R * 0.3 - i * R * 0.22, R * 0.85, Math.PI * 1.1, Math.PI * 1.9);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = alpha;
-        break;
-      default:
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.8, 0, TAU); ctx.stroke();
+    const geom = (RS.cosmos.TIERS[man.tierIndex] || RS.cosmos.TIERS[0]).geometry;
+    /* Cached on the manifestation: the skeleton is pure in (essence, geometry,
+     * seed), so it is built once and redrawn every frame for free. */
+    let buf = man.__ss;
+    if (!buf || buf.__geom !== geom) {
+      buf = man.__ss = RS.selfsimilar.build(man.essence, geom, man.seed, buf);
+      buf.__geom = geom;
     }
+    ctx.save();
+    ctx.translate(sx(x), sy(y));
+    ctx.rotate(t * 0.15 * man.twist);
+    RS.selfsimilar.draw(ctx, buf, 0, 0, px(r) * 1.25, hue, man.sat + 0.15, alpha, t);
     ctx.restore();
   }
 
@@ -687,6 +588,21 @@
 
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);
+
+      /* The live primitives for whatever you are working on, stacked in the
+       * gap between the reticle and the instruments. Anchored to the viewport
+       * rather than to the node: a readout that chases a drifting node is
+       * unreadable, and this one has to be legible while you are concentrating
+       * on something else. */
+      if (game.focusNode && game.focusNode.resolved > 0.25) {
+        const rows = RS.primhud;
+        const bandHue = vis.hue.value;
+        const bottom = (RS.hud && RS.hud.layout.clusterTop) ? RS.hud.layout.clusterTop : view.h * 0.78;
+        const need = RS.spectrum.BANDS[game.focusNode.man.bandIndex].prim.length;
+        const y0 = bottom - 10 - need * rows.ROW_H;
+        rows.drawFor(ctx, game, game.focusNode, 22, y0,
+          bandHue, 0.35 + game.focusNode.resolved * 0.6);
+      }
     }
 
     /* Scene transitions flash the whole frame rather than cross-fading two

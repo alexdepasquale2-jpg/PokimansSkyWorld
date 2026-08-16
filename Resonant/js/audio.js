@@ -189,7 +189,7 @@
   /* The rising tension while a lock fills. Pitch and filter both climb, so it
    * gets brighter as well as higher — brightness is what the ear reads as
    * "approaching", and it leaves the crystal chord somewhere to land. */
-  function updateRamp(coherence, bandIndex) {
+  function updateRamp(coherence, bandIndex, node) {
     if (!started || !enabled) return;
     const now = ctx.currentTime;
     if (coherence <= 0.001) {
@@ -198,10 +198,43 @@
     }
     const base = (BAND_TONE[bandIndex] || 220) * 0.5;
     const t = RS.core.ease.inQuad(clamp01(coherence));
-    rampOsc.frequency.setTargetAtTime(base * (1 + t * 1.6), now, 0.04);
-    rampFilter.frequency.setTargetAtTime(300 + t * 3600, now, 0.05);
+
+    /* ── The primitives, audible ──────────────────────────────────────────
+     *
+     * The ramp is not just "a lock is filling"; it says *what kind of thing*
+     * you are holding, using the same numbers the mechanics run on. Nothing
+     * here is a new synth — it is the existing ramp, modulated by three
+     * primitives, so the layers become audibly distinct for free and a player
+     * can hear an essence's axes before the codex has revealed them.
+     *
+     *   GATE  ducks the ramp when the window shuts, so the rhythm you have to
+     *         play to is a thing you hear rather than a thing you watch.
+     *   NEST  transposes a fifth per level, so a descent literally climbs —
+     *         and the pitch tells you how deep you are without looking.
+     *   FLOW  jitters the filter by (1 - steadiness), so a volatile essence
+     *         sounds unstable and a persistent one sounds locked.
+     */
+    let duck = 1, transpose = 1, jitter = 0;
+    if (node && node.man) {
+      const band = RS.spectrum.BANDS[node.man.bandIndex];
+      if (band) {
+        if (node.gateInfo && RS.spectrum.usesPrim(band, 'gate')) {
+          duck = 0.25 + 0.75 * clamp01(node.gate);
+        }
+        if (node.nestInfo && RS.spectrum.usesPrim(band, 'nest')) {
+          transpose = Math.pow(1.5, node.depth || 0);
+        }
+        if (node.flowInfo && RS.spectrum.usesPrim(band, 'flow')) {
+          jitter = (1 - clamp01(node.flowInfo.steadiness)) *
+            Math.sin(now * 9.1) * 700;
+        }
+      }
+    }
+
+    rampOsc.frequency.setTargetAtTime(base * transpose * (1 + t * 1.6), now, 0.04);
+    rampFilter.frequency.setTargetAtTime(Math.max(120, 300 + t * 3600 + jitter), now, 0.05);
     rampFilter.Q.setTargetAtTime(4 + t * 12, now, 0.06);
-    rampGain.gain.setTargetAtTime(0.03 + t * 0.075, now, 0.05);
+    rampGain.gain.setTargetAtTime((0.03 + t * 0.075) * duck, now, 0.04);
   }
 
   // --- one-shots -----------------------------------------------------------

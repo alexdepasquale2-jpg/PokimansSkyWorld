@@ -240,6 +240,7 @@
       x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
       age: 0,
       effort: 0,
+      rawAlign: 0, observed: 0,
       life: 26 + hashF(h, 5) * 34,
       fade: 0,               // 0..1 presence, springs in and out
       align: 0, alignParts: null,
@@ -292,7 +293,7 @@
         spin: parent.spin * 1.3,
         bob: hashF(h, 4) * TAU,
         x: parent.x, y: parent.y,
-        age: 0, effort: 0, life: 22 + hashF(h, 5) * 18,
+        age: 0, effort: 0, rawAlign: 0, observed: 0, life: 22 + hashF(h, 5) * 18,
         fade: 0, align: 0, alignParts: null, coherence: 0, resolved: 0.4,
         crystallised: false, dying: false,
         gate: 1, gatePhase: hashF(h, 6) * TAU,
@@ -303,9 +304,22 @@
         orderMet: 0, orderNeed: 0, orderBonus: 1,
         /* Children are worth more the deeper they are, and *how much* more is
          * the essence's shrink ratio: an asymmetric essence's children shrink
-         * away fast and pay correspondingly better for being caught. That is
-         * the whole reason to chase the nesting. */
-        bonus: Math.pow(1 / ratio, parent.depth + 1)
+         * away fast and pay correspondingly better for being caught.
+         *
+         * Linear in depth, not exponential. Compounding it made the four
+         * nesting layers out-earn every layer above them by an order of
+         * magnitude, because descending already pays twice — a chain hands you
+         * more crystals *and* hands them to you without a search. The real
+         * reward for going deep is the extra nodes; this is the premium for
+         * the risk of losing the chain on the way down.
+         *
+         * And it is split across the brood, which is where `branching` earns
+         * its keep: a Cascade is "one event that spends itself buying a
+         * thousand others", so its children are many and individually cheap,
+         * while a narrow essence's single heir carries the whole premium. Same
+         * number, opposite feel, and the player can read which they are in
+         * from the axis they already know. */
+        bonus: (1 + (parent.depth + 1) * (1 / ratio - 1) * 0.6) * (2 / (1 + n))
       });
     }
   }
@@ -396,17 +410,30 @@
       // ── alignment ─────────────────────────────────────────────────────
       const a = alignmentOf(game, n);
       n.alignParts = a;
-      let eff = a.total * n.gate;
-      if (n.twinInfo && !n.collapsed && !n.twinReal) eff *= 0.35;
+      n.rawAlign = a.total;
+      /* A missing antecedent is a wall, so it scores as one. A shut gate is
+       * not — it is a window, and windows are handled in the coherence block
+       * below where they belong. Folding the gate into alignment punished it
+       * twice, once for falling under the threshold and again for the margin
+       * it lost above it, which is why a rhythmic layer used to pay a twelfth
+       * of a still one for the same attention. */
+      let eff = a.total;
       if (n.blocked) eff *= 0.15;
       n.align = damp(n.align, eff, 12, dt);
 
       /* Time actually spent working this node. Anything the band's primitives
        * do to slow you down — a shut gate, a twin to resolve, a missing
-       * antecedent, a gradient carrying it away — shows up here, and the payout
-       * reads it. That is why no primitive needs a hand-written compensation
-       * factor: friction pays for itself by definition. */
-      if (n.align > 0.06) n.effort += dt;
+       * antecedent, a gradient carrying it away — shows up here as the gap
+       * between how long this took and how long an unobstructed hold would
+       * have, and the payout reads it. That is why no primitive needs a
+       * hand-written compensation factor: friction pays for itself by
+       * definition, and a band can be made harder by composing more
+       * primitives without anyone re-opening the yield table.
+       *
+       * The bar is "clearly working this node", not "somewhere near it".
+       * Counting proximity made every node in a slow layer max the multiplier
+       * out and stop discriminating, which is the opposite of the point. */
+      if (n.align > 0.45) n.effort += dt;
 
       /* Resolution: a node you are anywhere near begins to become legible.
        * Below that it is an unresolved smudge with no name and no glyph — the
@@ -417,8 +444,18 @@
       // ── coherence ─────────────────────────────────────────────────────
       if (!n.crystallised) {
         const need = 0.52;
+        /* Working an uncollapsed double is slow rather than futile. Zeroing it
+         * would deadlock the layer outright: the wrong twin could never build
+         * enough coherence to reveal itself, so half of every Probabilistic
+         * field would be nodes that could not be taken and could not be told
+         * apart from the ones that could. */
+        const twinDrag = (n.twinInfo && !n.collapsed && !n.twinReal) ? 0.35 : 1;
         if (n.align > need) {
-          const gain = (n.align - need) / (1 - need);
+          /* The gate scales the *rate*, so a shut window costs you the time it
+           * is shut and nothing else: your hold parks where it stands rather
+           * than unwinding. That makes a rhythmic layer about timing, which is
+           * what it is for, instead of about attrition, which it is not. */
+          const gain = (n.align - need) / (1 - need) * twinDrag * n.gate;
           const before = n.coherence;
           n.coherence = clamp01(n.coherence + gain * holdRate * dt / holdTimeOf(n));
           /* Crossing 25/50/75% is worth marking — the ramp needs waypoints or
@@ -431,10 +468,10 @@
           if (n.coherence >= 1) crystallise(game, bus, field, n);
         } else {
           /* Whether a partial hold survives being interrupted is the *node's*
-           * property, not the band's: persistence is exactly the axis that says
-           * "this stays". The band's drift only amplifies it. So a Memory in
-           * the Thermal layer holds on where a Seed in the Baryonic layer
-           * bleeds out, and the player who has read those two axes knows which
+           * property, not the band's. Persistence is exactly the axis that
+           * says "this stays"; the band's drift only amplifies it. So a Memory
+           * in the Thermal layer holds on where a Seed in the Baryonic layer
+           * bleeds out, and a player who has read those two axes knows which
            * nodes are worth stepping away from. */
           const per = RS.emergence.axes(n.man.essence).p;
           const decay = (0.03 + 0.17 * (1 - per)) * (0.5 + band.drift);
@@ -464,7 +501,12 @@
    * rare one at a deep layer is a genuine sustained effort, and the audio ramp
    * has room to become an event. */
   function holdTimeOf(n) {
-    return (1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9) / (1 + n.depth * 0.25);
+    /* Deliberately *not* discounted by nesting depth. It used to be, and once
+     * NEST started paying a derived depth bonus that became triple-dipping —
+     * a deep child was worth more, took less time, and arrived without any
+     * search — which made the nesting layers out-earn everything above them.
+     * The bonus is the payout for descending; the hold is the price. */
+    return 1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9;
   }
 
   /* ── Node behaviour ───────────────────────────────────────────────────────
@@ -533,16 +575,7 @@
           let met = 0, firstMissing = null;
           for (let k = 0; k < o.prereqs.length; k++) {
             const id = o.prereqs[k];
-            const stamp = field.satisfied[id];
-            /* Two ways to hold an antecedent, and the second is the whole
-             * point of the game: you have crystallised it here, recently — or
-             * you *understand* it, from having met it anywhere else in the
-             * cosmos. Gnosis earned at the cellular scale in the Thermal layer
-             * unblocks a dependency in the Causal layer at the supercluster
-             * scale, because it is the same essence and the ledger knows it. */
-            const alive = (stamp !== undefined && (o.holds || field.t - stamp < ORDER_WINDOW)) ||
-              RS.fractal.gnosisOf(game, id) > 0;
-            if (alive) met++;
+            if (holdsAntecedent(game, o, id)) met++;
             else if (!firstMissing) firstMissing = RS.fractal.ESSENCE_BY_ID[id];
           }
           n.orderMet = met;
@@ -566,7 +599,18 @@
           n.twinReal = w.realIsFirst;
           n.twinAng += n.spin * dt * 0.6 * sgn;
           n.twinSep = w.separation;
-          if (!n.collapsed && n.coherence > 0.30 * (1.4 - w.clarity * 0.6)) n.collapsed = true;
+          /* Collapse is driven by *observation*, not by coherence. Keying it
+           * to coherence made it circular — the decoy's penalty is exactly
+           * what stopped it accumulating the coherence that would have
+           * revealed it as the decoy. Attention is the mechanic here, so
+           * attention is what has to pay for it. How long it takes is the
+           * essence's clarity: a persistent, simple essence gives itself away
+           * almost at once, an intricate volatile one makes you stare. */
+          if (!n.collapsed) {
+            n.observed = (n.observed || 0) + (n.rawAlign > 0.45 ? dt : -dt * 0.7);
+            if (n.observed > lerp(2.6, 0.5, w.clarity)) n.collapsed = true;
+            else if (n.observed < 0) n.observed = 0;
+          }
           break;
         }
 
@@ -584,6 +628,22 @@
   /* How long an unsatisfied-by-nature antecedent stays satisfied. Only applies
    * to essences whose persistence is below half — everything else holds. */
   const ORDER_WINDOW = 14;
+
+  /* Is one antecedent currently held? Shared with the HUD so the dependency
+   * graph a player reads is the same predicate the simulation enforces — two
+   * copies of this rule would eventually disagree, and a puzzle whose display
+   * lies about its own state is worse than no display. */
+  function holdsAntecedent(game, o, id) {
+    const stamp = game.field.satisfied[id];
+    /* Two ways to hold an antecedent, and the second is the whole point of the
+     * game: you have crystallised it here, recently — or you *understand* it,
+     * from having met it anywhere else in the cosmos. Gnosis earned at the
+     * cellular scale in the Thermal layer unblocks a dependency in the Causal
+     * layer at the supercluster scale, because it is the same essence and the
+     * ledger knows it. */
+    if (stamp !== undefined && (o.holds || game.field.t - stamp < ORDER_WINDOW)) return true;
+    return RS.fractal.gnosisOf(game, id) > 0;
+  }
 
   function crystallise(game, bus, field, n) {
     n.crystallised = true;
@@ -611,9 +671,11 @@
      * composing more of them without anyone having to re-tune a yield table.
      * Clamped at both ends so a node collected instantly still pays something
      * and a node left simmering all session is not a farm. */
-    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 5);
+    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 8);
+    /* What the layer charges you in throughput, paid back per crystal. */
+    const frictionMul = RS.spectrum.frictionOf(band);
     const amount = man.potency * band.yield * gnosisMul * depthMul *
-      nestMul * orderMul * effortMul * game.yieldMul;
+      nestMul * orderMul * effortMul * frictionMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -675,6 +737,6 @@
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
     holdTimeOf, spawnNode, applyOffline, updateDerived,
-    applyPrimitives, passiveShareOf, DIAL_LOAD, ORDER_WINDOW
+    applyPrimitives, passiveShareOf, holdsAntecedent, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

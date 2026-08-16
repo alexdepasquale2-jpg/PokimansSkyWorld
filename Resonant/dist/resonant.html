@@ -1184,6 +1184,32 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * is to think about. */
   function demandOf(band) { return band.prim.length; }
 
+  /* ── Paying for friction ──────────────────────────────────────────────────
+   *
+   * `yield` is a promise; what a layer actually pays is yield × throughput,
+   * and the primitives move throughput by nearly an order of magnitude. A gate
+   * shuts you out for half of every cycle. A missing antecedent stops you
+   * outright. A nest hands you children without a search. Left alone, the
+   * Electromagnetic layer paid two thirds of what the tutorial layer did,
+   * which means climbing the spectrum was a demotion.
+   *
+   * These six numbers buy that back. They are per *primitive*, not per band —
+   * six instead of twelve — so composing a new band cannot silently create a
+   * dead layer, and adding a primitive to an existing one automatically prices
+   * itself in.
+   *
+   * Additive rather than multiplicative on purpose: Unity runs all six, and
+   * multiplying would make the last band pay seventy times what the second-
+   * last does rather than a handful.
+   */
+  const FRICTION = { gate: 1.4, twin: 1.0, order: 2.0, invert: 0.4, nest: 0.0, flow: 0.0 };
+
+  function frictionOf(band) {
+    let sum = 0;
+    for (let i = 0; i < band.prim.length; i++) sum += FRICTION[band.prim[i]] || 0;
+    return 1 + sum;
+  }
+
   const PHI_MIN = 0;
   const PHI_MAX = 1000;
 
@@ -1296,7 +1322,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   RS.spectrum = {
     BANDS, BY_ID, PHI_MIN, PHI_MAX,
     effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz,
-    usesPrim, demandOf
+    usesPrim, demandOf, frictionOf, FRICTION
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -2087,20 +2113,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* Something is available only sometimes.
    *
    * `persistence` sets how long a cycle lasts, `branching` how many times it
-   * subdivides inside that cycle, `symmetry` how much of it is open. Divided by
-   * the tier's clock, which spans three orders of magnitude — so the *same*
-   * essence in the *same* band is a fast tight pulse at the cellular scale and
-   * a slow vast one at the supercluster scale, for free.
+   * subdivides inside that cycle, `symmetry` how much of it is open. Scaled by
+   * the tier's clock — so the *same* essence in the *same* band is a tight
+   * pulse at the cellular scale and a slow vast one at the supercluster scale,
+   * for free.
    *
    * The subdivision is what makes this recognisable: Cascade (branching 0.9)
    * gives a five-stroke burst, Lattice (branching 0) gives one even beat. A
    * player hears the difference before they read the name. */
   /* The tier clock spans 34.0 (Planck) to 0.02 (ensemble) — a factor of 1700.
    * Used raw that is a 2 ms strobe at one end and a 160 s wait at the other,
-   * and neither is a game. Compressing it to the 0.45 power keeps the whole
-   * ordering (small is always faster than large) and the *feeling* of tempo
-   * while shrinking the span to ~28×, which is a range a player can actually
-   * live inside. The stroke clamp below closes the remainder. */
+   * and neither is a game. Raising it to the 0.6 power keeps the whole ordering
+   * (small is always faster than large) and the *feeling* of tempo while
+   * shrinking the span to about 85×; the stroke clamp below closes the rest,
+   * leaving a range a player can actually live inside. */
   const TEMPO_EXP = 0.6;
   /* No stroke is shorter than a sixth of a second (below that the gate is a
    * flicker rather than a rhythm) or longer than four (above that waiting for
@@ -2282,11 +2308,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   /* Human-readable names, used by the HUD and the guide so a player can learn
    * the vocabulary the game is actually built from. */
+  /* Glyphs are deliberately drawn from Geometric Shapes, Arrows and Math
+   * Operators only. The more expressive codepoints (⌷ ⧉ ⇴) are missing from
+   * most monospace faces and render as tofu, and a HUD legend that shows a row
+   * of empty boxes is worse than no legend. */
   const LABELS = {
-    gate: { name: 'Gate', glyph: '⌷', blurb: 'Available only in windows. Learn the rhythm.' },
-    nest: { name: 'Nest', glyph: '⧉', blurb: 'Contains smaller copies. Descend for the payout.' },
+    gate: { name: 'Gate', glyph: '▮', blurb: 'Available only in windows. Learn the rhythm.' },
+    nest: { name: 'Nest', glyph: '◇', blurb: 'Contains smaller copies. Descend for the payout.' },
     flow: { name: 'Flow', glyph: '≈', blurb: 'Has a direction. Follow the gradient.' },
-    order: { name: 'Order', glyph: '⇴', blurb: 'Needs its antecedents first. Read the graph.' },
+    order: { name: 'Order', glyph: '→', blurb: 'Needs its antecedents first. Read the graph.' },
     twin: { name: 'Twin', glyph: '◐', blurb: 'Exists twice. One is real — find the tell.' },
     invert: { name: 'Invert', glyph: '○', blurb: 'Reads backwards. Unlearn what you know.' }
   };
@@ -2757,6 +2787,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
       age: 0,
       effort: 0,
+      rawAlign: 0, observed: 0,
       life: 26 + hashF(h, 5) * 34,
       fade: 0,               // 0..1 presence, springs in and out
       align: 0, alignParts: null,
@@ -2809,7 +2840,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         spin: parent.spin * 1.3,
         bob: hashF(h, 4) * TAU,
         x: parent.x, y: parent.y,
-        age: 0, effort: 0, life: 22 + hashF(h, 5) * 18,
+        age: 0, effort: 0, rawAlign: 0, observed: 0, life: 22 + hashF(h, 5) * 18,
         fade: 0, align: 0, alignParts: null, coherence: 0, resolved: 0.4,
         crystallised: false, dying: false,
         gate: 1, gatePhase: hashF(h, 6) * TAU,
@@ -2820,9 +2851,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         orderMet: 0, orderNeed: 0, orderBonus: 1,
         /* Children are worth more the deeper they are, and *how much* more is
          * the essence's shrink ratio: an asymmetric essence's children shrink
-         * away fast and pay correspondingly better for being caught. That is
-         * the whole reason to chase the nesting. */
-        bonus: Math.pow(1 / ratio, parent.depth + 1)
+         * away fast and pay correspondingly better for being caught.
+         *
+         * Linear in depth, not exponential. Compounding it made the four
+         * nesting layers out-earn every layer above them by an order of
+         * magnitude, because descending already pays twice — a chain hands you
+         * more crystals *and* hands them to you without a search. The real
+         * reward for going deep is the extra nodes; this is the premium for
+         * the risk of losing the chain on the way down.
+         *
+         * And it is split across the brood, which is where `branching` earns
+         * its keep: a Cascade is "one event that spends itself buying a
+         * thousand others", so its children are many and individually cheap,
+         * while a narrow essence's single heir carries the whole premium. Same
+         * number, opposite feel, and the player can read which they are in
+         * from the axis they already know. */
+        bonus: (1 + (parent.depth + 1) * (1 / ratio - 1) * 0.6) * (2 / (1 + n))
       });
     }
   }
@@ -2913,17 +2957,30 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       // ── alignment ─────────────────────────────────────────────────────
       const a = alignmentOf(game, n);
       n.alignParts = a;
-      let eff = a.total * n.gate;
-      if (n.twinInfo && !n.collapsed && !n.twinReal) eff *= 0.35;
+      n.rawAlign = a.total;
+      /* A missing antecedent is a wall, so it scores as one. A shut gate is
+       * not — it is a window, and windows are handled in the coherence block
+       * below where they belong. Folding the gate into alignment punished it
+       * twice, once for falling under the threshold and again for the margin
+       * it lost above it, which is why a rhythmic layer used to pay a twelfth
+       * of a still one for the same attention. */
+      let eff = a.total;
       if (n.blocked) eff *= 0.15;
       n.align = damp(n.align, eff, 12, dt);
 
       /* Time actually spent working this node. Anything the band's primitives
        * do to slow you down — a shut gate, a twin to resolve, a missing
-       * antecedent, a gradient carrying it away — shows up here, and the payout
-       * reads it. That is why no primitive needs a hand-written compensation
-       * factor: friction pays for itself by definition. */
-      if (n.align > 0.06) n.effort += dt;
+       * antecedent, a gradient carrying it away — shows up here as the gap
+       * between how long this took and how long an unobstructed hold would
+       * have, and the payout reads it. That is why no primitive needs a
+       * hand-written compensation factor: friction pays for itself by
+       * definition, and a band can be made harder by composing more
+       * primitives without anyone re-opening the yield table.
+       *
+       * The bar is "clearly working this node", not "somewhere near it".
+       * Counting proximity made every node in a slow layer max the multiplier
+       * out and stop discriminating, which is the opposite of the point. */
+      if (n.align > 0.45) n.effort += dt;
 
       /* Resolution: a node you are anywhere near begins to become legible.
        * Below that it is an unresolved smudge with no name and no glyph — the
@@ -2934,8 +2991,18 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       // ── coherence ─────────────────────────────────────────────────────
       if (!n.crystallised) {
         const need = 0.52;
+        /* Working an uncollapsed double is slow rather than futile. Zeroing it
+         * would deadlock the layer outright: the wrong twin could never build
+         * enough coherence to reveal itself, so half of every Probabilistic
+         * field would be nodes that could not be taken and could not be told
+         * apart from the ones that could. */
+        const twinDrag = (n.twinInfo && !n.collapsed && !n.twinReal) ? 0.35 : 1;
         if (n.align > need) {
-          const gain = (n.align - need) / (1 - need);
+          /* The gate scales the *rate*, so a shut window costs you the time it
+           * is shut and nothing else: your hold parks where it stands rather
+           * than unwinding. That makes a rhythmic layer about timing, which is
+           * what it is for, instead of about attrition, which it is not. */
+          const gain = (n.align - need) / (1 - need) * twinDrag * n.gate;
           const before = n.coherence;
           n.coherence = clamp01(n.coherence + gain * holdRate * dt / holdTimeOf(n));
           /* Crossing 25/50/75% is worth marking — the ramp needs waypoints or
@@ -2948,10 +3015,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           if (n.coherence >= 1) crystallise(game, bus, field, n);
         } else {
           /* Whether a partial hold survives being interrupted is the *node's*
-           * property, not the band's: persistence is exactly the axis that says
-           * "this stays". The band's drift only amplifies it. So a Memory in
-           * the Thermal layer holds on where a Seed in the Baryonic layer
-           * bleeds out, and the player who has read those two axes knows which
+           * property, not the band's. Persistence is exactly the axis that
+           * says "this stays"; the band's drift only amplifies it. So a Memory
+           * in the Thermal layer holds on where a Seed in the Baryonic layer
+           * bleeds out, and a player who has read those two axes knows which
            * nodes are worth stepping away from. */
           const per = RS.emergence.axes(n.man.essence).p;
           const decay = (0.03 + 0.17 * (1 - per)) * (0.5 + band.drift);
@@ -2981,7 +3048,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
    * rare one at a deep layer is a genuine sustained effort, and the audio ramp
    * has room to become an event. */
   function holdTimeOf(n) {
-    return (1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9) / (1 + n.depth * 0.25);
+    /* Deliberately *not* discounted by nesting depth. It used to be, and once
+     * NEST started paying a derived depth bonus that became triple-dipping —
+     * a deep child was worth more, took less time, and arrived without any
+     * search — which made the nesting layers out-earn everything above them.
+     * The bonus is the payout for descending; the hold is the price. */
+    return 1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9;
   }
 
   /* ── Node behaviour ───────────────────────────────────────────────────────
@@ -3050,16 +3122,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           let met = 0, firstMissing = null;
           for (let k = 0; k < o.prereqs.length; k++) {
             const id = o.prereqs[k];
-            const stamp = field.satisfied[id];
-            /* Two ways to hold an antecedent, and the second is the whole
-             * point of the game: you have crystallised it here, recently — or
-             * you *understand* it, from having met it anywhere else in the
-             * cosmos. Gnosis earned at the cellular scale in the Thermal layer
-             * unblocks a dependency in the Causal layer at the supercluster
-             * scale, because it is the same essence and the ledger knows it. */
-            const alive = (stamp !== undefined && (o.holds || field.t - stamp < ORDER_WINDOW)) ||
-              RS.fractal.gnosisOf(game, id) > 0;
-            if (alive) met++;
+            if (holdsAntecedent(game, o, id)) met++;
             else if (!firstMissing) firstMissing = RS.fractal.ESSENCE_BY_ID[id];
           }
           n.orderMet = met;
@@ -3083,7 +3146,18 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           n.twinReal = w.realIsFirst;
           n.twinAng += n.spin * dt * 0.6 * sgn;
           n.twinSep = w.separation;
-          if (!n.collapsed && n.coherence > 0.30 * (1.4 - w.clarity * 0.6)) n.collapsed = true;
+          /* Collapse is driven by *observation*, not by coherence. Keying it
+           * to coherence made it circular — the decoy's penalty is exactly
+           * what stopped it accumulating the coherence that would have
+           * revealed it as the decoy. Attention is the mechanic here, so
+           * attention is what has to pay for it. How long it takes is the
+           * essence's clarity: a persistent, simple essence gives itself away
+           * almost at once, an intricate volatile one makes you stare. */
+          if (!n.collapsed) {
+            n.observed = (n.observed || 0) + (n.rawAlign > 0.45 ? dt : -dt * 0.7);
+            if (n.observed > lerp(2.6, 0.5, w.clarity)) n.collapsed = true;
+            else if (n.observed < 0) n.observed = 0;
+          }
           break;
         }
 
@@ -3101,6 +3175,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* How long an unsatisfied-by-nature antecedent stays satisfied. Only applies
    * to essences whose persistence is below half — everything else holds. */
   const ORDER_WINDOW = 14;
+
+  /* Is one antecedent currently held? Shared with the HUD so the dependency
+   * graph a player reads is the same predicate the simulation enforces — two
+   * copies of this rule would eventually disagree, and a puzzle whose display
+   * lies about its own state is worse than no display. */
+  function holdsAntecedent(game, o, id) {
+    const stamp = game.field.satisfied[id];
+    /* Two ways to hold an antecedent, and the second is the whole point of the
+     * game: you have crystallised it here, recently — or you *understand* it,
+     * from having met it anywhere else in the cosmos. Gnosis earned at the
+     * cellular scale in the Thermal layer unblocks a dependency in the Causal
+     * layer at the supercluster scale, because it is the same essence and the
+     * ledger knows it. */
+    if (stamp !== undefined && (o.holds || game.field.t - stamp < ORDER_WINDOW)) return true;
+    return RS.fractal.gnosisOf(game, id) > 0;
+  }
 
   function crystallise(game, bus, field, n) {
     n.crystallised = true;
@@ -3128,9 +3218,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
      * composing more of them without anyone having to re-tune a yield table.
      * Clamped at both ends so a node collected instantly still pays something
      * and a node left simmering all session is not a farm. */
-    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 5);
+    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 8);
+    /* What the layer charges you in throughput, paid back per crystal. */
+    const frictionMul = RS.spectrum.frictionOf(band);
     const amount = man.potency * band.yield * gnosisMul * depthMul *
-      nestMul * orderMul * effortMul * game.yieldMul;
+      nestMul * orderMul * effortMul * frictionMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -3192,7 +3284,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
     holdTimeOf, spawnNode, applyOffline, updateDerived,
-    applyPrimitives, passiveShareOf, DIAL_LOAD, ORDER_WINDOW
+    applyPrimitives, passiveShareOf, holdsAntecedent, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -8097,7 +8189,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* The rising tension while a lock fills. Pitch and filter both climb, so it
    * gets brighter as well as higher — brightness is what the ear reads as
    * "approaching", and it leaves the crystal chord somewhere to land. */
-  function updateRamp(coherence, bandIndex) {
+  function updateRamp(coherence, bandIndex, node) {
     if (!started || !enabled) return;
     const now = ctx.currentTime;
     if (coherence <= 0.001) {
@@ -8106,10 +8198,43 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
     const base = (BAND_TONE[bandIndex] || 220) * 0.5;
     const t = RS.core.ease.inQuad(clamp01(coherence));
-    rampOsc.frequency.setTargetAtTime(base * (1 + t * 1.6), now, 0.04);
-    rampFilter.frequency.setTargetAtTime(300 + t * 3600, now, 0.05);
+
+    /* ── The primitives, audible ──────────────────────────────────────────
+     *
+     * The ramp is not just "a lock is filling"; it says *what kind of thing*
+     * you are holding, using the same numbers the mechanics run on. Nothing
+     * here is a new synth — it is the existing ramp, modulated by three
+     * primitives, so the layers become audibly distinct for free and a player
+     * can hear an essence's axes before the codex has revealed them.
+     *
+     *   GATE  ducks the ramp when the window shuts, so the rhythm you have to
+     *         play to is a thing you hear rather than a thing you watch.
+     *   NEST  transposes a fifth per level, so a descent literally climbs —
+     *         and the pitch tells you how deep you are without looking.
+     *   FLOW  jitters the filter by (1 - steadiness), so a volatile essence
+     *         sounds unstable and a persistent one sounds locked.
+     */
+    let duck = 1, transpose = 1, jitter = 0;
+    if (node && node.man) {
+      const band = RS.spectrum.BANDS[node.man.bandIndex];
+      if (band) {
+        if (node.gateInfo && RS.spectrum.usesPrim(band, 'gate')) {
+          duck = 0.25 + 0.75 * clamp01(node.gate);
+        }
+        if (node.nestInfo && RS.spectrum.usesPrim(band, 'nest')) {
+          transpose = Math.pow(1.5, node.depth || 0);
+        }
+        if (node.flowInfo && RS.spectrum.usesPrim(band, 'flow')) {
+          jitter = (1 - clamp01(node.flowInfo.steadiness)) *
+            Math.sin(now * 9.1) * 700;
+        }
+      }
+    }
+
+    rampOsc.frequency.setTargetAtTime(base * transpose * (1 + t * 1.6), now, 0.04);
+    rampFilter.frequency.setTargetAtTime(Math.max(120, 300 + t * 3600 + jitter), now, 0.05);
     rampFilter.Q.setTargetAtTime(4 + t * 12, now, 0.06);
-    rampGain.gain.setTargetAtTime(0.03 + t * 0.075, now, 0.05);
+    rampGain.gain.setTargetAtTime((0.03 + t * 0.075) * duck, now, 0.04);
   }
 
   // --- one-shots -----------------------------------------------------------
@@ -8681,6 +8806,250 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — one readout per primitive, not one per layer.
+ *
+ * ── Why this file is organised by primitive ───────────────────────────────
+ *
+ * Because that is how the game is organised. There is no Electromagnetic HUD;
+ * there is a GATE readout, and the Electromagnetic layer happens to run GATE.
+ * When the Noetic layer runs GATE too, it gets the same readout, and a player
+ * who learned to read a rhythm bar in the third layer can read one in the
+ * tenth without being taught twice. A per-band HUD would have to re-teach the
+ * same idea twelve times and would still leave Unity — which runs all six —
+ * with nothing coherent to draw.
+ *
+ * ── The ghost ─────────────────────────────────────────────────────────────
+ *
+ * Every readout here draws twice: the *measured* behaviour solid, and behind
+ * it, faint, the behaviour `fractal.predicted()` says this essence should
+ * have, from whatever axes gnosis has revealed. Early on the ghost is absent
+ * or wrong and you play by looking. Later the ghost lands exactly on the real
+ * thing before it happens, and you are playing by knowing.
+ *
+ * That gap closing is the reward the gnosis ledger has been building toward,
+ * and it is a thing you *see* rather than a percentage in a menu.
+ *
+ * ── Cost ──────────────────────────────────────────────────────────────────
+ *
+ * Drawn only for the focus node, only for that node's band's primitives — so
+ * at most six short rows, once a frame. Scratch objects are module-level and
+ * reused; nothing here allocates.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hsl, TAU } = RS.core;
+
+  /* Reused scratch. These are written by the primitives every frame and never
+   * escape this module. */
+  const _pred = {};
+  const _real = {};
+  const _predEss = {};
+
+  const ROW_H = 15;
+  const ROW_W = 132;
+
+  /* An essence with only the axes gnosis has revealed, so a primitive fed with
+   * it produces the player's *belief* about what is coming. */
+  function beliefOf(game, ess) {
+    return RS.fractal.predictedEssence(game, ess.id, _predEss);
+  }
+
+  function label(ctx, x, y, text, hue, alpha) {
+    ctx.fillStyle = hsl(hue, 0.35, 0.72, alpha);
+    ctx.font = '9px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+  }
+
+  // ── GATE: a rhythm bar ───────────────────────────────────────────────────
+  /* The bar is one full period; the lit blocks are the open strokes. A Cascade
+   * shows five narrow strokes, a Lattice one wide one, and the moving needle
+   * says where in the bar you are. The ghost strokes behind are the predicted
+   * subdivision — get `branching` revealed and you know the pattern of a layer
+   * you have never heard. */
+  function gate(ctx, game, n, x, y, w, hue, alpha) {
+    const scale = game.dials.space.value;
+    const t = game.field.rt + n.gatePhase;
+    const g = RS.emergence.GATE(n.man.essence, scale, t, _real);
+    const p = RS.emergence.GATE(beliefOf(game, n.man.essence), scale, t, _pred);
+
+    const h = 6;
+    ctx.fillStyle = hsl(hue, 0.3, 0.35, alpha * 0.30);
+    ctx.fillRect(x, y - h / 2, w, h);
+
+    /* Predicted strokes, behind. */
+    if (p.subdiv !== g.subdiv || Math.abs(p.duty - g.duty) > 0.02) {
+      for (let i = 0; i < p.subdiv; i++) {
+        const x0 = x + (i / p.subdiv) * w;
+        ctx.fillStyle = hsl(hue + 40, 0.5, 0.6, alpha * 0.20);
+        ctx.fillRect(x0, y - h / 2 - 3, (w / p.subdiv) * p.duty, 2);
+      }
+    }
+
+    /* Measured strokes. */
+    for (let i = 0; i < g.subdiv; i++) {
+      const x0 = x + (i / g.subdiv) * w;
+      const live = i === g.stroke;
+      ctx.fillStyle = hsl(hue, 0.8, live ? 0.68 : 0.48, alpha * (live ? 0.95 : 0.5));
+      ctx.fillRect(x0, y - h / 2, (w / g.subdiv) * g.duty, h);
+    }
+
+    /* The needle. */
+    const nx = x + ((g.stroke + g.phase) / g.subdiv) * w;
+    ctx.fillStyle = hsl(hue + 20, 1, 0.85, alpha);
+    ctx.fillRect(nx - 1, y - h / 2 - 3, 2, h + 6);
+
+    label(ctx, x + w + 6, y, g.open > 0.5 ? 'OPEN' : g.nextEdge.toFixed(1) + 's',
+      g.open > 0.5 ? 140 : hue, alpha * 0.9);
+  }
+
+  // ── NEST: a depth gauge ──────────────────────────────────────────────────
+  /* Pips for each level this essence can descend, filled to where you have
+   * actually got to. The hollow pips are the payout you have not taken yet,
+   * which is the entire argument for pushing deeper. */
+  function nest(ctx, game, n, x, y, w, hue, alpha) {
+    const g = RS.emergence.NEST(n.man.essence, _real);
+    const p = RS.emergence.NEST(beliefOf(game, n.man.essence), _pred);
+    const max = Math.max(g.depth, p.depth);
+    const step = Math.min(13, w / Math.max(1, max));
+    for (let i = 0; i < max; i++) {
+      const cx = x + i * step + step / 2;
+      const here = i <= n.depth;
+      const real = i < g.depth;
+      ctx.beginPath();
+      ctx.arc(cx, y, real ? 3.4 : 2.2, 0, TAU);
+      if (here) { ctx.fillStyle = hsl(hue, 0.85, 0.68, alpha); ctx.fill(); }
+      else {
+        ctx.strokeStyle = hsl(hue, 0.6, 0.6, alpha * (real ? 0.55 : 0.22));
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+    label(ctx, x + max * step + 6, y, '×' + g.fanout + ' ·' + (n.bonus || 1).toFixed(1),
+      hue, alpha * 0.9);
+  }
+
+  // ── FLOW: a gradient compass ─────────────────────────────────────────────
+  /* Which way this node is being carried, and how hard. A converging essence
+   * points inward and the needle shortens as it arrives; a diverging one
+   * points outward and lengthens as it escapes, which is your warning. */
+  function flow(ctx, game, n, x, y, w, hue, alpha) {
+    const g = RS.emergence.FLOW(n.man.essence, n.x, n.y, game.field.t, _real);
+    const cx = x + 9, cy = y;
+    ctx.strokeStyle = hsl(hue, 0.4, 0.5, alpha * 0.35);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 8, 0, TAU); ctx.stroke();
+
+    const len = 3 + clamp01(g.strength) * 7;
+    const a = Math.atan2(g.gy, g.gx);
+    ctx.strokeStyle = hsl(g.divergence > 0.5 ? 12 : 168, 0.85, 0.66, alpha);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+    ctx.stroke();
+
+    label(ctx, x + 24, y, (g.divergence > 0.5 ? 'out' : 'in') +
+      ' ' + (g.steadiness > 0.6 ? 'steady' : 'restless'), hue, alpha * 0.9);
+  }
+
+  // ── ORDER: the dependency graph ──────────────────────────────────────────
+  /* The antecedents, ticked where held. This is the layer's whole puzzle made
+   * visible: you can see which of them you are missing and go and get it,
+   * rather than being told "blocked" and left to guess. */
+  function order(ctx, game, n, x, y, w, hue, alpha) {
+    const o = n.orderInfo || RS.emergence.ORDER(n.man.essence, n.man.seed, _real);
+    let cx = x;
+    for (let i = 0; i < o.prereqs.length; i++) {
+      const ess = RS.fractal.ESSENCE_BY_ID[o.prereqs[i]];
+      if (!ess) continue;
+      const held = RS.field.holdsAntecedent(game, o, o.prereqs[i]);
+      ctx.fillStyle = hsl(held ? 140 : 0, held ? 0.6 : 0.5, held ? 0.62 : 0.48,
+        alpha * (held ? 0.95 : 0.5));
+      ctx.font = '10px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((held ? '✓' : '·') + ess.name.slice(0, 5), cx, y);
+      cx += 42;
+      if (cx > x + w) break;
+    }
+    label(ctx, x + w + 6, y, o.holds ? 'holds' : 'decays', hue, alpha * 0.7);
+  }
+
+  // ── TWIN: the tell ───────────────────────────────────────────────────────
+  /* A bar that fills as observation accumulates, and a mark that says which of
+   * the pair the tell is pointing at. Clarity sets how fast it fills, so a
+   * player who knows the essence's persistence knows whether to wait for
+   * certainty or commit and accept the drag. */
+  function twin(ctx, game, n, x, y, w, hue, alpha) {
+    const g = n.twinInfo || RS.emergence.TWIN(n.man.essence, n.man.seed, _real);
+    const need = lerp(2.6, 0.5, g.clarity);
+    const fill = n.collapsed ? 1 : clamp01((n.observed || 0) / need);
+    const h = 5;
+    ctx.fillStyle = hsl(hue, 0.3, 0.35, alpha * 0.3);
+    ctx.fillRect(x, y - h / 2, w * 0.62, h);
+    /* Coloured by the *answer*, not by the fact that there is one. A full
+     * green bar over the word DECOY reads as good news, which is the opposite
+     * of what it is. */
+    const verdict = !n.collapsed ? 268 : (n.twinReal ? 140 : 8);
+    ctx.fillStyle = hsl(verdict, 0.8, 0.64, alpha * 0.9);
+    ctx.fillRect(x, y - h / 2, w * 0.62 * fill, h);
+    label(ctx, x + w * 0.62 + 6, y,
+      n.collapsed ? (n.twinReal ? 'REAL' : 'DECOY') : 'reading…',
+      verdict, alpha * 0.95);
+  }
+
+  // ── INVERT: the mirror ───────────────────────────────────────────────────
+  /* How far backwards this node reads, and on which axis. At strength 0 it is
+   * an ordinary node sitting in the Null layer, which is a genuinely useful
+   * thing to know and impossible to guess without this. */
+  function invert(ctx, game, n, x, y, w, hue, alpha) {
+    const g = n.inv || RS.emergence.INVERT(n.man.essence, _real);
+    const h = 5, bw = w * 0.55;
+    ctx.fillStyle = hsl(hue, 0.2, 0.35, alpha * 0.3);
+    ctx.fillRect(x, y - h / 2, bw, h);
+    /* Filled from the right, because the whole point is that it runs the other
+     * way. */
+    ctx.fillStyle = hsl(0, 0.0, 0.82, alpha * 0.85);
+    ctx.fillRect(x + bw * (1 - g.strength), y - h / 2, bw * g.strength, h);
+    label(ctx, x + bw + 6, y,
+      g.strength < 0.1 ? 'reads true' : (g.axis === 'phase' ? 'Δ mirrored' : 'magnitude'),
+      hue, alpha * 0.9);
+  }
+
+  const DRAW = { gate, nest, flow, order, twin, invert };
+
+  /* Draw the live primitives for one node, stacked. Returns how many rows were
+   * drawn so the caller can lay out around it. */
+  function drawFor(ctx, game, n, x, y, hue, alpha) {
+    if (!n || !n.man) return 0;
+    const band = RS.spectrum.BANDS[n.man.bandIndex];
+    if (!band) return 0;
+    ctx.save();
+    let row = 0;
+    for (let i = 0; i < band.prim.length; i++) {
+      const fn = DRAW[band.prim[i]];
+      if (!fn) continue;
+      const gy = y + row * ROW_H;
+      const L = RS.emergence.LABELS[band.prim[i]];
+      ctx.fillStyle = hsl(hue, 0.4, 0.66, alpha * 0.75);
+      ctx.font = '10px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(L ? L.glyph : '·', x - 6, gy);
+      fn(ctx, game, n, x, gy, ROW_W, hue, alpha);
+      row++;
+    }
+    ctx.restore();
+    return row;
+  }
+
+  RS.primhud = { drawFor, DRAW, ROW_H, ROW_W };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the renderer.
  *
  * The field is drawn in normalised space: the origin is the point of
@@ -8915,133 +9284,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* The essence glyphs. Each is drawn from the manifestation's own derived
    * parameters, so two instances of the same essence are recognisably the same
    * shape without being identical drawings. */
+  /* ── One generator, every essence ────────────────────────────────────────
+   *
+   * This used to be fourteen hand-drawn cases — a spiral routine, a lattice
+   * routine, a cascade routine. They looked fine and they proved nothing: two
+   * shapes drawn by two unrelated functions are alike only because someone
+   * said so. Now every essence comes out of `selfsimilar.build()`, driven by
+   * the same four axes that drive its behaviour, and `geometry` decides only
+   * how the ink is laid down.
+   *
+   * So a Cascade in a molecular tier and a Cascade in a filament tier are the
+   * same skeleton rendered as bonds and as filaments — demonstrably the same
+   * essence rather than nominally so — and a player can see the kinship before
+   * they can name it. It also reaches the 42 form names that were previously
+   * unreachable, because a geometry is no longer tied to a hand-written case.
+   */
   function drawEssence(ctx, man, x, y, r, hue, alpha, t) {
-    const cx = sx(x), cy = sy(y), R = px(r);
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(t * 0.15 * man.twist);
-    ctx.strokeStyle = hsl(hue, man.sat + 0.15, 0.68, alpha);
-    ctx.fillStyle = hsl(hue, man.sat + 0.15, 0.62, alpha * 0.55);
-    ctx.lineWidth = Math.max(1, R * 0.09);
-    ctx.lineCap = 'round';
-    const arms = man.arms;
-
-    switch (man.essence.id) {
-      case 'boundary':
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.arc(0, 0, R * (0.5 + i * 0.26), 0.4 + i * 0.5, Math.PI * 1.6 + i * 0.5);
-          ctx.stroke();
-        }
-        break;
-      case 'flow':
-        for (let s = 0; s < 3; s++) {
-          ctx.beginPath();
-          for (let i = 0; i <= 22; i++) {
-            const u = i / 22;
-            const px2 = (u - 0.5) * R * 2.2;
-            const py2 = Math.sin(u * 7 + t * 2.2 + s * 1.5) * R * 0.34 + (s - 1) * R * 0.34;
-            i === 0 ? ctx.moveTo(px2, py2) : ctx.lineTo(px2, py2);
-          }
-          ctx.stroke();
-        }
-        break;
-      case 'recursion':
-        for (let i = 0; i < 4; i++) {
-          const rr = R * Math.pow(0.62, i);
-          ctx.beginPath();
-          ctx.arc(R * (1 - Math.pow(0.62, i)) * 0.5, 0, rr, 0, TAU);
-          ctx.stroke();
-        }
-        break;
-      case 'attractor':
-        for (let i = 4; i >= 1; i--) {
-          ctx.globalAlpha = alpha * (0.2 + i * 0.16);
-          ctx.beginPath(); ctx.arc(0, 0, R * i * 0.27, 0, TAU); ctx.fill();
-        }
-        ctx.globalAlpha = alpha;
-        break;
-      case 'duality':
-        ctx.beginPath(); ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, R, Math.PI / 2, -Math.PI / 2); ctx.stroke();
-        break;
-      case 'emergence':
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * TAU + t * 0.4;
-          const rr = R * (0.55 + Math.sin(t * 1.6 + i * 0.9) * 0.42);
-          ctx.beginPath();
-          ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, R * 0.11, 0, TAU);
-          ctx.fill();
-        }
-        break;
-      case 'threshold':
-        ctx.beginPath();
-        ctx.moveTo(-R, R * 0.5); ctx.lineTo(0, R * 0.5);
-        ctx.lineTo(0, -R * 0.5); ctx.lineTo(R, -R * 0.5);
-        ctx.stroke();
-        break;
-      case 'lattice':
-        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-          ctx.beginPath();
-          ctx.arc(i * R * 0.62, j * R * 0.62, R * 0.13, 0, TAU);
-          ctx.fill();
-        }
-        break;
-      case 'spiral':
-        ctx.beginPath();
-        for (let i = 0; i <= 46; i++) {
-          const u = i / 46;
-          const a = u * TAU * 1.9 * (man.twist > 0 ? 1 : -1);
-          const rr = u * R * 1.15;
-          i === 0 ? ctx.moveTo(0, 0) : ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-        }
-        ctx.stroke();
-        break;
-      case 'void':
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, TAU); ctx.stroke();
-        break;
-      case 'seed':
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.3, 0, TAU); ctx.fill();
-        for (let i = 0; i < arms; i++) {
-          const a = (i / arms) * TAU + t * 0.3;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a) * R * 0.45, Math.sin(a) * R * 0.45);
-          ctx.lineTo(Math.cos(a) * R * 1.05, Math.sin(a) * R * 1.05);
-          ctx.stroke();
-        }
-        break;
-      case 'weave':
-        for (let i = 0; i < 3; i++) {
-          const a = (i / 3) * Math.PI + t * 0.1;
-          ctx.beginPath();
-          ctx.moveTo(-Math.cos(a) * R, -Math.sin(a) * R);
-          ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R);
-          ctx.stroke();
-        }
-        break;
-      case 'cascade': {
-        const branch = (x0, y0, a, len, d) => {
-          if (d <= 0) return;
-          const x1 = x0 + Math.cos(a) * len, y1 = y0 + Math.sin(a) * len;
-          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          branch(x1, y1, a - 0.5, len * 0.62, d - 1);
-          branch(x1, y1, a + 0.5, len * 0.62, d - 1);
-        };
-        branch(0, R, -Math.PI / 2, R * 0.72, 3);
-        break;
-      }
-      case 'memory':
-        for (let i = 0; i < 5; i++) {
-          ctx.globalAlpha = alpha * (1 - i * 0.17);
-          ctx.beginPath();
-          ctx.arc(0, R * 0.3 - i * R * 0.22, R * 0.85, Math.PI * 1.1, Math.PI * 1.9);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = alpha;
-        break;
-      default:
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.8, 0, TAU); ctx.stroke();
+    const geom = (RS.cosmos.TIERS[man.tierIndex] || RS.cosmos.TIERS[0]).geometry;
+    /* Cached on the manifestation: the skeleton is pure in (essence, geometry,
+     * seed), so it is built once and redrawn every frame for free. */
+    let buf = man.__ss;
+    if (!buf || buf.__geom !== geom) {
+      buf = man.__ss = RS.selfsimilar.build(man.essence, geom, man.seed, buf);
+      buf.__geom = geom;
     }
+    ctx.save();
+    ctx.translate(sx(x), sy(y));
+    ctx.rotate(t * 0.15 * man.twist);
+    RS.selfsimilar.draw(ctx, buf, 0, 0, px(r) * 1.25, hue, man.sat + 0.15, alpha, t);
     ctx.restore();
   }
 
@@ -9370,6 +9640,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);
+
+      /* The live primitives for whatever you are working on, stacked in the
+       * gap between the reticle and the instruments. Anchored to the viewport
+       * rather than to the node: a readout that chases a drifting node is
+       * unreadable, and this one has to be legible while you are concentrating
+       * on something else. */
+      if (game.focusNode && game.focusNode.resolved > 0.25) {
+        const rows = RS.primhud;
+        const bandHue = vis.hue.value;
+        const bottom = (RS.hud && RS.hud.layout.clusterTop) ? RS.hud.layout.clusterTop : view.h * 0.78;
+        const need = RS.spectrum.BANDS[game.focusNode.man.bandIndex].prim.length;
+        const y0 = bottom - 10 - need * rows.ROW_H;
+        rows.drawFor(ctx, game, game.focusNode, 22, y0,
+          bandHue, 0.35 + game.focusNode.resolved * 0.6);
+      }
     }
 
     /* Scene transitions flash the whole frame rather than cross-fading two
@@ -12307,6 +12592,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 (function (RS) {
   'use strict';
 
+  const lastStroke = { node: null, i: -1 };
+
   const SIM_DT = 1 / 60;
   const MAX_STEPS = 5;
 
@@ -12469,6 +12756,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       steps++;
     }
     if (steps === MAX_STEPS) acc = 0;
+  /* Which gate stroke last fired a click, so the track ticks once per stroke
+   * rather than once per frame. */
 
     // audio follows the dials every frame, not every sim step
     if (game.settings.audio && RS.audio.isReady()) {
@@ -12483,7 +12772,24 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         RS.spectrum.resonanceOf(band, D.value, focus) * (inField ? 1 : 0.22),
         RS.spectrum.isGhost(band, focus));
       const n = inField ? game.focusNode : null;
-      RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index);
+      RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index, n);
+
+      /* The click track is GATE's, not a metronome's. One tick per stroke of
+       * whatever you are currently holding, so the rhythm you have to play to
+       * is audible before you have worked out what it is — and its pattern is
+       * the essence's `branching`, which means the beat is a tell. */
+      if (n && n.gateInfo && n.resolved > 0.25) {
+        if (lastStroke.node !== n.id || lastStroke.i !== n.gateInfo.stroke) {
+          if (lastStroke.node === n.id) {
+            RS.audio.click(n.gateInfo.stroke === 0 ? 0.5 : 0.26,
+              n.gateInfo.stroke === 0 ? 1.5 : 1.0);
+          }
+          lastStroke.node = n.id;
+          lastStroke.i = n.gateInfo.stroke;
+        }
+      } else if (lastStroke.node) {
+        lastStroke.node = null;
+      }
     }
 
     /* Fields depend on research, gnosis and structure maturity, all of which

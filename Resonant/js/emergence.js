@@ -51,20 +51,20 @@
   /* Something is available only sometimes.
    *
    * `persistence` sets how long a cycle lasts, `branching` how many times it
-   * subdivides inside that cycle, `symmetry` how much of it is open. Divided by
-   * the tier's clock, which spans three orders of magnitude — so the *same*
-   * essence in the *same* band is a fast tight pulse at the cellular scale and
-   * a slow vast one at the supercluster scale, for free.
+   * subdivides inside that cycle, `symmetry` how much of it is open. Scaled by
+   * the tier's clock — so the *same* essence in the *same* band is a tight
+   * pulse at the cellular scale and a slow vast one at the supercluster scale,
+   * for free.
    *
    * The subdivision is what makes this recognisable: Cascade (branching 0.9)
    * gives a five-stroke burst, Lattice (branching 0) gives one even beat. A
    * player hears the difference before they read the name. */
   /* The tier clock spans 34.0 (Planck) to 0.02 (ensemble) — a factor of 1700.
    * Used raw that is a 2 ms strobe at one end and a 160 s wait at the other,
-   * and neither is a game. Compressing it to the 0.45 power keeps the whole
-   * ordering (small is always faster than large) and the *feeling* of tempo
-   * while shrinking the span to ~28×, which is a range a player can actually
-   * live inside. The stroke clamp below closes the remainder. */
+   * and neither is a game. Raising it to the 0.6 power keeps the whole ordering
+   * (small is always faster than large) and the *feeling* of tempo while
+   * shrinking the span to about 85×; the stroke clamp below closes the rest,
+   * leaving a range a player can actually live inside. */
   const TEMPO_EXP = 0.6;
   /* No stroke is shorter than a sixth of a second (below that the gate is a
    * flicker rather than a rhythm) or longer than four (above that waiting for
@@ -246,11 +246,15 @@
 
   /* Human-readable names, used by the HUD and the guide so a player can learn
    * the vocabulary the game is actually built from. */
+  /* Glyphs are deliberately drawn from Geometric Shapes, Arrows and Math
+   * Operators only. The more expressive codepoints (⌷ ⧉ ⇴) are missing from
+   * most monospace faces and render as tofu, and a HUD legend that shows a row
+   * of empty boxes is worse than no legend. */
   const LABELS = {
-    gate: { name: 'Gate', glyph: '⌷', blurb: 'Available only in windows. Learn the rhythm.' },
-    nest: { name: 'Nest', glyph: '⧉', blurb: 'Contains smaller copies. Descend for the payout.' },
+    gate: { name: 'Gate', glyph: '▮', blurb: 'Available only in windows. Learn the rhythm.' },
+    nest: { name: 'Nest', glyph: '◇', blurb: 'Contains smaller copies. Descend for the payout.' },
     flow: { name: 'Flow', glyph: '≈', blurb: 'Has a direction. Follow the gradient.' },
-    order: { name: 'Order', glyph: '⇴', blurb: 'Needs its antecedents first. Read the graph.' },
+    order: { name: 'Order', glyph: '→', blurb: 'Needs its antecedents first. Read the graph.' },
     twin: { name: 'Twin', glyph: '◐', blurb: 'Exists twice. One is real — find the tell.' },
     invert: { name: 'Invert', glyph: '○', blurb: 'Reads backwards. Unlearn what you know.' }
   };
