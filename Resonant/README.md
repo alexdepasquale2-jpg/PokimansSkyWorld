@@ -1,5 +1,9 @@
 # Resonant
 
+> **Picking this up cold?** Read [`HANDOFF.md`](HANDOFF.md) first — it covers
+> the three ideas the whole codebase follows from, how to add a scope or an
+> essence, and the eight bugs that are load-bearing so you do not re-break them.
+
 You are a single point of consciousness. You cannot move. You have four dials,
 and everything you will ever perceive is a consequence of where they sit.
 
