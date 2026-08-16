@@ -257,19 +257,22 @@ generated from live state rather than written out:
 
 Turning Σ is how you travel, and each range of rungs is somewhere different.
 
-| Σ | scope | what it is |
-|---|---|---|
-| galactic → ensemble | **Attunement field** | tune layers, hold manifestations |
-| interstellar · cluster | **Star map** | the stars around you; where to go next |
-| stellar · system | **System** | one gravity well and everything bound to it |
-| planetary and within | **Surface** | stand on a world; needs a body |
-| cellular | **Cytoplasm** | inside one cell of a living world |
+| Σ | scope | what it is | only here |
+|---|---|---|---|
+| planck · quantum | **Quantum foam** | pairs borrowing existence and paying it back | **no body works**; find the one that never cancelled |
+| cellular | **Cytoplasm** | inside one cell of a living world | change a biosphere from inside it |
+| planetary and within | **Surface** | stand on a world | terrain, weather, creatures, structures |
+| stellar · system | **System** | one gravity well and everything bound to it | trade, contact, orbital mechanics |
+| interstellar · cluster | **Star map** | the stars around you | where to go next |
+| local group → hubble | **Cosmic web** | filaments and voids | **tau is the age of the universe** |
+| galactic · beyond | **Attunement field** | tune layers, hold manifestations | the spectrum itself |
 
-**Cytoplasm** is the first scope built on the primitives, and it is deliberately
-a *place* rather than a rule set: the attunement loop runs exactly as it does
-anywhere else, so a player who learned to read a rhythm in the Electromagnetic
-layer reads one here on arrival. What is new is what the place is made of and
-what your work there does.
+Each scope is deliberately a *place* rather than a rule set: the attunement loop
+runs exactly as it does anywhere else, so a player who learned to read a rhythm
+in the Electromagnetic layer reads one on arrival anywhere. What changes is what
+the place is made of, and what your work there is worth.
+
+### Cytoplasm
 
 - The cell is derived from the host planet's own biosphere. A sterile world has
   no cell to enter and says so; a microbial one is a bare prokaryote; a
@@ -286,6 +289,42 @@ what your work there does.
   reversible stroke returns you exactly where you started. The Swimmer that
   works in an ocean refuses cytoplasm and says why; the Ciliate — almost no
   mass, enormous drag — is the body for a place where nothing coasts.
+
+### Cosmic web
+
+τ stops being a throttle and becomes the age of the universe. The structure is a
+*function* of it — growth is a closed-form logistic on each node's own primordial
+seed, so scrubbing thirteen billion years costs the same as scrubbing one. At
+0.8 Gyr nothing has collapsed and the whole slab is void; by 13.8 there are 34
+collapsed nodes and 119 filaments between them.
+
+- **A filament pays best while it is assembling**, when its growth *rate* is at
+  peak rather than its size. Reading the clock instead of the picture is a skill
+  that exists nowhere else, and the present day is usually the wrong moment to
+  be standing in.
+- **Past the event horizon** — 4.9 Gpc comoving, not the 14.3 Gpc particle
+  horizon — a structure is visible and permanently incommunicado: its old light
+  is already on its way, and nothing sent from now on will ever cross in either
+  direction. An essence recognised out there cannot be corroborated locally,
+  which is the purest statement the game can make of its own premise. The
+  Hubble-volume rung is the only slab wide enough to contain any.
+- Voids are measured, not labelled: the distance from a grid of sample points to
+  the nearest *collapsed* node, so they genuinely shrink as structure forms.
+
+### Quantum foam
+
+**You cannot wear a body here.** A body is a persistent arrangement of matter,
+and nothing at 10⁻³⁵ m persists long enough to be arranged. It is the only scope
+that refuses one outright, and it refuses for the reason that is true of the
+*place* rather than of the vessel.
+
+Everything here is a countdown, and how long a pair lasts is `persistence` — the
+axis the player has been reading everywhere else, doing here exactly what it
+says on the tin. A Memory hangs around long enough to work; a Seed is gone
+before the reticle catches it. Rarely a pair separates too far to recombine and
+what was borrowed is never repaid — which, at the largest scale, is the reason
+there is anything at all rather than nothing. Finding one is the scope's
+discovery.
 
 ## Six primitives
 
@@ -477,7 +516,9 @@ All audio is synthesised at runtime — there are no sound files.
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
 | `scenes.js` | the scene registry, the modal split, agents |
-| `scene_cellular.js` | the Cellular scope: derived cells, organelles as essences, expression |
+| `scene_cellular.js` | Cytoplasm: derived cells, organelles as essences, expression |
+| `scene_web.js` | Cosmic web: logistic structure formation, voids, the event horizon |
+| `scene_foam.js` | Quantum foam: virtual pairs, lifetimes from persistence, ejection |
 | `game.js` `save.js` | state, economy, objectives, persistence |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
 | `primhud.js` | one readout per primitive, with the predicted behaviour ghosted behind |
@@ -549,14 +590,15 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **A scene per rung.** Five of the twenty-two rungs have a distinct view; the
-  rest fall back to the planet surface or the attunement field. Scenes are a
-  registry now (`SCENES` in `scenes.js`) and the test suite asserts the ladder
-  is covered without gaps, so adding one is a row and a file. Each new scope
-  gets all twelve layer behaviours free, because the primitives are already
-  scale-parameterised — the cost is a *place*, not a rule set. Molecular,
-  orbital-shell, quantum-foam, cosmic-web and ensemble are next, and their
-  backdrop geometries are already written.
+- **The rest of the ladder.** Fourteen of the twenty-two rungs have a view of
+  their own. What is left is Molecular (`chain`), the orbital shells
+  (`orbital`), and the four ensemble rungs (`abstract`). The ensemble is the
+  interesting one: `physics.js` would lift the constants `stellar.js` and
+  `planet.js` currently hardcode into a named block, and an ensemble node would
+  be an *alternative* block — so you meet the essences you have collected
+  instantiated under different laws. Scenes are a registry (`SCENES` in
+  `scenes.js`) and the suite asserts the ladder is covered without gaps, so
+  adding one is a row and a file.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.
