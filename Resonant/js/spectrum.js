@@ -23,10 +23,22 @@
   'use strict';
   const { clamp, clamp01 } = RS.core;
 
-  /* `mode` names the mechanical character a layer imposes on the field. The
-   * field sim (field.js) reads these and genuinely plays differently under
-   * each — this is the "unique gameplay per layer" axis, and it composes with
-   * tier geometry so a layer feels different again at every scale.
+  /* ── `prim` is the layer's gameplay ───────────────────────────────────────
+   *
+   * A band does not have a hand-written mode. It declares which of the six
+   * primitives in emergence.js are live, and everything else follows: the
+   * primitive is parameterised by the *node's own essence* (its four axes) and
+   * scaled by the *tier's clock*. So one band is already many different things
+   * — Electromagnetic is a five-stroke burst when the node is a Cascade and a
+   * single even beat when it is a Lattice, fast at the cellular scale and vast
+   * at the supercluster one.
+   *
+   * Difficulty is derived from this rather than tuned: a band demanding six
+   * primitives is harder than one demanding one, which is why the list length
+   * drives `field.demandsFor()`.
+   *
+   * `mode` is kept alongside as a human-readable label and for the codex; it is
+   * no longer read by the simulation.
    *
    *   accretion   — incremental: dense, slow, passive yield, compounding
    *   flux        — tracking: nodes drift fast, alignment leaks constantly
@@ -43,6 +55,7 @@
     {
       id: 'baryonic', name: 'Baryonic', glyph: '◉',
       centre: 8, width: 7.5, minFocus: 0, hue: 205, sat: 0.34, mode: 'accretion',
+      prim: ['flow'],
       blurb: 'Matter as it presents itself. The layer consciousness is issued with.',
       rules: 'Dense, slow, forgiving. Yield accrues without attention.',
       yield: 1.0, drift: 0.35, unlockedAtStart: true
@@ -50,6 +63,7 @@
     {
       id: 'thermal', name: 'Thermal', glyph: '≋',
       centre: 44, width: 6.0, minFocus: 0, hue: 24, sat: 0.62, mode: 'flux',
+      prim: ['flow'],
       blurb: 'Disorder made visible. Everything here is on its way to equilibrium.',
       rules: 'Nodes drift and cool. Coherence leaks unless you keep tracking.',
       yield: 1.5, drift: 1.5
@@ -57,6 +71,7 @@
     {
       id: 'electromagnetic', name: 'Electromagnetic', glyph: '⌇',
       centre: 97, width: 4.6, minFocus: 0.15, hue: 187, sat: 0.75, mode: 'pulse',
+      prim: ['gate'],
       blurb: 'The layer that carries every message the baryonic layer ever sends.',
       rules: 'Nodes gate on and off. Lock only counts inside the open window.',
       yield: 2.3, drift: 0.9
@@ -64,6 +79,7 @@
     {
       id: 'probabilistic', name: 'Probabilistic', glyph: '⟡',
       centre: 168, width: 3.6, minFocus: 0.30, hue: 268, sat: 0.70, mode: 'superposed',
+      prim: ['twin'],
       blurb: 'Where outcomes have not yet been asked to choose.',
       rules: 'Each node manifests twice. Only one is load-bearing until observed.',
       yield: 3.4, drift: 1.1
@@ -71,6 +87,7 @@
     {
       id: 'vital', name: 'Vital', glyph: '⚘',
       centre: 253, width: 3.0, minFocus: 0.42, hue: 142, sat: 0.66, mode: 'recursive',
+      prim: ['nest', 'flow'],
       blurb: 'Negative entropy, held against the gradient. What life looks like from outside.',
       rules: 'Nodes nest. Locking a parent exposes its children — depth is the payout.',
       yield: 5.0, drift: 0.7
@@ -78,6 +95,7 @@
     {
       id: 'emotive', name: 'Emotional', glyph: '❥',
       centre: 341, width: 2.5, minFocus: 0.55, hue: 336, sat: 0.78, mode: 'valence',
+      prim: ['flow', 'twin'],
       blurb: 'The first layer that reacts to being observed. Its geometry is its mood.',
       rules: 'Valence attracts and repels. Patterns and colour bloom with feeling.',
       yield: 7.4, drift: 1.3
@@ -85,6 +103,7 @@
     {
       id: 'mnemonic', name: 'Mnemonic', glyph: '⌘',
       centre: 437, width: 2.1, minFocus: 0.64, hue: 47, sat: 0.60, mode: 'symbolic',
+      prim: ['order', 'nest'],
       blurb: 'Everything that has been recorded, indexed by resemblance rather than time.',
       rules: 'Signatures must be read off the glyph. Sweeping blind will not find them.',
       yield: 11.0, drift: 0.5
@@ -92,6 +111,7 @@
     {
       id: 'causal', name: 'Causal', glyph: '⇴',
       centre: 542, width: 1.75, minFocus: 0.72, hue: 12, sat: 0.72, mode: 'causal',
+      prim: ['order'],
       blurb: 'The dependency graph underneath events. Time is a projection of this.',
       rules: 'A node cannot be held before its antecedent. Order is the puzzle.',
       yield: 16.0, drift: 0.6
@@ -99,6 +119,7 @@
     {
       id: 'archetypal', name: 'Archetypal', glyph: '☉',
       centre: 655, width: 1.45, minFocus: 0.78, hue: 279, sat: 0.82, mode: 'symbolic',
+      prim: ['nest', 'order'],
       blurb: 'The small set of shapes every other layer keeps rediscovering.',
       rules: 'Essences appear undisguised here. Recognition is worth more than yield.',
       yield: 23.0, drift: 0.4
@@ -106,6 +127,7 @@
     {
       id: 'noetic', name: 'Noetic', glyph: '◈',
       centre: 771, width: 1.15, minFocus: 0.84, hue: 168, sat: 0.74, mode: 'recursive',
+      prim: ['nest', 'gate', 'flow'],
       blurb: 'Knowing without inference. The layer where the fractal store is legible.',
       rules: 'Nesting runs arbitrarily deep. Descend as far as focus will hold.',
       yield: 34.0, drift: 0.35
@@ -113,6 +135,7 @@
     {
       id: 'null', name: 'Null', glyph: '○',
       centre: 883, width: 0.9, minFocus: 0.86, hue: 220, sat: 0.10, mode: 'inverted',
+      prim: ['invert'],
       blurb: 'The absence that the other layers are figure against.',
       rules: 'Alignment is scored inverted. Everything you learned reads backwards.',
       yield: 52.0, drift: 0.9
@@ -120,6 +143,7 @@
     {
       id: 'unity', name: 'Unity', glyph: '✷',
       centre: 977, width: 0.65, minFocus: 0.90, hue: 0, sat: 0.0, mode: 'unity',
+      prim: ['gate', 'nest', 'flow', 'order', 'twin', 'invert'],
       blurb: 'One band containing all the others. Discrimination stops working here.',
       rules: 'Every layer manifests at once. There is nothing left to tune against.',
       yield: 88.0, drift: 0.25
@@ -127,7 +151,20 @@
   ];
 
   const BY_ID = Object.create(null);
-  BANDS.forEach((b, i) => { b.index = i; BY_ID[b.id] = b; });
+  BANDS.forEach((b, i) => {
+    b.index = i;
+    BY_ID[b.id] = b;
+    /* Every band must declare at least one primitive or it has no gameplay. */
+    if (!b.prim || !b.prim.length) b.prim = ['flow'];
+  });
+
+  /* Does this band run this primitive? Hot path — called per node per frame. */
+  function usesPrim(band, id) { return band.prim.indexOf(id) >= 0; }
+
+  /* How many axes a band asks of the player. Derived, not authored: it is
+   * simply how many primitives are live, which is also exactly how much there
+   * is to think about. */
+  function demandOf(band) { return band.prim.length; }
 
   const PHI_MIN = 0;
   const PHI_MAX = 1000;
@@ -240,6 +277,7 @@
 
   RS.spectrum = {
     BANDS, BY_ID, PHI_MIN, PHI_MAX,
-    effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz
+    effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz,
+    usesPrim, demandOf
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

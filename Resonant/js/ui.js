@@ -308,7 +308,12 @@
       ? man.essence.name + (gn ? ' · gnosis ' + gn : '') + (man.rarity ? ' · ' + '★'.repeat(man.rarity) : '')
       : 'Hold closer to resolve';
     const blocked = n.blocked && n.antecedent
-      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first</div>' : '';
+      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first' +
+        (n.orderNeed > 1 ? ' <small>(' + n.orderMet + '/' + n.orderNeed + ' antecedents held)</small>' : '') +
+        '</div>'
+      : (n.orderNeed > 1 && n.orderMet < n.orderNeed
+        ? '<div class="ro-block ok">' + n.orderMet + '/' + n.orderNeed + ' antecedents held · ×' +
+          n.orderBonus.toFixed(2) + '</div>' : '');
 
     node.innerHTML =
       '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(man.hue, 0.8, 0.7) + '">' +

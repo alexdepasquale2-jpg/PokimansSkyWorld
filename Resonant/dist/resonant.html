@@ -1041,10 +1041,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   'use strict';
   const { clamp, clamp01 } = RS.core;
 
-  /* `mode` names the mechanical character a layer imposes on the field. The
-   * field sim (field.js) reads these and genuinely plays differently under
-   * each — this is the "unique gameplay per layer" axis, and it composes with
-   * tier geometry so a layer feels different again at every scale.
+  /* ── `prim` is the layer's gameplay ───────────────────────────────────────
+   *
+   * A band does not have a hand-written mode. It declares which of the six
+   * primitives in emergence.js are live, and everything else follows: the
+   * primitive is parameterised by the *node's own essence* (its four axes) and
+   * scaled by the *tier's clock*. So one band is already many different things
+   * — Electromagnetic is a five-stroke burst when the node is a Cascade and a
+   * single even beat when it is a Lattice, fast at the cellular scale and vast
+   * at the supercluster one.
+   *
+   * Difficulty is derived from this rather than tuned: a band demanding six
+   * primitives is harder than one demanding one, which is why the list length
+   * drives `field.demandsFor()`.
+   *
+   * `mode` is kept alongside as a human-readable label and for the codex; it is
+   * no longer read by the simulation.
    *
    *   accretion   — incremental: dense, slow, passive yield, compounding
    *   flux        — tracking: nodes drift fast, alignment leaks constantly
@@ -1061,6 +1073,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'baryonic', name: 'Baryonic', glyph: '◉',
       centre: 8, width: 7.5, minFocus: 0, hue: 205, sat: 0.34, mode: 'accretion',
+      prim: ['flow'],
       blurb: 'Matter as it presents itself. The layer consciousness is issued with.',
       rules: 'Dense, slow, forgiving. Yield accrues without attention.',
       yield: 1.0, drift: 0.35, unlockedAtStart: true
@@ -1068,6 +1081,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'thermal', name: 'Thermal', glyph: '≋',
       centre: 44, width: 6.0, minFocus: 0, hue: 24, sat: 0.62, mode: 'flux',
+      prim: ['flow'],
       blurb: 'Disorder made visible. Everything here is on its way to equilibrium.',
       rules: 'Nodes drift and cool. Coherence leaks unless you keep tracking.',
       yield: 1.5, drift: 1.5
@@ -1075,6 +1089,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'electromagnetic', name: 'Electromagnetic', glyph: '⌇',
       centre: 97, width: 4.6, minFocus: 0.15, hue: 187, sat: 0.75, mode: 'pulse',
+      prim: ['gate'],
       blurb: 'The layer that carries every message the baryonic layer ever sends.',
       rules: 'Nodes gate on and off. Lock only counts inside the open window.',
       yield: 2.3, drift: 0.9
@@ -1082,6 +1097,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'probabilistic', name: 'Probabilistic', glyph: '⟡',
       centre: 168, width: 3.6, minFocus: 0.30, hue: 268, sat: 0.70, mode: 'superposed',
+      prim: ['twin'],
       blurb: 'Where outcomes have not yet been asked to choose.',
       rules: 'Each node manifests twice. Only one is load-bearing until observed.',
       yield: 3.4, drift: 1.1
@@ -1089,6 +1105,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'vital', name: 'Vital', glyph: '⚘',
       centre: 253, width: 3.0, minFocus: 0.42, hue: 142, sat: 0.66, mode: 'recursive',
+      prim: ['nest', 'flow'],
       blurb: 'Negative entropy, held against the gradient. What life looks like from outside.',
       rules: 'Nodes nest. Locking a parent exposes its children — depth is the payout.',
       yield: 5.0, drift: 0.7
@@ -1096,6 +1113,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'emotive', name: 'Emotional', glyph: '❥',
       centre: 341, width: 2.5, minFocus: 0.55, hue: 336, sat: 0.78, mode: 'valence',
+      prim: ['flow', 'twin'],
       blurb: 'The first layer that reacts to being observed. Its geometry is its mood.',
       rules: 'Valence attracts and repels. Patterns and colour bloom with feeling.',
       yield: 7.4, drift: 1.3
@@ -1103,6 +1121,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'mnemonic', name: 'Mnemonic', glyph: '⌘',
       centre: 437, width: 2.1, minFocus: 0.64, hue: 47, sat: 0.60, mode: 'symbolic',
+      prim: ['order', 'nest'],
       blurb: 'Everything that has been recorded, indexed by resemblance rather than time.',
       rules: 'Signatures must be read off the glyph. Sweeping blind will not find them.',
       yield: 11.0, drift: 0.5
@@ -1110,6 +1129,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'causal', name: 'Causal', glyph: '⇴',
       centre: 542, width: 1.75, minFocus: 0.72, hue: 12, sat: 0.72, mode: 'causal',
+      prim: ['order'],
       blurb: 'The dependency graph underneath events. Time is a projection of this.',
       rules: 'A node cannot be held before its antecedent. Order is the puzzle.',
       yield: 16.0, drift: 0.6
@@ -1117,6 +1137,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'archetypal', name: 'Archetypal', glyph: '☉',
       centre: 655, width: 1.45, minFocus: 0.78, hue: 279, sat: 0.82, mode: 'symbolic',
+      prim: ['nest', 'order'],
       blurb: 'The small set of shapes every other layer keeps rediscovering.',
       rules: 'Essences appear undisguised here. Recognition is worth more than yield.',
       yield: 23.0, drift: 0.4
@@ -1124,6 +1145,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'noetic', name: 'Noetic', glyph: '◈',
       centre: 771, width: 1.15, minFocus: 0.84, hue: 168, sat: 0.74, mode: 'recursive',
+      prim: ['nest', 'gate', 'flow'],
       blurb: 'Knowing without inference. The layer where the fractal store is legible.',
       rules: 'Nesting runs arbitrarily deep. Descend as far as focus will hold.',
       yield: 34.0, drift: 0.35
@@ -1131,6 +1153,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'null', name: 'Null', glyph: '○',
       centre: 883, width: 0.9, minFocus: 0.86, hue: 220, sat: 0.10, mode: 'inverted',
+      prim: ['invert'],
       blurb: 'The absence that the other layers are figure against.',
       rules: 'Alignment is scored inverted. Everything you learned reads backwards.',
       yield: 52.0, drift: 0.9
@@ -1138,6 +1161,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     {
       id: 'unity', name: 'Unity', glyph: '✷',
       centre: 977, width: 0.65, minFocus: 0.90, hue: 0, sat: 0.0, mode: 'unity',
+      prim: ['gate', 'nest', 'flow', 'order', 'twin', 'invert'],
       blurb: 'One band containing all the others. Discrimination stops working here.',
       rules: 'Every layer manifests at once. There is nothing left to tune against.',
       yield: 88.0, drift: 0.25
@@ -1145,7 +1169,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   ];
 
   const BY_ID = Object.create(null);
-  BANDS.forEach((b, i) => { b.index = i; BY_ID[b.id] = b; });
+  BANDS.forEach((b, i) => {
+    b.index = i;
+    BY_ID[b.id] = b;
+    /* Every band must declare at least one primitive or it has no gameplay. */
+    if (!b.prim || !b.prim.length) b.prim = ['flow'];
+  });
+
+  /* Does this band run this primitive? Hot path — called per node per frame. */
+  function usesPrim(band, id) { return band.prim.indexOf(id) >= 0; }
+
+  /* How many axes a band asks of the player. Derived, not authored: it is
+   * simply how many primitives are live, which is also exactly how much there
+   * is to think about. */
+  function demandOf(band) { return band.prim.length; }
 
   const PHI_MIN = 0;
   const PHI_MAX = 1000;
@@ -1258,7 +1295,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.spectrum = {
     BANDS, BY_ID, PHI_MIN, PHI_MAX,
-    effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz
+    effWidth, resonanceOf, isGhost, sample, blendVisual, bandsWithin, nearestBand, beatHz,
+    usesPrim, demandOf
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -1656,61 +1694,103 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* The irreducible set. These are not content; they are the alphabet every
    * tier and layer spells its content out of. `forms` gives the local noun for
    * each of cosmos.js's geometries — this table *is* the "local rules" idea in
-   * its most literal form. */
+   * its most literal form.
+   *
+   * ── The four axes: the entire authored seed of the game ──────────────────
+   *
+   * Fourteen essences × four numbers = 56 values, and every mechanic in the
+   * game is generated from them (see emergence.js). 12 bands × 14 essences ×
+   * 8 geometries = 1344 distinct situations, all traceable back to this table
+   * — which is what makes them *recognisable* rather than merely various.
+   *
+   *   complexity   how much structure it carries      → nesting depth, ordering depth
+   *   branching    how much it divides                → rhythm subdivision, fan-out, divergence
+   *   symmetry     how regular it is                  → duty cycle, angle regularity, twin closeness
+   *   persistence  how long it holds                  → period, gradient steadiness, inversion
+   *
+   * Each number must be a claim the essence's own `trait` string already makes
+   * in prose. Lattice is "order that repeats without a centre" → symmetry 1,
+   * branching 0. Cascade is "one event that spends itself buying a thousand
+   * others" → branching 0.9, persistence 0.2. If a number and its trait ever
+   * disagree, the trait is right and the number is a bug: the player learns
+   * these essences by their described character and then has to be able to
+   * predict their behaviour from it. */
   const ESSENCES = [
-    { id: 'boundary', name: 'Boundary', glyph: '⊂', hueShift: -18, complexity: 0.3,
+    { id: 'boundary', name: 'Boundary', glyph: '⊂', hueShift: -18, complexity: 0.35,
+      /* A closed surface: more structure than a point, no branching, regular,
+       * and it stays put — a boundary that moved would not be one. */
+      branching: 0.05, symmetry: 0.85, persistence: 0.95,
       trait: 'Separates an inside from an outside, and is neither.',
       forms: { foam: 'Horizon Quantum', orbital: 'Valence Shell', chain: 'Membrane Fold',
         cell: 'Cell Wall', body: 'Coastline', disc: 'Galactic Rim', web: 'Void Wall', abstract: 'Distinction' } },
     { id: 'flow', name: 'Flow', glyph: '≈', hueShift: 12, complexity: 0.4,
+      branching: 0.35, symmetry: 0.25, persistence: 0.30,
       trait: 'Transport down a gradient. Never the same twice, always the same shape.',
       forms: { foam: 'Probability Current', orbital: 'Electron Drift', chain: 'Solvent Channel',
         cell: 'Cytoplasmic Stream', body: 'River', disc: 'Density Wave', web: 'Filament Flow', abstract: 'Mapping' } },
     { id: 'recursion', name: 'Recursion', glyph: '⟳', hueShift: 34, complexity: 0.9,
+      branching: 0.60, symmetry: 0.80, persistence: 0.50,
       trait: 'Contains a smaller copy of itself, and is a smaller copy of something.',
       forms: { foam: 'Self-Similar Foam', orbital: 'Nested Shell', chain: 'Branched Polymer',
         cell: 'Organelle Lineage', body: 'Fern Canopy', disc: 'Sub-Spiral', web: 'Nested Void', abstract: 'Fixed Point' } },
-    { id: 'attractor', name: 'Attractor', glyph: '◎', hueShift: -34, complexity: 0.6,
+    { id: 'attractor', name: 'Attractor', glyph: '◎', hueShift: -34, complexity: 0.20,
+      /* One basin everything falls into: minimal structure, zero branching
+       * (its gradient converges hard), highly regular, and it does not move. */
+      branching: 0.00, symmetry: 0.95, persistence: 0.90,
       trait: 'Everything nearby ends up here regardless of where it started.',
       forms: { foam: 'Vacuum Minimum', orbital: 'Ground State', chain: 'Folded Core',
         cell: 'Nucleus', body: 'Basin', disc: 'Galactic Core', web: 'Great Attractor', abstract: 'Limit' } },
     { id: 'duality', name: 'Duality', glyph: '◐', hueShift: 96, complexity: 0.5,
+      branching: 0.10, symmetry: 1.00, persistence: 0.70,
       trait: 'One thing that must be described two incompatible ways at once.',
       forms: { foam: 'Virtual Pair', orbital: 'Spin Doublet', chain: 'Chirality',
         cell: 'Mitotic Pair', body: 'Binary', disc: 'Bar Mode', web: 'Filament Pair', abstract: 'Complement' } },
     { id: 'emergence', name: 'Emergence', glyph: '⁂', hueShift: 62, complexity: 1.0,
+      branching: 0.75, symmetry: 0.30, persistence: 0.25,
       trait: 'A property of the whole that none of the parts possess.',
       forms: { foam: 'Condensate', orbital: 'Molecular Bond', chain: 'Tertiary Fold',
         cell: 'Tissue', body: 'Swarm', disc: 'Spiral Pattern', web: 'Web Topology', abstract: 'Supervenience' } },
     { id: 'threshold', name: 'Threshold', glyph: '⌇', hueShift: 8, complexity: 0.45,
+      branching: 0.05, symmetry: 0.50, persistence: 0.15,
       trait: 'Below it nothing happens. Above it everything does.',
       forms: { foam: 'Symmetry Break', orbital: 'Ionisation Edge', chain: 'Melting Point',
         cell: 'Action Potential', body: 'Phase Change', disc: 'Star Formation Line', web: 'Collapse Density', abstract: 'Critical Value' } },
     { id: 'lattice', name: 'Lattice', glyph: '⧉', hueShift: -62, complexity: 0.55,
+      /* A lattice repeats *outward to its neighbours*, so it branches — evenly,
+       * which is the whole point. Zero branching would make it a chain; what
+       * distinguishes it is symmetry 1.0, a perfectly regular fan with no
+       * jitter and no centre. */
+      branching: 0.50, symmetry: 1.00, persistence: 0.95,
       trait: 'Order that repeats without a centre and without an edge.',
       forms: { foam: 'Spin Network', orbital: 'Crystal Cell', chain: 'Polymer Grid',
         cell: 'Cytoskeleton', body: 'Mineral Seam', disc: 'Resonance Ring', web: 'Sheet Structure', abstract: 'Group' } },
     { id: 'spiral', name: 'Spiral', glyph: '❋', hueShift: 22, complexity: 0.7,
+      branching: 0.10, symmetry: 0.40, persistence: 0.60,
       trait: 'Rotation that does not close. The compromise between orbit and escape.',
       forms: { foam: 'Vortex Quantum', orbital: 'Precessing Orbit', chain: 'Helix',
         cell: 'Coiled Flagellum', body: 'Cyclone', disc: 'Spiral Arm', web: 'Filament Curl', abstract: 'Iteration' } },
     { id: 'void', name: 'Void', glyph: '○', hueShift: 0, complexity: 0.15,
+      branching: 0.00, symmetry: 0.70, persistence: 1.00,
       trait: 'The absence that gives everything else its shape.',
       forms: { foam: 'False Vacuum', orbital: 'Forbidden Gap', chain: 'Vacancy',
         cell: 'Vacuole', body: 'Cavern', disc: 'Inter-arm Gap', web: 'Cosmic Void', abstract: 'Null Set' } },
     { id: 'seed', name: 'Seed', glyph: '✦', hueShift: 46, complexity: 0.35,
+      branching: 0.85, symmetry: 0.45, persistence: 0.10,
       trait: 'Compressed instructions for something enormously larger.',
       forms: { foam: 'Fluctuation', orbital: 'Nucleation Site', chain: 'Codon',
         cell: 'Spore', body: 'Germ', disc: 'Protostellar Core', web: 'Primordial Overdensity', abstract: 'Axiom' } },
     { id: 'weave', name: 'Weave', glyph: '⋈', hueShift: -8, complexity: 0.8,
+      branching: 0.40, symmetry: 0.90, persistence: 0.80,
       trait: 'Strength that exists only in the crossing, never in the strands.',
       forms: { foam: 'Entanglement', orbital: 'Hybrid Orbital', chain: 'Double Helix',
         cell: 'Mycelium', body: 'Root Mat', disc: 'Tidal Bridge', web: 'Filament Node', abstract: 'Relation' } },
     { id: 'cascade', name: 'Cascade', glyph: '⋔', hueShift: 74, complexity: 0.75,
+      branching: 0.90, symmetry: 0.15, persistence: 0.20,
       trait: 'One event that spends itself buying a thousand others.',
       forms: { foam: 'Decay Chain', orbital: 'Auger Cascade', chain: 'Reaction Cascade',
         cell: 'Signal Cascade', body: 'Avalanche', disc: 'Starburst', web: 'Merger Chain', abstract: 'Entailment' } },
     { id: 'memory', name: 'Memory', glyph: '⌸', hueShift: -46, complexity: 0.65,
+      branching: 0.20, symmetry: 0.60, persistence: 1.00,
       trait: 'The present shaped by something that has already stopped existing.',
       forms: { foam: 'Vacuum Imprint', orbital: 'Hysteresis', chain: 'Conformational State',
         cell: 'Methylation Mark', body: 'Strata', disc: 'Stellar Stream', web: 'Relic Structure', abstract: 'State' } }
@@ -1849,6 +1929,95 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return 1 + gnosisOf(game, essenceId) * 0.085;
   }
 
+  /* ── Gnosis as foresight ───────────────────────────────────────────────────
+   *
+   * The yield bonus above is the small half of understanding. This is the real
+   * one: recognising an essence in enough contexts progressively reveals its
+   * four axes, and because every mechanic in the game is generated from those
+   * four numbers (emergence.js), a revealed axis is a *prediction*.
+   *
+   * Know that Cascade has branching 0.9 and you know — without being told, and
+   * without ever having played there — that its rhythm subdivides five ways in
+   * the Electromagnetic layer, that its dependency graph fans out four wide in
+   * the Causal layer, and that its nests are wide and shallow in the Vital
+   * layer. You can walk into a layer you have never opened and already know how
+   * it will behave.
+   *
+   * That is the difference between a game that *says* knowledge is fractal and
+   * one where it demonstrably is. It only works because the world really is
+   * generated from these numbers.
+   *
+   * Reveal order is hashed per essence, so two players learn the same essence
+   * along different axes first and their intuitions genuinely differ. */
+  const AXES = ['complexity', 'branching', 'symmetry', 'persistence'];
+
+  /* Contexts needed to reveal 1, 2, 3, 4 axes. */
+  const REVEAL_AT = [2, 4, 6, 8];
+
+  function revealCount(contexts) {
+    let n = 0;
+    for (const need of REVEAL_AT) if (contexts >= need) n++;
+    return n;
+  }
+
+  /* The order this particular essence gives itself up in. Stable per essence
+   * and per world, derived by a Fisher–Yates shuffle off the address hash. */
+  function revealOrder(worldSeed, essence) {
+    const order = AXES.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = hashN(worldSeed ^ 0x0AE5, essence.index, i) % (i + 1);
+      const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+    }
+    return order;
+  }
+
+  /* What the player currently knows about an essence's generative axes.
+   * Unrevealed axes are simply absent, so a HUD can render a blank rather than
+   * a wrong guess. */
+  function predicted(game, essenceId, out) {
+    const o = out || {};
+    const ess = ESSENCE_BY_ID[essenceId];
+    o.essence = ess || null;
+    o.contexts = gnosisOf(game, essenceId);
+    o.revealed = ess ? revealCount(o.contexts) : 0;
+    o.order = ess ? revealOrder(game.seed, ess) : [];
+    /* Clear any previously-revealed values so a reused buffer cannot leak
+     * knowledge the player has not earned in this call. */
+    for (const a of AXES) o[a] = undefined;
+    for (let i = 0; i < o.revealed; i++) o[o.order[i]] = ess[o.order[i]];
+    /* What it would take to learn the next one — the thing that makes hunting
+     * an essence across contexts a deliberate strategy. */
+    o.next = ess && o.revealed < AXES.length ? o.order[o.revealed] : null;
+    o.nextAt = o.revealed < REVEAL_AT.length ? REVEAL_AT[o.revealed] : null;
+    return o;
+  }
+
+  /* Is a specific axis known? Hot path for HUD modules deciding whether to
+   * ghost in a prediction. */
+  function knows(game, essenceId, axis) {
+    const ess = ESSENCE_BY_ID[essenceId];
+    if (!ess) return false;
+    const n = revealCount(gnosisOf(game, essenceId));
+    const order = revealOrder(game.seed, ess);
+    return order.indexOf(axis) < n;
+  }
+
+  /* An essence with only its known axes filled in, for feeding a primitive to
+   * produce a *predicted* behaviour to ghost behind the real one. Unknown axes
+   * fall back to the population mean so the ghost is a reasonable guess rather
+   * than nonsense. */
+  const MEAN = { complexity: 0.58, branching: 0.31, symmetry: 0.65, persistence: 0.62 };
+  function predictedEssence(game, essenceId, out) {
+    const o = out || {};
+    const ess = ESSENCE_BY_ID[essenceId];
+    if (!ess) return null;
+    const p = predicted(game, essenceId, o.__p || (o.__p = {}));
+    o.id = ess.id; o.index = ess.index; o.name = ess.name; o.glyph = ess.glyph;
+    for (const a of AXES) o[a] = p[a] === undefined ? MEAN[a] : p[a];
+    o.confidence = p.revealed / AXES.length;
+    return o;
+  }
+
   /* Total across the ledger, for the meta-progression readout. */
   function totalGnosis(game) {
     let n = 0;
@@ -1858,8 +2027,490 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.fractal = {
     ESSENCES, ESSENCE_BY_ID, BAND_ADJ,
-    essenceAt, resolve, contextKey, gnosisOf, recognise, gnosisBonus, totalGnosis
+    essenceAt, resolve, contextKey, gnosisOf, recognise, gnosisBonus, totalGnosis,
+    AXES, REVEAL_AT, revealCount, revealOrder, predicted, knows, predictedEssence
   };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the six primitives.
+ *
+ * ── The whole design in one paragraph ─────────────────────────────────────
+ *
+ * There are no per-layer minigames in this game. There are six functions, and
+ * every mechanic anywhere is one or more of them, parameterised by the four
+ * numbers an essence carries (fractal.js) and scaled by the local clock
+ * (cosmos.js). A band declares which primitives are live (spectrum.js). A tier
+ * declares how fast and how they are drawn.
+ *
+ *     56 authored numbers  ×  6 functions  =  1344 distinct situations
+ *
+ * ── Why this and not twelve hand-written modes ────────────────────────────
+ *
+ * Because the player has to be able to *transfer knowledge*, and that only
+ * works if the world is actually generated from a small seed. Once you learn
+ * that Cascade branches (branching 0.9), you know — without being told, and
+ * without ever having played there — that its rhythm subdivides five ways, its
+ * dependency graph fans out four wide, its nests are wide and shallow, and its
+ * gradient sprays rather than converges. In every layer. At every scale.
+ *
+ * That is the premise ("one body of information, rendered differently by local
+ * rules") stated as executable code rather than as flavour text. Hand-written
+ * modes cannot do it: twelve authored minigames have twelve unrelated rule
+ * sets, and nothing a player learns in one predicts anything in another.
+ *
+ * ── Contract ──────────────────────────────────────────────────────────────
+ *
+ * Every function here is pure, allocation-free (writes into a caller-owned
+ * `out`), finite for all 14 essences × 22 tiers, and reads *all four* axes so
+ * no essence is inert in any primitive. They are called per node per frame, so
+ * they must stay cheap — no trigonometry beyond one sin/cos, no allocation.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, TAU } = RS.core;
+
+  /* Guard: primitives are called with whatever essence a cell resolved to, and
+   * a missing axis must degrade rather than produce NaN and poison a node's
+   * position for the rest of the session. */
+  function axes(ess) {
+    return {
+      c: ess && typeof ess.complexity === 'number' ? clamp01(ess.complexity) : 0.5,
+      b: ess && typeof ess.branching === 'number' ? clamp01(ess.branching) : 0.3,
+      s: ess && typeof ess.symmetry === 'number' ? clamp01(ess.symmetry) : 0.5,
+      p: ess && typeof ess.persistence === 'number' ? clamp01(ess.persistence) : 0.5
+    };
+  }
+
+  // ── GATE ─────────────────────────────────────────────────────────────────
+  /* Something is available only sometimes.
+   *
+   * `persistence` sets how long a cycle lasts, `branching` how many times it
+   * subdivides inside that cycle, `symmetry` how much of it is open. Divided by
+   * the tier's clock, which spans three orders of magnitude — so the *same*
+   * essence in the *same* band is a fast tight pulse at the cellular scale and
+   * a slow vast one at the supercluster scale, for free.
+   *
+   * The subdivision is what makes this recognisable: Cascade (branching 0.9)
+   * gives a five-stroke burst, Lattice (branching 0) gives one even beat. A
+   * player hears the difference before they read the name. */
+  /* The tier clock spans 34.0 (Planck) to 0.02 (ensemble) — a factor of 1700.
+   * Used raw that is a 2 ms strobe at one end and a 160 s wait at the other,
+   * and neither is a game. Compressing it to the 0.45 power keeps the whole
+   * ordering (small is always faster than large) and the *feeling* of tempo
+   * while shrinking the span to ~28×, which is a range a player can actually
+   * live inside. The stroke clamp below closes the remainder. */
+  const TEMPO_EXP = 0.6;
+  /* No stroke is shorter than a sixth of a second (below that the gate is a
+   * flicker rather than a rhythm) or longer than four (above that waiting for
+   * the window stops being a decision). */
+  const STROKE_MIN = 0.16, STROKE_MAX = 4.0;
+
+  function GATE(ess, scale, t, out) {
+    const o = out || {};
+    const a = axes(ess);
+    const tempo = Math.pow(Math.max(1e-3, RS.cosmos.clockAt(scale)), TEMPO_EXP);
+
+    const subdiv = 1 + Math.round(a.b * 4);
+    const duty = lerp(0.25, 0.75, a.s);
+
+    /* Phase within the current subdivision. Each stroke is `period/subdiv`
+     * long and open for `duty` of it. */
+    const strokeLen = clamp(lerp(0.35, 3.2, a.p) / tempo / subdiv, STROKE_MIN, STROKE_MAX);
+    const period = strokeLen * subdiv;
+    const phase = ((t % strokeLen) + strokeLen) % strokeLen / strokeLen;
+
+    /* Soft edges rather than a square wave — a hard gate is unplayable because
+     * there is no warning, and the ramp is what makes the rhythm readable. */
+    const edge = 0.12;
+    let open;
+    if (phase < edge) open = phase / edge;
+    else if (phase < duty - edge) open = 1;
+    else if (phase < duty) open = (duty - phase) / edge;
+    else open = 0;
+
+    o.open = clamp01(open);
+    o.period = period;
+    o.subdiv = subdiv;
+    o.duty = duty;
+    o.strokeLen = strokeLen;
+    o.phase = phase;
+    /* Time until the next opening edge — what a rhythm HUD counts down. */
+    o.nextEdge = phase < duty ? (strokeLen - phase * strokeLen) : (1 - phase) * strokeLen;
+    /* Which stroke of the bar we are on, so a HUD can show the pattern. */
+    o.stroke = Math.floor((t % period) / strokeLen);
+    return o;
+  }
+
+  // ── NEST ─────────────────────────────────────────────────────────────────
+  /* Something contains a smaller version of itself.
+   *
+   * `complexity` sets how deep, `branching` how wide, `symmetry` how much
+   * smaller each level is. Emergence (complexity 1.0) nests five deep; Void
+   * (0.15) does not nest at all, which is exactly what "the absence that gives
+   * everything else its shape" should do. */
+  function NEST(ess, out) {
+    const o = out || {};
+    const a = axes(ess);
+    o.depth = 1 + Math.floor(a.c * 4);
+    o.fanout = 1 + Math.round(a.b * 3);
+    o.ratio = lerp(0.45, 0.80, a.s);
+    /* Total children if fully expanded — the payout ceiling for a descent, and
+     * why a wide shallow essence and a narrow deep one are worth different
+     * things. */
+    o.total = o.fanout === 1 ? o.depth
+      : Math.round((Math.pow(o.fanout, o.depth) - 1) / (o.fanout - 1));
+    /* How much smaller each level is, compounded — a descent into a symmetric
+     * essence stays legible, an asymmetric one shrinks away fast. */
+    o.floor = Math.pow(o.ratio, o.depth - 1);
+    return o;
+  }
+
+  // ── FLOW ─────────────────────────────────────────────────────────────────
+  /* Something has a direction to follow.
+   *
+   * `branching` sets divergence (Seed sprays outward, Attractor converges on a
+   * point), `persistence` sets steadiness (Memory holds a gradient still,
+   * Threshold flickers). The field is derived from position and time, so it is
+   * the same everywhere for the same essence — a gradient you learn to read. */
+  function FLOW(ess, x, y, t, out) {
+    const o = out || {};
+    const a = axes(ess);
+
+    /* Divergence: below 0.5 the field points inward, above it points outward.
+     * Attractor (0.0) converges hard; Seed (0.85) sprays. */
+    const div = a.b * 2 - 1;
+    const d = Math.hypot(x, y) + 1e-5;
+
+    /* A slow rotation whose rate falls with persistence, so a steady essence's
+     * gradient is nearly static and a volatile one's swims. */
+    const wobble = (1 - a.p) * 1.6;
+    const ang = Math.atan2(y, x) + Math.sin(t * wobble + d * 3) * (1 - a.s) * 0.9;
+
+    o.gx = Math.cos(ang) * div;
+    o.gy = Math.sin(ang) * div;
+    o.divergence = a.b;
+    o.steadiness = a.p;
+    /* Strength falls off with distance for a converging field and rises for a
+     * diverging one, so following it is a real navigation problem either way. */
+    o.strength = div < 0 ? clamp01(1 / (0.4 + d)) : clamp01(d * 1.2);
+    return o;
+  }
+
+  // ── ORDER ────────────────────────────────────────────────────────────────
+  /* Something requires another thing first.
+   *
+   * `branching` sets how many prerequisites, `complexity` how deep the chain
+   * runs. Prerequisites are other *essences*, chosen by hash, so the dependency
+   * graph is stable and learnable: Cascade always needs the same things, and a
+   * player who has satisfied it once knows the shape next time. */
+  function ORDER(ess, seed, out) {
+    const o = out || {};
+    const a = axes(ess);
+    const E = RS.fractal.ESSENCES;
+    o.fanout = 1 + Math.round(a.b * 3);
+    o.depth = 1 + Math.floor(a.c * 3);
+
+    const list = o.prereqs || (o.prereqs = []);
+    list.length = 0;
+    /* Offset from the essence's own index so nothing depends on itself, and so
+     * the graph is a genuine ordering rather than a cycle. */
+    for (let i = 0; i < o.fanout; i++) {
+      const step = 1 + (RS.core.hashN(seed >>> 0, ess.index, i) % (E.length - 1));
+      list.push(E[(ess.index + step) % E.length].id);
+    }
+    /* Persistence decides whether a satisfied prerequisite *stays* satisfied.
+     * A volatile essence's chain has to be re-satisfied; a persistent one's
+     * holds, which is the difference between a puzzle and a chore. */
+    o.holds = a.p > 0.5;
+    o.decay = (1 - a.p) * 0.4;
+    return o;
+  }
+
+  // ── TWIN ─────────────────────────────────────────────────────────────────
+  /* Something exists in two places; one is load-bearing.
+   *
+   * `symmetry` sets how close the twins sit — and a symmetric essence twins
+   * *close and confusingly*, which is the right way round: Duality (symmetry
+   * 1.0) is nearly impossible to tell apart, Cascade (0.15) throws its double a
+   * long way off. `persistence` sets the `tell`: how much of the time the real
+   * one gives itself away, so deduction is possible rather than a coin flip. */
+  function TWIN(ess, seed, out) {
+    const o = out || {};
+    const a = axes(ess);
+    o.separation = lerp(0.10, 0.60, 1 - a.s);
+    o.tell = a.p;
+    /* Which of the pair is real. Stable per address, so a player who works it
+     * out and comes back is rewarded rather than re-rolled. */
+    o.realIsFirst = (RS.core.hashN(seed >>> 0, 0x7217) & 1) === 0;
+    /* How strongly the tell shows. Complexity muddies it — an intricate essence
+     * is harder to read even when it is being honest. */
+    o.clarity = clamp01(a.p * (1 - a.c * 0.45));
+    o.bias = lerp(0.5, 0.85, a.b);
+    return o;
+  }
+
+  // ── INVERT ───────────────────────────────────────────────────────────────
+  /* A rule reads backwards.
+   *
+   * `persistence` is what resists inversion — Memory and Void (1.0) barely
+   * invert at all, Seed (0.10) inverts almost completely. Which axis gets
+   * inverted is derived from symmetry, so a given essence always inverts the
+   * same way. */
+  function INVERT(ess, out) {
+    const o = out || {};
+    const a = axes(ess);
+    o.strength = 1 - a.p;
+    /* Symmetric essences invert their *phase*; asymmetric ones invert their
+     * *magnitude*. Two genuinely different kinds of backwards. */
+    o.axis = a.s > 0.5 ? 'phase' : 'magnitude';
+    o.partial = a.c > 0.6;   // complex essences invert only partly — messier
+    return o;
+  }
+
+  /* Apply an inversion to a 0..1 alignment value. Kept here so every caller
+   * inverts the same way. */
+  function applyInvert(inv, value) {
+    if (!inv || inv.strength <= 0) return value;
+    const flipped = 1 - value;
+    return lerp(value, inv.partial ? (flipped * 0.7 + value * 0.3) : flipped, inv.strength);
+  }
+
+  const BY_ID = { gate: GATE, nest: NEST, flow: FLOW, order: ORDER, twin: TWIN, invert: INVERT };
+  const IDS = ['gate', 'nest', 'flow', 'order', 'twin', 'invert'];
+
+  /* Human-readable names, used by the HUD and the guide so a player can learn
+   * the vocabulary the game is actually built from. */
+  const LABELS = {
+    gate: { name: 'Gate', glyph: '⌷', blurb: 'Available only in windows. Learn the rhythm.' },
+    nest: { name: 'Nest', glyph: '⧉', blurb: 'Contains smaller copies. Descend for the payout.' },
+    flow: { name: 'Flow', glyph: '≈', blurb: 'Has a direction. Follow the gradient.' },
+    order: { name: 'Order', glyph: '⇴', blurb: 'Needs its antecedents first. Read the graph.' },
+    twin: { name: 'Twin', glyph: '◐', blurb: 'Exists twice. One is real — find the tell.' },
+    invert: { name: 'Invert', glyph: '○', blurb: 'Reads backwards. Unlearn what you know.' }
+  };
+
+  RS.emergence = { GATE, NEST, FLOW, ORDER, TWIN, INVERT, applyInvert, axes, BY_ID, IDS, LABELS };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — one generator, every scale.
+ *
+ * ── The visual statement of the thesis ────────────────────────────────────
+ *
+ * This file draws a molecule and a galaxy with the same function. Not
+ * similar functions — the same one, called with a different `geometry`.
+ *
+ * That is not a saving; it is the argument. The premise says one body of
+ * information is rendered differently by local rules, so a spiral arm and a
+ * coiled flagellum should come out of the same generator with the same
+ * parameters and differ only in how the strokes are laid down. If they came
+ * from two hand-drawn routines the game would merely *claim* they were the
+ * same essence. This way they demonstrably are, and a player can see the
+ * kinship before they can name it.
+ *
+ * ── How it is driven ──────────────────────────────────────────────────────
+ *
+ * Entirely by the four axes in fractal.js:
+ *
+ *   branching    → fanout at each node
+ *   symmetry     → how regular the angles are (1.0 = perfectly even fan)
+ *   persistence  → how slowly segments shorten with depth
+ *   complexity   → how many levels
+ *
+ * `geometry` (from cosmos.js) chooses the stroke, and nothing else. Topology is
+ * identical across geometries for the same essence — same segment count, same
+ * depth — which is exactly what makes it self-similarity rather than variety,
+ * and which simtest asserts.
+ *
+ * ── Cost ──────────────────────────────────────────────────────────────────
+ *
+ * Writes into a caller-owned flat array of segments and allocates nothing after
+ * the first call. Segment count is bounded by MAX_SEGMENTS regardless of the
+ * essence, so a maximally branching essence at full depth cannot blow the frame
+ * budget — the recursion is capped, not trusted.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, TAU, hashF, hashN } = RS.core;
+
+  /* Hard ceiling. Emergence at fanout 4 and depth 5 would be 341 nodes; capping
+   * at 160 keeps the worst case cheap and the difference is invisible because
+   * the deepest segments are sub-pixel anyway. */
+  const MAX_SEGMENTS = 160;
+
+  /* A segment is 7 flat numbers: x0, y0, x1, y1, depth, angle, scale.
+   * Flat rather than objects because this is rebuilt for every visible node
+   * every frame at some scales. */
+  const STRIDE = 7;
+
+  function newBuffer() {
+    return { data: new Float32Array(MAX_SEGMENTS * STRIDE), count: 0, depthMax: 0 };
+  }
+
+  /* Build the structure. Pure and deterministic: the same essence always
+   * produces the same skeleton, so a player recognises an essence by its shape
+   * before they read its name. */
+  function build(essence, geometry, seed, out) {
+    const buf = out || newBuffer();
+    buf.count = 0;
+    buf.depthMax = 0;
+    buf.geometry = geometry;
+    buf.essence = essence;
+
+    const a = RS.emergence.axes(essence);
+    const depth = 1 + Math.floor(a.c * 4);
+    const fanout = 1 + Math.round(a.b * 3);
+    const decay = lerp(0.48, 0.86, a.p);
+    /* Spread narrows as symmetry rises: a perfectly symmetric essence fans out
+     * evenly and tightly, an asymmetric one throws its branches wide. */
+    const spread = lerp(1.5, 0.55, a.s);
+    /* Jitter is the inverse of symmetry, hashed so it is stable per essence. */
+    const jitter = (1 - a.s) * 0.8;
+
+    grow(buf, 0, 0, -Math.PI / 2, 1, 0, depth, fanout, decay, spread, jitter, seed >>> 0);
+    return buf;
+  }
+
+  function grow(buf, x, y, ang, len, d, maxD, fanout, decay, spread, jitter, seed) {
+    if (d >= maxD || buf.count >= MAX_SEGMENTS) return;
+
+    const x1 = x + Math.cos(ang) * len;
+    const y1 = y + Math.sin(ang) * len;
+
+    const i = buf.count * STRIDE;
+    buf.data[i] = x; buf.data[i + 1] = y;
+    buf.data[i + 2] = x1; buf.data[i + 3] = y1;
+    buf.data[i + 4] = d;
+    buf.data[i + 5] = ang;
+    buf.data[i + 6] = len;
+    buf.count++;
+    if (d > buf.depthMax) buf.depthMax = d;
+
+    for (let k = 0; k < fanout; k++) {
+      if (buf.count >= MAX_SEGMENTS) return;
+      /* Even fan, then a stable per-branch jitter. */
+      const base = fanout === 1 ? 0 : (k / (fanout - 1) - 0.5) * spread;
+      const j = (hashF(hashN(seed, d, k), 3) * 2 - 1) * jitter;
+      grow(buf, x1, y1, ang + base + j, len * decay, d + 1, maxD,
+        fanout, decay, spread, jitter, seed);
+    }
+  }
+
+  /* ── Strokes ──────────────────────────────────────────────────────────────
+   *
+   * The only thing `geometry` changes. Same skeleton, eight ways of laying ink
+   * on it — which is precisely "local rules" rendered literally.
+   */
+  function draw(ctx, buf, cx, cy, radius, hue, sat, alpha, t) {
+    if (!buf || !buf.count) return;
+    const g = buf.geometry;
+    const n = buf.count;
+    const dm = Math.max(1, buf.depthMax);
+
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    for (let s = 0; s < n; s++) {
+      const i = s * STRIDE;
+      const x0 = cx + buf.data[i] * radius, y0 = cy + buf.data[i + 1] * radius;
+      const x1 = cx + buf.data[i + 2] * radius, y1 = cy + buf.data[i + 3] * radius;
+      const d = buf.data[i + 4];
+      const len = buf.data[i + 6];
+      /* Deeper segments fade — it reads as depth and it hides the cap. */
+      const fade = alpha * (1 - d / (dm + 1) * 0.55);
+      const w = Math.max(0.6, radius * len * 0.16);
+
+      switch (g) {
+        case 'chain':
+          /* Bonds: a line with a node at each end. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat, 0.62, fade);
+          ctx.lineWidth = w * 0.7;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.fillStyle = RS.core.hsl(hue + d * 6, sat, 0.72, fade);
+          ctx.beginPath(); ctx.arc(x1, y1, w * 0.9, 0, TAU); ctx.fill();
+          break;
+
+        case 'cell':
+          /* Lobes: soft blobs along the skeleton, membrane-ish. */
+          ctx.fillStyle = RS.core.hsl(hue + d * 4, sat * 0.9, 0.5, fade * 0.5);
+          ctx.beginPath();
+          ctx.ellipse((x0 + x1) / 2, (y0 + y1) / 2,
+            Math.hypot(x1 - x0, y1 - y0) * 0.55, w * 1.6,
+            Math.atan2(y1 - y0, x1 - x0), 0, TAU);
+          ctx.fill();
+          break;
+
+        case 'web':
+          /* Filaments: thin, long, with brighter intersections. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat * 0.8, 0.6, fade * 0.75);
+          ctx.lineWidth = Math.max(0.5, w * 0.4);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          if (d < 2) {
+            ctx.fillStyle = RS.core.hsl(hue, sat, 0.8, fade * 0.6);
+            ctx.beginPath(); ctx.arc(x0, y0, w * 0.6, 0, TAU); ctx.fill();
+          }
+          break;
+
+        case 'disc':
+          /* Arms: swept, thick at the root, trailing. */
+          ctx.strokeStyle = RS.core.hsl(hue + d * 8, sat, 0.6, fade * 0.85);
+          ctx.lineWidth = w * 1.3;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.quadraticCurveTo(x0 + (x1 - x0) * 0.5 - (y1 - y0) * 0.25,
+            y0 + (y1 - y0) * 0.5 + (x1 - x0) * 0.25, x1, y1);
+          ctx.stroke();
+          break;
+
+        case 'foam':
+          /* Flecks: no continuous structure survives at this scale, only the
+           * vertices, and they flicker. */
+          if (((s * 7 + Math.floor(t * 6)) % 3) === 0) break;
+          ctx.fillStyle = RS.core.hsl(hue + s * 3, sat, 0.7, fade * 0.9);
+          ctx.fillRect(x1 - w * 0.5, y1 - w * 0.5, w, w);
+          break;
+
+        case 'orbital':
+          /* Shells: arcs at each depth rather than lines between them. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat, 0.65, fade * 0.7);
+          ctx.lineWidth = Math.max(0.5, w * 0.45);
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.hypot(x1 - cx, y1 - cy),
+            buf.data[i + 5] - 0.5, buf.data[i + 5] + 0.5);
+          ctx.stroke();
+          break;
+
+        case 'abstract':
+          /* Relations: nodes and edges, no spatial pretence. */
+          ctx.strokeStyle = RS.core.hsl(hue, sat * 0.5, 0.6, fade * 0.5);
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 3]);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = RS.core.hsl(hue, sat * 0.6, 0.75, fade);
+          ctx.beginPath(); ctx.arc(x1, y1, Math.max(1, w * 0.7), 0, TAU); ctx.fill();
+          break;
+
+        default: // 'body'
+          ctx.strokeStyle = RS.core.hsl(hue, sat, 0.62, fade);
+          ctx.lineWidth = w;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /* Topology fingerprint — two geometries of the same essence must agree on
+   * this exactly. simtest uses it to assert that geometry changes the ink and
+   * never the structure, which is the whole claim of this file. */
+  function topology(buf) {
+    return buf.count + ':' + buf.depthMax;
+  }
+
+  RS.selfsimilar = { MAX_SEGMENTS, STRIDE, newBuffer, build, draw, topology };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
 </script>
@@ -1908,6 +2559,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
        * worked. */
       streams: Object.create(null),
       t: 0,
+      /* Rhythm time. Advances with the τ dial but *not* with the rung's clock,
+       * because GATE derives its own period from the clock and would otherwise
+       * be scaled by it twice. */
+      rt: 0,
+      /* essenceId → field.t at which it was last crystallised. This is the
+       * state the ORDER primitive reads, and it is why the causal layers are a
+       * graph you work rather than a queue you drain. */
+      satisfied: Object.create(null),
       tierIndex: RS.cosmos.ROOT_INDEX,
       bandIndex: 0,
       /* Rises when the rendered reality changes out from under the player;
@@ -1944,15 +2603,51 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // --- demands -------------------------------------------------------------
 
-  /* How much each dial matters in a given band. Ramps in deliberately: this is
-   * the mechanic-per-layer curve. */
+  /* ── How much each dial matters in a given band ──────────────────────────
+   *
+   * Derived from the band's primitive set, not hand-tuned. Each primitive
+   * genuinely leans on particular dials, and a band demands a dial to the
+   * extent that *any* of its live primitives wants it — a probabilistic OR, so
+   * two primitives that both want Δ compound rather than average.
+   *
+   *   gate   wants τ hardest: a rhythm is a thing in time.
+   *   flow   wants neither. A gradient is read off φ and Σ alone, which is
+   *          exactly why it is the primitive the game opens with — and why it
+   *          is also the one that pays out passively.
+   *   nest   wants Σ (already always 1) and a little of both others.
+   *   order  wants Δ: a sequence is a position in the fourth dimension.
+   *   twin   wants Δ: the two halves of a superposition differ by phase.
+   *   invert wants everything, moderately.
+   *
+   * φ and Σ are always fully demanded — they are which layer and which rung,
+   * and nothing is legible without them. The consequence is a curve that is
+   * *shaped* rather than sloped: Baryonic and Thermal ask for nothing beyond
+   * the two dials you start with, Electromagnetic makes τ matter the instant
+   * you arrive, Probabilistic does the same for Δ, and Unity asks for all four
+   * at once. Each layer introduces the dial its own mechanics need, which is a
+   * better tutorial than a ramp because the reason is visible.
+   */
+  const DIAL_LOAD = {
+    gate:   { phase: 0.15, rate: 0.90 },
+    flow:   { phase: 0.00, rate: 0.00 },
+    nest:   { phase: 0.30, rate: 0.15 },
+    order:  { phase: 0.70, rate: 0.35 },
+    twin:   { phase: 0.75, rate: 0.20 },
+    invert: { phase: 0.60, rate: 0.60 }
+  };
+
   function demandsFor(bandIndex) {
-    return {
-      freq: 1,
-      tier: 1,
-      phase: clamp01((bandIndex - 1) / 2.6),
-      rate: clamp01((bandIndex - 2) / 2.8)
-    };
+    const band = RS.spectrum.BANDS[bandIndex];
+    let pMiss = 1, rMiss = 1;
+    if (band) {
+      for (let i = 0; i < band.prim.length; i++) {
+        const load = DIAL_LOAD[band.prim[i]];
+        if (!load) continue;
+        pMiss *= 1 - load.phase;
+        rMiss *= 1 - load.rate;
+      }
+    }
+    return { freq: 1, tier: 1, phase: clamp01(1 - pMiss), rate: clamp01(1 - rMiss) };
   }
 
   function gauss(d) { return Math.exp(-d * d); }
@@ -1995,12 +2690,29 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     let total = af * ap * ar * as;
 
-    /* The null layer scores inverted — everything the player learned reads
-     * backwards, which is the entire joke of that band. */
-    if (band.mode === 'inverted') total = 1 - total;
-    /* Unity cannot be discriminated against: everything is partly aligned and
-     * nothing is ever fully so. */
-    if (band.mode === 'unity') total = 0.45 + total * 0.5;
+    /* Inversion is a *primitive*, not a band. The Null layer runs it on every
+     * node, so the layer reads backwards — but by how much is the node's own
+     * business: INVERT.strength is 1 - persistence, so a Memory manifesting in
+     * the Null layer barely inverts at all and a Seed inverts almost totally.
+     * That is the difference between "the null band is the backwards one" and
+     * "backwards is a thing essences do, and this band is where they all do
+     * it" — the second is learnable, and gnosis on an essence tells you which
+     * way its reading will run before you ever tune it. */
+    if (RS.spectrum.usesPrim(band, 'invert')) {
+      total = RS.emergence.applyInvert(
+        RS.emergence.INVERT(man.essence, node.inv || (node.inv = {})), total);
+    }
+
+    /* Discrimination degrades as a band runs more primitives at once. With one
+     * live you can read exactly what is wrong; with six there is always
+     * something partly right and nothing ever fully so, which is precisely
+     * what the Unity layer is supposed to feel like. Derived from the count,
+     * so it arrives on its own the moment a band gets crowded. */
+    const load = RS.spectrum.demandOf(band);
+    if (load > 3) {
+      const k = clamp01((load - 3) / 3);
+      total = lerp(total, 0.45 + total * 0.5, k);
+    }
 
     return { total: clamp01(total), f: af, p: ap, r: ar, s: as, fd, pd, rd, sd, dem };
   }
@@ -2044,6 +2756,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       bob: hashF(h, 4) * TAU,
       x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
       age: 0,
+      effort: 0,
       life: 26 + hashF(h, 5) * 34,
       fade: 0,               // 0..1 presence, springs in and out
       align: 0, alignParts: null,
@@ -2051,16 +2764,22 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       resolved: 0,           // 0..1 how much of its identity is legible
       crystallised: false,
       dying: false,
-      /* mode-specific live state */
-      gate: 1,               // electromagnetic: open/closed window
+      /* Live primitive state. Every one of these is filled in by
+       * `applyPrimitives` from the node's own essence; what is stored here is
+       * only the part that cannot be derived — the per-node phase offset that
+       * stops a field of gated nodes blinking in lockstep, and the seeds of
+       * the geometry. */
+      gate: 1,
       gatePhase: hashF(h, 6) * TAU,
-      twinAng: ang + Math.PI * (0.6 + hashF(h, 7) * 0.8), // probabilistic
-      twinReal: hashF(h, 8) < 0.5,
+      gateInfo: null, flowInfo: null, nestInfo: null,
+      orderInfo: null, twinInfo: null, inv: null,
+      twinAng: ang + Math.PI * (0.6 + hashF(h, 7) * 0.8),
+      twinReal: true, twinSep: 0.3,
       collapsed: false,
-      valence: hashF(h, 9) * 2 - 1,                        // emotive
-      depth: 0,                                            // recursive nesting
+      depth: 0,
       parent: null,
-      blocked: false                                       // causal
+      blocked: false,
+      orderMet: 0, orderNeed: 0, orderBonus: 1
     };
     field.nodes.push(node);
     return node;
@@ -2069,7 +2788,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* Recursive layers: crystallising a parent exposes its children, which are
    * resolved from the *same* cell one slot deeper. Descent is the payout. */
   function spawnChildren(game, field, parent) {
-    const n = 2 + (hashN(parent.man.seed, 41) % 2);
+    const nest = parent.nestInfo || RS.emergence.NEST(parent.man.essence, {});
+    /* Fanout and depth are the essence's, not the band's — so a Cascade nests
+     * wide and a Void does not nest at all, in every layer that nests. Capped
+     * because a fanout-4 essence at depth 5 is 341 nodes and the frame budget
+     * is not a suggestion. */
+    const n = clamp(nest.fanout, 1, 3);
+    const ratio = nest.ratio;
+    if (field.nodes.length + n > capacityOf(game) * 1.7) return;
     for (let i = 0; i < n; i++) {
       const man = RS.fractal.resolve(game.seed, parent.man.tierIndex, parent.man.bandIndex,
         parent.man.cellX, parent.man.cellY, parent.man.slot + 1 + i);
@@ -2083,16 +2809,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         spin: parent.spin * 1.3,
         bob: hashF(h, 4) * TAU,
         x: parent.x, y: parent.y,
-        age: 0, life: 22 + hashF(h, 5) * 18,
+        age: 0, effort: 0, life: 22 + hashF(h, 5) * 18,
         fade: 0, align: 0, alignParts: null, coherence: 0, resolved: 0.4,
         crystallised: false, dying: false,
         gate: 1, gatePhase: hashF(h, 6) * TAU,
-        twinAng: ang + Math.PI, twinReal: hashF(h, 8) < 0.5, collapsed: false,
-        valence: hashF(h, 9) * 2 - 1,
+        gateInfo: null, flowInfo: null, nestInfo: null,
+        orderInfo: null, twinInfo: null, inv: null,
+        twinAng: ang + Math.PI, twinReal: true, twinSep: 0.3, collapsed: false,
         depth: parent.depth + 1, parent: parent.id, blocked: false,
-        /* Children are worth more the deeper they are — that is the whole
-         * reason to chase the nesting. */
-        bonus: Math.pow(1.85, parent.depth + 1)
+        orderMet: 0, orderNeed: 0, orderBonus: 1,
+        /* Children are worth more the deeper they are, and *how much* more is
+         * the essence's shrink ratio: an asymmetric essence's children shrink
+         * away fast and pay correspondingly better for being caught. That is
+         * the whole reason to chase the nesting. */
+        bonus: Math.pow(1 / ratio, parent.depth + 1)
       });
     }
   }
@@ -2109,6 +2839,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const tierClock = RS.cosmos.clockAt(D.space.value);
     const flow = D.time.value * tierClock;
     field.t += dt * Math.abs(flow);
+    field.rt += dt * Math.abs(D.time.value);
 
     const tierIndex = clamp(Math.round(D.space.value), 0, RS.cosmos.TIERS.length - 1);
     const focus = RS.dials.focusOf(D.frequency);
@@ -2176,16 +2907,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       n.x = Math.cos(n.ang) * n.rad + bx;
       n.y = Math.sin(n.ang) * n.rad + by;
 
-      // ── mode rules ────────────────────────────────────────────────────
-      applyMode(game, field, n, band, dt, sgn);
+      // ── primitives ────────────────────────────────────────────────────
+      applyPrimitives(game, field, n, band, dt, sgn);
 
       // ── alignment ─────────────────────────────────────────────────────
       const a = alignmentOf(game, n);
       n.alignParts = a;
       let eff = a.total * n.gate;
-      if (band.mode === 'superposed' && !n.collapsed && !n.twinReal) eff *= 0.35;
+      if (n.twinInfo && !n.collapsed && !n.twinReal) eff *= 0.35;
       if (n.blocked) eff *= 0.15;
       n.align = damp(n.align, eff, 12, dt);
+
+      /* Time actually spent working this node. Anything the band's primitives
+       * do to slow you down — a shut gate, a twin to resolve, a missing
+       * antecedent, a gradient carrying it away — shows up here, and the payout
+       * reads it. That is why no primitive needs a hand-written compensation
+       * factor: friction pays for itself by definition. */
+      if (n.align > 0.06) n.effort += dt;
 
       /* Resolution: a node you are anywhere near begins to become legible.
        * Below that it is an unresolved smudge with no name and no glyph — the
@@ -2209,22 +2947,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           }
           if (n.coherence >= 1) crystallise(game, bus, field, n);
         } else {
-          /* Accretion layers hold what they have gained; everything else
-           * bleeds. That single difference is what makes the baryonic layer
-           * feel like an idle game and the thermal layer feel like a chase. */
-          const decay = band.mode === 'accretion' ? 0.035 : 0.14 * (1 + band.drift);
+          /* Whether a partial hold survives being interrupted is the *node's*
+           * property, not the band's: persistence is exactly the axis that says
+           * "this stays". The band's drift only amplifies it. So a Memory in
+           * the Thermal layer holds on where a Seed in the Baryonic layer
+           * bleeds out, and the player who has read those two axes knows which
+           * nodes are worth stepping away from. */
+          const per = RS.emergence.axes(n.man.essence).p;
+          const decay = (0.03 + 0.17 * (1 - per)) * (0.5 + band.drift);
           n.coherence = Math.max(0, n.coherence - decay * dt);
         }
       }
     }
 
-    /* Passive accretion: the baryonic layer pays a trickle without attention,
-     * which is what makes leaving the game running mean something. */
-    if (RS.spectrum.BANDS[bandIndex].mode === 'accretion') {
-      game.insight += game.passiveRate * dt;
-    }
+    /* Passive accretion. FLOW is the one primitive that pays without
+     * attention — a gradient carries things to you whether or not you are
+     * watching — but only where the layer is calm enough for anything to
+     * settle, and split between however many primitives are competing for it.
+     * Baryonic (one slow flow) is therefore the idle layer; Thermal, which
+     * runs the same primitive at four times the drift, pays nothing at all. */
+    game.insight += game.passiveRate * dt * passiveShareOf(RS.spectrum.BANDS[bandIndex]);
 
     updateDerived(game);
+  }
+
+  /* What fraction of the idle floor a band pays out. See the call site. */
+  function passiveShareOf(band) {
+    if (!RS.spectrum.usesPrim(band, 'flow')) return 0;
+    return clamp01(1.25 - band.drift) / RS.spectrum.demandOf(band);
   }
 
   /* Hold time scales with what the node is worth. A common node is a beat; a
@@ -2234,65 +2984,123 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     return (1.15 + n.man.potency * 0.42 + n.man.rarity * 0.9) / (1 + n.depth * 0.25);
   }
 
-  function applyMode(game, field, n, band, dt, sgn) {
-    switch (band.mode) {
-      case 'pulse': {
-        /* Rhythmic gating. The window is generous enough to be fair and tight
-         * enough that you play to the beat rather than around it. */
-        n.gatePhase += dt * 2.1 * sgn;
-        const s = (Math.sin(n.gatePhase) + 1) / 2;
-        n.gate = s > 0.42 ? 1 : clamp01((s - 0.16) / 0.26);
-        break;
-      }
-      case 'superposed': {
-        /* Two positions, one of them load-bearing. Sustained attention
-         * collapses the pair — observation is the mechanic, not a metaphor. */
-        n.twinAng += n.spin * dt * 0.6 * sgn;
-        if (!n.collapsed && n.coherence > 0.3) n.collapsed = true;
-        n.gate = 1;
-        break;
-      }
-      case 'valence': {
-        /* Emotional physics: like valences cluster, opposites push apart, and
-         * the resulting pattern *is* the layer's appearance. */
-        let fx = 0, fy = 0;
-        for (const o of field.nodes) {
-          if (o === n || o.band !== band) continue;
-          const dx = o.x - n.x, dy = o.y - n.y;
-          const d2 = dx * dx + dy * dy + 0.004;
-          const affinity = n.valence * o.valence;
-          const f = affinity * 0.0016 / d2;
-          fx += dx * f; fy += dy * f;
+  /* ── Node behaviour ───────────────────────────────────────────────────────
+   *
+   * There is no per-band code here, and that is the entire point. A band
+   * declares which primitives are live; each primitive is called with the
+   * *node's own essence* and the *current rung*, and applies its result. So a
+   * single band is already many different things — Electromagnetic is a
+   * five-stroke burst when the node is a Cascade and one even beat when it is
+   * a Lattice, brisk at the cellular rung and ponderous at the supercluster —
+   * and a player who learned Cascade in one band can predict it in every other
+   * before they have ever tuned there. Twelve hand-written modes could not do
+   * that, because nothing learned in one would say anything about the next.
+   */
+  function applyPrimitives(game, field, n, band, dt, sgn) {
+    const E = RS.emergence;
+    const ess = n.man.essence;
+    const scale = game.dials.space.value;
+    const prim = band.prim;
+
+    n.gate = 1;
+    n.blocked = false;
+
+    for (let i = 0; i < prim.length; i++) {
+      switch (prim[i]) {
+
+        case 'gate': {
+          /* `field.rt` rather than `field.t`: GATE derives its own period from
+           * the rung's clock, so feeding it a clock-scaled time would count the
+           * scale twice and freeze the deep tiers solid. The τ dial still
+           * drives it — pushing time makes the window flicker faster, which is
+           * the one place where a high throttle genuinely costs you. */
+          const g = E.GATE(ess, scale, field.rt + n.gatePhase, n.gateInfo || (n.gateInfo = {}));
+          n.gate *= g.open;
+          break;
         }
-        n.targetRad = clamp(n.targetRad + (fx * n.x + fy * n.y) * dt * 4, 0.16, 1.02);
-        n.spin += (fy * n.x - fx * n.y) * dt * 2.5;
-        n.spin = clamp(n.spin, -0.9, 0.9);
-        n.gate = 1;
-        break;
+
+        case 'flow': {
+          /* The gradient moves the node rather than the player: a divergent
+           * essence climbs away from you and a convergent one falls inward,
+           * so "follow the flow" is a real tracking problem whose difficulty
+           * is the essence's branching number. */
+          const f = E.FLOW(ess, n.x, n.y, field.t, n.flowInfo || (n.flowInfo = {}));
+          const d = Math.hypot(n.x, n.y) + 1e-4;
+          const radial = (f.gx * n.x + f.gy * n.y) / d;
+          const tangent = (f.gy * n.x - f.gx * n.y) / d;
+          n.targetRad = clamp(n.targetRad + radial * f.strength * dt * 0.30 * sgn, 0.16, 1.08);
+          n.spin = clamp(n.spin + tangent * dt * 0.55 * sgn, -0.95, 0.95);
+          break;
+        }
+
+        case 'nest': {
+          /* No motion of its own — it decides what crystallising this node
+           * exposes, and how much the descent is worth. */
+          n.nestInfo = E.NEST(ess, n.nestInfo || {});
+          break;
+        }
+
+        case 'order': {
+          /* A node cannot be held until its antecedents have been. They are
+           * other essences, derived from this one, so the layer is a
+           * dependency graph you read and satisfy — and because ORDER.holds is
+           * the essence's persistence, a persistent essence's chain stays
+           * satisfied while a volatile one's has to be kept alive. */
+          const o = E.ORDER(ess, n.man.seed, n.orderInfo || (n.orderInfo = {}));
+          let met = 0, firstMissing = null;
+          for (let k = 0; k < o.prereqs.length; k++) {
+            const id = o.prereqs[k];
+            const stamp = field.satisfied[id];
+            /* Two ways to hold an antecedent, and the second is the whole
+             * point of the game: you have crystallised it here, recently — or
+             * you *understand* it, from having met it anywhere else in the
+             * cosmos. Gnosis earned at the cellular scale in the Thermal layer
+             * unblocks a dependency in the Causal layer at the supercluster
+             * scale, because it is the same essence and the ledger knows it. */
+            const alive = (stamp !== undefined && (o.holds || field.t - stamp < ORDER_WINDOW)) ||
+              RS.fractal.gnosisOf(game, id) > 0;
+            if (alive) met++;
+            else if (!firstMissing) firstMissing = RS.fractal.ESSENCE_BY_ID[id];
+          }
+          n.orderMet = met;
+          n.orderNeed = o.prereqs.length;
+          n.antecedent = firstMissing || RS.fractal.ESSENCE_BY_ID[o.prereqs[0]];
+          /* One satisfied antecedent unblocks; satisfying the rest is worth
+           * paying for. A wall that needs all four at once would just be a
+           * wall. */
+          n.blocked = met === 0;
+          n.orderBonus = 1 + (met - 1) * 0.55;
+          break;
+        }
+
+        case 'twin': {
+          /* Two positions, one load-bearing. Symmetry decides how close the
+           * pair sits (a symmetric essence twins confusingly close),
+           * persistence decides how much of the time the real one gives itself
+           * away, and sustained attention collapses the pair — observation is
+           * the mechanic rather than a metaphor. */
+          const w = E.TWIN(ess, n.man.seed, n.twinInfo || (n.twinInfo = {}));
+          n.twinReal = w.realIsFirst;
+          n.twinAng += n.spin * dt * 0.6 * sgn;
+          n.twinSep = w.separation;
+          if (!n.collapsed && n.coherence > 0.30 * (1.4 - w.clarity * 0.6)) n.collapsed = true;
+          break;
+        }
+
+        case 'invert': {
+          /* Read by `alignmentOf`. Held on the node so the HUD can mirror the
+           * reticle for exactly the nodes whose scoring actually runs
+           * backwards, which is not all of them. */
+          n.inv = E.INVERT(ess, n.inv || {});
+          break;
+        }
       }
-      case 'causal': {
-        /* A node cannot be held before its antecedent has been. The antecedent
-         * is another essence, derived from this one — so the layer is a
-         * dependency graph you have to read and satisfy in order. */
-        const need = RS.fractal.ESSENCES[(n.man.essence.index + 3) % RS.fractal.ESSENCES.length];
-        n.antecedent = need;
-        n.blocked = !(field.lastCrystal && field.lastCrystal === need.id);
-        n.gate = 1;
-        break;
-      }
-      case 'flux':
-        /* Thermal nodes cool as they age — the longer you dither, the less
-         * they are worth, so the layer rewards decisiveness. */
-        n.targetRad = clamp(n.targetRad + dt * 0.02 * sgn, 0.16, 1.1);
-        n.gate = 1;
-        break;
-      case 'unity':
-        n.gate = 1;
-        break;
-      default:
-        n.gate = 1;
     }
   }
+
+  /* How long an unsatisfied-by-nature antecedent stays satisfied. Only applies
+   * to essences whose persistence is below half — everything else holds. */
+  const ORDER_WINDOW = 14;
 
   function crystallise(game, bus, field, n) {
     n.crystallised = true;
@@ -2310,7 +3118,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const gnosisMul = RS.fractal.gnosisBonus(game, man.essence.id);
     const depthMul = 1 + RS.cosmos.depthFromRoot(man.tierIndex) * 0.09;
     const nestMul = n.bonus || 1;
-    const amount = man.potency * band.yield * gnosisMul * depthMul * nestMul * game.yieldMul;
+    /* Satisfying more antecedents than the one you needed pays for it. */
+    const orderMul = n.orderBonus > 1 ? n.orderBonus : 1;
+    /* Paid for the hold, not for the click. A node that took three times as
+     * long to bring in — because its layer gated, or its double had to be
+     * resolved first, or its antecedents were missing — is worth three times
+     * as much. This is the whole balance mechanism for the primitives: every
+     * friction they impose compensates itself, so a band can be made harder by
+     * composing more of them without anyone having to re-tune a yield table.
+     * Clamped at both ends so a node collected instantly still pays something
+     * and a node left simmering all session is not a farm. */
+    const effortMul = clamp(n.effort * 1.4 / holdTimeOf(n), 0.75, 5);
+    const amount = man.potency * band.yield * gnosisMul * depthMul *
+      nestMul * orderMul * effortMul * game.yieldMul;
 
     game.insight += amount;
     game.stats.crystals++;
@@ -2324,6 +3144,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     const rec = RS.fractal.recognise(game, man);
     field.lastCrystal = man.essence.id;
+    /* Stamped rather than replaced: ORDER reads the whole ledger, so a player
+     * who has recently worked several essences is holding several keys at once
+     * and can attack the dependency graph from wherever it is thinnest. */
+    field.satisfied[man.essence.id] = field.t;
 
     bus.emit('node:crystallise', {
       node: n, amount, man, band, tier,
@@ -2333,7 +3157,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (firstTier) bus.emit('discover:tier', { tier });
     if (rec.fresh) bus.emit('discover:gnosis', { essence: man.essence, level: rec.level, man });
 
-    if (band.mode === 'recursive' && n.depth < 4) spawnChildren(game, field, n);
+    if (RS.spectrum.usesPrim(band, 'nest') && n.nestInfo &&
+        n.depth + 1 < Math.min(n.nestInfo.depth, 5)) {
+      spawnChildren(game, field, n);
+    }
   }
 
   /* Aggregates the HUD and the economy read every frame. */
@@ -2364,7 +3191,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   RS.field = {
     FIELD_RADIUS, newField, tick, alignmentOf, demandsFor, capacityOf,
-    holdTimeOf, spawnNode, applyOffline, updateDerived
+    holdTimeOf, spawnNode, applyOffline, updateDerived,
+    applyPrimitives, passiveShareOf, DIAL_LOAD, ORDER_WINDOW
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
 
@@ -8224,11 +9052,15 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const hue = man.hue;
     const r = 0.036 * man.size * (1 + n.align * 0.28);
 
-    /* Probabilistic layer: the uncollapsed twin renders as a real, equally
-     * convincing node. Half the time you tune the wrong one, which is the
-     * entire mechanic. */
-    if (n.band.mode === 'superposed' && !n.collapsed) {
-      const tx = Math.cos(n.twinAng) * n.rad, ty = Math.sin(n.twinAng) * n.rad;
+    /* TWIN: the uncollapsed double renders as a real, equally convincing node.
+     * Half the time you tune the wrong one, which is the entire mechanic —
+     * and how far off it sits is the essence's symmetry, so a Duality twins
+     * almost on top of itself and a Cascade throws its double clear across
+     * the field. */
+    if (n.twinInfo && !n.collapsed) {
+      const sep = 0.35 + n.twinSep * 1.3;
+      const ta = n.ang + Math.PI * sep;
+      const tx = Math.cos(ta) * n.rad, ty = Math.sin(ta) * n.rad;
       drawSmudge(ctx, tx, ty, r, hue, a * 0.5, t, man.seed);
       if (n.resolved > 0.3) drawEssence(ctx, man, tx, ty, r, hue, a * n.resolved * 0.45, t);
     }
@@ -10228,7 +11060,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       ? man.essence.name + (gn ? ' · gnosis ' + gn : '') + (man.rarity ? ' · ' + '★'.repeat(man.rarity) : '')
       : 'Hold closer to resolve';
     const blocked = n.blocked && n.antecedent
-      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first</div>' : '';
+      ? '<div class="ro-block">Blocked — requires ' + n.antecedent.name + ' crystallised first' +
+        (n.orderNeed > 1 ? ' <small>(' + n.orderMet + '/' + n.orderNeed + ' antecedents held)</small>' : '') +
+        '</div>'
+      : (n.orderNeed > 1 && n.orderMet < n.orderNeed
+        ? '<div class="ro-block ok">' + n.orderMet + '/' + n.orderNeed + ' antecedents held · ×' +
+          n.orderBonus.toFixed(2) + '</div>' : '');
 
     node.innerHTML =
       '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(man.hue, 0.8, 0.7) + '">' +
