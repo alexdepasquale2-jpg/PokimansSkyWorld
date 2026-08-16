@@ -140,6 +140,9 @@
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Inhabitants — derived per frame, never persisted. */
+      inhabitants: null,
+      localT: 0,
       /* Molecular and orbital shells. */
       molecule: null, molIndex: 0, molT: 0,
       shells: null, shellT: 0,
@@ -272,6 +275,12 @@
     else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
     else if (s.kind === 'molecular') RS.molecular.tick(game, bus, dt);
     else if (s.kind === 'shells') RS.shells.tick(game, bus, dt);
+
+    /* Inhabitants, in every scope. Derived rather than spawned, so they were
+     * already doing this before you arrived and will be doing it when you come
+     * back — and cost nothing at all while you are elsewhere. */
+    s.inhabitants = RS.inhabitants.inhabitantsFor(game, s.kind, s.t * 1e-4 + s.localT, dt, s.inhabitants);
+    s.localT = (s.localT || 0) + dt;
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */

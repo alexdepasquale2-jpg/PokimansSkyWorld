@@ -85,6 +85,7 @@
 
     noiseBuf = makeNoise(0.5);
     buildDrone();
+    buildBed();
     buildRamp();
     started = true;
     return true;
@@ -167,6 +168,74 @@
     droneGain.gain.setTargetAtTime(vol, now, 0.09);
     droneFilter.frequency.setTargetAtTime(
       ghost ? 420 : lerp(600, 4200, res), now, 0.12);
+  }
+
+  // --- ambient beds --------------------------------------------------------
+
+  /* ── One bed per scope ────────────────────────────────────────────────────
+   *
+   * Not new machinery: one noise source and one filter, shaped differently per
+   * scope. A place that sounds the same everywhere reads as a menu, and this is
+   * the cheapest possible fix — the whole thing is two nodes and a table.
+   *
+   * The most important entry is the vacuum. Sound genuinely does not propagate
+   * where there is no medium, so the system and galaxy scopes get *silence*,
+   * and the contrast when you descend into an atmosphere and the wind arrives
+   * is worth more than any amount of texture would have been.
+   */
+  const BEDS = {
+    /* freq: the filter's centre. q: how resonant — high q is a pitch, low q is
+     * a wash. gain: how loud, and zero means genuinely silent. */
+    field:     { freq: 220,  q: 0.6, gain: 0.020, type: 'lowpass'  },
+    foam:      { freq: 5200, q: 0.4, gain: 0.055, type: 'highpass' },
+    shells:    { freq: 1400, q: 7.0, gain: 0.030, type: 'bandpass' },
+    molecular: { freq: 700,  q: 3.0, gain: 0.026, type: 'bandpass' },
+    cellular:  { freq: 300,  q: 1.6, gain: 0.040, type: 'lowpass'  },
+    planet:    { freq: 500,  q: 0.7, gain: 0.045, type: 'lowpass'  },
+    system:    { freq: 200,  q: 0.5, gain: 0.000, type: 'lowpass'  },
+    galaxy:    { freq: 200,  q: 0.5, gain: 0.000, type: 'lowpass'  },
+    web:       { freq: 70,   q: 0.8, gain: 0.050, type: 'lowpass'  },
+    ensemble:  { freq: 950,  q: 12.0, gain: 0.022, type: 'bandpass' }
+  };
+
+  let bedSrc = null, bedFilter = null, bedGain = null;
+
+  function buildBed() {
+    bedGain = ctx.createGain(); bedGain.gain.value = 0;
+    bedFilter = ctx.createBiquadFilter();
+    bedFilter.type = 'lowpass';
+    bedFilter.frequency.value = 400;
+    bedFilter.Q.value = 1;
+    bedSrc = ctx.createBufferSource();
+    bedSrc.buffer = makeNoise(4);
+    bedSrc.loop = true;
+    bedSrc.connect(bedFilter);
+    bedFilter.connect(bedGain);
+    bedGain.connect(master);
+    bedGain.connect(verbGain);
+    bedSrc.start();
+  }
+
+  /* `pressure` scales the planet surface bed, because wind is a thing air does
+   * and a body on an airless world should hear nothing but its own machinery.
+   * That is the one place in the game where the physics and the sound design
+   * are the same decision. */
+  function updateBed(sceneKind, pressure) {
+    if (!started || !enabled || !bedGain) return;
+    const b = BEDS[sceneKind] || BEDS.field;
+    const now = ctx.currentTime;
+    let gain = b.gain;
+    if (sceneKind === 'planet') {
+      /* Saturating in pressure: Mars at 0.006 bar is essentially silent, Earth
+       * at 1 is a light wind, and Venus at 92 is not 92 times louder. */
+      gain *= clamp01(1 - Math.exp(-(pressure || 0) * 2.2));
+    }
+    bedFilter.type = b.type;
+    bedFilter.frequency.setTargetAtTime(b.freq, now, 0.4);
+    bedFilter.Q.setTargetAtTime(b.q, now, 0.4);
+    /* Slow: a bed that crossfades quickly is a transition, and a bed that
+     * crossfades slowly is a place changing around you. */
+    bedGain.gain.setTargetAtTime(gain, now, 0.9);
   }
 
   // --- the coherence ramp --------------------------------------------------
@@ -412,7 +481,7 @@
   RS.audio = {
     BAND_TONE, BEAT_SCALE,
     init, unlock, setEnabled, isEnabled, isReady, suspend, resume,
-    updateDrone, updateRamp,
+    updateDrone, updateRamp, updateBed, BEDS,
     click, seat, step, crystal, discover, upheaval, purchase, deny
   };
 })(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));

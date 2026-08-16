@@ -389,6 +389,40 @@ Leaving restores our block, always. An alternative universe you had forgotten
 you were standing in would silently re-derive every star in the game and read as
 a bug rather than a mechanic.
 
+## Nowhere is empty
+
+`neural.mindAt` builds a small recurrent network from any address and steps it
+for about 200 multiply-adds. It was in the codebase from the solar layer onward,
+and exactly two things called it: creatures on a planet surface, and the mind
+you ride. Every other scope was furniture — a cell with no traffic, a filament
+with nothing falling down it, an atom whose shells were a diagram.
+
+Every scope now has its own inhabitants, from the same generator: transitions
+dropping between states in the shells, catalysts working the chain, vesicles on
+the cytoskeleton, ships in transit, somebody else's probes, galaxies falling
+down filaments, and whatever does the observing in a universe that is not ours.
+
+**They act before you arrive and continue after you leave.** Nothing is spawned
+on entry or despawned on exit, because an inhabitant that begins existing when
+you look at it is a decoration. Each one's *path* is a pure function of
+(address, scene time) — so it costs nothing while you are elsewhere, because it
+is not being simulated, it is being derived — and a real recurrent mind rides
+that path and perturbs it, so what a thing does is emergent rather than
+scripted. The test suite checks both halves: the path is byte-identical at the
+same address and time, and the mind moves it without replacing it.
+
+### And silence where there is no medium
+
+One ambient bed per scope: seething broadband in the foam, a resonant ring in
+the shells, fluid pulse in a cell, a vast low drone in the web. On a planet
+surface the wind scales with real atmospheric pressure and saturates, so Mars is
+essentially silent and Venus is not ninety times louder than Earth.
+
+The system and galaxy scopes are **silent**, because sound does not propagate
+where there is no medium. It is the one place where the physics and the sound
+design are the same decision, and the contrast when you descend into an
+atmosphere is worth more than any amount of texture would have been.
+
 ## Six primitives
 
 There are no per-layer minigames. There are **six functions**, and every mechanic
@@ -593,6 +627,7 @@ All audio is synthesised at runtime — there are no sound files.
 | `contact.js` | carriers, awareness, standing, dialogue, uplift |
 | `guide.js` | the live guide and the three pathways |
 | `neural.js` | derived recurrent minds; the influence channel |
+| `inhabitants.js` | what lives in each scope — derived paths, real minds riding them |
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
 | `scenes.js` | the scene registry, the modal split, agents |
@@ -674,11 +709,11 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **Immersion.** The ladder and the routes through it are both complete. What
-  is thin is the *texture*: ambient beds per scope, inhabitants everywhere
-  (`neural.mindAt` works at any address and almost nothing calls it), local time
-  you can feel from real `dayHours` and tidal locking, and arrival transitions
-  that show movement between scopes rather than a white flash.
+- **Immersion.** Inhabitants and ambient beds are in. What is left is *local
+  time you can feel* — day and night from real `dayHours` and tidal locking,
+  seasons from `axialTilt`, tides from `moons`, all of which are already derived
+  and none of which is rendered — and arrival transitions that show movement
+  between scopes rather than a white flash.
 - **Interface.** Seven topbar buttons and growing. They want to be one tabbed
   drawer — World / Bodies / Codex / Pathways / Guide / Settings — with Contact
   staying separate because it is event-driven and must remain unmissable.

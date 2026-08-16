@@ -22,8 +22,8 @@ const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
-  'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
-  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js', 'js/ui.js'
+  'js/neural.js', 'js/vessel.js', 'js/inhabitants.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
+  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js', 'js/audio.js', 'js/ui.js'
 ];
 
 const sandbox = {
@@ -3242,6 +3242,110 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
     }
     assert(listed, b.id + ' runs at least one primitive the sheet can show it under');
   }
+}
+
+
+// ── nowhere is empty ─────────────────────────────────────────────────────
+/* `neural.mindAt` works at any address and, until this landed, exactly two
+ * things called it. The claim is not "there are dots moving" — it is that the
+ * inhabitants were already doing this before you arrived, which is only true if
+ * their positions are derived rather than spawned. */
+{
+  const g = RS.game.newGame(90210);
+  const kinds = Object.keys(RS.inhabitants.KINDS);
+  assert(kinds.length >= 8, 'most scopes declare inhabitants (' + kinds.length + ')');
+
+  /* Every scope in the registry must have an entry, or a scope quietly ships
+   * empty and nobody notices. */
+  const missing = [];
+  for (const sc of RS.scenes.SCENES) {
+    if (!RS.inhabitants.KINDS[sc.id]) missing.push(sc.id);
+  }
+  assert(missing.length === 0, 'every scope declares what lives in it: ' + (missing.join(', ') || 'all do'));
+
+  /* Derivation, not spawning: the same address at the same time is the same
+   * population, and it exists at t=0 without anything having created it. */
+  const a = RS.inhabitants.inhabitantsFor(g, 'cellular', 0, 1 / 60, null);
+  assert(a.list.length > 0, 'a cell has traffic in it the instant you look');
+  const b = RS.inhabitants.inhabitantsFor(g, 'cellular', 0, 1 / 60, null);
+  /* The *path* is pure; the mind riding it is not, and should not be — a
+   * population that produced byte-identical output on every call would be an
+   * animation rather than a set of things with something going on inside them.
+   * So the base path must match exactly, and the real position must be close to
+   * it but free to differ. */
+  assert(a.list.every((x, i) => Math.abs(x.bx - b.list[i].bx) < 1e-9),
+    'the derived path is the same at the same address and time');
+  assert(a.list.every((x, i) => Math.hypot(x.x - x.bx, x.y - x.by) < 0.1),
+    'and the mind perturbs it rather than replacing it');
+
+  /* And it moves — a derived population that does not advance with t is a
+   * still life. */
+  const later = RS.inhabitants.inhabitantsFor(g, 'cellular', 9.0, 1 / 60, null);
+  let moved = 0;
+  for (let i = 0; i < later.list.length; i++) {
+    if (Math.hypot(later.list[i].bx - a.list[i].bx, later.list[i].by - a.list[i].by) > 0.05) moved++;
+  }
+  assert(moved > later.list.length / 2, 'and it has visibly moved on by nine seconds');
+
+  /* Bounded, and never NaN, across every scope and a long span of time. */
+  let bad = null;
+  for (const k of kinds) {
+    for (let t = 0; t < 600; t += 7.3) {
+      const r = RS.inhabitants.inhabitantsFor(g, k, t, 1 / 60, null);
+      for (const o of r.list) {
+        if (!Number.isFinite(o.x) || !Number.isFinite(o.y) || !Number.isFinite(o.bright)) bad = k + '@' + t;
+        if (Math.hypot(o.x, o.y) > 1.6) bad = k + '@' + t + ' escaped';
+      }
+    }
+  }
+  assert(!bad, 'inhabitants stay finite and stay home: ' + (bad || 'all of them'));
+
+  /* Different places have different populations, or "returning here" means
+   * nothing. */
+  const g2 = RS.game.newGame(90210);
+  g2.scene.cellIndex = 7;
+  g2.scene.cell = { type: { id: 'x' } };
+  const other = RS.inhabitants.inhabitantsFor(g2, 'cellular', 0, 1 / 60, null);
+  assert(other.list.some((x, i) => Math.abs(x.bx - a.list[i].bx) > 1e-6),
+    'a different cell has different traffic');
+
+  /* The mind state cache must not grow without bound across a long session
+   * that visits many places. */
+  const before = RS.inhabitants.states.size;
+  for (let i = 0; i < 400; i++) {
+    const gg = RS.game.newGame(i);
+    RS.inhabitants.inhabitantsFor(gg, 'web', i, 1 / 60, null);
+  }
+  assert(RS.inhabitants.states.size <= 260,
+    'mind state stays bounded over a long session (' + before + ' → ' + RS.inhabitants.states.size + ')');
+
+  /* And they exist in the live game, in every scope, without being asked for. */
+  const g3 = RS.game.newGame(4);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g3.dials.space, 'range');
+  const empty = [];
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g3, g3.dials.space, i);
+    for (let k = 0; k < 15; k++) RS.scenes.tick(g3, nullBus, 1 / 60);
+    const want = RS.inhabitants.KINDS[g3.scene.kind];
+    if (want && want.n && (!g3.scene.inhabitants || !g3.scene.inhabitants.list.length)) {
+      empty.push(RS.cosmos.TIERS[i].id);
+    }
+  }
+  assert(empty.length === 0, 'every scope is populated in play: ' + (empty.join(', ') || 'all of them'));
+}
+
+// ── silence where there is no medium ─────────────────────────────────────
+/* The one place the physics and the sound design are the same decision. */
+{
+  const B = RS.audio.BEDS;
+  for (const sc of RS.scenes.SCENES) {
+    assert(B[sc.id], sc.id + ' has an ambient bed defined');
+  }
+  assert(B.system.gain === 0 && B.galaxy.gain === 0,
+    'sound does not propagate in a vacuum, so the vacuum scopes are silent');
+  assert(B.planet.gain > 0, 'and a surface with air is not');
+  assert(B.web.freq < B.foam.freq / 10,
+    'the largest scope drones and the smallest seethes');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

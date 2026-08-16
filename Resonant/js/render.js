@@ -605,6 +605,30 @@
     }
   }
 
+  /* Whatever lives here. Deliberately small and dim: they are the difference
+   * between a place and a diagram, not the thing you are looking at, and a
+   * scope whose traffic competes with its nodes for attention would be worse
+   * than one with none. */
+  function drawInhabitants(ctx, game, t) {
+    const inh = game.scene.inhabitants;
+    if (!inh || !inh.list.length) return;
+    for (let i = 0; i < inh.list.length; i++) {
+      const o = inh.list[i];
+      const X = sx(o.x), Y = sy(o.y);
+      const r = px(o.size);
+      ctx.fillStyle = hsl(o.hue, 0.7, 0.62, 0.30 * o.bright);
+      ctx.beginPath(); ctx.arc(X, Y, r, 0, TAU); ctx.fill();
+      /* A short wake in the direction of travel — the cheapest possible way to
+       * say "this is going somewhere" rather than "this is a dot". */
+      ctx.strokeStyle = hsl(o.hue, 0.7, 0.6, 0.16 * o.bright);
+      ctx.lineWidth = Math.max(1, r * 0.7);
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X - Math.cos(o.heading) * r * 4, Y - Math.sin(o.heading) * r * 4);
+      ctx.stroke();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -950,6 +974,10 @@
       for (let i = 0; i < nodes.length; i++) {
         if (nodes[i].resolved > 0.5) drawNode(ctx, game, nodes[i], t);
       }
+
+      /* Inhabitants, under the nodes: whatever lives at this scope, doing what
+       * it was already doing. */
+      drawInhabitants(ctx, game, t);
 
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);

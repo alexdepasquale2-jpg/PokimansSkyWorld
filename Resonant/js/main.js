@@ -203,6 +203,11 @@
       RS.audio.updateDrone(D.value, band,
         RS.spectrum.resonanceOf(band, D.value, focus) * (inField ? 1 : 0.22),
         RS.spectrum.isGhost(band, focus));
+      /* The scope's ambient bed. Silent in a vacuum, which is both correct
+       * and the reason arriving in an atmosphere lands. */
+      RS.audio.updateBed(game.scene.kind,
+        game.scene.planet ? game.scene.planet.pressure : 0);
+
       const n = inField ? game.focusNode : null;
       RS.audio.updateRamp(n ? n.coherence : 0, n ? n.man.bandIndex : band.index, n);
 
