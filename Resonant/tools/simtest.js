@@ -23,7 +23,7 @@ const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
   'js/neural.js', 'js/vessel.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
-  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
+  'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js'
 ];
 
 const sandbox = {
@@ -2286,9 +2286,11 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   }
   assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL) === 'cellular',
     'the cellular rung shows the cellular scope, not a planet surface');
-  assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL - 1) === 'planet' &&
-         RS.scenes.sceneForTier(RS.scenes.TIER_CELL + 1) === 'planet',
-    'and its neighbours are unaffected');
+  /* And it does not leak: a one-rung scope owns exactly one rung, whatever
+   * happens to be on either side of it as the ladder fills in. */
+  assert(RS.scenes.sceneForTier(RS.scenes.TIER_CELL - 1) !== 'cellular' &&
+         RS.scenes.sceneForTier(RS.scenes.TIER_CELL + 1) !== 'cellular',
+    'and it owns exactly that one rung');
   assert(RS.scenes.tierForScene('cellular') === RS.scenes.TIER_CELL,
     'a pathway can name the rung the cellular scope is entered at');
 }
@@ -2927,6 +2929,141 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(bad.alternative && bad.alternative.id === 'ciliate',
     'and the status names the body that would work: ' +
     (bad.alternative ? bad.alternative.name : 'none'));
+}
+
+
+// ── molecular: handedness, and what it says about a world ────────────────
+{
+  const g = RS.game.newGame(4004);
+
+  /* Symmetry decides chirality, straight through — an essence whose mirror
+   * image is itself has no handedness, which is what perfect symmetry means. */
+  assert(!RS.molecular.isChiral(RS.fractal.ESSENCE_BY_ID.lattice),
+    'a perfectly symmetric essence is achiral');
+  assert(RS.molecular.isChiral(RS.fractal.ESSENCE_BY_ID.cascade),
+    'an asymmetric one is not');
+
+  /* Homochirality is a measurement of the biosphere, so it must be zero on a
+   * dead world and rise with complexity — that is the whole reason the scope
+   * tells you anything. */
+  const dead = { name: 'Dead', biosphere: null };
+  const faint = { name: 'Faint', biosphere: { complexity: 0.08 } };
+  const deep = { name: 'Deep', biosphere: { complexity: 0.9 } };
+  assert(RS.molecular.homochiralityOf(dead) === 0, 'nothing chooses on a sterile world');
+  assert(RS.molecular.homochiralityOf(faint) > 0, 'the first life already biases the mixture');
+  assert(RS.molecular.homochiralityOf(deep) > RS.molecular.homochiralityOf(faint),
+    'and a deep biosphere has very nearly settled it');
+  assert(RS.molecular.homochiralityOf(deep) < 1, 'but never completely');
+
+  /* The mixture must actually come out that way when sampled, or the number is
+   * a label rather than a measurement. */
+  function minorityRate(planet) {
+    let chiral = 0, minority = 0;
+    for (let i = 0; i < 120; i++) {
+      const m = RS.molecular.moleculeAt(g, planet, i * 0.017, i, null);
+      chiral += m.chiral; minority += m.minority;
+    }
+    return minority / Math.max(1, chiral);
+  }
+  const rDead = minorityRate(dead), rDeep = minorityRate(deep);
+  assert(rDead > 0.35 && rDead < 0.65,
+    'a sterile world is a near-even mixture (' + rDead.toFixed(2) + ')');
+  assert(rDeep < 0.12,
+    'a living one is overwhelmingly one hand (' + rDeep.toFixed(2) + ')');
+  assert(rDeep > 0, 'and the wrong hand still turns up sometimes — that is the find');
+
+  /* Purity, and no NaN. */
+  const a = RS.molecular.moleculeAt(g, deep, 0.5, 3, null);
+  const b = RS.molecular.moleculeAt(g, deep, 0.5, 3, null);
+  assert(a.sites.every((x, i) => x.hand === b.sites[i].hand && x.x === b.sites[i].x),
+    'a molecule is a pure function of its address');
+  for (const st of a.sites) {
+    assert(Number.isFinite(st.x) && Number.isFinite(st.size) && st.bond >= 1,
+      'every site is well formed');
+  }
+}
+
+// ── orbital shells: exclusion is the mechanic ────────────────────────────
+{
+  const g = RS.game.newGame(1717);
+  const sh = RS.shells.shellsAt(g, 3, null);
+
+  /* The rule. If two occupants ever share a state the scope is claiming
+   * something about physics that it is not doing. */
+  const seen = new Set();
+  let clash = null;
+  for (const oc of sh.occupants) {
+    const k = RS.shells.stateKey(oc.q);
+    if (seen.has(k)) clash = k;
+    seen.add(k);
+  }
+  assert(!clash, 'no two occupants share a state: ' + (clash || 'none do'));
+  assert(sh.occupants.length === RS.fractal.ESSENCES.length,
+    'every essence finds somewhere to be');
+  assert(sh.capacity > sh.occupants.length,
+    'and there is room, so the placement always terminates (' +
+    sh.occupants.length + '/' + sh.capacity + ')');
+
+  /* Quantum numbers must be legal, or the diagram is decorative. */
+  for (const oc of sh.occupants) {
+    assert(oc.q.n >= 1 && oc.q.n <= RS.shells.N_MAX, 'n is in range');
+    assert(oc.q.l >= 0 && oc.q.l <= oc.q.n - 1, 'l < n');
+    assert(Math.abs(oc.q.m) <= oc.q.l, '|m| <= l');
+    assert(oc.q.s === 1 || oc.q.s === -1, 'spin is a half-integer either way');
+  }
+
+  /* The essence axes have to be what places things, or nothing a player
+   * learned elsewhere helps them here. */
+  const attractor = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.attractor);
+  const cascade = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.cascade);
+  assert(attractor.l < cascade.l,
+    'a converging essence wants a spherical subshell and a branching one does not (' +
+    attractor.l + ' vs ' + cascade.l + ')');
+  const emergence = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.emergence);
+  const voidE = RS.shells.desiredState(RS.fractal.ESSENCE_BY_ID.void);
+  assert(emergence.n > voidE.n, 'and a complex essence sits further out than an empty one');
+
+  /* Slot counts are the real ones: 2, 6, 10, 14. */
+  assert(RS.shells.slotsIn(0) === 2 && RS.shells.slotsIn(1) === 6 &&
+         RS.shells.slotsIn(2) === 10 && RS.shells.slotsIn(3) === 14,
+    's, p, d and f hold the numbers they hold');
+
+  /* Madelung: 4s fills before 3d, which is why the periodic table looks the
+   * way it does. If this inverts, the scope is teaching something false. */
+  assert(RS.shells.energyOf(4, 0) < RS.shells.energyOf(3, 2),
+    '4s sits below 3d, as it must');
+
+  const bonus = RS.shells.bonusFor({ scene: { kind: 'shells', shells: sh } });
+  assert(bonus >= 1 && bonus < 4, 'the scope pays a bounded premium (×' + bonus.toFixed(2) + ')');
+}
+
+// ── the ladder is complete ───────────────────────────────────────────────
+{
+  const g = RS.game.newGame(9090);
+  for (let i = 0; i < 40; i++) RS.dials.applyUpgrade(g.dials.space, 'range');
+  const seen = Object.create(null);
+  let broke = null;
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    RS.dials.setValue(g, g.dials.space, i);
+    for (let k = 0; k < 20; k++) { RS.scenes.tick(g, nullBus, 1 / 60); RS.field.tick(g, nullBus, 1 / 60); }
+    const want = RS.scenes.sceneForTier(i);
+    seen[want] = true;
+    if (g.scene.kind !== want) broke = RS.cosmos.TIERS[i].id + ' → ' + g.scene.kind;
+    if (!Number.isFinite(g.insight)) broke = RS.cosmos.TIERS[i].id + ' (NaN)';
+  }
+  assert(!broke, 'every rung lands on its scope: ' + (broke || 'all 22'));
+  assert(Object.keys(seen).length === RS.scenes.SCENES.length,
+    'and all ' + RS.scenes.SCENES.length + ' scopes are reachable by turning Σ');
+
+  /* No rung falls back to a scope that is not about it. `planet` is allowed to
+   * cover a range; nothing else may quietly absorb a rung it does not describe. */
+  const fallback = [];
+  for (let i = 0; i < RS.cosmos.TIERS.length; i++) {
+    const id = RS.scenes.sceneForTier(i);
+    const sc = RS.scenes.SCENE_BY_ID[id];
+    if (sc.last - sc.first > 4 && id !== 'field' && id !== 'planet') fallback.push(RS.cosmos.TIERS[i].id);
+  }
+  assert(fallback.length === 0, 'no rung is absorbed by an unrelated scope: ' + (fallback.join(', ') || 'none'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

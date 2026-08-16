@@ -500,6 +500,111 @@
     }
   }
 
+  /* ── The molecule ────────────────────────────────────────────────────────
+   *
+   * A coiled chain of sites, bonded. Handedness is the whole point, so it is
+   * the loudest thing on screen: warm for the minority hand, cool for the
+   * majority, neutral green for the achiral sites where the question does not
+   * arise. On a sterile world the two colours are evenly mixed; on a living one
+   * the screen is nearly one colour and the odd warm site is the find.
+   */
+  function drawMolecule(ctx, game, t) {
+    const m = game.scene.molecule;
+    if (!m) return;
+    const ct = game.scene.molT || 0;
+
+    /* Bonds first. Line weight is bond order, which is the essence's
+     * persistence — how tightly it holds on, everywhere in the game. */
+    for (let i = 0; i < m.sites.length - 1; i++) {
+      const a = m.sites[i], b = m.sites[i + 1];
+      ctx.strokeStyle = hsl(200, 0.3, 0.55, 0.35);
+      ctx.lineWidth = Math.max(1, px(0.002 * a.bond));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+      /* A double or triple bond is drawn as such — it is a real distinction
+       * and it costs one extra line. */
+      for (let k = 1; k < a.bond; k++) {
+        const dx = (b.y - a.y), dy = -(b.x - a.x);
+        const len = Math.hypot(dx, dy) + 1e-5;
+        const off = px(0.006 * k) / len;
+        ctx.beginPath();
+        ctx.moveTo(sx(a.x) + dx * off, sy(a.y) + dy * off);
+        ctx.lineTo(sx(b.x) + dx * off, sy(b.y) + dy * off);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < m.sites.length; i++) {
+      const st = m.sites[i];
+      const wob = Math.sin(ct * 1.3 + i * 0.7) * 0.006;
+      const X = sx(st.x + wob), Y = sy(st.y + wob);
+      /* The minority hand gets a halo, because on a homochiral world it is the
+       * one thing in the scope worth crossing the screen for. */
+      if (st.hand < 0 && m.bias > 0.4) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(st.size * 4));
+        g.addColorStop(0, hsl(24, 0.9, 0.6, 0.4));
+        g.addColorStop(1, hsl(24, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(st.size * 4), 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = hsl(st.hue, st.chiral ? 0.75 : 0.35, 0.62, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(st.size), 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Orbital shells ──────────────────────────────────────────────────────
+   *
+   * Concentric shells with their occupants on them. Spin is drawn as a tick
+   * above or below — the only quantum number that has nowhere else to go, and
+   * the one that makes two otherwise identical occupants distinguishable, which
+   * is exactly the situation TWIN describes.
+   */
+  function drawShells(ctx, game, t) {
+    const sh = game.scene.shells;
+    if (!sh) return;
+
+    for (let n = 1; n <= sh.shells; n++) {
+      const r = 0.16 + (n - 1) / sh.shells * 0.74;
+      ctx.strokeStyle = hsl(200, 0.4, 0.5, 0.13);
+      ctx.lineWidth = Math.max(1, px(0.002));
+      ctx.beginPath();
+      ctx.ellipse(view.cx, view.cy, px(r), px(r * 0.9), 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < sh.occupants.length; i++) {
+      const oc = sh.occupants[i];
+      /* Occupants precess around their shell at a rate set by n, so an inner
+       * shell visibly runs faster — which is true and is the cheapest possible
+       * way to say "this one is more tightly bound". */
+      const a = oc.ang + t * (0.30 / oc.q.n);
+      const X = sx(Math.cos(a) * oc.rad), Y = sy(Math.sin(a) * oc.rad * 0.9);
+
+      /* Displaced occupants are excited states — about to fall back, and worth
+       * catching before they do. */
+      if (oc.excited) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(0.05));
+        g.addColorStop(0, hsl(46, 0.9, 0.66, 0.42));
+        g.addColorStop(1, hsl(46, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(0.05), 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = hsl(oc.hue, 0.7, 0.66, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(0.013), 0, TAU); ctx.fill();
+
+      /* Spin: a tick up or down. */
+      ctx.strokeStyle = hsl(oc.hue, 0.8, 0.75, 0.8);
+      ctx.lineWidth = Math.max(1, px(0.0022));
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X, Y + px(0.022) * (oc.spin > 0 ? -1 : 1));
+      ctx.stroke();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -809,6 +914,8 @@
       const inWeb = kind === 'web';
       const inFoam = kind === 'foam';
       const inEnsemble = kind === 'ensemble';
+      const inMol = kind === 'molecular';
+      const inShells = kind === 'shells';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -820,6 +927,8 @@
       else if (inWeb) drawWeb(ctx, game, t);
       else if (inFoam) drawFoam(ctx, game, t);
       else if (inEnsemble) drawEnsemble(ctx, game, t);
+      else if (inMol) drawMolecule(ctx, game, t);
+      else if (inShells) drawShells(ctx, game, t);
 
       /* The rim. A membrane in a cell, the horizon in the web, and absent in
        * the foam — there is no boundary at a scale where nothing persists long

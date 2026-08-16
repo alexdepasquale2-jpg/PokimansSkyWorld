@@ -234,6 +234,32 @@
         RS.ensemble.bonusFor(game).toFixed(2) + ' to recognise one under these laws.',
         kind: 'express' };
     }
+    if (s.kind === 'molecular') {
+      const m = s.molecule;
+      if (!m) return { text: 'Resolving…', kind: 'wait' };
+      if (m.bias < 0.1) {
+        return { text: 'Both hands in equal numbers here — nothing is choosing. Find a living world and come back.',
+          kind: 'select' };
+      }
+      if (m.anomalous) {
+        return { text: m.anomalous + ' molecule' + (m.anomalous > 1 ? 's' : '') +
+          ' of the wrong hand — the warm ones. ×' + RS.molecular.bonusFor(game).toFixed(2) + '.',
+          kind: 'express' };
+      }
+      return { text: 'Every chiral site here is the hand life chose. Sweep Σ for a sample that is not.',
+        kind: 'select' };
+    }
+    if (s.kind === 'shells') {
+      const sh = s.shells;
+      if (!sh) return { text: 'Resolving…', kind: 'wait' };
+      if (sh.degenerate) {
+        return { text: sh.degenerate + ' occupants share an energy without sharing a state. ' +
+          'That coincidence is where chemistry comes from — and it pays ×' +
+          RS.shells.bonusFor(game).toFixed(2) + '.', kind: 'express' };
+      }
+      return { text: sh.displaced + ' occupants were pushed outward because their state was taken. ' +
+        'Excited, and about to fall back.', kind: 'express' };
+    }
     if (s.kind === 'foam') {
       const f = s.foam;
       if (!f) return { text: 'Resolving…', kind: 'wait' };

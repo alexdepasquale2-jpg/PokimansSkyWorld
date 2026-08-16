@@ -260,6 +260,8 @@ Turning Σ is how you travel, and each range of rungs is somewhere different.
 | Σ | scope | what it is | only here |
 |---|---|---|---|
 | planck · quantum | **Quantum foam** | pairs borrowing existence and paying it back | **no body works**; find the one that never cancelled |
+| nucleonic · atomic | **Orbital shells** | finite states, and no two may be the same | catch a degeneracy — where chemistry comes from |
+| molecular | **Molecular** | coiled chains, and handedness | read a biosphere's depth off a bag of molecules |
 | cellular | **Cytoplasm** | inside one cell of a living world | change a biosphere from inside it |
 | planetary and within | **Surface** | stand on a world | terrain, weather, creatures, structures |
 | stellar · system | **System** | one gravity well and everything bound to it | trade, contact, orbital mechanics |
@@ -326,6 +328,37 @@ before the reticle catches it. Rarely a pair separates too far to recombine and
 what was borrowed is never repaid — which, at the largest scale, is the reason
 there is anything at all rather than nothing. Finding one is the scope's
 discovery.
+
+### Orbital shells
+
+The only scope with a **finite, contested** set of places to be. No two
+occupants may share a full set of quantum numbers — that is not a rule anybody
+chose, it is what "fermion" means, and it is why matter takes up space and why
+there is a periodic table. An essence's four axes decide the state it wants:
+complexity picks the shell, branching picks the subshell (s is spherical; p, d
+and f have progressively more lobes), symmetry picks the orientation,
+persistence picks the spin. Two essences that want the same state genuinely
+fight over it, and the loser is pushed outward into an excited state that is
+about to fall back.
+
+The find is **degeneracy** — different states that happen to share an energy.
+`4s` sits below `3d`, which the suite asserts, because that ordering is why the
+periodic table has the shape it has.
+
+### Molecular
+
+A molecule with four different groups on a carbon comes in two mirror-image
+forms that cannot be superimposed, with identical energies and identical
+spectra. Life uses one almost exclusively — every amino acid on Earth is
+left-handed — and nobody knows why it went that way.
+
+So on a sterile world the two hands appear in equal numbers, and on a living one
+the chemistry is **homochiral**. You can read a biosphere's depth off a bag of
+molecules without ever seeing an organism, which is a real technique. The find is
+the exception: on a homochiral world, the rare molecule of the wrong hand.
+
+Handedness comes from `symmetry`, straight through — an essence at symmetry 1.0
+is achiral, because its mirror image *is* itself.
 
 ### Ensemble
 
@@ -544,6 +577,8 @@ All audio is synthesised at runtime — there are no sound files.
 | `scene_web.js` | Cosmic web: logistic structure formation, voids, the event horizon |
 | `scene_foam.js` | Quantum foam: virtual pairs, lifetimes from persistence, ejection |
 | `scene_ensemble.js` | Ensemble: alternative law, adoption, the two-universe specimen |
+| `scene_molecular.js` | Molecular: chirality, and what homochirality says about a world |
+| `scene_shells.js` | Orbital shells: exclusion, Aufbau placement, degeneracy |
 | `physics.js` | the constants, gathered and swappable; ours is the default block |
 | `game.js` `save.js` | state, economy, objectives, persistence |
 | `audio.js` `feel.js` | procedural synthesis; shake/hitstop/particles/haptics |
@@ -616,12 +651,14 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **The last three rungs.** Eighteen of the twenty-two have a view of their
-  own. What is left is Molecular (`chain`) and the two orbital-shell rungs
-  (`orbital`) — both small, both following the pattern the other scopes
-  established. Scenes are a registry (`SCENES` in `scenes.js`) and the suite
-  asserts the ladder is covered without gaps, so adding one is a row and a
-  file.
+- **Pathways.** The ladder is complete — all twenty-two rungs have a scope, and
+  the suite asserts every one is reachable by turning Σ and that no rung is
+  absorbed by a scope that is not about it. What is missing is the *routes*
+  through it: **INWARD** (microscopy → cellular → molecular synthesis) and
+  **BEYOND** (causal mapping → ensemble transit) as first-class pathways
+  alongside TUNE, REACH and CONTACT, plus a **RECOGNITION** pathway now that
+  gnosis is foresight and deliberately hunting an essence across contexts is a
+  real strategy. `MICROSCOPY` is already INWARD's first node.
 - **Culture-to-culture relations.** Standing is per-player right now. Cultures
   knowing about *each other* — and about what you did to their neighbours — is
   the same derived-plus-delta pattern with one more index.

@@ -3111,6 +3111,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (k === 'web' && RS.web) return RS.web.bonusFor(game);
     if (k === 'foam' && RS.foam) return RS.foam.bonusFor(game);
     if (k === 'ensemble' && RS.ensemble) return RS.ensemble.bonusFor(game);
+    if (k === 'molecular' && RS.molecular) return RS.molecular.bonusFor(game);
+    if (k === 'shells' && RS.shells) return RS.shells.bonusFor(game);
     return 1;
   }
 
@@ -7453,6 +7455,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         active: sc.kind === 'planet', hue: 130 },
       { name: 'Cytoplasm', range: 'cellular', what: 'Inside one cell of a living world. Work here and its biosphere changes.',
         active: sc.kind === 'cellular', hue: 150 },
+      { name: 'Orbital shells', range: 'nucleonic · atomic', what: 'Finite places, and no two may be the same. Catch a degeneracy.',
+        active: sc.kind === 'shells', hue: 210 },
+      { name: 'Molecular', range: 'molecular', what: 'Handedness. A living world settled which hand it uses — find one of the other.',
+        active: sc.kind === 'molecular', hue: 196 },
       { name: 'Quantum foam', range: 'planck · quantum', what: 'Nothing persists, including your body. Find the pair that never cancelled.',
         active: sc.kind === 'foam', hue: 291 },
       { name: 'Cosmic web', range: 'local group → hubble volume', what: 'τ is the age of the universe. Catch a filament while it assembles.',
@@ -8550,6 +8556,383 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 </script>
 <script>
+/* Resonant — the Molecular scope. Rung 4, and the one place handedness matters.
+ *
+ * ── The only-here rule: chirality ─────────────────────────────────────────
+ *
+ * A molecule with four different groups on a carbon comes in two forms that are
+ * mirror images and cannot be superimposed — left-handed and right-handed. They
+ * have identical energies, identical spectra, identical everything a physicist
+ * measures. And life uses one of them almost exclusively: every amino acid in
+ * every organism on Earth is left-handed, every sugar right-handed, and nobody
+ * knows why it went that way rather than the other.
+ *
+ * That is the scope. On a sterile world the two handednesses are found in equal
+ * numbers, because nothing is selecting. On a living world the chemistry is
+ * **homochiral** — one hand dominates, and the fraction that has been driven
+ * out is a direct measurement of how thoroughly life has taken the place over.
+ * You can read a biosphere's depth off a bag of molecules without ever seeing
+ * an organism, which is a real technique and a genuinely different way to look
+ * at a world.
+ *
+ * And the discovery is the exception: on a homochiral world, the rare molecule
+ * of the *wrong* hand. It is either contamination, or abiotic, or something
+ * living that does not share an ancestor with everything else there.
+ *
+ * ── Where handedness comes from ───────────────────────────────────────────
+ *
+ * `symmetry`, straight through. An essence with symmetry 1.0 is achiral — its
+ * mirror image *is* itself, so the question does not arise, which is exactly
+ * what perfect symmetry means. Below that, the lower the symmetry the more
+ * strongly a molecule commits to one hand. The player has been reading that
+ * axis since the first layer; here it decides something no other scope uses it
+ * for.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  const SITE_COUNT = 14;
+
+  /* Below this, an essence is symmetric enough that its mirror image is itself
+   * and handedness is not defined. */
+  const ACHIRAL_ABOVE = 0.92;
+
+  function isChiral(ess) {
+    return RS.emergence.axes(ess).s < ACHIRAL_ABOVE;
+  }
+
+  /* How strongly life here has driven out one hand. Zero on a sterile world —
+   * an equal mixture, which is what chemistry produces when nothing is
+   * choosing — and rising toward total as a biosphere deepens. */
+  function homochiralityOf(planet) {
+    const bio = planet && planet.biosphere;
+    if (!bio) return 0;
+    /* Saturating: the first stirrings of life already bias the mixture
+     * noticeably, and a mature biosphere is very nearly pure. */
+    return clamp01(1 - Math.exp(-bio.complexity * 3.4));
+  }
+
+  /* Which hand this particular molecule is. On a sterile world it is a coin
+   * flip; on a living one the coin is weighted by how homochiral the place is,
+   * and the rare exception is the find. */
+  function handOf(seed, i, bias) {
+    const u = hashF(hashN(seed >>> 0, i, 0x0CA1), 3);
+    /* `bias` 0 → half and half. `bias` 1 → the minority hand essentially never
+     * appears. The threshold is the fraction of the minority hand. */
+    const minority = (1 - bias) * 0.5;
+    return u < minority ? -1 : 1;
+  }
+
+  function moleculeAt(game, planet, patch, index, out) {
+    const o = out || {};
+    const bias = homochiralityOf(planet);
+    const seed = hashN(game.seed ^ 0x3013, Math.round(patch * 1e4), index);
+    const sites = o.sites || (o.sites = []);
+    sites.length = 0;
+
+    let chiral = 0, minority = 0;
+    for (let i = 0; i < SITE_COUNT; i++) {
+      const h = hashN(seed, i, 11);
+      const ess = RS.fractal.essenceAt(game.seed, index * 613 + i, Math.round(patch * 1e3));
+      const chi = isChiral(ess);
+      const hand = chi ? handOf(seed, i, bias) : 0;
+      if (chi) { chiral++; if (hand < 0) minority++; }
+
+      /* Sites sit on a chain that coils — the `chain` geometry's own shape, and
+       * the reason the rung looks like nothing else on the ladder. */
+      const u = i / SITE_COUNT;
+      const turns = 2.4;
+      const ang = u * TAU * turns + hashF(h, 1) * 0.18;
+      const rad = 0.18 + u * 0.62;
+
+      sites.push({
+        i, essence: ess,
+        form: (ess.forms && ess.forms.chain) || ess.name,
+        chiral: chi, hand,
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad * 0.82,
+        size: 0.030 + hashF(h, 2) * 0.030,
+        /* Bond order to the next site — how tightly it is held, which is the
+         * essence's persistence doing what it says everywhere else. */
+        bond: 1 + Math.round(RS.emergence.axes(ess).p * 2),
+        hue: chi ? (hand < 0 ? 24 : 196) : 140
+      });
+    }
+
+    o.sites = sites;
+    o.bias = bias;
+    o.chiral = chiral;
+    /* The find: molecules of the hand life here does *not* use. On a sterile
+     * world this is meaningless (both hands are equally common); on a deeply
+     * homochiral one it is the anomaly the whole scope exists to notice. */
+    o.minority = minority;
+    o.anomalous = bias > 0.5 ? minority : 0;
+    o.host = planet ? planet.name : null;
+    o.patch = patch;
+    o.index = index;
+    return o;
+  }
+
+  function reasonAbsent(planet) {
+    if (!planet) return 'no world selected';
+    /* Molecules exist everywhere; there is nothing to refuse. The scope is
+     * simply much less interesting on a world with no chemistry worth the
+     * name, and it says so rather than pretending. */
+    return null;
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    s.molIndex = s.molIndex || 0;
+    s.molecule = moleculeAt(game, s.planet, RS.cellular.patchOf(s), s.molIndex, s.molecule);
+    bus.emit('molecule:enter', { molecule: s.molecule });
+    return s.molecule;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    s.molT = (s.molT || 0) + dt * 0.7;
+    if (!s.molecule) enter(game, bus);
+  }
+
+  /* Finding the wrong-handed molecule on a world that settled the question
+   * long ago is the scope's discovery, and it scales with how settled the
+   * question is — an anomaly in a 50/50 mixture is not an anomaly. */
+  function bonusFor(game) {
+    const s = game.scene;
+    const m = s.molecule;
+    if (s.kind !== 'molecular' || !m) return 1;
+    return 1 + clamp01(m.anomalous / 3) * m.bias * 2.2;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const m = s.molecule;
+    if (!m) return { title: 'Molecular', sub: 'resolving…' };
+    const pct = Math.round(m.bias * 100);
+    return {
+      title: m.bias > 0.5 ? 'Homochiral Chemistry' : 'Racemic Chemistry',
+      sub: m.bias < 0.05
+        ? 'Both hands in equal numbers. Nothing here is choosing.'
+        : pct + '% of one hand — life here settled the question and never revisited it.',
+      bias: m.bias,
+      chiral: m.chiral,
+      anomalous: m.anomalous,
+      host: m.host,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.molecular = {
+    SITE_COUNT, ACHIRAL_ABOVE, isChiral, homochiralityOf, handOf,
+    moleculeAt, reasonAbsent, enter, tick, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
+/* Resonant — the Orbital Shell scope. Rungs 2–3, and the only place where two
+ * things are forbidden from being the same.
+ *
+ * ── The only-here rule: exclusion ─────────────────────────────────────────
+ *
+ * Every other scope in the game lets manifestations overlap freely. Here they
+ * cannot: no two occupants may share a full set of quantum numbers (n, l, m,
+ * s). That is not a rule anybody chose — it is what "fermion" means — and it is
+ * the reason matter takes up space, the reason there is a periodic table, and
+ * the reason a star can stop collapsing.
+ *
+ * Mechanically it makes this the one scope with a **finite, contested** set of
+ * places to be. A shell has 2(2l+1) slots and no more. Occupied slots are gone.
+ * Which slot a manifestation lands in is derived from its essence, so two
+ * essences that want the same state genuinely fight over it, and the one that
+ * loses is displaced outward to a higher shell — which costs energy, and shows.
+ *
+ * ── What you can find only here: degeneracy ───────────────────────────────
+ *
+ * Two configurations with different quantum numbers but the *same* energy. In
+ * our universe they are the reason chemistry exists — degenerate orbitals are
+ * where bonds come from — and they are unstable to any perturbation, so
+ * catching one is catching a coincidence. The scope pays for it, and how many
+ * there are depends on the physics block, which means the Ensemble and this
+ * scope talk to each other without either being told about the other.
+ *
+ * ── TWIN is native here ───────────────────────────────────────────────────
+ *
+ * Spin-up and spin-down share every other quantum number and differ only in the
+ * one that cannot be observed without choosing it. The Probabilistic layer's
+ * primitive is not a metaphor at this rung; it is the literal situation.
+ */
+(function (RS) {
+  'use strict';
+  const { clamp, clamp01, lerp, hashF, hashN, TAU } = RS.core;
+
+  /* How many shells to render. Beyond n = 5 the radii are too close together
+   * to read and nothing interesting is happening out there anyway. */
+  const N_MAX = 5;
+
+  /* Slots in subshell l: 2(2l+1) — two spins × (2l+1) orientations. */
+  function slotsIn(l) { return 2 * (2 * l + 1); }
+
+  /* Energy of a state, in arbitrary but ordered units. The Madelung rule —
+   * order by (n + l), then by n — is why 4s fills before 3d and therefore why
+   * the periodic table has the shape it has. Degeneracies are exactly the
+   * states that tie. */
+  function energyOf(n, l) { return (n + l) + n / 100; }
+
+  /* Which state an essence wants. Derived, so an essence always goes for the
+   * same place and a player learns where to expect it — and so two essences
+   * that both want it genuinely collide. */
+  function desiredState(ess) {
+    const a = RS.emergence.axes(ess);
+    /* Complexity picks the principal number: an intricate essence sits further
+     * out, which is both the obvious reading and the useful one. */
+    const n = 1 + Math.floor(a.c * (N_MAX - 1) + 0.5);
+    /* Branching picks the subshell: s is spherical (no branching), p, d and f
+     * have progressively more lobes. Exactly what `branching` means. */
+    const l = Math.min(n - 1, Math.round(a.b * 3));
+    /* Symmetry picks the orientation within the subshell. */
+    const m = Math.round((a.s * 2 - 1) * l);
+    /* Persistence picks the spin, so a Memory and a Seed in the same orbital
+     * are the two halves of a pair rather than a collision. */
+    const s = a.p >= 0.5 ? 1 : -1;
+    return { n, l, m, s };
+  }
+
+  function stateKey(q) { return q.n + ':' + q.l + ':' + q.m + ':' + q.s; }
+
+  /* ── The configuration ────────────────────────────────────────────────────
+   *
+   * Fill the shells with essences, honouring exclusion. An essence whose state
+   * is taken is pushed outward until it finds one free — the Aufbau principle
+   * running as a placement algorithm rather than as a diagram.
+   */
+  function shellsAt(game, scale, out) {
+    const o = out || {};
+    const occupants = o.occupants || (o.occupants = []);
+    occupants.length = 0;
+    const taken = o.__taken || (o.__taken = new Map());
+    taken.clear();
+
+    const E = RS.fractal.ESSENCES;
+    let displaced = 0;
+
+    for (let i = 0; i < E.length; i++) {
+      const ess = E[i];
+      const want = desiredState(ess);
+      let q = want, bumped = 0;
+      /* Walk outward until a free state turns up. It always does: there are
+       * far more states within N_MAX than there are essences. */
+      while (taken.has(stateKey(q)) && bumped < 40) {
+        bumped++;
+        let n = q.n, l = q.l, m = q.m, s = q.s;
+        if (s > 0) s = -1;                    // try the other spin first
+        else { s = 1; m++; }                  // then the next orientation
+        if (m > l) { m = -l; l++; }           // then the next subshell
+        if (l > n - 1) { l = 0; m = 0; n++; } // then the next shell
+        if (n > N_MAX) { n = 1; l = 0; m = 0; }
+        q = { n, l, m, s };
+      }
+      taken.set(stateKey(q), ess.id);
+      if (bumped) displaced++;
+
+      const shell = q.n;
+      const rad = 0.16 + (shell - 1) / N_MAX * 0.74;
+      /* Position within the shell from the orientation, so m is visible as an
+       * angle rather than being a number in a tooltip. */
+      const ang = (q.m + q.l + 0.5) / (2 * q.l + 1) * TAU + q.l * 0.6;
+
+      occupants.push({
+        essence: ess,
+        form: (ess.forms && ess.forms.orbital) || ess.name,
+        q, want, bumped,
+        /* Energy cost of being displaced. Real: a displaced electron is in an
+         * excited state and wants to fall back. */
+        excited: bumped > 0,
+        energy: energyOf(q.n, q.l),
+        x: Math.cos(ang) * rad, y: Math.sin(ang) * rad * 0.9,
+        rad, ang,
+        /* Spin-up and spin-down are the literal TWIN of this rung. */
+        spin: q.s,
+        hue: 196 + q.l * 26 + (q.s > 0 ? 0 : 18)
+      });
+    }
+
+    /* Degeneracies: distinct states that happen to share an energy. In our
+     * block the Madelung ordering produces plenty; in a block where the
+     * mass–luminosity exponents have moved, fewer or more — so the Ensemble
+     * changes what this rung contains without either scope knowing about the
+     * other. */
+    const byEnergy = new Map();
+    for (const oc of occupants) {
+      const k = oc.energy.toFixed(3);
+      byEnergy.set(k, (byEnergy.get(k) || 0) + 1);
+    }
+    let degenerate = 0;
+    for (const [, n] of byEnergy) if (n > 1) degenerate += n;
+
+    o.occupants = occupants;
+    o.displaced = displaced;
+    o.degenerate = degenerate;
+    o.shells = N_MAX;
+    o.capacity = capacityWithin(N_MAX);
+    o.scale = scale;
+    return o;
+  }
+
+  function capacityWithin(nMax) {
+    let n = 0;
+    for (let i = 1; i <= nMax; i++) for (let l = 0; l < i; l++) n += slotsIn(l);
+    return n;
+  }
+
+  function enter(game, bus) {
+    const s = game.scene;
+    s.shells = shellsAt(game, game.dials.space.value, s.shells);
+    bus.emit('shells:enter', { shells: s.shells });
+    return s.shells;
+  }
+
+  function tick(game, bus, dt) {
+    const s = game.scene;
+    s.shellT = (s.shellT || 0) + dt;
+    if (!s.shells) enter(game, bus);
+  }
+
+  /* Degeneracy is a coincidence and coincidences are worth catching. Displaced
+   * occupants pay too — an excited state is a thing that is about to stop
+   * being, and working one before it falls back is the timing element this rung
+   * has instead of a gate. */
+  function bonusFor(game) {
+    const s = game.scene;
+    const sh = s.shells;
+    if (s.kind !== 'shells' || !sh) return 1;
+    return 1 + clamp01(sh.degenerate / 8) * 1.4 + clamp01(sh.displaced / 6) * 0.8;
+  }
+
+  function readout(game) {
+    const s = game.scene;
+    const sh = s.shells;
+    if (!sh) return { title: 'Orbital Shells', sub: 'resolving…' };
+    return {
+      title: 'Orbital Shells',
+      sub: 'No two occupants may share a state. That is why matter takes up space.',
+      occupied: sh.occupants.length,
+      capacity: sh.capacity,
+      displaced: sh.displaced,
+      degenerate: sh.degenerate,
+      bonus: bonusFor(game)
+    };
+  }
+
+  RS.shells = {
+    N_MAX, slotsIn, energyOf, desiredState, stateKey, shellsAt,
+    capacityWithin, enter, tick, bonusFor, readout
+  };
+})(typeof window !== 'undefined' ? (window.RS = window.RS || {}) : (globalThis.RS = globalThis.RS || {}));
+
+</script>
+<script>
 /* Resonant — the scene stack: field → system → planet surface.
  *
  * ── The modal split, and why it is the best idea in this file ──────────────
@@ -8605,11 +8988,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const TIER_GROUP = RS.cosmos.BY_ID.group.index;            // 14
   const TIER_HUBBLE = RS.cosmos.BY_ID.hubble.index;          // 17
   const TIER_ENSEMBLE = RS.cosmos.BY_ID.inflationary.index;  // 18
+  const TIER_ATOMIC = RS.cosmos.BY_ID.atomic.index;          // 3
+  const TIER_MOLECULAR = RS.cosmos.BY_ID.molecular.index;    // 4
 
   const SCENES = [
     {
       id: 'foam', name: 'Quantum Foam', first: 0, last: TIER_QUANTUM,
       blurb: 'Below the scale at which anything persists. No body works here.'
+    },
+    {
+      id: 'shells', name: 'Orbital Shells', first: TIER_QUANTUM + 1, last: TIER_ATOMIC,
+      blurb: 'Where no two occupants may share a state. That is why matter takes up space.'
+    },
+    {
+      id: 'molecular', name: 'Molecular', first: TIER_MOLECULAR, last: TIER_MOLECULAR,
+      blurb: 'Chains and handedness. A living world settles which hand it uses and never revisits it.'
     },
     {
       id: 'cellular', name: 'Cytoplasm', first: TIER_CELL, last: TIER_CELL,
@@ -8682,6 +9075,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Molecular and orbital shells. */
+      molecule: null, molIndex: 0, molT: 0,
+      shells: null, shellT: 0,
       /* Ensemble. `blockNode` is the alternative physics currently adopted;
        * `specimen` is one address derived under both blocks side by side. */
       ensemble: null,
@@ -8809,6 +9205,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     else if (s.kind === 'web') RS.web.tick(game, bus, dt);
     else if (s.kind === 'foam') RS.foam.tick(game, bus, dt);
     else if (s.kind === 'ensemble') RS.ensemble.tick(game, bus, dt);
+    else if (s.kind === 'molecular') RS.molecular.tick(game, bus, dt);
+    else if (s.kind === 'shells') RS.shells.tick(game, bus, dt);
 
     /* The body is integrated in every scene — even the attunement field, where
      * a mote drifts. */
@@ -8881,6 +9279,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     } else if (kind === 'ensemble') {
       s.agents.length = 0;
       RS.ensemble.enter(game, bus);
+    } else if (kind === 'molecular') {
+      /* Molecules belong to a world, so the same rule as the cell: arriving
+       * without one chosen picks the one the surface scene would have. */
+      if (!s.system) enterSystem(game, bus, systemAddrFrom(game));
+      if (!s.planet) selectBody(game, bus, mostInteresting(game, s.system));
+      s.agents.length = 0;
+      s.molecule = null;
+      RS.molecular.enter(game, bus);
+    } else if (kind === 'shells') {
+      /* Shells belong to nothing in particular — an atom is an atom anywhere,
+       * which is itself the point of the rung. */
+      s.agents.length = 0;
+      RS.shells.enter(game, bus);
     }
     bus.emit('scene:change', { kind, from: s.lastKind, scene: s });
   }
@@ -9290,7 +9701,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   RS.scenes = {
-    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE,
+    TIER_PLANET, TIER_STELLAR, TIER_SYSTEM, TIER_CELL, TIER_QUANTUM, TIER_GROUP, TIER_HUBBLE, TIER_ENSEMBLE, TIER_ATOMIC, TIER_MOLECULAR,
     SCENES, SCENE_BY_ID, sceneForTier, tierForScene, newScene, systemAddrFrom, systemKey, enterSystem, selectBody,
     derivePlanet, mostInteresting, tick, systemPositions, terrainProfile,
     sampleSurface, embark, disembark, extract, sell, PROFILE_N,
@@ -9535,6 +9946,32 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         '% unlike ours. The essences are the same essences. ×' +
         RS.ensemble.bonusFor(game).toFixed(2) + ' to recognise one under these laws.',
         kind: 'express' };
+    }
+    if (s.kind === 'molecular') {
+      const m = s.molecule;
+      if (!m) return { text: 'Resolving…', kind: 'wait' };
+      if (m.bias < 0.1) {
+        return { text: 'Both hands in equal numbers here — nothing is choosing. Find a living world and come back.',
+          kind: 'select' };
+      }
+      if (m.anomalous) {
+        return { text: m.anomalous + ' molecule' + (m.anomalous > 1 ? 's' : '') +
+          ' of the wrong hand — the warm ones. ×' + RS.molecular.bonusFor(game).toFixed(2) + '.',
+          kind: 'express' };
+      }
+      return { text: 'Every chiral site here is the hand life chose. Sweep Σ for a sample that is not.',
+        kind: 'select' };
+    }
+    if (s.kind === 'shells') {
+      const sh = s.shells;
+      if (!sh) return { text: 'Resolving…', kind: 'wait' };
+      if (sh.degenerate) {
+        return { text: sh.degenerate + ' occupants share an energy without sharing a state. ' +
+          'That coincidence is where chemistry comes from — and it pays ×' +
+          RS.shells.bonusFor(game).toFixed(2) + '.', kind: 'express' };
+      }
+      return { text: sh.displaced + ' occupants were pushed outward because their state was taken. ' +
+        'Excited, and about to fall back.', kind: 'express' };
     }
     if (s.kind === 'foam') {
       const f = s.foam;
@@ -11188,6 +11625,111 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
   }
 
+  /* ── The molecule ────────────────────────────────────────────────────────
+   *
+   * A coiled chain of sites, bonded. Handedness is the whole point, so it is
+   * the loudest thing on screen: warm for the minority hand, cool for the
+   * majority, neutral green for the achiral sites where the question does not
+   * arise. On a sterile world the two colours are evenly mixed; on a living one
+   * the screen is nearly one colour and the odd warm site is the find.
+   */
+  function drawMolecule(ctx, game, t) {
+    const m = game.scene.molecule;
+    if (!m) return;
+    const ct = game.scene.molT || 0;
+
+    /* Bonds first. Line weight is bond order, which is the essence's
+     * persistence — how tightly it holds on, everywhere in the game. */
+    for (let i = 0; i < m.sites.length - 1; i++) {
+      const a = m.sites[i], b = m.sites[i + 1];
+      ctx.strokeStyle = hsl(200, 0.3, 0.55, 0.35);
+      ctx.lineWidth = Math.max(1, px(0.002 * a.bond));
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+      /* A double or triple bond is drawn as such — it is a real distinction
+       * and it costs one extra line. */
+      for (let k = 1; k < a.bond; k++) {
+        const dx = (b.y - a.y), dy = -(b.x - a.x);
+        const len = Math.hypot(dx, dy) + 1e-5;
+        const off = px(0.006 * k) / len;
+        ctx.beginPath();
+        ctx.moveTo(sx(a.x) + dx * off, sy(a.y) + dy * off);
+        ctx.lineTo(sx(b.x) + dx * off, sy(b.y) + dy * off);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < m.sites.length; i++) {
+      const st = m.sites[i];
+      const wob = Math.sin(ct * 1.3 + i * 0.7) * 0.006;
+      const X = sx(st.x + wob), Y = sy(st.y + wob);
+      /* The minority hand gets a halo, because on a homochiral world it is the
+       * one thing in the scope worth crossing the screen for. */
+      if (st.hand < 0 && m.bias > 0.4) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(st.size * 4));
+        g.addColorStop(0, hsl(24, 0.9, 0.6, 0.4));
+        g.addColorStop(1, hsl(24, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(st.size * 4), 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = hsl(st.hue, st.chiral ? 0.75 : 0.35, 0.62, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(st.size), 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ── Orbital shells ──────────────────────────────────────────────────────
+   *
+   * Concentric shells with their occupants on them. Spin is drawn as a tick
+   * above or below — the only quantum number that has nowhere else to go, and
+   * the one that makes two otherwise identical occupants distinguishable, which
+   * is exactly the situation TWIN describes.
+   */
+  function drawShells(ctx, game, t) {
+    const sh = game.scene.shells;
+    if (!sh) return;
+
+    for (let n = 1; n <= sh.shells; n++) {
+      const r = 0.16 + (n - 1) / sh.shells * 0.74;
+      ctx.strokeStyle = hsl(200, 0.4, 0.5, 0.13);
+      ctx.lineWidth = Math.max(1, px(0.002));
+      ctx.beginPath();
+      ctx.ellipse(view.cx, view.cy, px(r), px(r * 0.9), 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < sh.occupants.length; i++) {
+      const oc = sh.occupants[i];
+      /* Occupants precess around their shell at a rate set by n, so an inner
+       * shell visibly runs faster — which is true and is the cheapest possible
+       * way to say "this one is more tightly bound". */
+      const a = oc.ang + t * (0.30 / oc.q.n);
+      const X = sx(Math.cos(a) * oc.rad), Y = sy(Math.sin(a) * oc.rad * 0.9);
+
+      /* Displaced occupants are excited states — about to fall back, and worth
+       * catching before they do. */
+      if (oc.excited) {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, px(0.05));
+        g.addColorStop(0, hsl(46, 0.9, 0.66, 0.42));
+        g.addColorStop(1, hsl(46, 0.9, 0.6, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, px(0.05), 0, TAU); ctx.fill();
+      }
+
+      ctx.fillStyle = hsl(oc.hue, 0.7, 0.66, 0.9);
+      ctx.beginPath(); ctx.arc(X, Y, px(0.013), 0, TAU); ctx.fill();
+
+      /* Spin: a tick up or down. */
+      ctx.strokeStyle = hsl(oc.hue, 0.8, 0.75, 0.8);
+      ctx.lineWidth = Math.max(1, px(0.0022));
+      ctx.beginPath();
+      ctx.moveTo(X, Y);
+      ctx.lineTo(X, Y + px(0.022) * (oc.spin > 0 ? -1 : 1));
+      ctx.stroke();
+    }
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -11497,6 +12039,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       const inWeb = kind === 'web';
       const inFoam = kind === 'foam';
       const inEnsemble = kind === 'ensemble';
+      const inMol = kind === 'molecular';
+      const inShells = kind === 'shells';
 
       // tier backdrops, cross-faded between the two rungs the dial straddles
       const tb = RS.cosmos.tierBlend(vis.tierMix.value);
@@ -11508,6 +12052,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       else if (inWeb) drawWeb(ctx, game, t);
       else if (inFoam) drawFoam(ctx, game, t);
       else if (inEnsemble) drawEnsemble(ctx, game, t);
+      else if (inMol) drawMolecule(ctx, game, t);
+      else if (inShells) drawShells(ctx, game, t);
 
       /* The rim. A membrane in a cell, the horizon in the web, and absent in
        * the foam — there is no boundary at a scale where nothing persists long
@@ -13142,6 +13688,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
         (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
       el['layer-name'].style.color = hsl(291, 0.7, 0.72);
+    } else if (sc.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sub + ' · ' + r.chiral + ' chiral sites' +
+        (r.anomalous ? ' · ' + r.anomalous + ' of the wrong hand ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(r.bias > 0.5 ? 150 : 196, 0.7, 0.72);
+    } else if (sc.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      setText('layer-name', 'ORBITAL SHELLS');
+      setText('layer-rules', r.occupied + '/' + r.capacity + ' states filled · ' +
+        r.displaced + ' displaced outward · ' + r.degenerate + ' degenerate' +
+        (r.bonus > 1.05 ? ' ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(210, 0.7, 0.72);
     } else if (sc.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       setText('layer-name', r.title.toUpperCase());
@@ -13418,6 +13977,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           ? '<div class="ro-sub" style="color:' + hsl(46, 0.85, 0.68) + '">' + r.survivors +
             ' fluctuation' + (r.survivors > 1 ? 's' : '') + ' never cancelled &mdash; &times;' +
             r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(r.bias > 0.5 ? 150 : 196, 0.8, 0.72) + '">&#9901;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (r.host ? '<div class="ro-sub" style="margin-top:4px">' + r.host + ' &middot; ' +
+          r.chiral + ' of ' + RS.molecular.SITE_COUNT + ' sites are chiral</div>' : '') +
+        (r.anomalous
+          ? '<div class="ro-sub" style="color:' + hsl(24, 0.85, 0.68) + '">' + r.anomalous +
+            ' of the hand life here does not use &mdash; &times;' + r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.8, 0.72) + '">&#9096;</span>' +
+        '<span class="ro-title">Orbital Shells</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">' + r.occupied + '/' + r.capacity +
+        ' states filled</div>' +
+        (r.displaced ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.68) + '">' +
+          r.displaced + ' pushed outward &mdash; excited, and about to fall back</div>' : '') +
+        (r.degenerate ? '<div class="ro-sub" style="color:' + hsl(150, 0.7, 0.66) + '">' +
+          r.degenerate + ' degenerate &mdash; same energy, different state. This is where chemistry comes from.</div>' : '');
       return;
     }
     if (s.kind === 'cellular') {
@@ -14274,6 +14861,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         foam: { hue: 291, icon: '∴',
           title: () => 'quantum foam',
           body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
+        molecular: { hue: 196, icon: '⌬',
+          title: sc => sc.molecule && sc.molecule.bias > 0.5 ? 'homochiral chemistry' : 'racemic chemistry',
+          body: sc => sc.molecule && sc.molecule.bias > 0.5
+            ? 'Life here settled which hand it uses. Find one of the other.'
+            : 'Both hands in equal numbers. Nothing here is choosing.' },
+        shells: { hue: 210, icon: '⌸',
+          title: () => 'orbital shells',
+          body: () => 'No two occupants may share a state. Finite places, and they are taken.' },
         cellular: { hue: 150, icon: '❋',
           title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
           body: sc => {

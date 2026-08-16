@@ -213,6 +213,19 @@
       setText('layer-rules', r.sub + ' · mean lifetime ' + r.meanLife.toFixed(2) + ' s' +
         (r.survivors ? ' · ' + r.survivors + ' never cancelled ×' + r.bonus.toFixed(2) : ''));
       el['layer-name'].style.color = hsl(291, 0.7, 0.72);
+    } else if (sc.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      setText('layer-name', r.title.toUpperCase());
+      setText('layer-rules', r.sub + ' · ' + r.chiral + ' chiral sites' +
+        (r.anomalous ? ' · ' + r.anomalous + ' of the wrong hand ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(r.bias > 0.5 ? 150 : 196, 0.7, 0.72);
+    } else if (sc.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      setText('layer-name', 'ORBITAL SHELLS');
+      setText('layer-rules', r.occupied + '/' + r.capacity + ' states filled · ' +
+        r.displaced + ' displaced outward · ' + r.degenerate + ' degenerate' +
+        (r.bonus > 1.05 ? ' ×' + r.bonus.toFixed(2) : ''));
+      el['layer-name'].style.color = hsl(210, 0.7, 0.72);
     } else if (sc.kind === 'cellular') {
       const r = RS.cellular.readout(game);
       setText('layer-name', r.title.toUpperCase());
@@ -489,6 +502,34 @@
           ? '<div class="ro-sub" style="color:' + hsl(46, 0.85, 0.68) + '">' + r.survivors +
             ' fluctuation' + (r.survivors > 1 ? 's' : '') + ' never cancelled &mdash; &times;' +
             r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'molecular') {
+      const r = RS.molecular.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' +
+          hsl(r.bias > 0.5 ? 150 : 196, 0.8, 0.72) + '">&#9901;</span>' +
+        '<span class="ro-title">' + r.title + '</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        (r.host ? '<div class="ro-sub" style="margin-top:4px">' + r.host + ' &middot; ' +
+          r.chiral + ' of ' + RS.molecular.SITE_COUNT + ' sites are chiral</div>' : '') +
+        (r.anomalous
+          ? '<div class="ro-sub" style="color:' + hsl(24, 0.85, 0.68) + '">' + r.anomalous +
+            ' of the hand life here does not use &mdash; &times;' + r.bonus.toFixed(2) + '</div>' : '');
+      return;
+    }
+    if (s.kind === 'shells') {
+      const r = RS.shells.readout(game);
+      node.innerHTML =
+        '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(210, 0.8, 0.72) + '">&#9096;</span>' +
+        '<span class="ro-title">Orbital Shells</span></div>' +
+        '<div class="ro-sub">' + r.sub + '</div>' +
+        '<div class="ro-sub" style="margin-top:4px">' + r.occupied + '/' + r.capacity +
+        ' states filled</div>' +
+        (r.displaced ? '<div class="ro-sub" style="color:' + hsl(46, 0.8, 0.68) + '">' +
+          r.displaced + ' pushed outward &mdash; excited, and about to fall back</div>' : '') +
+        (r.degenerate ? '<div class="ro-sub" style="color:' + hsl(150, 0.7, 0.66) + '">' +
+          r.degenerate + ' degenerate &mdash; same energy, different state. This is where chemistry comes from.</div>' : '');
       return;
     }
     if (s.kind === 'cellular') {

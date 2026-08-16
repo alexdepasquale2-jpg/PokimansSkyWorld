@@ -207,6 +207,14 @@
         foam: { hue: 291, icon: '∴',
           title: () => 'quantum foam',
           body: () => 'Nothing persists at this scale, including you. Pairs borrow existence and pay it back.' },
+        molecular: { hue: 196, icon: '⌬',
+          title: sc => sc.molecule && sc.molecule.bias > 0.5 ? 'homochiral chemistry' : 'racemic chemistry',
+          body: sc => sc.molecule && sc.molecule.bias > 0.5
+            ? 'Life here settled which hand it uses. Find one of the other.'
+            : 'Both hands in equal numbers. Nothing here is choosing.' },
+        shells: { hue: 210, icon: '⌸',
+          title: () => 'orbital shells',
+          body: () => 'No two occupants may share a state. Finite places, and they are taken.' },
         cellular: { hue: 150, icon: '❋',
           title: sc => sc.cell ? sc.cell.type.name : 'cytoplasm',
           body: sc => {
