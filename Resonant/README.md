@@ -411,6 +411,32 @@ that path and perturbs it, so what a thing does is emergent rather than
 scripted. The test suite checks both halves: the path is byte-identical at the
 same address and time, and the mind moves it without replacing it.
 
+### Time you can feel standing in it
+
+`dayHours`, `axialTilt`, `tidallyLocked` and a full list of `moons` with real
+orbital periods have been derived since the solar layer landed. Every one of
+those numbers was correct, none was rendered, and a surface looked the same at
+every hour of every day of every year on every world.
+
+Now the star's elevation is a real solar-elevation calculation in (planet,
+longitude, latitude, epoch) — closed-form, so scrubbing τ across a thousand
+years costs exactly what standing still costs, and τ gains a second meaning on a
+surface without gaining a second control.
+
+- **Twilight width is the atmosphere's own.** A dense world has a long dusk that
+  reddens as the light path lengthens; an airless one snaps from noon to night,
+  which is why the Moon has no dusk.
+- **A tidally locked world has places instead of times of day.** The substellar
+  point is directly under the star forever, the antistellar point never sees it,
+  and nine hundred years later nothing has moved. That is the single most
+  important fact about the commonest kind of habitable world in the real galaxy,
+  and standing on one used to look exactly like standing on Earth.
+- **Seasons turn**, from the real declination swing, and the hemispheres
+  disagree about which one it is.
+- **Tides scale as the cube of distance**, so a close small moon out-pulls a
+  distant large one, and several moons produce a genuinely messy tide with
+  occasional spring alignments rather than simply a bigger one.
+
 ### And silence where there is no medium
 
 One ambient bed per scope: seething broadband in the foam, a resonant ring in
@@ -628,6 +654,7 @@ All audio is synthesised at runtime — there are no sound files.
 | `guide.js` | the live guide and the three pathways |
 | `neural.js` | derived recurrent minds; the influence channel |
 | `inhabitants.js` | what lives in each scope — derived paths, real minds riding them |
+| `localtime.js` | solar elevation, seasons and tides, closed-form in place and epoch |
 | `vessel.js` | archetypes, forces, senses, expenditure, dial remapping |
 | `influence.js` | structures, research, sparse deltas, the two fields |
 | `scenes.js` | the scene registry, the modal split, agents |
@@ -709,11 +736,9 @@ The clearest things to build next — none of which require changing the
 architecture, because the sparse-delta and derive-everything decisions were made
 to accommodate them:
 
-- **Immersion.** Inhabitants and ambient beds are in. What is left is *local
-  time you can feel* — day and night from real `dayHours` and tidal locking,
-  seasons from `axialTilt`, tides from `moons`, all of which are already derived
-  and none of which is rendered — and arrival transitions that show movement
-  between scopes rather than a white flash.
+- **Arrival.** `scene.transition` is a white flash. Changing scope should show
+  *movement* between scopes — falling inward, climbing outward — because the
+  ladder is the navigation and a cut makes it feel like a menu.
 - **Interface.** Seven topbar buttons and growing. They want to be one tabbed
   drawer — World / Bodies / Codex / Pathways / Guide / Settings — with Contact
   staying separate because it is event-driven and must remain unmissable.

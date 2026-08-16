@@ -235,7 +235,8 @@
       el['layer-name'].style.color = hsl(150, 0.7, 0.72);
     } else if (sc.kind === 'planet' && sc.planet) {
       const p = sc.planet;
-      setText('layer-name', p.name.toUpperCase());
+      const when = RS.localtime.describe(sc.clock);
+      setText('layer-name', p.name.toUpperCase() + (when ? ' · ' + sc.clock.sun.phase.toUpperCase() : ''));
       setText('layer-rules', p.type.name + ' · ' + Math.round(p.surfaceTemp) + ' K · ' +
         p.gravity.toFixed(2) + ' g · ' +
         (p.pressure < 0.01 ? 'no atmosphere' : p.pressure.toFixed(2) + ' bar') +
@@ -553,6 +554,9 @@
     if (s.kind === 'planet' && s.planet) {
       const p = s.planet;
       const su = s.surface;
+      /* Where in the day, the year, and the tide. All of it was already
+       * derived and none of it was ever shown. */
+      const when = RS.localtime.describe(s.clock);
       node.innerHTML =
         '<div class="ro-head"><span class="ro-glyph" style="color:' + hsl(p.type.hue, 0.8, 0.7) + '">&#9679;</span>' +
         '<span class="ro-title">' + p.name + '</span></div>' +
@@ -561,6 +565,8 @@
         (su ? '<div class="ro-sub" style="margin-top:4px;color:' + hsl(su.biome.hue, 0.6, 0.7) + '">' +
           su.biome.name + ' &middot; ' + Math.round(su.T) + ' K &middot; lat ' +
           (su.lat * 57.3).toFixed(0) + '&deg;</div>' : '') +
+        (when ? '<div class="ro-sub" style="margin-top:4px;color:' +
+          hsl(s.clock.sun.daylight > 0.5 ? 45 : 220, 0.55, 0.68) + '">' + when + '</div>' : '') +
         (s.agents.length ? '<div class="ro-sub" style="margin-top:4px">' + s.agents.length +
           ' minds nearby</div>' : '');
       return;

@@ -22,7 +22,7 @@ const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'js/core.js', 'js/cosmos.js', 'js/spectrum.js', 'js/dials.js', 'js/fractal.js', 'js/emergence.js', 'js/selfsimilar.js',
   'js/field.js', 'js/physics.js', 'js/orbital.js', 'js/stellar.js', 'js/civ.js', 'js/planet.js',
-  'js/neural.js', 'js/vessel.js', 'js/inhabitants.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
+  'js/neural.js', 'js/vessel.js', 'js/inhabitants.js', 'js/localtime.js', 'js/influence.js', 'js/galaxy.js', 'js/contact.js',
   'js/scene_cellular.js', 'js/scene_web.js', 'js/scene_foam.js', 'js/scene_ensemble.js', 'js/scene_molecular.js', 'js/scene_shells.js', 'js/scenes.js', 'js/game.js', 'js/guide.js', 'js/save.js', 'js/audio.js', 'js/ui.js'
 ];
 
@@ -3346,6 +3346,110 @@ const posOut = { x: 0, y: 0, z: 0, r: 0 };
   assert(B.planet.gain > 0, 'and a surface with air is not');
   assert(B.web.freq < B.foam.freq / 10,
     'the largest scope drones and the smallest seethes');
+}
+
+
+// ── local time was derived all along and never shown ─────────────────────
+{
+  const g = RS.game.newGame(31337);
+  /* Hunt the neighbourhood rather than assuming the home system has one — a
+   * seed whose nearest star is all tidally locked worlds is a legitimate
+   * galaxy, not a broken test. */
+  let p = null;
+  for (let sx = -2; sx <= 2 && !p; sx++) {
+    for (let sy = -2; sy <= 2 && !p; sy++) {
+      const sys = RS.stellar.systemAt(g.seed, sx, sy, 0);
+      if (!sys) continue;
+      for (let i = 0; i < sys.bodies.length; i++) {
+        if (sys.bodies[i].kind !== 'planet') continue;
+        const q = RS.scenes.derivePlanet(g, sys, i);
+        if (q && q.type.landable && !q.tidallyLocked && q.dayHours < 400) { p = q; break; }
+      }
+    }
+  }
+  assert(p, 'the galaxy contains a rotating world to stand on');
+  if (!p) p = { tidallyLocked: false, dayHours: 24, axialTilt: 0.4, pressure: 1, moons: null };
+
+  /* A rotating world must actually have a day: the star has to rise and set. */
+  let hi = -2, lo = 2;
+  for (let k = 0; k < 400; k++) {
+    const t = k * (p.dayHours / RS.localtime.HOURS_PER_YEAR) / 40;
+    const sun = RS.localtime.sunAt(p, 0, 0, t, null);
+    if (sun.elevation > hi) hi = sun.elevation;
+    if (sun.elevation < lo) lo = sun.elevation;
+  }
+  assert(hi > 0.5 && lo < -0.5, 'the star rises and sets (' + lo.toFixed(2) + ' … ' + hi.toFixed(2) + ')');
+
+  /* A tidally locked world must not. Half of it never sees the star, and that
+   * is the single most important fact about the commonest kind of habitable
+   * world there is. */
+  const locked = { tidallyLocked: true, dayHours: 1e6, axialTilt: 0, pressure: 1, moons: null };
+  const sub = RS.localtime.sunAt(locked, 0, 0, 0, null);
+  const anti = RS.localtime.sunAt(locked, 180, 0, 0, null);
+  assert(sub.elevation > 0.95, 'the substellar point is directly under the star');
+  assert(anti.elevation < -0.95, 'and the antistellar point never sees it');
+  const later = RS.localtime.sunAt(locked, 0, 0, 900, null);
+  assert(Math.abs(later.elevation - sub.elevation) < 1e-9,
+    'and nine hundred years later, nothing has moved');
+  assert(sub.phase === 'substellar' && anti.phase === 'night side',
+    'a locked world has places rather than times of day');
+  assert(RS.localtime.seasonOf(locked, 40, sub) === 'no seasons',
+    'and no seasons either');
+
+  /* Twilight width follows atmospheric thickness — a thin world snaps from day
+   * to night, which is why the Moon has no dusk. */
+  const thin = { tidallyLocked: false, dayHours: 24, axialTilt: 0.4, pressure: 0.001 };
+  const thick = { tidallyLocked: false, dayHours: 24, axialTilt: 0.4, pressure: 3 };
+  function twilightSpan(w) {
+    let n = 0;
+    for (let k = 0; k < 2000; k++) {
+      const d = RS.localtime.sunAt(w, 0, 0, k / 2000 * (24 / RS.localtime.HOURS_PER_YEAR), null).daylight;
+      if (d > 0.05 && d < 0.95) n++;
+    }
+    return n / 2000;
+  }
+  assert(twilightSpan(thick) > twilightSpan(thin) * 2,
+    'a dense atmosphere has a long twilight and an airless world has none (' +
+    twilightSpan(thick).toFixed(3) + ' vs ' + twilightSpan(thin).toFixed(3) + ')');
+
+  /* Seasons must actually turn over a year, and reverse between hemispheres. */
+  const tilted = { tidallyLocked: false, dayHours: 24, axialTilt: 0.41, pressure: 1 };
+  const seasons = new Set();
+  for (let k = 0; k < 24; k++) {
+    seasons.add(RS.localtime.seasonOf(tilted, 45, RS.localtime.sunAt(tilted, 0, 45, k / 24, null)));
+  }
+  assert(seasons.size >= 4, 'a tilted world has a year with seasons in it (' + [...seasons].join(', ') + ')');
+  const midYear = RS.localtime.sunAt(tilted, 0, 45, 0.25, null);
+  assert(RS.localtime.seasonOf(tilted, 45, midYear) !== RS.localtime.seasonOf(tilted, -45, midYear),
+    'and the hemispheres disagree about which one it is');
+
+  /* Tides scale as the cube of distance, which is why a close small moon beats
+   * a distant large one — the thing everyone gets wrong. */
+  const near = { moons: { list: [{ massE: 0.01, a: 0.001, period: 3 }] } };
+  const far = { moons: { list: [{ massE: 1.0, a: 0.01, period: 30 }] } };
+  assert(RS.localtime.tideAt(near, 0, null).height > RS.localtime.tideAt(far, 0, null).height,
+    'a close small moon out-pulls a distant large one');
+  assert(RS.localtime.tideAt({ moons: null }, 0, null).height === 0, 'and a moonless world has no tide');
+
+  /* No NaN anywhere, over a long span and every latitude. */
+  let bad = null;
+  for (let lat = -90; lat <= 90; lat += 15) {
+    for (let t = 0; t < 50; t += 0.37) {
+      const sun = RS.localtime.sunAt(p, 0, lat, t, null);
+      if (!Number.isFinite(sun.elevation) || !Number.isFinite(sun.daylight)) bad = lat + '@' + t;
+      if (sun.daylight < 0 || sun.daylight > 1) bad = lat + '@' + t + ' out of range';
+    }
+  }
+  assert(!bad, 'the sun is finite everywhere and everywhen: ' + (bad || 'clean'));
+
+  /* And it reaches the readout, which is the entire point. */
+  const g2 = RS.game.newGame(31337);
+  g2.scene.planet = p;
+  g2.scene.lon = 0; g2.scene.lat = 20; g2.scene.t = 0.3;
+  const st = RS.localtime.stateFor(g2, null);
+  const line = RS.localtime.describe(st);
+  assert(line.length > 8 && /day|night|midday|twilight|dusk|afternoon/.test(line),
+    'the readout says where in the day you are: "' + line + '"');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -140,6 +140,8 @@
       /* Quantum foam. */
       foam: null,
       foamT: 0,
+      /* Local time at the current lon/lat — day, season, tide. */
+      clock: null,
       /* Inhabitants — derived per frame, never persisted. */
       inhabitants: null,
       localT: 0,
@@ -265,6 +267,11 @@
       s.t += rate * dt;
     }
     s.tGyr = s.t * 1e-9;
+
+    /* Local time. Closed-form in (planet, lon, lat, epoch), so scrubbing τ
+     * across a thousand years costs exactly what standing still costs — and it
+     * gives τ a second meaning on a surface without a second control. */
+    if (s.planet) s.clock = RS.localtime.stateFor(game, s.clock);
 
     if (s.kind === 'system') tickSystem(game, bus, dt);
     else if (s.kind === 'planet') tickPlanet(game, bus, dt);
