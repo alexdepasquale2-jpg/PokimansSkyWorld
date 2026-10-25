@@ -65,6 +65,12 @@ static func ensure(id: String, name_hint: String = "") -> CultureResource:
 	var existing: CultureResource = _cultures.get(id)
 	if existing != null:
 		existing.ensure_nets()
+		# A clan is usually minted implicitly, the first time one of its members
+		# is asked what it belongs to, and at that moment nobody has a name for
+		# it. When a name does turn up later, take it — otherwise the placeholder
+		# is permanent and the raw id is what a player ends up reading.
+		if not name_hint.is_empty() and existing.display_name == existing.culture_id:
+			existing.display_name = name_hint
 		return existing
 	var culture := CultureResource.create(id, _world_seed, name_hint)
 	_cultures[id] = culture
@@ -115,6 +121,173 @@ static func note_birth(culture_id: String, child_generation: int) -> void:
 	culture.note_birth(child_generation)
 	if culture.generation_advance_due():
 		culture.advance_generation()
+		# The same boundary decides both inheritances. The network keeps a
+		# fraction of what it drifted toward; the tree keeps only what the clan
+		# is numerous enough to carry. One is automatic and one is brutal, and
+		# they turn over together because they are the same generation.
+		NeuronalTree.for_clan(culture.culture_id).advance_generation(
+			float(living_members(culture.culture_id)))
+
+
+## A day passed for every clan somebody is actually simulating.
+##
+## THE COUNTERPART TO `CultureResource.age_unattended`, and the reason the split
+## has to be by simulation band rather than by whether anyone is alive. A clan
+## with somebody in a live band ages here, one day at a time. A clan with nobody
+## does not age at all until the player comes back, at which point `_catch_up`
+## hands it the whole absence in one go. Count a dormant colonist as present and
+## that colony ages twice over for the same nine years.
+static func age_simulated(days: float) -> void:
+	if days <= 0.0:
+		return
+	for entry in _cultures.values():
+		var culture: CultureResource = entry
+		if simulated_members(culture.culture_id) <= 0:
+			continue
+		culture.days_lived += days
+		press_generation(culture.culture_id)
+
+
+## Living long enough turns a generation over. Returns true if one did.
+##
+## EDGE-TRIGGERED AND CLOCKED ON DAYS, and both halves of that were learned the
+## hard way — see the note on `CultureResource.days_lived`. Asking it here, from
+## a watermark stored on the culture, makes double-firing impossible however
+## often anybody calls this and whatever they call it from.
+static func press_generation(culture_id: String) -> bool:
+	var culture := ensure(String(culture_id))
+	culture.ensure_nets()
+	if culture.days_lived - culture.days_at_last_generation \
+			< CultureResource.GENERATION_DAYS:
+		return false
+	culture.days_at_last_generation = culture.days_lived
+	var before := culture.generation
+	note_birth(culture.culture_id, culture.generation + 1)
+	return culture.generation > before
+
+
+## How many of this clan are alive right now.
+##
+## THE ONE ANSWER, because there were three and they disagreed. The boundary used
+## `culture.member_count`, which `note_birth` only ever increments — a cumulative
+## record of births that no death reduces. So support at a generation change rose
+## forever, pending understandings always survived, and the loss branch that the
+## whole tree is built around could not fire in a real playthrough. Meanwhile the
+## Understandings screen counted the party, the HUD counted the party plus the
+## settlers, and both of them warned the player about a loss that was never going
+## to happen. A warning that does not come true is worse than no warning.
+##
+## Counted from SimulationBudget's registry, which is the only thing that knows
+## the whole population — including colonists on a world nobody is standing on,
+## who are still alive and still this clan's, unless departure forked them onto
+## an id of their own.
+static func living_members(culture_id: String) -> int:
+	return _count_members(culture_id, false)
+
+
+## Living members the simulation is actually running — see `age_simulated`.
+static func simulated_members(culture_id: String) -> int:
+	return _count_members(culture_id, true)
+
+
+static func _count_members(culture_id: String, simulated_only: bool) -> int:
+	var count := 0
+	for uid in SimulationBudget.uids():
+		var node := SimulationBudget.node_for(StringName(uid))
+		if node == null or not is_instance_valid(node):
+			continue
+		if node.get("identity") == null:
+			continue
+		if culture_for(node).culture_id != culture_id:
+			continue
+		var needs: Variant = node.get("needs")
+		if needs != null and needs.is_dead():
+			continue
+		if simulated_only:
+			var lod := SimulationBudget.lod_of(StringName(uid))
+			if lod == AetherTypes.SimLOD.DORMANT or lod == AetherTypes.SimLOD.FROZEN:
+				continue
+		count += 1
+	return count
+
+
+## Split a culture in two, giving the child everything the parent knows today.
+##
+## THE MOMENT A PEOPLE BECOMES TWO PEOPLES. Up to here a culture could only ever
+## be one shared brain per clan id, which meant a colony left behind on another
+## world for nine years came back thinking exactly what the crew that flew away
+## thought — the two halves stayed in telepathic contact across interstellar
+## distance. `drift` existed to make separated clans diverge and had nothing to
+## separate.
+##
+## The child starts as an exact copy and then goes its own way: its RNG is seeded
+## from the child id, not the parent's, so the drift it accumulates is its own
+## and is reproducible from the campaign seed.
+##
+## Returns the child. Idempotent — forking onto an id that already exists hands
+## back the existing culture rather than overwriting a people who already have a
+## history.
+static func fork(parent_id: String, child_id: String, reason: String = "split") -> CultureResource:
+	install()
+	var parent: CultureResource = _cultures.get(parent_id)
+	if parent == null or child_id.is_empty() or child_id == parent_id:
+		return ensure(child_id if not child_id.is_empty() else parent_id)
+	if _cultures.has(child_id):
+		return _cultures[child_id]
+
+	parent.ensure_nets()
+	var child := CultureResource.create(child_id, _world_seed,
+		parent.display_name + " (apart)")
+	child.live.copy_from(parent.live)
+	child.locked.copy_from(parent.locked)
+	# Inherited history, not inherited membership: who is in the new clan is
+	# decided by whoever actually went with it.
+	child.generation = parent.generation
+	child.high_water_generation = parent.high_water_generation
+	child.learning_rate = parent.learning_rate
+	child.inheritance_fraction = parent.inheritance_fraction
+	child.drift = parent.drift
+	child.reward_baseline = parent.reward_baseline
+	child.reward_variance = parent.reward_variance
+	child.member_count = 0
+
+	_cultures[child_id] = child
+	# What the lineage understands goes with them; what it was mid-way through
+	# working out does not.
+	NeuronalTree.fork(parent_id, child_id)
+	EventBus.culture_forked.emit(parent_id, child_id, reason)
+	_prune()
+	return child
+
+
+## Blend `from_id`'s culture into `into_id`, weighted by how many people each
+## side brings. Two clans that meet again after a long separation do not simply
+## pick one accent — the larger group dominates, but not completely.
+##
+## The absorbed culture is left in the registry as a record rather than deleted:
+## a creature still carrying its id must not find itself with no brain at all.
+static func merge(into_id: String, from_id: String) -> bool:
+	var into: CultureResource = _cultures.get(into_id)
+	var from: CultureResource = _cultures.get(from_id)
+	if into == null or from == null or into == from:
+		return false
+	into.ensure_nets()
+	from.ensure_nets()
+	if not into.live.same_shape_as(from.live):
+		push_warning("CultureRegistry.merge: '%s' and '%s' have different brains; kept apart."
+			% [into_id, from_id])
+		return false
+
+	var mine := maxf(1.0, float(into.member_count))
+	var theirs := maxf(1.0, float(from.member_count))
+	var share := theirs / (mine + theirs)
+	CultureResource.blend_nets(into.live, from.live, share)
+	CultureResource.blend_nets(into.locked, from.locked, share)
+	into.member_count += from.member_count
+	into.generation = maxi(into.generation, from.generation)
+	into.high_water_generation = maxi(into.high_water_generation, from.high_water_generation)
+	EventBus.culture_forked.emit(from_id, into_id, "merge")
+	return true
 
 
 ## Drop the least-recently-active cultures once the cap is exceeded. Kept simple:

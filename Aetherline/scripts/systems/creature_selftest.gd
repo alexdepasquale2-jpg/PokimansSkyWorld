@@ -208,6 +208,44 @@ func _test_epigenetic_expression(parent: Node, rng: RandomNumberGenerator) -> vo
 	_check("epigenetics: pressure accrues as discrete episodes",
 		dense != null and dense.exposure_count >= 2)
 
+	# --- And a mark that fades has to say so. -----------------------------------
+	#
+	# `EventBus.epigenetic_mark_lost` was declared in Phase 1 and emitted by
+	# nobody for the life of the project. Marks DO expire — `decay_all` filters
+	# them out — so the world would mark a creature, the feed would announce it,
+	# and then the mark would quietly vanish along with whatever it was doing to
+	# that animal's traits. A player watching a creature get slower with no event
+	# to attach it to has been told a lie by omission.
+	#
+	# Run against the creature this test already has rather than a fresh one.
+	# Spawning a second body here shifted the hundredth-monkey generalisation
+	# figure by half a point three suites later, because CLAN SIZE IS A PERCEPTION
+	# SLOT — every creature in every later suite sees a different input vector.
+	# That fragility is worth knowing about; adding to it is not.
+	var faded: Array[String] = []
+	var fade_handler := func(_uid: StringName, definition_id: StringName):
+		faded.append(String(definition_id))
+	EventBus.epigenetic_mark_lost.connect(fade_handler)
+
+	var held := creature.epigenetics.profile.marks.size()
+	var cold_while_marked := float(creature.stats.phenotype().get("cold_tolerance", 0.0))
+	var guard := 0
+	while not creature.epigenetics.profile.marks.is_empty() and guard < 4000:
+		guard += 1
+		creature.epigenetics.decay(1.0)
+
+	EventBus.epigenetic_mark_lost.disconnect(fade_handler)
+
+	_check("fading: marks left alone eventually go (%d days)" % guard,
+		creature.epigenetics.profile.marks.is_empty())
+	_check("fading: and every one of them is announced, by name (%d of %d)"
+		% [faded.size(), held], faded.size() == held)
+	_check("fading: the trait one was holding up comes back down",
+		float(creature.stats.phenotype().get("cold_tolerance", 0.0)) < cold_while_marked)
+	var said := LoreVoice.mark_faded_sentence("Weathered", "epi_cold_hardening")
+	_check("fading: the player is told in words, not ids",
+		not said.is_empty() and not said.contains("_"))
+
 	creature.queue_free()
 
 

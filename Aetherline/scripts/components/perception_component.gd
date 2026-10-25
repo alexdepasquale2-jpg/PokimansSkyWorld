@@ -29,6 +29,11 @@ var _vector: PackedFloat32Array = PackedFloat32Array()
 var _sensed_tick: int = -1
 var _has_sensed: bool = false
 
+## Spatial senses from the world host (Overworld). Empty means Stage-1 zeros for
+## DEAD_SLOTS 27–30 so pure culture tests stay bit-exact. Non-empty activates
+## Odyssey Stage-2 inputs without re-initialising clan weights.
+var world_senses: Dictionary = {}
+
 
 func _on_setup() -> void:
 	_vector = Perception.blank()
@@ -37,17 +42,27 @@ func _on_setup() -> void:
 ## Full Tier-1 sensing.
 func sense() -> PackedFloat32Array:
 	var fresh := Perception.compose(creature)
+	apply_world_senses(fresh, world_senses)
 	_blend(fresh)
 	_sensed_tick = SimulationBudget.current_tick
 	return _vector
 
 
 ## Tier-2 sensing: refresh the cheap slots, carry the rest forward.
+## World senses are reapplied so a NEAR creature still feels predators/food
+## without a full phenotype recompose of every trait slot.
 func sense_coarse() -> PackedFloat32Array:
 	var fresh := Perception.compose_coarse(creature, _vector)
+	apply_world_senses(fresh, world_senses)
 	_blend(fresh)
 	_sensed_tick = SimulationBudget.current_tick
 	return _vector
+
+
+## Map host-supplied world distances/counts into slots 27–30. Safe no-op when
+## `senses` is empty (culture lab / unit tests).
+func apply_world_senses(v: PackedFloat32Array, senses: Dictionary) -> void:
+	Perception.apply_world_senses(v, senses)
 
 
 func _blend(fresh: PackedFloat32Array) -> void:

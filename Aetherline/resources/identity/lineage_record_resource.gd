@@ -74,7 +74,35 @@ func is_extinct() -> bool:
 	return living_uids.is_empty() and not member_uids.is_empty()
 
 
-func record_birth(uid: String, generation: int) -> void:
+## uid -> { name, generation, parents: [uid], born, died, cause }
+##
+## WHO DESCENDS FROM WHOM. The game is named for bloodlines and did not keep one:
+## `member_uids` is a flat list and `max_generation` is a number, so a lineage
+## knew how many people it had and how deep it ran and nothing whatsoever about
+## its shape. Meanwhile every creature has carried `identity.parent_uids` since
+## Phase 1 and `BreedingSystem` has filled it in on every conception — the
+## parentage existed on the individuals and was thrown away the moment it
+## reached the record that exists to remember them.
+##
+## Kept as a flat map rather than nested children, because a lineage is a graph
+## (two parents, and a founder pair recurs) and nesting would force a choice of
+## which parent owns a child. Drawing walks it either direction.
+@export var descent: Dictionary = {}
+
+## Beyond this the oldest generations are pruned when the record is compacted.
+## A campaign that ran for hours should not carry a thousand ancestors into
+## every save, and the shape of a bloodline is legible from its recent depth.
+const MAX_DESCENT: int = 400
+
+
+## `parent_names` is not redundant with `parents`. Offspring join the GESTATING
+## parent's line, because the cytoplasmic chromosome does, so the siring parent
+## is frequently a member of some other bloodline entirely and has no node in
+## this record. Without their name the tree draws every child with one parent and
+## the screen quietly asserts a kind of parthenogenesis the simulation does not
+## do. The link is drawn where both are here; the name is said either way.
+func record_birth(uid: String, generation: int, name: String = "",
+		parents: Array = [], tick: int = -1, parent_names: Array = []) -> void:
 	if not member_uids.has(uid):
 		member_uids.append(uid)
 	if not living_uids.has(uid):
@@ -82,10 +110,71 @@ func record_birth(uid: String, generation: int) -> void:
 	max_generation = maxi(max_generation, generation)
 	bump("births")
 
+	var known: Array[String] = []
+	for parent in parents:
+		known.append(String(parent))
+	var named: Array[String] = []
+	for parent_name in parent_names:
+		named.append(String(parent_name))
+	descent[uid] = {
+		"name": name,
+		"generation": generation,
+		"parents": known,
+		"parent_names": named,
+		"born": tick,
+		"died": -1,
+		"cause": "",
+	}
+	if descent.size() > MAX_DESCENT:
+		_prune_descent()
 
-func record_death(uid: String) -> void:
+
+func record_death(uid: String, cause: String = "", tick: int = -1) -> void:
 	living_uids.erase(uid)
 	bump("deaths")
+	if descent.has(uid):
+		var entry: Dictionary = descent[uid]
+		entry["died"] = tick
+		entry["cause"] = cause
+
+
+## Whether anyone still alive descends from this one. Used by pruning, and it is
+## the question a player asks about an ancestor: did their line go anywhere.
+func has_living_descendants(uid: String) -> bool:
+	var frontier: Array[String] = [uid]
+	var seen := {uid: true}
+	while not frontier.is_empty():
+		var current: String = frontier.pop_back()
+		for other in descent:
+			var entry: Dictionary = descent[other]
+			if not (entry["parents"] as Array).has(current):
+				continue
+			if seen.has(other):
+				continue
+			seen[other] = true
+			if int(entry["died"]) < 0:
+				return true
+			frontier.append(String(other))
+	return false
+
+
+## Drop the shallowest generations first, keeping anyone still alive and anyone
+## an surviving line runs through. A bloodline's shape is in its recent depth;
+## its earliest founders are named on the record itself and do not need a node.
+func _prune_descent() -> void:
+	var by_generation: Array = descent.keys()
+	by_generation.sort_custom(func(a, b):
+		return int(descent[a]["generation"]) < int(descent[b]["generation"]))
+	var over := descent.size() - MAX_DESCENT
+	for uid in by_generation:
+		if over <= 0:
+			break
+		if living_uids.has(uid) or String(uid) == founder_uid:
+			continue
+		if has_living_descendants(String(uid)):
+			continue
+		descent.erase(uid)
+		over -= 1
 
 
 func bump(key: String, amount: float = 1.0) -> void:
@@ -137,6 +226,7 @@ func to_dict() -> Dictionary:
 		"founding_planet_name": founding_planet_name,
 		"founding_tick": founding_tick,
 		"member_uids": member_uids.duplicate(),
+		"descent": descent.duplicate(true),
 		"living_uids": living_uids.duplicate(),
 		"max_generation": max_generation,
 		"totals": totals.duplicate(true),

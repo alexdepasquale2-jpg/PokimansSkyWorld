@@ -1,0 +1,32 @@
+[
+  { "id": "story_colony_founded", "kind": "colony_founded", "severity": 0.5,
+    "cooldown_ticks": 100000, "once_per_creature": false,
+    "conditions": [{ "metric": "structure_count", "comparator": ">=", "threshold": 1.0 }],
+    "tags": ["colony"], "text": "The first structure goes up on {planet}. Whatever this becomes starts here." },
+
+  { "id": "story_colony_thriving", "kind": "colony_thriving", "severity": 0.6,
+    "cooldown_ticks": 6000, "once_per_creature": false,
+    "conditions": [
+      { "metric": "population", "comparator": ">=", "threshold": 8.0 },
+      { "metric": "average_mood", "comparator": ">=", "threshold": 0.7 }
+    ],
+    "tags": ["colony"], "text": "The colony on {planet} is doing well — {m.population} creatures, and most of them content." },
+
+  { "id": "story_colony_strained", "kind": "colony_strained", "severity": 0.75,
+    "cooldown_ticks": 3000, "once_per_creature": false,
+    "conditions": [
+      { "metric": "population", "comparator": ">=", "threshold": 5.0 },
+      { "metric": "average_mood", "comparator": "<=", "threshold": 0.3 }
+    ],
+    "tags": ["colony", "tragic"], "text": "Something is wrong on {planet}. Mood across the colony has been low for a while." },
+
+  { "id": "story_research_milestone", "kind": "research_milestone", "severity": 0.55,
+    "cooldown_ticks": 4000, "once_per_creature": false,
+    "conditions": [{ "metric": "research_unlocked_count", "comparator": ">=", "threshold": 5.0 }],
+    "tags": ["colony", "research"], "text": "Five discoveries in, and the colony barely resembles what landed here." },
+
+  { "id": "story_hostile_world", "kind": "hostile_world", "severity": 0.6,
+    "cooldown_ticks": 5000, "once_per_creature": false,
+    "conditions": [{ "metric": "planet_habitability", "comparator": "<=", "threshold": 0.15 }],
+    "tags": ["colony", "hardship"], "text": "{planet} is not forgiving. Every generation born here will carry it." }
+]

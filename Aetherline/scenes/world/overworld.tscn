@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://baetheroverworld"]
+
+[ext_resource type="Script" path="res://scenes/world/overworld.gd" id="1_ow"]
+
+[node name="Overworld" type="Node2D"]
+script = ExtResource("1_ow")

@@ -136,10 +136,16 @@ func apply_pressures(pressures: Dictionary, days: float) -> void:
 ## Passive fade. Driven by the day tick for active creatures, and integrated in
 ## one step for dormant ones.
 func decay(days: float) -> void:
-	var before := profile.marks.size()
-	profile.decay_all(days)
-	if profile.marks.size() != before:
-		_invalidate()
+	var lost := profile.decay_all(days)
+	if lost.is_empty():
+		return
+	_invalidate()
+	# `epigenetic_mark_lost` has been declared since Phase 1 and emitted by
+	# nobody. Gaining a mark was announced; losing one was not, so a creature's
+	# traits would quietly move back with nothing in the feed to attach it to.
+	var uid: StringName = creature.identity.uid if creature != null else &""
+	for definition_id in lost:
+		EventBus.epigenetic_mark_lost.emit(uid, definition_id)
 
 
 # --- Applying to expression ---------------------------------------------------

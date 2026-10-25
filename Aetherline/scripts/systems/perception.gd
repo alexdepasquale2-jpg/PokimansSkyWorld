@@ -151,9 +151,28 @@ static func compose(creature: Node) -> PackedFloat32Array:
 
 	v[26] = _thermal_comfort(stats)
 
-	# Slots 27-30 stay exactly zero. Stage 2 fills them; until then the network
-	# must not be able to tell them apart from "nothing there".
+	# Slots 27-30 stay exactly zero here. Stage 2 fills them via
+	# apply_world_senses when an Overworld (or other world host) has entities
+	# to sense. Culture self-tests call compose alone and must keep bit-exact
+	# zeros so dead-column weight activation remains a no-op until then.
 	return v
+
+
+## Write Odyssey Stage-2 spatial slots from a host-supplied senses dictionary.
+## Absent keys leave the slot at the Stage-1 default (zero contribution from a
+## far / empty reading). Indices resolve by name so layout reorders stay safe.
+static func apply_world_senses(v: PackedFloat32Array, senses: Dictionary) -> void:
+	if v.size() != SLOT_COUNT or senses.is_empty():
+		return
+	var i_pred := slot_index("predator_pressure")
+	var i_food := slot_index("food_proximity")
+	var i_ally := slot_index("ally_density")
+	var i_haz := slot_index("terrain_hazard")
+	# Near = high pressure / proximity (inverse distance, clamped 0..1).
+	v[i_pred] = clampf(1.0 - float(senses.get("predator_dist", 9999.0)) / 600.0, 0.0, 1.0)
+	v[i_food] = clampf(1.0 - float(senses.get("food_dist", 9999.0)) / 500.0, 0.0, 1.0)
+	v[i_ally] = clampf(float(senses.get("ally_count", 0)) / 8.0, 0.0, 1.0)
+	v[i_haz] = clampf(float(senses.get("hazard", 0.0)), 0.0, 1.0)
 
 
 ## Tier-2 perception: refresh only the cheap slots and carry the rest forward

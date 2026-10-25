@@ -101,8 +101,17 @@ static func _make_identity(rng: RandomNumberGenerator, opts: Dictionary) -> Crea
 		SimulationBudget.current_tick, _uid_counter,
 		"hu" if bool(opts.get("is_human", false)) else "cr")
 
-	identity.given_name = String(opts.get("name", "")) if opts.has("name") \
-		else generate_name(rng)
+	# An EMPTY name means "give it one", not "leave it blank". `opts.has("name")`
+	# was the test, and `BreedingSystem._conceive` passes `"name": opts.get(
+	# "name", "")` on every conception — so the key was always present and always
+	# empty, and every creature ever BORN in this game was nameless. Founders got
+	# names because `spawn_random` omits the key entirely.
+	#
+	# It stayed invisible because nothing displayed a child by name until the
+	# bloodline was drawn, and then an entire generation came out as "unnamed".
+	# In a game about carrying a lineage, that is not a cosmetic bug.
+	var supplied := String(opts.get("name", ""))
+	identity.given_name = supplied if not supplied.is_empty() else generate_name(rng)
 	identity.species_id = StringName(opts.get("species_id", "aether_base"))
 	identity.is_human = bool(opts.get("is_human", false))
 	identity.generation = int(opts.get("generation", 0))
@@ -140,7 +149,8 @@ static func _register_lineage(creature: Creature, opts: Dictionary) -> void:
 		lineage.founding_planet_id = identity.birth_planet_id
 		lineage.founding_planet_name = identity.birth_planet_name
 
-	lineage.record_birth(String(identity.uid), identity.generation)
+	lineage.record_birth(String(identity.uid), identity.generation,
+		identity.given_name, identity.parent_uids, identity.birth_tick)
 	if not identity.birth_planet_id.is_empty():
 		lineage.note_planet(identity.birth_planet_id)
 

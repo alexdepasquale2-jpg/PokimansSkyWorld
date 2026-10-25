@@ -42,6 +42,24 @@ var decisions_abstract: int = 0
 
 func _ready() -> void:
 	process_physics_priority = 100  # After SimulationBudget's tick advance.
+	# The generational clock. Connected here rather than gated behind `enabled`,
+	# which suspends DECISIONS for the lab's benefit — a clan that is not being
+	# thought about is still getting older.
+	EventBus.day_passed.connect(_on_day_passed)
+
+
+func _exit_tree() -> void:
+	if EventBus.day_passed.is_connected(_on_day_passed):
+		EventBus.day_passed.disconnect(_on_day_passed)
+
+
+## A day of lived time, for every clan somebody is simulating.
+##
+## Here rather than in the settlement, which is where it used to be: a clan ages
+## whether or not it has a village, and hanging the boundary off village life
+## meant a party in the field aged not at all.
+func _on_day_passed(_day: int) -> void:
+	CultureRegistry.age_simulated(1.0)
 
 
 func _physics_process(_delta: float) -> void:

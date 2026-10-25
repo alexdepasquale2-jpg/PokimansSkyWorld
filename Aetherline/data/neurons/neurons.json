@@ -1,0 +1,456 @@
+[
+  {
+    "id": "neu_listen",
+    "display_name": "Listening",
+    "branch": "perception",
+    "tier": 0,
+    "cost": 8.0,
+    "prerequisites": [],
+    "description": "Holding still long enough to hear what is out there before walking into it.",
+    "traits": {
+      "hearing": 0.25
+    },
+    "drives": {
+      "vigilance": 1.15
+    }
+  },
+  {
+    "id": "neu_scent_memory",
+    "display_name": "Scent Memory",
+    "branch": "perception",
+    "tier": 1,
+    "cost": 18.0,
+    "prerequisites": [
+      "neu_listen"
+    ],
+    "description": "A smell stops being a smell and becomes a place you have been.",
+    "traits": {
+      "scent": 0.3,
+      "tracking": 0.25
+    },
+    "drives": {
+      "curiosity": 1.1
+    }
+  },
+  {
+    "id": "neu_night_eyes",
+    "display_name": "Night Eyes",
+    "branch": "perception",
+    "tier": 1,
+    "cost": 20.0,
+    "prerequisites": [
+      "neu_listen"
+    ],
+    "description": "The dark stops being a wall and becomes merely a worse kind of light.",
+    "traits": {
+      "night_sight": 0.4,
+      "sight": 0.15
+    },
+    "drives": {
+      "fear": 0.88
+    }
+  },
+  {
+    "id": "neu_danger_sense",
+    "display_name": "Sense of Danger",
+    "branch": "perception",
+    "tier": 2,
+    "cost": 40.0,
+    "prerequisites": [
+      "neu_scent_memory",
+      "neu_night_eyes"
+    ],
+    "description": "Knowing a thing is wrong before knowing why. The first abstraction.",
+    "traits": {
+      "perception": 0.35,
+      "stress_resilience": 0.2
+    },
+    "drives": {
+      "vigilance": 1.3,
+      "fear": 0.85
+    }
+  },
+  {
+    "id": "neu_grip",
+    "display_name": "Precision Grip",
+    "branch": "intelligence",
+    "tier": 0,
+    "cost": 10.0,
+    "prerequisites": [],
+    "description": "Thumb against finger. Everything that follows is downstream of this.",
+    "traits": {
+      "grip": 0.3,
+      "dexterity": 0.25
+    },
+    "drives": {
+      "tool_confidence": 1.2
+    }
+  },
+  {
+    "id": "neu_object_use",
+    "display_name": "Object Use",
+    "branch": "intelligence",
+    "tier": 1,
+    "cost": 22.0,
+    "prerequisites": [
+      "neu_grip"
+    ],
+    "description": "The stone is no longer a stone. It is the thing that opens the other thing.",
+    "traits": {
+      "craft": 0.3,
+      "forage": 0.2
+    },
+    "drives": {
+      "tool_confidence": 1.35
+    }
+  },
+  {
+    "id": "neu_combination",
+    "display_name": "Combination",
+    "branch": "intelligence",
+    "tier": 2,
+    "cost": 45.0,
+    "prerequisites": [
+      "neu_object_use"
+    ],
+    "description": "Two objects held at once, and the idea that they might be one object.",
+    "traits": {
+      "craft": 0.4,
+      "dexterity": 0.2
+    },
+    "drives": {
+      "tool_confidence": 1.4,
+      "industry": 1.2
+    }
+  },
+  {
+    "id": "neu_foresight",
+    "display_name": "Foresight",
+    "branch": "intelligence",
+    "tier": 3,
+    "cost": 80.0,
+    "prerequisites": [
+      "neu_combination",
+      "neu_danger_sense"
+    ],
+    "description": "Carrying the tool to where it will be needed. Time becomes a place.",
+    "traits": {
+      "craft": 0.3,
+      "perception": 0.25
+    },
+    "drives": {
+      "industry": 1.35,
+      "migration_urge": 1.15,
+      "play": 0.9
+    }
+  },
+  {
+    "id": "neu_grooming",
+    "display_name": "Grooming",
+    "branch": "communication",
+    "tier": 0,
+    "cost": 8.0,
+    "prerequisites": [],
+    "description": "Touch that means nothing except that you are still here.",
+    "traits": {
+      "sociability": 0.25,
+      "empathy": 0.2
+    },
+    "drives": {
+      "social_bonding": 1.2
+    }
+  },
+  {
+    "id": "neu_alarm_call",
+    "display_name": "Alarm Call",
+    "branch": "communication",
+    "tier": 1,
+    "cost": 20.0,
+    "prerequisites": [
+      "neu_grooming"
+    ],
+    "description": "One throat, and forty animals move at once. The clan becomes a single organism.",
+    "traits": {
+      "sociability": 0.2,
+      "loyalty": 0.25
+    },
+    "drives": {
+      "protectiveness": 1.25,
+      "vigilance": 1.15
+    }
+  },
+  {
+    "id": "neu_teaching",
+    "display_name": "Showing",
+    "branch": "communication",
+    "tier": 2,
+    "cost": 48.0,
+    "prerequisites": [
+      "neu_alarm_call",
+      "neu_object_use"
+    ],
+    "description": "Doing a thing slowly, on purpose, while a younger one watches. Culture stops being an accident.",
+    "traits": {
+      "trainability": 0.35,
+      "empathy": 0.2
+    },
+    "drives": {
+      "social_bonding": 1.25,
+      "tool_confidence": 1.15
+    }
+  },
+  {
+    "id": "neu_mourning",
+    "display_name": "Mourning",
+    "branch": "communication",
+    "tier": 3,
+    "cost": 75.0,
+    "prerequisites": [
+      "neu_teaching"
+    ],
+    "description": "Staying with the body. Nothing is gained by it, and every clan that does it survives better.",
+    "traits": {
+      "empathy": 0.4,
+      "loyalty": 0.3,
+      "stress_resilience": -0.1
+    },
+    "drives": {
+      "protectiveness": 1.3,
+      "social_bonding": 1.2
+    }
+  },
+  {
+    "id": "neu_balance",
+    "display_name": "Balance",
+    "branch": "motricity",
+    "tier": 0,
+    "cost": 9.0,
+    "prerequisites": [],
+    "description": "The inner ear learns the difference between falling and moving.",
+    "traits": {
+      "balance": 0.3,
+      "agility": 0.15
+    },
+    "drives": {
+      "curiosity": 1.1
+    }
+  },
+  {
+    "id": "neu_upright",
+    "display_name": "Standing Up",
+    "branch": "motricity",
+    "tier": 1,
+    "cost": 30.0,
+    "prerequisites": [
+      "neu_balance"
+    ],
+    "description": "Seeing further, carrying more, and paying for both with a spine that will never forgive it.",
+    "traits": {
+      "balance": 0.35,
+      "reach": 0.3,
+      "sight": 0.2,
+      "stamina": -0.1
+    },
+    "drives": {
+      "migration_urge": 1.2,
+      "industry": 1.15
+    }
+  },
+  {
+    "id": "neu_endurance",
+    "display_name": "Endurance",
+    "branch": "motricity",
+    "tier": 2,
+    "cost": 42.0,
+    "prerequisites": [
+      "neu_upright"
+    ],
+    "description": "Not faster than anything. Simply still walking when it has stopped.",
+    "traits": {
+      "gait_endurance": 0.45,
+      "stamina": 0.3
+    },
+    "drives": {
+      "migration_urge": 1.25,
+      "rest_urge": 0.85
+    }
+  },
+  {
+    "id": "neu_throwing",
+    "display_name": "Throwing",
+    "branch": "motricity",
+    "tier": 3,
+    "cost": 70.0,
+    "prerequisites": [
+      "neu_endurance",
+      "neu_grip"
+    ],
+    "description": "Killing at a distance. The first thing this lineage does that nothing else can.",
+    "traits": {
+      "attack_power": 0.35,
+      "dexterity": 0.25
+    },
+    "drives": {
+      "aggression": 1.2,
+      "fear": 0.9
+    }
+  },
+  {
+    "id": "neu_gaze_follow",
+    "display_name": "Following a Gaze",
+    "branch": "communication",
+    "tier": 1,
+    "cost": 18.0,
+    "prerequisites": [
+      "neu_grooming"
+    ],
+    "description": "Looking where someone else is looking. The cheapest trick in cognition and the root of every other.",
+    "traits": {
+      "perception": 0.2,
+      "sociability": 0.15
+    },
+    "drives": {
+      "social_bonding": 1.15,
+      "vigilance": 1.1
+    }
+  },
+  {
+    "id": "neu_naming",
+    "display_name": "Naming",
+    "branch": "communication",
+    "tier": 3,
+    "cost": 78.0,
+    "prerequisites": [
+      "neu_teaching"
+    ],
+    "description": "A sound that means one particular thing whether or not it is present. The clan can now speak about the absent.",
+    "traits": {
+      "trainability": 0.3,
+      "sociability": 0.3
+    },
+    "drives": {
+      "social_bonding": 1.2,
+      "curiosity": 1.15
+    }
+  },
+  {
+    "id": "neu_shelter",
+    "display_name": "Shelter",
+    "branch": "intelligence",
+    "tier": 1,
+    "cost": 24.0,
+    "prerequisites": [
+      "neu_grip"
+    ],
+    "description": "Changing the place instead of enduring it. The first time this lineage argues with the weather.",
+    "traits": {
+      "insulation": 0.3,
+      "stress_resilience": 0.2
+    },
+    "drives": {
+      "rest_urge": 1.15,
+      "industry": 1.2
+    }
+  },
+  {
+    "id": "neu_fire_keeping",
+    "display_name": "Keeping Fire",
+    "branch": "intelligence",
+    "tier": 3,
+    "cost": 85.0,
+    "prerequisites": [
+      "neu_shelter",
+      "neu_combination"
+    ],
+    "description": "Not making it. Only refusing to let it go out, night after night, for longer than anyone alive remembers.",
+    "traits": {
+      "insulation": 0.35,
+      "heat_tolerance": 0.2,
+      "craft": 0.2
+    },
+    "drives": {
+      "social_bonding": 1.2,
+      "fear": 0.85,
+      "industry": 1.15
+    }
+  },
+  {
+    "id": "neu_depth",
+    "display_name": "Depth",
+    "branch": "perception",
+    "tier": 1,
+    "cost": 16.0,
+    "prerequisites": [
+      "neu_listen"
+    ],
+    "description": "Two eyes arguing, and a world with distance in it.",
+    "traits": {
+      "sight": 0.25,
+      "balance": 0.15
+    },
+    "drives": {
+      "curiosity": 1.1,
+      "tool_confidence": 1.1
+    }
+  },
+  {
+    "id": "neu_pattern",
+    "display_name": "Pattern",
+    "branch": "perception",
+    "tier": 3,
+    "cost": 72.0,
+    "prerequisites": [
+      "neu_danger_sense"
+    ],
+    "description": "The same shape twice is not a coincidence. Seasons become a thing you can be early for.",
+    "traits": {
+      "perception": 0.3,
+      "tracking": 0.3
+    },
+    "drives": {
+      "migration_urge": 1.2,
+      "industry": 1.2,
+      "vigilance": 1.15
+    }
+  },
+  {
+    "id": "neu_carrying",
+    "display_name": "Carrying",
+    "branch": "motricity",
+    "tier": 1,
+    "cost": 26.0,
+    "prerequisites": [
+      "neu_balance"
+    ],
+    "description": "Hands full and still walking. Everything the clan owns becomes portable, including the young.",
+    "traits": {
+      "haul": 0.35,
+      "reach": 0.2
+    },
+    "drives": {
+      "industry": 1.2,
+      "protectiveness": 1.15
+    }
+  },
+  {
+    "id": "neu_ambush",
+    "display_name": "Waiting",
+    "branch": "motricity",
+    "tier": 3,
+    "cost": 68.0,
+    "prerequisites": [
+      "neu_throwing"
+    ],
+    "description": "Stillness as a weapon. The hardest thing a hungry animal can be asked to do.",
+    "traits": {
+      "camouflage": 0.3,
+      "attack_power": 0.2,
+      "stress_resilience": 0.2
+    },
+    "drives": {
+      "vigilance": 1.3,
+      "aggression": 1.1,
+      "rest_urge": 0.9
+    }
+  }
+]

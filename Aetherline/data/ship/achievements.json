@@ -1,0 +1,50 @@
+[
+  { "id": "ach_first_landfall", "display_name": "Landfall", "salvage": 15.0,
+    "description": "Set foot on a world that was not K3-4R1.",
+    "metric": "planets_visited", "threshold": 2.0,
+    "reward_text": "+15 salvage" },
+
+  { "id": "ach_wanderer", "display_name": "Long Way Out", "salvage": 40.0,
+    "description": "Visit ten worlds.", "metric": "planets_visited", "threshold": 10.0,
+    "reward_text": "+40 salvage" },
+
+  { "id": "ach_first_birth", "display_name": "Something New", "salvage": 20.0,
+    "description": "Breed your first creature.", "metric": "births", "threshold": 1.0,
+    "reward_text": "+20 salvage" },
+
+  { "id": "ach_dynasty", "display_name": "Dynasty", "salvage": 60.0,
+    "description": "Reach the fifth generation of any bloodline.",
+    "metric": "max_generation", "threshold": 5.0, "reward_text": "+60 salvage" },
+
+  { "id": "ach_deep_line", "display_name": "Deep Line", "salvage": 120.0,
+    "description": "Reach the tenth generation of any bloodline.",
+    "metric": "max_generation", "threshold": 10.0, "reward_text": "+120 salvage" },
+
+  { "id": "ach_first_archetype", "display_name": "Became Something", "salvage": 45.0,
+    "description": "Have a creature crystallize an archetype.",
+    "metric": "archetypes", "threshold": 1.0, "reward_text": "+45 salvage" },
+
+  { "id": "ach_menagerie", "display_name": "Menagerie", "salvage": 50.0,
+    "description": "Keep twelve creatures alive at once.",
+    "metric": "colony_size", "threshold": 12.0, "reward_text": "+50 salvage" },
+
+  { "id": "ach_tamer", "display_name": "Tamer", "salvage": 35.0,
+    "description": "Tame five wild creatures.", "metric": "tamed", "threshold": 5.0,
+    "reward_text": "+35 salvage" },
+
+  { "id": "ach_builder", "display_name": "Settled", "salvage": 30.0,
+    "description": "Raise ten structures.", "metric": "structures_built", "threshold": 10.0,
+    "reward_text": "+30 salvage" },
+
+  { "id": "ach_scholar", "display_name": "Scholar", "salvage": 55.0,
+    "description": "Complete eight researches.", "metric": "research_unlocked", "threshold": 8.0,
+    "reward_text": "+55 salvage" },
+
+  { "id": "ach_survivor", "display_name": "Hundred Days", "salvage": 40.0,
+    "description": "Survive one hundred days.", "metric": "days", "threshold": 100.0,
+    "reward_text": "+40 salvage" },
+
+  { "id": "ach_legacy", "display_name": "Worth Remembering", "salvage": 100.0,
+    "description": "Accumulate 2000 legacy.", "metric": "legacy", "threshold": 2000.0,
+    "reward_text": "+100 salvage" }
+]

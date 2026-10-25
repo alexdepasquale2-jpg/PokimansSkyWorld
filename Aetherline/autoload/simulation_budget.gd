@@ -51,6 +51,61 @@ var stats: Dictionary = {
 
 var _paused: bool = false
 
+## Ticks between LOD reassignment passes.
+const LOD_REASSIGN_INTERVAL: int = 30
+
+## Where "near the player" is measured from. Set by the world scene each frame
+## it moves; creatures are banded by distance from this point.
+var focus_point: Vector2 = Vector2.ZERO
+
+
+func set_focus_point(point: Vector2) -> void:
+	focus_point = point
+
+
+## Bands every registered creature by distance from the focus, then enforces
+## the FULL-band ceiling by demoting the furthest, lowest-priority creatures.
+func reassign_lod() -> void:
+	var active := PlanetManager.active_planet_id
+	var candidates: Array = []
+
+	for uid in _registry:
+		var entry: Dictionary = _registry[uid]
+		if String(entry["planet_id"]) != active:
+			_assign(uid, AetherTypes.SimLOD.DORMANT)
+			continue
+		var node: Node = entry["node"]
+		if node == null or not is_instance_valid(node):
+			_assign(uid, AetherTypes.SimLOD.DORMANT)
+			continue
+		if not (node is Node2D):
+			_assign(uid, AetherTypes.SimLOD.ABSTRACT)
+			continue
+		var distance: float = (node as Node2D).global_position.distance_to(focus_point)
+		if distance <= full_radius:
+			candidates.append({"uid": uid, "distance": distance,
+				"priority": float(entry["priority"])})
+		elif distance <= near_radius:
+			_assign(uid, AetherTypes.SimLOD.NEAR)
+		else:
+			_assign(uid, AetherTypes.SimLOD.ABSTRACT)
+
+	candidates.sort_custom(func(a, b):
+		if not is_equal_approx(a["priority"], b["priority"]):
+			return a["priority"] > b["priority"]
+		return a["distance"] < b["distance"])
+	for i in candidates.size():
+		_assign(candidates[i]["uid"],
+			AetherTypes.SimLOD.FULL if i < max_full_creatures else AetherTypes.SimLOD.NEAR)
+
+
+func _assign(uid: String, lod: AetherTypes.SimLOD) -> void:
+	var entry: Dictionary = _registry[uid]
+	if entry["lod"] == lod:
+		return
+	entry["lod"] = lod
+	EventBus.sim_lod_changed.emit(StringName(uid), int(lod))
+
 
 func _ready() -> void:
 	# Runs even when the game logic is paused so the debug overlay stays live.
@@ -127,6 +182,15 @@ func uids_on_planet(planet_id: String) -> Array:
 		if _registry[uid]["planet_id"] == planet_id:
 			out.append(uid)
 	return out
+
+
+## Every creature the simulation knows about, whatever band it is in.
+##
+## The registry is the only place that knows the whole population — party,
+## settlers, colonists left behind on another world. Anything that counts people
+## by walking one of those lists instead counts a subset, and the subsets differ.
+func uids() -> Array:
+	return _registry.keys()
 
 
 func node_for(uid: StringName) -> Node:

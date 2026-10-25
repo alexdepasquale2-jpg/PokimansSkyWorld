@@ -21,6 +21,8 @@ class_name StatsComponent
 ## newborns silently spawn on 1 hp.
 @export var hp: float = 0.0
 @export var age_days: float = 0.0
+## Set while collapsed. Cleared by healing, resting or a stable's care.
+@export var downed: bool = false
 
 var _phenotype: Dictionary = {}
 var _derived: Dictionary = {}
@@ -66,6 +68,11 @@ func _resolve() -> void:
 	var traits := lived_traits()
 	if creature.archetype != null:
 		traits = creature.archetype.apply_to(traits)
+	# And last, what the whole LINEAGE worked out. Genetics is what it was born,
+	# epigenetics what its life made of it, archetype what it became, neurons what
+	# its people have understood — broadest inheritance applied last.
+	if creature.identity != null:
+		traits = NeuronalTree.for_creature(creature).apply_to(traits)
 	_phenotype = traits
 	_derived = _derive(traits)
 	_dirty = false
@@ -137,6 +144,37 @@ func is_elderly() -> bool:
 	return age_days >= stat("max_age_days")
 
 
+func is_infant() -> bool:
+	return age_days < stat("max_age_days") * 0.06
+
+
+## Creatures are DURABLE. Outside the fragile bookends of life they collapse
+## rather than die — dropping to a whisker of health, unconscious and useless
+## until tended, but recoverable.
+##
+## This is a deliberate design stance: the whole game is built on attachment to
+## specific bloodlines, and a system that kills a nine-generation animal to a
+## bad roll spends the player's investment carelessly. Death is reserved for
+## the very old and the very young, where it carries meaning instead of noise.
+func is_fragile() -> bool:
+	return is_elderly() or is_infant()
+
+
+## Returns true if this blow actually kills. Otherwise the creature is left
+## downed at minimum health.
+func resolve_mortal_blow() -> bool:
+	if is_fragile():
+		return true
+	hp = maxf(1.0, max_hp() * 0.05)
+	downed = true
+	return false
+
+
+func revive(fraction: float = 0.4) -> void:
+	downed = false
+	hp = maxf(hp, max_hp() * fraction)
+
+
 # --- Readout ------------------------------------------------------------------
 
 func describe() -> Array[String]:
@@ -158,8 +196,9 @@ func describe() -> Array[String]:
 
 	lines.append("")
 	var d := derived()
-	lines.append("  hp %.0f/%.0f · speed %.0f · atk %.1f · def %.1f · carry %.0f" % [
-		hp, d["max_hp"], d["move_speed"], d["attack_power"], d["defense"], d["carry_capacity"]])
+	lines.append("  hp %.0f/%.0f · speed %.0f · atk %.1f · def %.1f · carry %.0f%s" % [
+		hp, d["max_hp"], d["move_speed"], d["attack_power"], d["defense"], d["carry_capacity"],
+		" · DOWNED" if downed else ""])
 	lines.append("  age %.0f/%.0f days · comfort %.0f°C to %.0f°C" % [
 		age_days, d["max_age_days"], d["cold_floor_c"], d["heat_ceiling_c"]])
 	return lines
@@ -171,12 +210,13 @@ func to_dict() -> Dictionary:
 	# Only true state is stored. Derived stats are recomputed on load, which
 	# means a balance patch applies to existing creatures instead of leaving a
 	# generation of animals frozen at old numbers.
-	return {"hp": hp, "age_days": age_days}
+	return {"hp": hp, "age_days": age_days, "downed": downed}
 
 
 func from_dict(d: Dictionary) -> void:
 	hp = float(d.get("hp", 0.0))
 	age_days = float(d.get("age_days", 0.0))
+	downed = bool(d.get("downed", false))
 	mark_dirty()
 
 

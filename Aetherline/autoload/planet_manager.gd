@@ -67,8 +67,7 @@ func create_planet(seed_value: int = 0) -> PlanetSeedResource:
 
 ## Runs the deterministic derivation pass (orbit -> climate -> biomes ->
 ## resources -> hazards -> ruins -> fauna) and caches the results on the seed.
-## TODO(phase 3): implement in scripts/generators/planet_generator.gd and call
-## it from here. Idempotent by contract: calling twice must change nothing.
+## Idempotent by contract: calling twice must change nothing.
 func derive_planet(planet_id: String) -> PlanetSeedResource:
 	var planet: PlanetSeedResource = known_planets.get(planet_id)
 	if planet == null:
@@ -76,8 +75,7 @@ func derive_planet(planet_id: String) -> PlanetSeedResource:
 		return null
 	if planet.derived:
 		return planet
-	push_warning("PlanetManager.derive_planet: generator not implemented until Phase 3.")
-	return planet
+	return PlanetGenerator.derive(planet)
 
 
 func get_planet(planet_id: String) -> PlanetSeedResource:
@@ -129,16 +127,16 @@ func land(planet_id: String) -> Array:
 	summary.visited = true
 	summary.visit_count += 1
 
-	# Residents have been in cold storage since departure. Their needs, ageing
-	# and epigenetic decay are integrated over the gap in one step rather than
-	# simulated, which is what makes leaving a colony behind affordable.
-	# TODO(phase 3): run the catch-up integration over `elapsed_days` here.
 	var elapsed_days := summary.days_since_departure(
 		SimulationBudget.current_tick, SimulationBudget.TICKS_PER_DAY)
-	if elapsed_days > 0.0:
-		EventBus.trace("planet_catchup", {"planet": planet_id, "days": elapsed_days})
-
 	var residents := summary.take_residents()
+	if elapsed_days > 0.0:
+		var aged_cultures := _catch_up_cultures(residents, elapsed_days)
+		residents = _catch_up(residents, planet_id, elapsed_days)
+		EventBus.trace("planet_catchup", {
+			"planet": planet_id, "days": elapsed_days, "residents": residents.size(),
+			"cultures_aged": aged_cultures,
+		})
 	EventBus.planet_landed.emit(planet_id)
 	return residents
 
@@ -162,6 +160,11 @@ func depart(carried_uids: Array, serializer: Callable = Callable()) -> void:
 		if serializer.is_valid():
 			var data: Variant = serializer.call(StringName(uid))
 			if typeof(data) == TYPE_DICTIONARY:
+				# Whoever stays here stops being part of the clan that leaves.
+				# Their culture forks now, while both halves still think the
+				# same thing, and diverges over the absence — see
+				# CultureResource.age_unattended.
+				_fork_culture_for_resident(data, planet_id)
 				summary.add_resident(data)
 		SimulationBudget.set_lod(StringName(uid), AetherTypes.SimLOD.DORMANT)
 
@@ -171,6 +174,127 @@ func depart(carried_uids: Array, serializer: Callable = Callable()) -> void:
 	active_planet_id = ""
 	active_world_root = null
 	EventBus.planet_departed.emit(planet_id, left_behind)
+
+
+## Move one departing resident onto a planet-local fork of its clan's culture.
+##
+## The id is derived from the parent and the planet, so landing here twice puts
+## the second wave of castaways into the same people the first wave became rather
+## than founding a third clan on the same rock.
+func _fork_culture_for_resident(data: Dictionary, planet_id: String) -> void:
+	var identity: Dictionary = data.get("identity", {})
+	if identity.is_empty():
+		return
+	var parent_id := String(identity.get("culture_id", ""))
+	if parent_id.is_empty():
+		# Empty means "resolve to lineage", which is what CultureRegistry does
+		# for a creature that never joined a named clan.
+		parent_id = String(identity.get("lineage_id", ""))
+	if parent_id.is_empty():
+		return
+	var child_id := "%s@%s" % [parent_id, planet_id]
+	var child := CultureRegistry.fork(parent_id, child_id, "left_behind")
+	child.member_count += 1
+	identity["culture_id"] = child.culture_id
+	data["identity"] = identity
+
+
+## Age every culture whose people were left here, across the absence.
+##
+## Bodies are caught up by `_catch_up`; this is the same idea applied to what
+## those bodies believe. Done once per culture rather than once per resident —
+## a culture is shared, and running it per head would drift it N times as far.
+func _catch_up_cultures(residents: Array, days: float) -> Dictionary:
+	var aged: Dictionary = {}
+	for data in residents:
+		var culture_id := String((data.get("identity", {}) as Dictionary).get("culture_id", ""))
+		if culture_id.is_empty() or aged.has(culture_id):
+			continue
+		var culture := CultureRegistry.get_culture(culture_id)
+		if culture == null:
+			continue
+		aged[culture_id] = culture.age_unattended(days)
+	return aged
+
+
+## Integrate `days` of absence over creatures left behind without inflating
+## scene nodes. Closed-form ageing, pressure, and attrition.
+func _catch_up(residents: Array, planet_id: String, days: float) -> Array:
+	var planet: PlanetSeedResource = get_planet(planet_id)
+	var pressures: Dictionary = planet.epigenetic_pressures if planet != null else {}
+	var survivors: Array = []
+
+	for data in residents:
+		var components: Dictionary = data.get("components", {})
+		var stats: Dictionary = components.get("Stats", {})
+		var identity: Dictionary = data.get("identity", {})
+
+		var age := float(stats.get("age_days", 0.0)) + days
+		stats["age_days"] = age
+
+		var profile: Dictionary = components.get("Epigenetics", {}).get("profile", {})
+		var marks: Array = profile.get("marks", [])
+		var surviving_marks: Array = []
+		for mark in marks:
+			var stability := float(mark.get("stability", 0.5))
+			var strength := float(mark.get("strength", 0.0)) - 0.02 * (1.0 - stability) * days
+			var pressure := float(pressures.get(String(mark.get("definition_id", "")), 0.0))
+			if pressure > 0.0:
+				strength = minf(1.0, strength + pressure * days * 0.01)
+				mark["exposure_count"] = int(mark.get("exposure_count", 0)) + int(days * pressure)
+			if strength > 0.001:
+				mark["strength"] = strength
+				surviving_marks.append(mark)
+		profile["marks"] = surviving_marks
+
+		for definition_id in pressures:
+			if _has_mark(surviving_marks, String(definition_id)):
+				continue
+			var template := GenomeDB.instantiate_mark(definition_id)
+			if template == null:
+				continue
+			template.strength = clampf(float(pressures[definition_id]) * days * 0.01, 0.0, 1.0)
+			template.exposure_count = int(days * float(pressures[definition_id]))
+			template.origin_planet_id = planet_id
+			if template.strength > 0.02:
+				surviving_marks.append(template.to_dict())
+
+		var needs: Dictionary = components.get("Needs", {})
+		var health := float(needs.get("health", 1.0))
+		if bool(data.get("boarded", false)):
+			health = minf(1.0, health + days * 0.002)
+			needs["hunger"] = 1.0
+		else:
+			var attrition := clampf(
+				1.0 - (planet.habitability if planet != null else 0.5), 0.0, 1.0)
+			health -= attrition * days * 0.004
+		needs["health"] = clampf(health, 0.0, 1.0)
+
+		var max_age := 300.0 * maxf(0.1, float(stats.get("lifespan_hint", 1.0)))
+		if health <= 0.0 or age > max_age:
+			_mourn(identity, planet_id, "died while the colony was away"
+				if health <= 0.0 else "died of old age while the colony was away")
+			continue
+		survivors.append(data)
+
+	return survivors
+
+
+func _has_mark(marks: Array, definition_id: String) -> bool:
+	for mark in marks:
+		if String(mark.get("definition_id", "")) == definition_id:
+			return true
+	return false
+
+
+func _mourn(identity: Dictionary, planet_id: String, cause: String) -> void:
+	var uid := StringName(identity.get("uid", ""))
+	EventBus.creature_died.emit(uid, cause, SimulationBudget.current_tick)
+	var lineage := StoryDirector.get_lineage(StringName(identity.get("lineage_id", "")))
+	if lineage != null:
+		lineage.record_death(String(uid), cause, SimulationBudget.current_tick)
+		lineage.add_event(SimulationBudget.current_tick, planet_id, String(uid), "death",
+			"%s %s." % [identity.get("given_name", "Something"), cause], 0.8)
 
 
 func _build_summary_line(s: PlanetSummaryResource) -> String:

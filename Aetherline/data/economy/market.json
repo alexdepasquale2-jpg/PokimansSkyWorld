@@ -1,0 +1,17 @@
+[
+  { "id": "timber", "display_name": "Timber", "sell": 0.45, "buy": 1.10, "category": "raw" },
+  { "id": "ore_ferrite", "display_name": "Ferrite Ore", "sell": 0.70, "buy": 1.60, "category": "raw" },
+  { "id": "forage", "display_name": "Forage", "sell": 0.30, "buy": 0.75, "category": "food" },
+  { "id": "grain", "display_name": "Grain", "sell": 0.40, "buy": 0.95, "category": "food" },
+  { "id": "reed", "display_name": "Reed", "sell": 0.35, "buy": 0.85, "category": "raw" },
+  { "id": "silica", "display_name": "Silica", "sell": 0.55, "buy": 1.30, "category": "raw" },
+  { "id": "sulfur", "display_name": "Sulfur", "sell": 0.80, "buy": 1.90, "category": "raw" },
+  { "id": "ice", "display_name": "Ice", "sell": 0.25, "buy": 0.60, "category": "raw" },
+  { "id": "planks", "display_name": "Planks", "sell": 1.20, "buy": 2.40, "category": "crafted" },
+  { "id": "rope", "display_name": "Rope", "sell": 1.00, "buy": 2.10, "category": "crafted" },
+  { "id": "ingot_ferrite", "display_name": "Ferrite Ingot", "sell": 2.40, "buy": 4.80, "category": "crafted" },
+  { "id": "tools", "display_name": "Tool Set", "sell": 6.00, "buy": 12.0, "category": "crafted" },
+  { "id": "glass", "display_name": "Glass", "sell": 1.80, "buy": 3.60, "category": "crafted" },
+  { "id": "feed", "display_name": "Compound Feed", "sell": 0.90, "buy": 1.80, "category": "food" },
+  { "id": "reagents", "display_name": "Lab Reagents", "sell": 4.50, "buy": 9.00, "category": "crafted" }
+]

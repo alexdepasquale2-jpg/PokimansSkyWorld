@@ -88,6 +88,7 @@ func _exit_tree() -> void:
 
 func _on_experience_logged(uid: StringName, kind: String, amount: float,
 		_payload: Dictionary) -> void:
+	_feed_the_tree(uid, kind)
 	var entry := GenomeDB.get_reward(kind)
 	if entry.is_empty():
 		return  # Recorded in the creature's history, but not something the clan learns from.
@@ -127,6 +128,33 @@ func _on_combat_ended(winner_uids: Array, loser_uids: Array) -> void:
 		route(StringName(uid), "combat_win", 1.0, 500)
 	for uid in loser_uids:
 		route(StringName(uid), "combat_loss", -1.2, 700)
+
+
+## Discovery pays the neuronal tree, separately from the reward that teaches the
+## network.
+##
+## Two systems reading one event, and deliberately reading DIFFERENT things about
+## it. The network cares how the outcome felt and how often; the tree cares only
+## whether it had ever happened before. That is why "first" is decided from the
+## creature's own `first_seen` — which has recorded exactly this since Phase 1 —
+## rather than from anything the router keeps.
+func _feed_the_tree(uid: StringName, kind: String) -> void:
+	var node := SimulationBudget.node_for(uid)
+	if node == null or not is_instance_valid(node):
+		return
+	var experience: ExperienceComponent = node.experience
+	if experience == null:
+		return
+	# log_event has already recorded this one, so a genuine first shows up as a
+	# first_seen tick equal to now.
+	var first := experience.when_first(kind) == SimulationBudget.current_tick
+	var tree := NeuronalTree.for_creature(node)
+	# Asked before `observe`, which is what records it. Afterwards the answer is
+	# always yes and the discovery is indistinguishable from a repeat.
+	var novel := first and not tree.has_discovered(kind)
+	var gained := tree.observe(kind, first)
+	if gained > 0.0:
+		EventBus.neuronal_energy_gained.emit(tree.clan_id, kind, gained, novel)
 
 
 # --- Routing ------------------------------------------------------------------

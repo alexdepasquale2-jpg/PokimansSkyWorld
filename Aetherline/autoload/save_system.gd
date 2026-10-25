@@ -24,6 +24,11 @@ const EXT := ".aether.json"
 ## via `register_provider`.
 const CORE_SECTIONS := ["meta", "budget", "planets", "story"]
 
+## Compaction ceilings — a campaign must have a save-size asymptote.
+const MAX_LONG_TERM_SAVED: int = 1500
+const MAX_LINEAGES_SAVED: int = 400
+const MAX_PLANETS_SAVED: int = 600
+
 ## key -> { "save": Callable() -> Dictionary, "load": Callable(Dictionary) }
 var _providers: Dictionary = {}
 
@@ -103,7 +108,12 @@ func save_game(slot: String) -> bool:
 		else:
 			push_warning("SaveSystem: provider '%s' returned a non-dictionary; skipped." % key)
 
-	var ok := _write_atomic(slot_path(slot), JSON.stringify(doc, "  "))
+	_compact(doc)
+	doc["integrity"] = _section_checksums(doc["sections"])
+	var compact_json := JSON.stringify(doc)
+	var text := JSON.stringify(doc, "  ") if compact_json.length() < 512000 else compact_json
+
+	var ok := _write_atomic(slot_path(slot), text)
 	EventBus.save_completed.emit(slot, ok, last_error)
 	return ok
 
@@ -156,6 +166,50 @@ func _write_atomic(path: String, text: String) -> bool:
 	return true
 
 
+func _compact(doc: Dictionary) -> void:
+	var story: Dictionary = doc["sections"].get("story", {})
+	var long_term: Array = story.get("long_term", [])
+	if long_term.size() > MAX_LONG_TERM_SAVED:
+		long_term.sort_custom(func(a, b): return float(a["weight"]) > float(b["weight"]))
+		story["long_term"] = long_term.slice(0, MAX_LONG_TERM_SAVED)
+
+	var lineages: Dictionary = story.get("lineages", {})
+	if lineages.size() > MAX_LINEAGES_SAVED:
+		var disposable: Array = []
+		for id in lineages:
+			var record: Dictionary = lineages[id]
+			var notable: bool = not (record.get("archetype_history", {}) as Dictionary).is_empty() \
+				or not (record.get("entrenched_marks", {}) as Dictionary).is_empty() \
+				or (record.get("living_uids", []) as Array).size() > 0
+			if not notable:
+				disposable.append(id)
+		var score_of := func(id): return float(lineages[id].get("legacy_score", 0.0))
+		disposable.sort_custom(func(a, b): return score_of.call(a) < score_of.call(b))
+		var to_drop: int = mini(disposable.size(), lineages.size() - MAX_LINEAGES_SAVED)
+		for i in to_drop:
+			lineages.erase(disposable[i])
+
+	var planets: Dictionary = doc["sections"].get("planets", {}).get("known_planets", {})
+	var summaries: Dictionary = doc["sections"].get("planets", {}).get("summaries", {})
+	if planets.size() > MAX_PLANETS_SAVED:
+		var unvisited: Array = planets.keys().filter(func(id): return not summaries.has(id))
+		var excess: int = mini(unvisited.size(), planets.size() - MAX_PLANETS_SAVED)
+		for i in excess:
+			planets.erase(unvisited[i])
+
+
+func _section_checksums(sections: Dictionary) -> Dictionary:
+	var sums := {}
+	for key in sections:
+		sums[key] = _normalized_hash(sections[key])
+	return sums
+
+
+func _normalized_hash(section: Variant) -> int:
+	var normalized: Variant = JSON.parse_string(JSON.stringify(section))
+	return str(JSON.stringify(normalized)).hash()
+
+
 # --- Load ---------------------------------------------------------------------
 
 func load_game(slot: String) -> bool:
@@ -179,6 +233,16 @@ func load_game(slot: String) -> bool:
 		doc = _migrate(doc, version)
 
 	var sections: Dictionary = doc.get("sections", {})
+	var failures: Array[String] = []
+
+	var integrity: Dictionary = doc.get("integrity", {})
+	for key in integrity.keys():
+		if not sections.has(key):
+			continue
+		if _normalized_hash(sections[key]) != int(integrity[key]):
+			push_error("SaveSystem: section '%s' failed its checksum; skipping it." % key)
+			failures.append(key)
+			sections.erase(key)
 
 	# Order matters: budget first (ticks), then planets, then story (which
 	# references planets), then everything the scene layer registered.
@@ -186,14 +250,12 @@ func load_game(slot: String) -> bool:
 	PlanetManager.from_dict(sections.get("planets", {}))
 	StoryDirector.from_dict(sections.get("story", {}))
 
-	var failures: Array[String] = []
 	for key in _providers:
 		if not sections.has(key):
 			continue
 		var fn: Callable = _providers[key]["load"]
 		if not fn.is_valid():
 			continue
-		# Section isolation: one bad provider must not abort the whole load.
 		var section: Dictionary = sections[key]
 		fn.call(section)
 
@@ -201,7 +263,6 @@ func load_game(slot: String) -> bool:
 	var note := "" if failures.is_empty() else "sections with problems: " + ", ".join(failures)
 	EventBus.load_completed.emit(slot, true, note)
 	return true
-
 
 func _read_document(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
