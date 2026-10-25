@@ -92,7 +92,7 @@ console.log('\nthe circle is settled before you look');
 console.log('\nwhat the peers make');
 {
   const d = K.core.today();
-  let draws = 0, writes = 0, beats = 0, checked = 0;
+  let draws = 0, writes = 0, beats = 0, checked = 0, bad = 0;
   for (let i = 0; i < 120; i++) {
     for (const post of K.peers.postsOn(d + i)) {
       checked++;
@@ -117,7 +117,6 @@ console.log('\nwhat the peers make');
       }
     }
   }
-  let bad = 0;
   function ok2(cond, why) { if (!cond) { bad++; if (bad < 4) console.log('     ' + why); } }
   ok('every generated piece is well formed', bad === 0, bad + ' bad of ' + checked);
   ok('all three crafts appear', draws > 0 && writes > 0 && beats > 0,
@@ -205,14 +204,13 @@ console.log('\nnothing decays');
 console.log('\nthe ladder only goes up');
 {
   const s = K.state.newState();
-  let last = -1;
+  let last = -1, bad = 0;
   for (let i = 0; i < 100; i++) {
     const lvl = K.state.levelFor(i);
     const at = K.content.LEVELS.indexOf(lvl.cur);
     ok2(at >= last, 'level went backwards at ' + i);
     last = at;
   }
-  let bad = 0;
   function ok2(cond, why) { if (!cond) { bad++; console.log('     ' + why); } }
   ok('more pieces never means a lower level', bad === 0);
   eq('nothing is a level at zero but the first', K.state.levelFor(0).cur.at, 0);

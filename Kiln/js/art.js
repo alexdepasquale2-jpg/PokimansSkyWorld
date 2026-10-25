@@ -183,7 +183,7 @@
       const c = rng.pick(pal);
       for (let i = 0; i < rng.int(3, 9); i++) {
         const x = rng(), y = rng();
-        out.push(line(c, 0, [x, y, x + 0.001, y]));
+        out.push(line(c, 0, [x, y, clamp(x + 0.001, 0, 1), y]));
       }
       return out;
     },
@@ -276,7 +276,7 @@
       const eyes = rng.int(1, 4);
       for (let i = 0; i < eyes; i++) {
         const x = cx + (rng() - 0.5) * rw, y = cy - rh * 0.3 + (rng() - 0.5) * 0.05;
-        out.push(line(c2, 2, [x, y, x + 0.001, y]));
+        out.push(line(c2, 2, [x, y, clamp(x + 0.001, 0, 1), y]));
       }
       return out;
     }

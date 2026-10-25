@@ -166,8 +166,11 @@
       const d = DISPOSITION[p.id];
       if (!d) continue;
       if ((ordinal + d.offset) % d.every !== 0) continue;
-      // They also have to have been around the day after you posted.
-      if (!active(p, piece.day + 1)) continue;
+      // They respond on the first day after you posted that they are around,
+      // so a quiet week delays a response rather than losing it.
+      let day = piece.day + 1;
+      while (day <= today && !active(p, day)) day++;
+      if (day > today) continue;
 
       const rng = seeded('resp', p.id, piece.id);
       const pool = C.PRAISE.filter(x => x.for.indexOf(piece.craft) >= 0);
@@ -177,7 +180,7 @@
         'This is the one.', 'Made me want to make something.',
         'I would not have thought of it.', 'Do more of these.'
       ]) : '';
-      out.push({ from: p.id, praise: praise.id, text: words, day: piece.day + 1 });
+      out.push({ from: p.id, praise: praise.id, text: words, day });
     }
     return out;
   }
