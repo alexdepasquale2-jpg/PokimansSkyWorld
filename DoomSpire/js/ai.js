@@ -23,6 +23,7 @@
     const tpl = K.BESTIARY[tplId];
     const level = opts.level || C.rndInt(tpl.level[0], tpl.level[1]);
     const maxHealth = Math.round(tpl.hp);
+    const sprites = tpl.sprites || [tpl.icon];
     const mob = {
       id: 'm' + (nextId++), kind: 'mob', tplId, name: tpl.name, icon: tpl.icon,
       x, y, angle: Math.random() * Math.PI * 2, level, faction: tpl.faction,
@@ -35,7 +36,8 @@
         critChance: tpl.boss ? 0.15 : tpl.elite ? 0.1 : 0.05, hastePct: 0, mods: {}
       },
       target: null, atkTimer: C.rnd(0.5, 1.4), abilityTimer: tpl.ability ? C.rnd(2, tpl.ability.every) : Infinity,
-      enraged: false, buffs: [], cooldowns: {}, alive: true
+      enraged: false, buffs: [], cooldowns: {}, alive: true,
+      sprites, spriteIdx: 0, walkAnimTime: 0
     };
     return mob;
   }
@@ -48,6 +50,17 @@
       if (d < bestD) { bestD = d; best = c; }
     });
     return best;
+  }
+
+  function updateMobSprite(mob, moved) {
+    if (moved) {
+      mob.walkAnimTime = (mob.walkAnimTime || 0) + 0.15;
+      if (mob.walkAnimTime >= 0.5) {
+        mob.walkAnimTime = 0;
+        mob.spriteIdx = (mob.spriteIdx + 1) % mob.sprites.length;
+      }
+    }
+    mob.icon = mob.sprites[mob.spriteIdx];
   }
 
   function tickMob(mob, candidates, zone, dt, log) {
@@ -69,11 +82,11 @@
       const dx = mob.leashX - mob.x, dy = mob.leashY - mob.y, d = Math.hypot(dx, dy) || 1;
       const step = mob.speed * dt * 1.6;
       const nx = mob.x + (dx / d) * step, ny = mob.y + (dy / d) * step;
-      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; }
+      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; updateMobSprite(mob, true); }
       mob.hp.current = Math.min(mob.hp.max, mob.hp.current + mob.hp.max * 0.15 * dt);
       return;
     }
-    if (!mob.target) return;
+    if (!mob.target) { updateMobSprite(mob, false); return; }
 
     const d = C.dist(mob.x, mob.y, mob.target.x, mob.target.y);
     mob.angle = Math.atan2(mob.target.y - mob.y, mob.target.x - mob.x);
@@ -81,15 +94,18 @@
     if (d > meleeRange) {
       const step = mob.speed * dt;
       const nx = mob.x + Math.cos(mob.angle) * step, ny = mob.y + Math.sin(mob.angle) * step;
-      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; }
-      else if (!DS.world.blocked(zone, nx, mob.y)) mob.x = nx;
-      else if (!DS.world.blocked(zone, mob.x, ny)) mob.y = ny;
+      let moved = false;
+      if (!DS.world.blocked(zone, nx, ny)) { mob.x = nx; mob.y = ny; moved = true; }
+      else if (!DS.world.blocked(zone, nx, mob.y)) { mob.x = nx; moved = true; }
+      else if (!DS.world.blocked(zone, mob.x, ny)) { mob.y = ny; moved = true; }
+      updateMobSprite(mob, moved);
     } else {
       mob.atkTimer -= dt;
       if (mob.atkTimer <= 0) {
         mob.atkTimer = 1.3 + Math.random() * 0.6;
         DS.combat.autoAttack(mob, mob.target, log);
       }
+      updateMobSprite(mob, false);
     }
     const ability = mob.enraged && mob.enrageAbilityTpl ? mob.enrageAbilityTpl : tpl.ability;
     if (ability) {
@@ -115,7 +131,8 @@
       kind: 'companion', id: 'c_' + id, defId: id, name: def.name, icon: def.icon, cls: def.cls,
       level: player.level, x: player.x, y: player.y, angle: player.angle, zone: player.zone,
       equip: {}, talents: {}, hp: { current: 1, max: 1 }, resource: { current: null },
-      comboPoints: 0, buffs: [], cooldowns: {}, alive: true
+      comboPoints: 0, buffs: [], cooldowns: {}, alive: true,
+      sprites: [def.icon], spriteIdx: 0, walkAnimTime: 0
     };
     DS.player.refreshVitals(actor);
     actor.hp.current = actor.hp.max;
@@ -172,13 +189,15 @@
     }
   }
   function moveTowardPoint(actor, tx, ty, zone, dt, speed) {
-    if (!speed) return;
+    if (!speed) { if (actor.sprites) updateMobSprite(actor, false); return; }
     const dx = tx - actor.x, dy = ty - actor.y, d = Math.hypot(dx, dy) || 1;
-    if (d < 0.3) return;
+    if (d < 0.3) { if (actor.sprites) updateMobSprite(actor, false); return; }
     actor.angle = Math.atan2(dy, dx);
     const step = speed * dt;
     const nx = actor.x + (dx / d) * step, ny = actor.y + (dy / d) * step;
-    if (!DS.world.blocked(zone, nx, ny)) { actor.x = nx; actor.y = ny; }
+    let moved = false;
+    if (!DS.world.blocked(zone, nx, ny)) { actor.x = nx; actor.y = ny; moved = true; }
+    if (actor.sprites) updateMobSprite(actor, moved);
   }
   function moveToward(comp, player, target, zone, dt, speed) {
     if (!target) return;

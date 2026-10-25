@@ -50,6 +50,20 @@
     else if (!DS.world.blocked(zoneId, actor.x, ny)) actor.y = ny;
   }
 
+  function updateAnimation(actor, dt) {
+    if (!actor.anim) return;
+    actor.anim.duration = (actor.anim.duration || 0) - dt;
+    if (actor.anim.duration > 0) {
+      const elapsed = (0.4 - actor.anim.duration) / 0.4;
+      actor.anim.frame = Math.floor(elapsed * 3);
+      if (actor.anim.kind === 'attack') {
+        actor.anim.scale = 1.0 + Math.sin(elapsed * Math.PI) * 0.15;
+      }
+    } else {
+      actor.anim = null;
+    }
+  }
+
   function handleMobDeath(game, mob) {
     if (mob.deathProcessed) return;
     mob.deathProcessed = true;
@@ -89,6 +103,9 @@
     const target = ability.self || ability.kind === 'buff' || ability.kind === 'heal' || ability.kind === 'utility' ? player : game.target;
     const res = CB.startCast(player, target, ability, game.combatLog);
     if (game.combatLog.length > LOG_MAX) game.combatLog.splice(0, game.combatLog.length - LOG_MAX);
+    if (res.ok && (ability.castTime || 0) < 0.05) {
+      player.anim = { kind: 'attack', frame: 0, scale: 1.0, duration: 0.4 };
+    }
     return res;
   }
 
@@ -111,6 +128,15 @@
     CB.tickBuffs(player, dt);
     CB.tickCasting(player, dt, game.combatLog);
 
+    updateAnimation(player, dt);
+    if (player.casting) {
+      const ability = player.casting.ability;
+      const animColor = ability.kind === 'heal' ? 'rgba(100, 220, 120, 0.8)' :
+                       ability.kind === 'buff' ? 'rgba(150, 150, 255, 0.8)' :
+                       'rgba(255, 180, 50, 0.8)';
+      player.anim = { kind: 'cast', frame: Math.floor((game.clock * 4) % 4), scale: 1.0, color: animColor };
+    }
+
     const liveMobs = rt.mobs.filter(m => m.alive);
     const target = pickTarget(player, liveMobs);
     player.__targetId = target ? target.id : null;
@@ -124,9 +150,15 @@
       if (player.autoAttackTimer <= 0) { player.autoAttackTimer = 1.9; CB.autoAttack(player, target, game.combatLog); }
     }
 
-    companions.forEach(c => DS.ai.tickCompanion(c, player, liveMobs, dt, player.zone, game.combatLog));
+    companions.forEach(c => {
+      DS.ai.tickCompanion(c, player, liveMobs, dt, player.zone, game.combatLog);
+      updateAnimation(c, dt);
+    });
     rt.mobs.forEach(m => {
-      if (m.alive) DS.ai.tickMob(m, [player].concat(companions), player.zone, dt, game.combatLog);
+      if (m.alive) {
+        DS.ai.tickMob(m, [player].concat(companions), player.zone, dt, game.combatLog);
+        updateAnimation(m, dt);
+      }
       else handleMobDeath(game, m);
     });
     DS.world.tickRespawns(rt, dt);
