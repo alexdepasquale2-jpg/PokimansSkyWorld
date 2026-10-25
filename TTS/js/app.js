@@ -26,7 +26,8 @@
     volume: 1,
     maxChars: 180,
     readSize: 19,
-    theme: 'auto'
+    theme: 'auto',
+    density: 'condensed'
   };
 
   function read(key, fallback) {

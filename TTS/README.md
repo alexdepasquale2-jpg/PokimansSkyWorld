@@ -142,6 +142,30 @@ reason the distinction is drawn:
   written down rather than inferred.
 - **Development** is the weakest, and honest about it.
 
+### Condensed by default
+
+A raw session is one beat per tool call, and read aloud that is *"Now I… Now
+I… Now I…"* for minutes at a stretch. The actions are all true and they are not
+the interesting part — the reasoning is, and it drowns.
+
+So the Session tab condenses by default, and **Every step** turns it off. The
+script on disk always keeps every beat; condensing is a way of listening to it,
+not a way of storing it. Four passes:
+
+- **A result folds into the action that caused it.** *"Now I run the self-test"*
+  and *"88 passed, 0 failed"* become one sentence.
+- **Runs of actions merge.** Two or three keep their detail — *"Now I read the
+  harness and search the code."* Four or more become a tally — *"Then I work
+  through reading four files and running three commands."*
+- **Runs of passing assertions collapse** into *"Six assertions on segmentation,
+  all passing."* A **failing** assertion is never merged and never loses its own
+  words, because it is the only one carrying information.
+- **Adjacent asides and exact duplicates merge.**
+
+Nothing that carries reasoning — a brief, a thought, a verdict that failed — is
+ever merged away. In practice a test run goes from 151 beats to 10, and a
+session from 287 to 176.
+
 ### What is not in the transcript
 
 Claude Code writes sessions to `~/.claude/projects/<slug>/<session>.jsonl`, and
@@ -214,14 +238,14 @@ wrapped line would turn prose into a stutter.
 ## Testing
 
 ```sh
-node tools/selftest.js            # 88 assertions, no browser, no dependencies
+node tools/selftest.js            # 113 assertions, no browser, no dependencies
 node tools/selftest.js --verbose  # list every assertion, not just failures
 node tools/monologue.mjs all      # regenerate narration.json
 node tools/build.mjs
 node tools/pagecheck.mjs          # load and drive the built page in Chromium
 ```
 
-`selftest.js` checks the three pure halves. The splitter runs against fixtures —
+`selftest.js` checks the pure modules — splitting, narration, condensing, probes. The splitter runs against fixtures —
 the abbreviations and decimals that must not end a sentence, the blank lines
 that must, the run-on that has to be chopped under the utterance limit, and the
 invariant that the chunks still add up to exactly the input.

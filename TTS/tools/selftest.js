@@ -265,6 +265,118 @@ const SCRIPT = {
     chunks.map(c => flat.text.slice(c.start, c.end)).join('') === flat.text);
 }
 
+// Condensing: the point is fluency, and the constraint is that nothing which
+// carries reasoning may be merged away.
+section('Condensing a narration');
+
+const mk = (kind, text, extra) => Object.assign({ kind, text, tone: 'neutral', at: '', inferred: false }, extra || {});
+
+{
+  const fused = NARRATE.condense([
+    mk('action', 'Now I run the self-test.', { at: 'Bash' }),
+    mk('result', '88 passed, 0 failed', { tone: 'good' })
+  ]);
+  eq('an action and its result become one beat', fused.length, 1);
+  check('the fused beat reads as one sentence',
+    /run the self-test — 88 passed, 0 failed\.$/.test(fused[0].text), fused[0].text);
+  eq('the fused beat takes the result\'s tone', fused[0].tone, 'good');
+}
+
+{
+  const run = [];
+  for (let i = 0; i < 4; i++) run.push(mk('action', 'Now I read file ' + i + '.', { at: 'Read' }));
+  run.push(mk('Bash' && 'action', 'Now I run the tests.', { at: 'Bash' }));
+  const out = NARRATE.condense(run);
+  eq('a long run of actions becomes one beat', out.length, 1);
+  check('the summary counts by tool in words',
+    /reading four files/.test(out[0].text) && /running one command/.test(out[0].text), out[0].text);
+  eq('the merge is recorded', out[0].merged, 5);
+}
+
+{
+  const out = NARRATE.condense([
+    mk('action', 'Now I read the harness.', { at: 'Read' }),
+    mk('action', 'Now I search the code.', { at: 'Grep' })
+  ]);
+  eq('a short run keeps its detail', out.length, 1);
+  check('short runs list what happened',
+    /read the harness and search the code/.test(out[0].text), out[0].text);
+}
+
+{
+  const passes = [];
+  for (let i = 0; i < 6; i++) passes.push(mk('verdict', 'assertion ' + i + '.', { tone: 'good', at: 'Segmentation' }));
+  const out = NARRATE.condense(passes);
+  eq('a run of passing assertions collapses', out.length, 1);
+  check('the collapse says how many and where',
+    /Six assertions on segmentation, all passing\./.test(out[0].text), out[0].text);
+}
+
+{
+  const mixed = [
+    mk('verdict', 'first.', { tone: 'good', at: 'A' }),
+    mk('verdict', 'second.', { tone: 'good', at: 'A' }),
+    mk('verdict', 'third.', { tone: 'good', at: 'A' }),
+    mk('verdict', 'the truncation probe missed it.', { tone: 'bad', at: 'A' }),
+    mk('verdict', 'fifth.', { tone: 'good', at: 'A' })
+  ];
+  const out = NARRATE.condense(mixed);
+  const failures = out.filter(b => b.tone === 'bad');
+  eq('a failing assertion is never merged away', failures.length, 1);
+  eq('the failure keeps its own words', failures[0].text, 'the truncation probe missed it.');
+  check('a lone passing assertion is not summarised',
+    out.some(b => b.text === 'fifth.'), out.map(b => b.text).join(' | '));
+}
+
+{
+  const kept = NARRATE.condense([
+    mk('brief', 'Build the thing.'),
+    mk('thought', 'Green, so the logic holds.', { inferred: true, tone: 'good' }),
+    mk('action', 'Now I commit.', { at: 'Bash' })
+  ]);
+  eq('reasoning beats survive condensing', kept.filter(b => b.kind === 'brief' || b.kind === 'thought').length, 2);
+  check('a reconstruction stays marked after condensing',
+    kept.filter(b => b.kind === 'thought')[0].inferred === true);
+}
+
+{
+  // The test narrator does not write in the first person; prefixing it with
+  // "Now I" produced "Now I Running the self-test."
+  const out = NARRATE.condense([mk('action', 'Running the self-test.', { at: 'suite' })]);
+  eq('a non-first-person action is left alone', out[0].text, 'Running the self-test.');
+  check('first person is detected', NARRATE.firstPerson('Now I read it.') === true);
+  check('third person is not', NARRATE.firstPerson('Running the suite.') === false);
+}
+
+{
+  const out = NARRATE.condense([
+    mk('say', 'One aside.'),
+    mk('say', 'Another aside.'),
+    mk('brief', 'Then a brief.')
+  ]);
+  eq('adjacent asides merge', out.length, 2);
+  eq('they merge in order', out[0].text, 'One aside. Another aside.');
+}
+
+{
+  const out = NARRATE.condense([
+    mk('verdict', 'the same thing.', { tone: 'bad' }),
+    mk('verdict', 'the same thing.', { tone: 'bad' })
+  ]);
+  eq('an adjacent duplicate is dropped', out.length, 1);
+}
+
+{
+  const out = NARRATE.condense([
+    mk('brief', 'a.'), mk('thought', 'b.'), mk('brief', 'c.')
+  ]);
+  eq('indices are resequenced after condensing', out.map(b => b.index), [0, 1, 2]);
+}
+
+eq('condensing nothing yields nothing', NARRATE.condense([]).length, 0);
+eq('numbers become words for speech', NARRATE.numberWord(4), 'four');
+eq('large numbers stay numerals', NARRATE.numberWord(88), '88');
+
 // Delivery differs by kind, or a reconstruction sounds like a record.
 {
   check('a reconstruction is read slower than an action',
