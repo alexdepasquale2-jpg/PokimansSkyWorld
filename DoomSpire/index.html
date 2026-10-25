@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0608">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>DoomSpire</title>
+<meta name="description" content="A Doom-simple raycast shooter with Burning-Crusade-deep MMORPG bones: six classes, talent trees, itemization, professions, reputation and a dungeon boss, all in one phone-playable file.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <div id="stage">
+    <canvas id="scene"></canvas>
+
+    <div id="hud">
+      <div id="hud-top">
+        <div id="vitals">
+          <div class="who"><b id="name-text"></b> <span id="lvl-text"></span></div>
+          <div class="bar hp"><i id="hp-fill"></i><b id="hp-text"></b></div>
+          <div class="bar res"><i id="res-fill"></i><b id="res-text"></b></div>
+          <div class="bar xp"><i id="xp-fill"></i></div>
+          <div id="combo-points"></div>
+        </div>
+        <div id="hud-right">
+          <div id="wallet"><span id="zone-text"></span><br><span id="gold-text"></span></div>
+          <canvas id="minimap"></canvas>
+        </div>
+      </div>
+
+      <div id="target-bar" class="hidden">
+        <span id="target-name"></span>
+        <div class="bar target"><i id="target-fill"></i></div>
+      </div>
+
+      <div id="combat-log"></div>
+
+      <button id="interact-btn" class="hidden"></button>
+    </div>
+
+    <div id="stick"><div id="knob"></div></div>
+
+    <div id="ability-bar"></div>
+
+    <div id="tabs">
+      <button data-tab="character">👤</button>
+      <button data-tab="talents">🌟</button>
+      <button data-tab="bags">🎒</button>
+      <button data-tab="quests">📜</button>
+      <button data-tab="professions">⚙️</button>
+      <button data-tab="reputation">🏳️</button>
+      <button data-tab="party">🤝</button>
+    </div>
+    <button id="menu-btn">☰</button>
+
+    <div id="panels" class="hidden panel">
+      <div class="panel-head">
+        <span class="panel-title"></span>
+        <button class="panel-close">✕</button>
+      </div>
+      <div class="panel-body"></div>
+    </div>
+
+    <div id="deathscreen" class="hidden overlay">
+      <div class="overlay-box">
+        <h2>YOU HAVE FALLEN</h2>
+        <p>The Scar remembers everyone eventually.</p>
+        <button class="respawn-btn">Return to Camp</button>
+      </div>
+    </div>
+
+    <div id="charcreate" class="overlay">
+      <div class="overlay-box wide">
+        <h1>DoomSpire</h1>
+        <p class="tagline">Simple halls. Deep character.</p>
+        <button id="continue-btn" class="hidden wide-btn">Continue</button>
+        <input id="name-input" placeholder="Your name" maxlength="18">
+        <div id="class-list"></div>
+        <button id="begin-btn" class="wide-btn" disabled>Begin</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="js/core.js"></script>
+<script src="js/content.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/player.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/world.js"></script>
+<script src="js/state.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f380f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Coremind</title>
+<meta name="description" content="COREMIND — a single-player biological evolution sandbox. Discover, analyze, extract, design, deploy, adapt.">
+<!-- Inline so the page stays a single self-contained bundle (see tools/build.mjs)
+     and so no request 404s when it is opened straight off the filesystem. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%230f380f' stroke='%238bac0f' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%238bac0f'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="stat" id="stat-biomass" title="Biomass"><i>B</i><span>0</span></div>
+    <div class="stat" id="stat-energy" title="Energy"><i>E</i><span>0</span></div>
+    <div class="stat" id="stat-pop" title="Colony"><i>C</i><span>0</span></div>
+    <div class="stat" id="stat-climate" title="Season and weather"><i>T</i><span>—</span></div>
+    <div class="stat mood" id="stat-mood" title="Colony status"><i>&#9670;</i><span>Exploring</span></div>
+    <div class="stat eco" id="stat-eco" title="ATT: earned while THINK, spent on orders. FAV: gifts and peace. GOS: sights and extracts. SCR: colony deaths."><span>ATT 2  FAV 0  GOS 0  SCR 0</span></div>
+    <button id="btn-speed" class="iconbtn" title="Simulation speed">1x</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="world-canvas"></canvas>
+
+    <div id="toast-layer"></div>
+
+    <div id="selection-panel" class="card hidden"></div>
+    <div id="hero-target" class="hidden"></div>
+    <div id="hero-hud" class="hidden">
+      <div id="hero-bar"></div>
+      <button type="button" id="btn-hero-bag">BAG</button>
+      <button type="button" id="btn-hero-exit">COMMAND</button>
+    </div>
+    <div id="hero-stick" class="hidden" aria-hidden="true"></div>
+    <div id="hero-bag" class="hidden"></div>
+
+    <div id="cam-controls">
+      <button id="btn-focus-core" class="roundbtn" title="Focus Core">&#8962;</button>
+      <button id="btn-zoom-in" class="roundbtn" title="Zoom in">+</button>
+      <button id="btn-zoom-out" class="roundbtn" title="Zoom out">&minus;</button>
+    </div>
+
+    <canvas id="minimap" width="140" height="140" title="Tap to jump"></canvas>
+    <div id="depth-controls"></div>
+    <div id="layer-card" class="hidden"></div>
+    <div id="guide-spot" class="hidden"><div id="guide-hole"></div></div>
+    <div id="guide-card" class="hidden"></div>
+    <div id="quest-card" class="hidden"></div>
+    <div id="order-bar" class="hidden"></div>
+    <div id="sanctum-meter" class="hidden"></div>
+  </div>
+
+  <div id="tabs">
+    <button data-tab="explore" class="tab active">EXPLORE</button>
+    <button data-tab="analyze" class="tab">ANALYZE<span id="badge-analyze" class="badge hidden">0</span></button>
+    <button data-tab="dna" class="tab">DNA<span id="badge-dna" class="badge hidden">!</span></button>
+    <button data-tab="world" class="tab">WORLD</button>
+  </div>
+
+  <div id="panel-explore" class="panel active">
+    <div id="selection-summary">Select a unit on the map, or give an order to the whole colony.</div>
+    <div id="directive-bar">
+      <button id="btn-open-build" class="bigbtn secondary">BUILD</button>
+    </div>
+  </div>
+
+  <div id="panel-world" class="panel">
+    <div id="world-readout"></div>
+    <div id="colony-roster"></div>
+  </div>
+
+  <div id="panel-analyze" class="panel">
+    <div id="research-list"></div>
+    <div id="event-feed"></div>
+  </div>
+
+  <div id="designer-overlay" class="sheet tall hidden">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="sheet-title">GENOME DESIGNER</div>
+      <button id="btn-designer-close" class="iconbtn">&#10005;</button>
+    </div>
+    <!-- Everything except the action row scrolls together. The fixed-height
+         preview and slot grid together can exceed the sheet, and with them
+         all flex:0 0 auto the CREATE ORGANISM button was pushed off the
+         bottom of the screen and became unclickable. -->
+    <div id="designer-scroll">
+      <div id="designer-preview">
+        <canvas id="preview-canvas" width="240" height="240"></canvas>
+        <div id="designer-cost"></div>
+      </div>
+      <div id="designer-slots"></div>
+      <div id="designer-combo"></div>
+      <div id="designer-stats"></div>
+      <div id="designer-designs"></div>
+    </div>
+    <div id="designer-actions">
+      <button id="btn-save-design" class="bigbtn secondary">SAVE STRAIN</button>
+      <button id="btn-create-organism" class="bigbtn" disabled>CREATE ORGANISM</button>
+    </div>
+  </div>
+
+  <div id="inspect-overlay" class="sheet hidden">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="sheet-title" id="inspect-title">DETAILS</div>
+      <button id="btn-inspect-close" class="iconbtn">&#10005;</button>
+    </div>
+    <div id="inspect-body"></div>
+  </div>
+
+  <div id="build-overlay" class="sheet hidden">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="sheet-title">BUILD</div>
+      <button id="btn-build-close" class="iconbtn">&#10005;</button>
+    </div>
+    <div id="build-body"></div>
+  </div>
+
+  <!-- Catches taps outside an open sheet so anywhere-but-the-sheet dismisses
+       it. Deliberately not a dimming scrim: the point of a sheet here is that
+       the world stays visible and legible behind it. -->
+  <div id="sheet-catcher" class="hidden"></div>
+
+  <div id="build-banner" class="hidden"></div>
+
+  <div id="end-overlay" class="overlay hidden">
+    <div class="boot-card">
+      <h1 id="end-title">COREMIND</h1>
+      <p class="tag" id="end-blurb"></p>
+      <button id="btn-end-continue" class="bigbtn secondary">KEEP PLAYING</button>
+    </div>
+  </div>
+
+  <div id="boot-overlay" class="overlay">
+    <div class="boot-card">
+      <div class="boot-core" aria-hidden="true"></div>
+      <h1>COREMIND</h1>
+      <p class="tag">grow a colony · dig a world · hold the gate</p>
+      <button id="btn-continue" class="bigbtn hidden">CONTINUE</button>
+      <button id="btn-new-world" class="bigbtn">NEW GAME</button>
+      <button id="btn-new-quiet" class="bigbtn secondary">NEW GAME — SKIP TUTORIAL</button>
+      <p class="hint">New Game walks you through select, gather, look, log, and build.</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/traits.js"></script>
+<script src="js/mutations.js"></script>
+<script src="js/progress.js"></script>
+<script src="js/flora.js"></script>
+<script src="js/world.js"></script>
+<script src="js/organism.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/discovery.js"></script>
+<script src="js/climate.js"></script>
+<script src="js/colony.js"></script>
+<script src="js/structures.js"></script>
+<script src="js/influence.js"></script>
+<script src="js/layers.js"></script>
+<script src="js/orders.js"></script>
+<script src="js/aura.js"></script>
+<script src="js/mind.js"></script>
+<script src="js/peel.js"></script>
+<script src="js/sense.js"></script>
+<script src="js/sentiment.js"></script>
+<script src="js/reputation.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/coremind.js"></script>
+<script src="js/life.js"></script>
+<script src="js/hero.js"></script>
+<script src="js/simulation.js"></script>
+<script src="js/render.js"></script>
+<script src="js/input.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/save.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
