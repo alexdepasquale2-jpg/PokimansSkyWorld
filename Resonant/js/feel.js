@@ -320,6 +320,44 @@
       aberrate(1.6);
       flash(hue, 0.06, 0.5);
     },
+    /* ── A strike ─────────────────────────────────────────────────────────
+     *
+     * The ring is the important part. It expands *inward* — starting wide and
+     * closing on the node — because a strike is attention arriving rather than
+     * energy leaving, and an outward ring would read as the node emitting
+     * something. It gets tighter and brighter with the combo, so the twentieth
+     * strike does not look like the first.
+     */
+    strike(node, quality, combo) {
+      if (!node) return;
+      const hue = node.man ? node.man.hue : 200;
+      const q = Math.max(0, Math.min(1, quality));
+      buzz('step');
+      ripple(node.x, node.y, {
+        r0: 0.16 - q * 0.05, r1: 0.03,
+        life: 0.30, hue: combo ? hue + 30 : hue,
+        width: 1.2 + q * 2.2
+      });
+      if (combo) {
+        burst(node.x, node.y, 3 + Math.min(9, Math.round(combo * 0.5)),
+          { hue: hue + 30, speed: 0.20 + q * 0.16, life: 0.42, size: 1.4 + q });
+        /* The count, floating off the node — but only at milestones. One per
+         * strike buries the field in numbers within a few seconds, and a number
+         * that arrives every time is a number nobody reads. Every fifth, plus
+         * the fifth itself, so the first one lands early enough to explain what
+         * is happening. The running count lives on the ring at the centre. */
+        if (combo === 5 || (combo >= 10 && combo % 10 === 0)) {
+          floater(node.x, node.y, '×' + combo, { hue: hue + 30, life: 0.9 });
+        }
+      }
+      punch(0.006 + q * 0.010);
+    },
+    strikeBreak(node) {
+      if (!node) return;
+      buzz('deny');
+      ripple(node.x, node.y, { r0: 0.04, r1: 0.13, life: 0.36, hue: 8, width: 1.4 });
+      aberrate(1.2);
+    },
     coherenceStep(x, y, mark, hue) {
       buzz('step');
       ripple(x, y, { r0: 0.02, r1: 0.09 + mark * 0.05, life: 0.45, hue, width: 1.6 });

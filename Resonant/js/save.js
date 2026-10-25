@@ -59,6 +59,10 @@
        * numbers per structure. A thousand visited systems is a list of
        * addresses. */
       research: game.research,
+      /* Strike upgrade levels and the best combo. The live combo is not saved:
+       * a streak you were not present for is not a streak. */
+      strikeLevels: game.strikeLevels,
+      bestCombo: game.strike ? game.strike.best : 0,
       vessels: game.vessels.unlocked,
       structuresUnlocked: game.structuresUnlocked,
       deltas: game.deltas,
@@ -132,6 +136,8 @@
      * Restored before fields are recomputed, since fields are derived from
      * research and structures. */
     game.research = data.research || Object.create(null);
+    game.strikeLevels = data.strikeLevels || Object.create(null);
+    if (game.strike) game.strike.best = data.bestCombo || 0;
     game.vessels.unlocked = data.vessels || { mote: true };
     game.vessels.unlocked.mote = true;          // never lose the bare point
     game.structuresUnlocked = data.structuresUnlocked || Object.create(null);

@@ -629,6 +629,59 @@
     }
   }
 
+  /* ── The combo ───────────────────────────────────────────────────────────
+   *
+   * Drawn on the centre, around you, because the combo is a property of the
+   * observer rather than of any node — it survives the node that started it.
+   * The ring is the window draining, which is the only pressure in the system
+   * and therefore the only thing that has to be legible without being read.
+   */
+  function drawCombo(ctx, game, t) {
+    const st = game.strike;
+    if (!st || st.combo <= 0) return;
+    const frac = RS.strike.windowFrac(game);
+    const mul = RS.strike.multiplier(game);
+    const R = px(0.145);
+    /* Hue climbs with the combo and then stops, so early progress is visible
+     * and a long streak does not cycle back to where it started. */
+    const hue = 320 + Math.min(70, st.combo * 2.2);
+
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    /* The window, draining clockwise. Reddens as it runs out — the one piece
+     * of urgency in a game that is otherwise about patience. */
+    const urgent = frac < 0.3;
+    ctx.lineWidth = Math.max(2, px(0.009));
+    ctx.strokeStyle = hsl(urgent ? 8 : hue, 0.85, urgent ? 0.62 : 0.68,
+      0.35 + frac * 0.5);
+    ctx.beginPath();
+    ctx.arc(view.cx, view.cy, R, -Math.PI / 2, -Math.PI / 2 + TAU * frac);
+    ctx.stroke();
+
+    /* A soft backing so the ring reads against a bright field. */
+    ctx.lineWidth = Math.max(1, px(0.003));
+    ctx.strokeStyle = hsl(hue, 0.5, 0.5, 0.14);
+    ctx.beginPath(); ctx.arc(view.cx, view.cy, R, 0, TAU); ctx.stroke();
+
+    /* The numbers. The count large, the multiplier under it — that order,
+     * because the count is what you are trying to raise and the multiplier is
+     * why. */
+    const pop = clamp01(1 - (game.stats.playSeconds - st.lastAt) * 6);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = hsl(hue, 0.9, 0.78, 0.95);
+    ctx.font = (Math.round(px(0.052) * (1 + pop * 0.22))) + 'px ui-monospace, Menlo, monospace';
+    /* Below the centre rather than above it. Above is where crystallisation
+     * floaters travel and where the node readout sits; a combo counter that
+     * shares that space is illegible exactly when it is most interesting. */
+    ctx.fillText('×' + st.combo, view.cx, view.cy + px(0.235));
+    ctx.fillStyle = hsl(hue, 0.6, 0.66, 0.7);
+    ctx.font = Math.round(px(0.028)) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText(mul.toFixed(2) + '× yield', view.cx, view.cy + px(0.29));
+    ctx.restore();
+  }
+
   function drawNode(ctx, game, n, t) {
     const man = n.man;
     const a = n.fade;
@@ -1037,6 +1090,7 @@
        * it was already doing. */
       drawInhabitants(ctx, game, t);
 
+      drawCombo(ctx, game, t);
       drawReticle(ctx, game, t);
       drawCentre(ctx, game, t, spec);
 
